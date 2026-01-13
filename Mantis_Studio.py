@@ -1259,7 +1259,24 @@ def _run_ui():
             r.raise_for_status()
             return True, ""
         except Exception as exc:
-            return False, str(exc)
+            hint = ""
+            base = base_url or ""
+            if "localhost" in base or "127.0.0.1" in base:
+                alt_base = base.replace("127.0.0.1", "host.docker.internal").replace("localhost", "host.docker.internal")
+                try:
+                    normalized_alt = normalize_ollama_base_url(alt_base)
+                    alt = requests.get(f"{normalized_alt}/api/tags", timeout=5)
+                    alt.raise_for_status()
+                    hint = (
+                        " Ollama is reachable at host.docker.internal. "
+                        "Update the base URL to host.docker.internal or your host IP."
+                    )
+                except Exception:
+                    hint = (
+                        " If MANTIS Studio runs in Docker or on another machine, "
+                        "use host.docker.internal or your host IP instead of localhost."
+                    )
+            return False, f"{exc}{hint}"
 
     def test_openai_connection(base_url: str, api_key: str) -> bool:
         headers = {}
