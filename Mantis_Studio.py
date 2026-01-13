@@ -123,6 +123,17 @@ def normalize_ollama_base_url(url: str) -> str:
     return normalized.rstrip("/")
 
 
+def normalize_local_base_url(url: str) -> str:
+    raw = (url or "").strip()
+    if not raw:
+        return raw
+    if not _is_running_in_docker():
+        return raw
+    if "localhost" in raw or "127.0.0.1" in raw:
+        return raw.replace("127.0.0.1", "host.docker.internal").replace("localhost", "host.docker.internal")
+    return raw
+
+
 os.makedirs(AppConfig.PROJECTS_DIR, exist_ok=True)
 os.makedirs(AppConfig.BACKUPS_DIR, exist_ok=True)
 os.makedirs(AppConfig.USERS_DIR, exist_ok=True)
@@ -1434,7 +1445,7 @@ def _run_ui():
 
         if provider == "Ollama":
             ollama_url = st.text_input("Ollama Base URL", value=st.session_state.ollama_base_url)
-            normalized_ollama_url = normalize_ollama_base_url(ollama_url)
+            normalized_ollama_url = normalize_ollama_base_url(normalize_local_base_url(ollama_url))
             if normalized_ollama_url != st.session_state.ollama_base_url:
                 st.session_state.ollama_base_url = normalized_ollama_url
                 AppConfig.OLLAMA_API_URL = normalized_ollama_url
@@ -1461,8 +1472,8 @@ def _run_ui():
         else:
             openai_presets = {
                 "Custom": "",
-                "LM Studio (free local)": "http://localhost:1234/v1",
-                "llama.cpp server (free local)": "http://localhost:8080/v1",
+                "LM Studio (free local)": normalize_local_base_url("http://localhost:1234/v1"),
+                "llama.cpp server (free local)": normalize_local_base_url("http://localhost:8080/v1"),
             }
             preset_choice = st.selectbox("OpenAI-Compatible Preset", list(openai_presets.keys()))
             preset_url = openai_presets.get(preset_choice, "")
@@ -1471,9 +1482,10 @@ def _run_ui():
                 AppConfig.OPENAI_API_URL = preset_url
 
             openai_url = st.text_input("OpenAI Base URL", value=st.session_state.openai_base_url)
-            if openai_url != st.session_state.openai_base_url:
-                st.session_state.openai_base_url = openai_url
-                AppConfig.OPENAI_API_URL = openai_url
+            normalized_openai_url = normalize_local_base_url(openai_url)
+            if normalized_openai_url != st.session_state.openai_base_url:
+                st.session_state.openai_base_url = normalized_openai_url
+                AppConfig.OPENAI_API_URL = normalized_openai_url
 
             openai_key = st.text_input(
                 "OpenAI API Key (optional for local servers)",
