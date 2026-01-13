@@ -539,7 +539,8 @@ class AIEngine:
                 yield "OpenAI model not configured."
                 return
             api_key = (AppConfig.OPENAI_API_KEY or "").strip()
-            if not api_key:
+            openai_base = AppConfig.OPENAI_API_URL.rstrip("/")
+            if not api_key and "api.openai.com" in openai_base:
                 yield "OpenAI API key not configured."
                 return
 
@@ -548,13 +549,12 @@ class AIEngine:
                 "messages": [{"role": "user", "content": prompt}],
                 "stream": True,
             }
-            headers = {
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json",
-            }
+            headers = {"Content-Type": "application/json"}
+            if api_key:
+                headers["Authorization"] = f"Bearer {api_key}"
             try:
                 with self.session.post(
-                    f"{AppConfig.OPENAI_API_URL.rstrip('/')}/chat/completions",
+                    f"{openai_base}/chat/completions",
                     json=payload,
                     headers=headers,
                     stream=True,
@@ -1197,12 +1197,13 @@ def _run_ui():
             return False, str(exc)
 
     def test_openai_connection(base_url: str, api_key: str) -> bool:
-        if not api_key:
-            return False
+        headers = {}
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
         try:
             r = requests.get(
                 f"{base_url.rstrip('/')}/models",
-                headers={"Authorization": f"Bearer {api_key}"},
+                headers=headers,
                 timeout=5,
             )
             r.raise_for_status()
@@ -1328,10 +1329,10 @@ def _run_ui():
                 AppConfig.OPENAI_API_URL = openai_url
 
             openai_key = st.text_input(
-                "OpenAI API Key",
+                "OpenAI API Key (optional for local servers)",
                 value=st.session_state.openai_api_key,
                 type="password",
-                help="Store your key locally in the session (not saved to disk).",
+                help="Leave blank for local OpenAI-compatible servers (LM Studio, llama.cpp).",
             )
             if openai_key != st.session_state.openai_api_key:
                 st.session_state.openai_api_key = openai_key
@@ -1343,7 +1344,8 @@ def _run_ui():
                 AppConfig.OPENAI_MODEL = openai_model
 
             st.markdown(
-                "[Create an OpenAI account](https://platform.openai.com/signup) to get an API key."
+                "[Create an OpenAI account](https://platform.openai.com/signup) to get an API key, "
+                "or point the base URL to a local OpenAI-compatible server for free models."
             )
             if st.button("🔌 Test OpenAI Connection", use_container_width=True):
                 ok = test_openai_connection(
@@ -1353,7 +1355,7 @@ def _run_ui():
                 if ok:
                     st.success("OpenAI connection OK.")
                 else:
-                    st.error("OpenAI connection failed. Check your key and base URL.")
+                    st.error("OpenAI connection failed. Check your base URL and key if required.")
 
         colm1, colm2 = st.columns([1, 1])
         with colm1:
