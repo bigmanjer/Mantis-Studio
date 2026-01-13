@@ -842,6 +842,33 @@ class AnalysisEngine:
         )
         return AIEngine().generate(prompt, model).get("text", "") or ""
 
+    @staticmethod
+    def coherence_check(
+        memory: str,
+        outline: str,
+        world_bible: str,
+        chapters: List[Dict[str, Any]],
+        model: str,
+    ) -> List[Dict[str, Any]]:
+        if not chapters:
+            return []
+        prompt = (
+            "You are a developmental editor checking continuity and canon coherence.\n"
+            "Identify contradictions, timeline issues, or inconsistent details.\n"
+            "Return ONLY JSON (no markdown) as a list of objects with keys:\n"
+            "- chapter_index (number)\n"
+            "- issue (short description)\n"
+            "- target_excerpt (exact text to replace, must exist in the chapter)\n"
+            "- suggested_rewrite (replacement text to fix coherence)\n"
+            "- confidence (low|medium|high)\n\n"
+            f"PROJECT MEMORY:\n{(memory or '')[:2000]}\n\n"
+            f"WORLD BIBLE:\n{(world_bible or '')[:2400]}\n\n"
+            f"OUTLINE:\n{(outline or '')[:2000]}\n\n"
+            "CHAPTERS (summaries + excerpts):\n"
+            f"{json.dumps(chapters, ensure_ascii=False)}"
+        )
+        return AIEngine().generate_json(prompt, model) or []
+
 
 class StoryEngine:
     @staticmethod
@@ -996,7 +1023,8 @@ def _run_ui():
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@400;600&family=Inter:wght@400;600&display=swap');
     .stApp { background-color: #0e1117; color: #e6edf3; font-family: 'Inter', sans-serif; }
-    .block-container { padding-top: 0.6rem; padding-bottom: 2rem; }
+    .block-container { padding-top: 2.6rem; padding-bottom: 2rem; }
+    header[data-testid="stHeader"] { height: 2.6rem; }
     h1, h2, h3 { letter-spacing: -0.02em; }
     .stTextInput input, .stSelectbox div, .stNumberInput input { background-color: #0f1521 !important; color: #e6edf3 !important; border: 1px solid #253041 !important; }
     .stTextArea textarea { background-color: #0f1521 !important; color: #e6edf3 !important; font-family: 'Crimson Pro', serif !important; font-size: 18px !important; line-height: 1.65 !important; border: 1px solid #253041 !important; }
@@ -1082,8 +1110,8 @@ def _run_ui():
         box-shadow: 0 10px 22px rgba(0,0,0,0.35);
     }
     .mantis-sidebar-logo{
-        width:38px;
-        height:38px;
+        width:54px;
+        height:54px;
         border-radius: 12px;
         background: rgba(0,0,0,0.20);
         display:flex;
@@ -1094,7 +1122,7 @@ def _run_ui():
         flex: 0 0 auto;
     }
     .mantis-sidebar-logo img{
-        height:22px;
+        height:36px;
         width:auto;
         display:block;
     }
@@ -1985,8 +2013,108 @@ def _run_ui():
                     save_p()
 
                 st.divider()
-                st.markdown("#### Chapter Summaries")
+                st.markdown("#### Coherence Check")
+                st.caption("Run a focused continuity sweep. Suggestions can replace exact passages in chapters.")
+
                 chaps = p.get_ordered_chapters()
+
+                def build_world_bible_text() -> str:
+                    grouped: Dict[str, List[Entity]] = {}
+                    for ent in p.world_db.values():
+                        grouped.setdefault(ent.category, []).append(ent)
+
+                    chunks = []
+                    for category in sorted(grouped.keys()):
+                        chunks.append(f"{category}s:")
+                        for ent in sorted(grouped[category], key=lambda e: e.name.lower()):
+                            desc = (ent.description or "").strip()
+                            line = f"- {ent.name}"
+                            if desc:
+                                line += f": {desc}"
+                            chunks.append(line)
+                        chunks.append("")
+                    return "\n".join(chunks).strip()
+
+                if st.button("🧭 Run Coherence Check", type="primary", use_container_width=True):
+                    if not chaps:
+                        st.warning("Add chapters before running a coherence check.")
+                    else:
+                        with st.spinner("Checking continuity across memory, world bible, and chapters..."):
+                            chapter_payload = []
+                            for c in chaps:
+                                excerpt = (c.content or "").strip()
+                                excerpt = excerpt[:1200]
+                                chapter_payload.append(
+                                    {
+                                        "chapter_index": c.index,
+                                        "title": c.title,
+                                        "summary": c.summary,
+                                        "excerpt": excerpt,
+                                    }
+                                )
+                            results = AnalysisEngine.coherence_check(
+                                p.memory or "",
+                                p.outline or "",
+                                build_world_bible_text(),
+                                chapter_payload,
+                                get_ai_model(),
+                            )
+                            st.session_state["coherence_results"] = results
+
+                results = st.session_state.get("coherence_results", [])
+                if results:
+                    for idx, item in enumerate(results, start=1):
+                        chap_index = item.get("chapter_index")
+                        chapter = next((c for c in chaps if c.index == chap_index), None)
+                        label = f"Issue {idx}"
+                        if chapter:
+                            label = f"Issue {idx} • Ch {chapter.index}: {chapter.title or 'Untitled'}"
+                        with st.expander(label):
+                            st.markdown(f"**Issue:** {item.get('issue', 'Unspecified')}")
+                            st.markdown(f"**Confidence:** {item.get('confidence', 'medium')}")
+                            target_excerpt = (item.get("target_excerpt") or "").strip()
+                            suggested = (item.get("suggested_rewrite") or "").strip()
+                            if target_excerpt:
+                                st.markdown("**Target Excerpt**")
+                                st.code(target_excerpt)
+                            if suggested:
+                                st.markdown("**Suggested Rewrite**")
+                                st.code(suggested)
+
+                            if chapter and target_excerpt and suggested:
+                                if target_excerpt not in (chapter.content or ""):
+                                    st.warning("Target excerpt not found in the chapter text.")
+                                elif st.button(
+                                    "✅ Replace in Chapter",
+                                    key=f"apply_fix_{idx}",
+                                    use_container_width=True,
+                                ):
+                                    updated = (chapter.content or "").replace(target_excerpt, suggested, 1)
+                                    chapter.update_content(updated, "Coherence Fix")
+                                    p.save()
+                                    st.toast("Chapter updated.")
+                else:
+                    st.info("Run a coherence check to see continuity fixes and replacement suggestions.")
+
+                st.divider()
+                st.markdown("#### World Bible Sync")
+                st.caption("Merge canon details from memory, outline, and summaries into the World Bible.")
+                if st.button("🔄 Merge World Bible Info", use_container_width=True):
+                    sync_text = "\n\n".join(
+                        [
+                            p.memory or "",
+                            p.outline or "",
+                            "\n".join([c.summary or "" for c in chaps]),
+                        ]
+                    ).strip()
+                    if sync_text:
+                        extract_entities_ui(sync_text[:8000], "Memory + Outline + Summaries")
+                        st.toast("World Bible merged from current canon.")
+                    else:
+                        st.warning("Add memory, outline, or summaries to sync the World Bible.")
+
+                st.divider()
+                st.markdown("#### Chapter Summaries")
                 if not chaps:
                     st.info("📭 No chapters yet. Add chapters to start building a timeline.")
                 else:
