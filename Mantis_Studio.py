@@ -29,6 +29,8 @@ import difflib
 import logging
 import hashlib
 import hmac
+import socket
+import struct
 from dataclasses import dataclass, field, asdict, fields
 from typing import Dict, List, Optional, Any, Generator
 
@@ -60,12 +62,60 @@ _MANTIS_LOGO_B64 = _mantis_logo_b64()
 # ==================================================
 
 SELFTEST_MODE = "--selftest" in sys.argv
+SELFTEST_MODELS = "--selftest-models" in sys.argv
 REPAIR_MODE = "--repair" in sys.argv
 
 
 # ============================================================
 # 1) CONFIG
 # ============================================================
+
+def _is_running_in_docker() -> bool:
+    if os.path.exists("/.dockerenv"):
+        return True
+    try:
+        with open("/proc/1/cgroup", "r", encoding="utf-8") as fh:
+            content = fh.read()
+        return any(marker in content for marker in ("docker", "kubepods", "containerd"))
+    except Exception:
+        return False
+
+
+def _can_resolve_host(hostname: str) -> bool:
+    try:
+        socket.gethostbyname(hostname)
+        return True
+    except Exception:
+        return False
+
+
+def _detect_docker_gateway_ip() -> Optional[str]:
+    try:
+        with open("/proc/net/route", "r", encoding="utf-8") as fh:
+            for line in fh:
+                fields = line.strip().split()
+                if len(fields) < 3:
+                    continue
+                iface, dest, gateway = fields[:3]
+                if dest != "00000000":
+                    continue
+                ip = socket.inet_ntoa(struct.pack("<L", int(gateway, 16)))
+                if ip and ip != "0.0.0.0":
+                    return ip
+    except Exception:
+        return None
+    return None
+
+
+def _pick_default_ollama_url() -> str:
+    if not _is_running_in_docker():
+        return "http://localhost:11434"
+    if _can_resolve_host("host.docker.internal"):
+        return "http://host.docker.internal:11434"
+    gateway = _detect_docker_gateway_ip()
+    if gateway:
+        return f"http://{gateway}:11434"
+    return "http://localhost:11434"
 
 class AppConfig:
     APP_NAME = "MANTIS Studio"
@@ -78,7 +128,8 @@ class AppConfig:
     )
     USERS_DIR = os.getenv("MANTIS_USERS_DIR", os.path.join(PROJECTS_DIR, "users"))
     GUESTS_DIR = os.getenv("MANTIS_GUESTS_DIR", os.path.join(PROJECTS_DIR, "guests"))
-    OLLAMA_API_URL = os.getenv("OLLAMA_API_URL", "http://localhost:11434")
+    DEFAULT_OLLAMA_URL = _pick_default_ollama_url()
+    OLLAMA_API_URL = os.getenv("OLLAMA_API_URL", DEFAULT_OLLAMA_URL)
     OLLAMA_TIMEOUT = int(os.getenv("OLLAMA_TIMEOUT", "300"))
     DEFAULT_MODEL = os.getenv("OLLAMA_MODEL", "mistral:latest")
     OPENAI_API_URL = os.getenv("OPENAI_API_URL", "https://api.openai.com/v1")
@@ -108,6 +159,47 @@ def normalize_ollama_base_url(url: str) -> str:
     return normalized.rstrip("/")
 
 
+def _ollama_fallback_urls(base_url: str) -> List[str]:
+    if not _is_running_in_docker():
+        return []
+    base = base_url or ""
+    if "localhost" not in base and "127.0.0.1" not in base:
+        return []
+    fallbacks: List[str] = []
+    if _can_resolve_host("host.docker.internal"):
+        fallbacks.append("http://host.docker.internal:11434")
+    gateway = _detect_docker_gateway_ip()
+    if gateway:
+        fallbacks.append(f"http://{gateway}:11434")
+    return fallbacks
+
+
+def _test_ollama_tags(base_url: str, timeout: int = 5) -> tuple[bool, str]:
+    try:
+        normalized = normalize_ollama_base_url(base_url)
+        r = requests.get(f"{normalized}/api/tags", timeout=timeout)
+        r.raise_for_status()
+        return True, ""
+    except Exception as exc:
+        return False, str(exc)
+
+
+def _test_openai_models(base_url: str, api_key: str, timeout: int = 5) -> tuple[bool, str]:
+    headers = {}
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+    try:
+        r = requests.get(
+            f"{base_url.rstrip('/')}/models",
+            headers=headers,
+            timeout=timeout,
+        )
+        r.raise_for_status()
+        return True, ""
+    except Exception as exc:
+        return False, str(exc)
+
+
 os.makedirs(AppConfig.PROJECTS_DIR, exist_ok=True)
 os.makedirs(AppConfig.BACKUPS_DIR, exist_ok=True)
 os.makedirs(AppConfig.USERS_DIR, exist_ok=True)
@@ -134,6 +226,10 @@ def save_app_config(data: Dict[str, str]) -> None:
     try:
         with open(AppConfig.CONFIG_PATH, "w", encoding="utf-8") as fh:
             json.dump(data, fh, indent=2)
+        try:
+            os.chmod(AppConfig.CONFIG_PATH, 0o600)
+        except Exception:
+            pass
     except Exception:
         logger.warning("Failed to save app config", exc_info=True)
 
@@ -159,6 +255,10 @@ def save_users_db(data: Dict[str, Dict[str, Any]]) -> None:
     try:
         with open(AppConfig.USERS_DB_PATH, "w", encoding="utf-8") as fh:
             json.dump(data, fh, indent=2)
+        try:
+            os.chmod(AppConfig.USERS_DB_PATH, 0o600)
+        except Exception:
+            pass
     except Exception:
         logger.warning("Failed to save users database", exc_info=True)
 
@@ -1119,8 +1219,14 @@ def _run_ui():
         )
     if "openai_base_url" not in st.session_state:
         st.session_state.openai_base_url = config_data.get("openai_base_url", AppConfig.OPENAI_API_URL)
+    if "persist_openai_key" not in st.session_state:
+        st.session_state.persist_openai_key = config_data.get("persist_openai_key", False)
     if "openai_api_key" not in st.session_state:
-        st.session_state.openai_api_key = config_data.get("openai_api_key", AppConfig.OPENAI_API_KEY)
+        st.session_state.openai_api_key = (
+            config_data.get("openai_api_key", AppConfig.OPENAI_API_KEY)
+            if st.session_state.persist_openai_key
+            else AppConfig.OPENAI_API_KEY
+        )
     if "openai_model" not in st.session_state:
         st.session_state.openai_model = config_data.get("openai_model", AppConfig.OPENAI_MODEL)
     if "openai_model_list" not in st.session_state:
@@ -1246,37 +1352,37 @@ def _run_ui():
             "ai_provider": st.session_state.ai_provider,
             "ollama_base_url": st.session_state.ollama_base_url,
             "openai_base_url": st.session_state.openai_base_url,
-            "openai_api_key": st.session_state.openai_api_key,
+            "persist_openai_key": st.session_state.persist_openai_key,
+            "openai_api_key": (
+                st.session_state.openai_api_key
+                if st.session_state.persist_openai_key
+                else ""
+            ),
             "openai_model": st.session_state.openai_model,
         }
         save_app_config(data)
         st.toast("Provider settings saved.")
 
     def test_ollama_connection(base_url: str) -> tuple[bool, str]:
-        try:
-            normalized = normalize_ollama_base_url(base_url)
-            r = requests.get(f"{normalized}/api/tags", timeout=5)
-            r.raise_for_status()
+        ok, error_message = _test_ollama_tags(base_url)
+        if ok:
             return True, ""
-        except Exception as exc:
-            hint = ""
-            base = base_url or ""
-            if "localhost" in base or "127.0.0.1" in base:
-                alt_base = base.replace("127.0.0.1", "host.docker.internal").replace("localhost", "host.docker.internal")
-                try:
-                    normalized_alt = normalize_ollama_base_url(alt_base)
-                    alt = requests.get(f"{normalized_alt}/api/tags", timeout=5)
-                    alt.raise_for_status()
-                    hint = (
-                        " Ollama is reachable at host.docker.internal. "
-                        "Update the base URL to host.docker.internal or your host IP."
-                    )
-                except Exception:
-                    hint = (
-                        " If MANTIS Studio runs in Docker or on another machine, "
-                        "use host.docker.internal or your host IP instead of localhost."
-                    )
-            return False, f"{exc}{hint}"
+        hint = ""
+        fallbacks = _ollama_fallback_urls(base_url)
+        for fallback in fallbacks:
+            ok, _ = _test_ollama_tags(fallback)
+            if ok:
+                hint = (
+                    f" Ollama is reachable at {fallback}. "
+                    "Update the base URL to that address or your host IP."
+                )
+                return False, f"{error_message}{hint}"
+        if fallbacks:
+            hint = (
+                " If MANTIS Studio runs in Docker or on another machine, "
+                "use host.docker.internal or your host IP instead of localhost."
+            )
+        return False, f"{error_message}{hint}"
 
     def test_openai_connection(base_url: str, api_key: str) -> bool:
         headers = {}
@@ -1469,6 +1575,13 @@ def _run_ui():
             if openai_key != st.session_state.openai_api_key:
                 st.session_state.openai_api_key = openai_key
                 AppConfig.OPENAI_API_KEY = openai_key
+            persist_key = st.checkbox(
+                "Remember API key on this device",
+                value=st.session_state.persist_openai_key,
+                help="If unchecked, the key is kept only in memory for this session.",
+            )
+            if persist_key != st.session_state.persist_openai_key:
+                st.session_state.persist_openai_key = persist_key
 
             if st.button("↻ Fetch Models", use_container_width=True):
                 models, error_message = fetch_openai_models(
@@ -2175,6 +2288,7 @@ def run_selftest() -> int:
     """
     Quick non-UI integrity test. Intended to be called by the launcher.
     Creates a temporary project, exercises save/load, chapters/entities/export, then cleans up.
+    If --selftest-models is provided, also verifies Ollama/OpenAI connectivity.
     """
     print("[MANTIS SELFTEST]")
     try:
@@ -2201,6 +2315,29 @@ def run_selftest() -> int:
         md = project_to_markdown(p2)
         if "# SELFTEST_PROJECT" not in md:
             raise RuntimeError("Export markdown failed: missing title header.")
+
+        if SELFTEST_MODELS:
+            print("[MODEL SELFTEST]")
+            ok, err = _test_ollama_tags(AppConfig.OLLAMA_API_URL, timeout=10)
+            if not ok:
+                fallbacks = _ollama_fallback_urls(AppConfig.OLLAMA_API_URL)
+                for fallback in fallbacks:
+                    ok, _ = _test_ollama_tags(fallback, timeout=10)
+                    if ok:
+                        print(f"Ollama reachable at {fallback}.")
+                        ok = True
+                        break
+                if not ok:
+                    raise RuntimeError(f"Ollama model check failed: {err}")
+            openai_base = AppConfig.OPENAI_API_URL
+            openai_key = AppConfig.OPENAI_API_KEY
+            if openai_base:
+                if "api.openai.com" in openai_base and not openai_key:
+                    print("OpenAI model check skipped: missing API key.")
+                else:
+                    ok, err = _test_openai_models(openai_base, openai_key, timeout=10)
+                    if not ok:
+                        raise RuntimeError(f"OpenAI model check failed: {err}")
 
         # Cleanup
         try:
