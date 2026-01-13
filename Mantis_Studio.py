@@ -1062,6 +1062,10 @@ def _run_ui():
         st.session_state.openai_api_key = config_data.get("openai_api_key", AppConfig.OPENAI_API_KEY)
     if "openai_model" not in st.session_state:
         st.session_state.openai_model = config_data.get("openai_model", AppConfig.OPENAI_MODEL)
+    if "openai_model_list" not in st.session_state:
+        st.session_state.openai_model_list = []
+    if "openai_model_tests" not in st.session_state:
+        st.session_state.openai_model_tests = {}
 
     if "_force_nav" not in st.session_state:
         st.session_state._force_nav = False
@@ -1211,6 +1215,45 @@ def _run_ui():
         except Exception:
             return False
 
+    def fetch_openai_models(base_url: str, api_key: str) -> tuple[List[str], str]:
+        headers = {}
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
+        try:
+            r = requests.get(
+                f"{base_url.rstrip('/')}/models",
+                headers=headers,
+                timeout=10,
+            )
+            r.raise_for_status()
+            data = r.json()
+            models = [m.get("id") for m in data.get("data", []) if m.get("id")]
+            return models, ""
+        except Exception as exc:
+            return [], str(exc)
+
+    def test_openai_model(base_url: str, api_key: str, model: str) -> tuple[bool, str]:
+        headers = {"Content-Type": "application/json"}
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
+        payload = {
+            "model": model,
+            "messages": [{"role": "user", "content": "ping"}],
+            "max_tokens": 1,
+            "temperature": 0,
+        }
+        try:
+            r = requests.post(
+                f"{base_url.rstrip('/')}/chat/completions",
+                headers=headers,
+                json=payload,
+                timeout=15,
+            )
+            r.raise_for_status()
+            return True, ""
+        except Exception as exc:
+            return False, str(exc)
+
     def extract_entities_ui(text: str, label: str):
         """Scan text for entities and update the World Bible.
 
@@ -1323,6 +1366,17 @@ def _run_ui():
                 else:
                     st.error(f"Could not reach Ollama. {error_message or 'Check the base URL and server.'}")
         else:
+            openai_presets = {
+                "Custom": "",
+                "LM Studio (free local)": "http://localhost:1234/v1",
+                "llama.cpp server (free local)": "http://localhost:8080/v1",
+            }
+            preset_choice = st.selectbox("OpenAI-Compatible Preset", list(openai_presets.keys()))
+            preset_url = openai_presets.get(preset_choice, "")
+            if preset_url and preset_url != st.session_state.openai_base_url:
+                st.session_state.openai_base_url = preset_url
+                AppConfig.OPENAI_API_URL = preset_url
+
             openai_url = st.text_input("OpenAI Base URL", value=st.session_state.openai_base_url)
             if openai_url != st.session_state.openai_base_url:
                 st.session_state.openai_base_url = openai_url
@@ -1338,7 +1392,58 @@ def _run_ui():
                 st.session_state.openai_api_key = openai_key
                 AppConfig.OPENAI_API_KEY = openai_key
 
-            openai_model = st.text_input("OpenAI Model", value=st.session_state.openai_model)
+            if st.button("↻ Fetch Models", use_container_width=True):
+                models, error_message = fetch_openai_models(
+                    st.session_state.openai_base_url,
+                    st.session_state.openai_api_key,
+                )
+                if models:
+                    st.session_state.openai_model_list = models
+                    st.session_state.openai_model_tests = {}
+                    st.toast(f"Loaded {len(models)} models.")
+                else:
+                    st.session_state.openai_model_list = []
+                    st.session_state.openai_model_tests = {}
+                    st.error(f"Model fetch failed. {error_message or 'Check the base URL and key.'}")
+
+            if st.session_state.openai_model_list:
+                models = st.session_state.openai_model_list
+                idx = 0
+                if st.session_state.openai_model in models:
+                    idx = models.index(st.session_state.openai_model)
+                openai_model = st.selectbox("OpenAI Model", models, index=idx)
+
+                if st.button("🧪 Test All Models", use_container_width=True):
+                    results = {}
+                    total = len(models)
+                    progress = st.progress(0)
+                    for i, model_name in enumerate(models, start=1):
+                        ok, error_message = test_openai_model(
+                            st.session_state.openai_base_url,
+                            st.session_state.openai_api_key,
+                            model_name,
+                        )
+                        results[model_name] = "" if ok else error_message
+                        progress.progress(i / total)
+                    st.session_state.openai_model_tests = results
+                    failures = [m for m, err in results.items() if err]
+                    if failures:
+                        st.warning(f"{len(failures)} models failed. Expand results for details.")
+                    else:
+                        st.success("All models responded successfully.")
+
+                if st.session_state.openai_model_tests:
+                    with st.expander("Model test results", expanded=False):
+                        for model_name, error_message in sorted(
+                            st.session_state.openai_model_tests.items()
+                        ):
+                            if error_message:
+                                st.error(f"{model_name}: {error_message}")
+                            else:
+                                st.success(f"{model_name}: OK")
+            else:
+                openai_model = st.text_input("OpenAI Model", value=st.session_state.openai_model)
+
             if openai_model != st.session_state.openai_model:
                 st.session_state.openai_model = openai_model
                 AppConfig.OPENAI_MODEL = openai_model
