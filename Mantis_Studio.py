@@ -374,8 +374,9 @@ class Project:
 # ============================================================
 
 class AIEngine:
-    def __init__(self, timeout: int = AppConfig.OLLAMA_TIMEOUT):
-        self.base_url = AppConfig.OLLAMA_API_URL.rstrip("/")
+    def __init__(self, timeout: int = AppConfig.OLLAMA_TIMEOUT, base_url: Optional[str] = None):
+        resolved_base = base_url or AppConfig.OLLAMA_API_URL
+        self.base_url = resolved_base.rstrip("/")
         self.timeout = timeout
         self.session = requests.Session()
 
@@ -969,7 +970,7 @@ def _run_ui():
 
     @st.cache_data(show_spinner=False)
     def _cached_models(base_url: str) -> List[str]:
-        return AIEngine().probe_models()
+        return AIEngine(base_url=base_url).probe_models()
 
     def refresh_models():
         st.session_state.model_list = _cached_models(AppConfig.OLLAMA_API_URL) or []
@@ -1098,26 +1099,6 @@ def _run_ui():
 
             st.selectbox("🧠 AI Model", models, index=idx, key="selected_model")
 
-        provider = st.selectbox("Provider", ["Ollama", "OpenAI"], key="ai_provider")
-
-        if provider == "Ollama":
-            ollama_url = st.text_input("Ollama Base URL", value=st.session_state.ollama_base_url)
-            if ollama_url != st.session_state.ollama_base_url:
-                st.session_state.ollama_base_url = ollama_url
-                AppConfig.OLLAMA_API_URL = ollama_url
-                st.cache_data.clear()
-                refresh_models()
-
-            if not st.session_state.model_list:
-                refresh_models()
-            models = st.session_state.model_list or ["Offline"]
-
-            idx = 0
-            if AppConfig.DEFAULT_MODEL in models:
-                idx = models.index(AppConfig.DEFAULT_MODEL)
-
-            st.selectbox("🧠 AI Model", models, index=idx, key="selected_model")
-
             if st.button("🔌 Test Ollama Connection", use_container_width=True):
                 ok = test_ollama_connection(st.session_state.ollama_base_url)
                 if ok:
@@ -1198,7 +1179,6 @@ def _run_ui():
             )
             if pmap[nav] != st.session_state.page:
                 st.session_state.page = pmap[nav]
-                st.rerun()
                 st.rerun()
 
             st.divider()
