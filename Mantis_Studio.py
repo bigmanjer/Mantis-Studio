@@ -40,6 +40,7 @@ import sys
 
 # ===== v45 BRANDING (SAFE, ORIGINAL TEMPLATE) =====
 import base64
+from urllib.parse import urlparse
 
 _MANTIS_LOGO_PATH = "mantis_logo_trans.png"
 
@@ -89,6 +90,22 @@ class AppConfig:
     )
     MAX_PROMPT_CHARS = 16000
     SUMMARY_CONTEXT_CHARS = 4000
+
+
+def normalize_ollama_base_url(url: str) -> str:
+    raw = (url or "").strip()
+    if not raw:
+        return AppConfig.OLLAMA_API_URL.rstrip("/")
+    if "://" not in raw:
+        raw = f"http://{raw}"
+    parsed = urlparse(raw)
+    path = parsed.path.rstrip("/")
+    if path.endswith("/api/v1"):
+        path = path[: -len("/api/v1")]
+    elif path.endswith("/api"):
+        path = path[: -len("/api")]
+    normalized = parsed._replace(path=path, params="", query="", fragment="").geturl()
+    return normalized.rstrip("/")
 
 
 os.makedirs(AppConfig.PROJECTS_DIR, exist_ok=True)
@@ -496,8 +513,8 @@ class Project:
 
 class AIEngine:
     def __init__(self, timeout: int = AppConfig.OLLAMA_TIMEOUT, base_url: Optional[str] = None):
-        resolved_base = base_url or AppConfig.OLLAMA_API_URL
-        self.base_url = resolved_base.rstrip("/")
+        resolved_base = normalize_ollama_base_url(base_url or AppConfig.OLLAMA_API_URL)
+        self.base_url = resolved_base
         self.timeout = timeout
         self.session = requests.Session()
 
@@ -1036,7 +1053,9 @@ def _run_ui():
     if "ai_provider" not in st.session_state:
         st.session_state.ai_provider = config_data.get("ai_provider", "Ollama")
     if "ollama_base_url" not in st.session_state:
-        st.session_state.ollama_base_url = config_data.get("ollama_base_url", AppConfig.OLLAMA_API_URL)
+        st.session_state.ollama_base_url = normalize_ollama_base_url(
+            config_data.get("ollama_base_url", AppConfig.OLLAMA_API_URL)
+        )
     if "openai_base_url" not in st.session_state:
         st.session_state.openai_base_url = config_data.get("openai_base_url", AppConfig.OPENAI_API_URL)
     if "openai_api_key" not in st.session_state:
@@ -1047,7 +1066,7 @@ def _run_ui():
     if "_force_nav" not in st.session_state:
         st.session_state._force_nav = False
 
-    AppConfig.OLLAMA_API_URL = st.session_state.ollama_base_url
+    AppConfig.OLLAMA_API_URL = normalize_ollama_base_url(st.session_state.ollama_base_url)
     AppConfig.OPENAI_API_URL = st.session_state.openai_base_url
     AppConfig.OPENAI_API_KEY = st.session_state.openai_api_key
     AppConfig.OPENAI_MODEL = st.session_state.openai_model
@@ -1168,13 +1187,14 @@ def _run_ui():
         save_app_config(data)
         st.toast("Provider settings saved.")
 
-    def test_ollama_connection(base_url: str) -> bool:
+    def test_ollama_connection(base_url: str) -> tuple[bool, str]:
         try:
-            r = requests.get(f"{base_url.rstrip('/')}/api/tags", timeout=5)
+            normalized = normalize_ollama_base_url(base_url)
+            r = requests.get(f"{normalized}/api/tags", timeout=5)
             r.raise_for_status()
-            return True
-        except Exception:
-            return False
+            return True, ""
+        except Exception as exc:
+            return False, str(exc)
 
     def test_openai_connection(base_url: str, api_key: str) -> bool:
         if not api_key:
@@ -1277,9 +1297,10 @@ def _run_ui():
 
         if provider == "Ollama":
             ollama_url = st.text_input("Ollama Base URL", value=st.session_state.ollama_base_url)
-            if ollama_url != st.session_state.ollama_base_url:
-                st.session_state.ollama_base_url = ollama_url
-                AppConfig.OLLAMA_API_URL = ollama_url
+            normalized_ollama_url = normalize_ollama_base_url(ollama_url)
+            if normalized_ollama_url != st.session_state.ollama_base_url:
+                st.session_state.ollama_base_url = normalized_ollama_url
+                AppConfig.OLLAMA_API_URL = normalized_ollama_url
                 st.cache_data.clear()
                 refresh_models()
             st.caption("Ollama must be reachable from the server hosting MANTIS Studio.")
@@ -1295,11 +1316,11 @@ def _run_ui():
             st.selectbox("🧠 AI Model", models, index=idx, key="selected_model")
 
             if st.button("🔌 Test Ollama Connection", use_container_width=True):
-                ok = test_ollama_connection(st.session_state.ollama_base_url)
+                ok, error_message = test_ollama_connection(st.session_state.ollama_base_url)
                 if ok:
                     st.success("Ollama connection OK.")
                 else:
-                    st.error("Could not reach Ollama. Check the base URL and server.")
+                    st.error(f"Could not reach Ollama. {error_message or 'Check the base URL and server.'}")
         else:
             openai_url = st.text_input("OpenAI Base URL", value=st.session_state.openai_base_url)
             if openai_url != st.session_state.openai_base_url:
