@@ -544,14 +544,40 @@ class AIEngine:
                 yield "OpenAI API key not configured."
                 return
 
+            headers = {"Content-Type": "application/json"}
+            if api_key:
+                headers["Authorization"] = f"Bearer {api_key}"
+
+            def _openai_non_stream() -> Generator[str, None, None]:
+                payload = {
+                    "model": openai_model,
+                    "messages": [{"role": "user", "content": prompt}],
+                    "stream": False,
+                }
+                try:
+                    r = self.session.post(
+                        f"{openai_base}/chat/completions",
+                        json=payload,
+                        headers=headers,
+                        timeout=self.timeout,
+                    )
+                    r.raise_for_status()
+                    data = r.json()
+                    choice = (data.get("choices") or [{}])[0]
+                    content = (choice.get("message") or {}).get("content") or choice.get("text") or ""
+                    if content:
+                        yield content
+                    else:
+                        yield "OpenAI response empty."
+                except Exception:
+                    logger.warning("OpenAI non-stream generation failed", exc_info=True)
+                    yield "OpenAI generation failed."
+
             payload = {
                 "model": openai_model,
                 "messages": [{"role": "user", "content": prompt}],
                 "stream": True,
             }
-            headers = {"Content-Type": "application/json"}
-            if api_key:
-                headers["Authorization"] = f"Bearer {api_key}"
             try:
                 with self.session.post(
                     f"{openai_base}/chat/completions",
@@ -561,6 +587,7 @@ class AIEngine:
                     timeout=self.timeout,
                 ) as r:
                     r.raise_for_status()
+                    yielded = False
                     for raw in r.iter_lines():
                         if not raw:
                             continue
@@ -577,11 +604,14 @@ class AIEngine:
                         delta = chunk.get("choices", [{}])[0].get("delta", {})
                         content = delta.get("content")
                         if content:
+                            yielded = True
                             yield content
+                    if not yielded:
+                        yield from _openai_non_stream()
                 return
             except Exception:
-                logger.warning("OpenAI generation failed", exc_info=True)
-                yield "OpenAI generation failed."
+                logger.warning("OpenAI streaming generation failed, retrying non-stream", exc_info=True)
+                yield from _openai_non_stream()
                 return
 
         payload = {
@@ -590,6 +620,30 @@ class AIEngine:
             "stream": True,
             "options": {"num_ctx": 8192},
         }
+
+        def _ollama_non_stream() -> Generator[str, None, None]:
+            payload_no_stream = {
+                "model": model,
+                "prompt": (prompt or "")[-AppConfig.MAX_PROMPT_CHARS:],
+                "stream": False,
+                "options": {"num_ctx": 8192},
+            }
+            try:
+                r = self.session.post(
+                    f"{self.base_url}/api/generate",
+                    json=payload_no_stream,
+                    timeout=self.timeout,
+                )
+                r.raise_for_status()
+                data = r.json()
+                content = data.get("response", "")
+                if content:
+                    yield content
+                else:
+                    yield "Ollama response empty."
+            except Exception:
+                logger.error("Non-stream generation failed for %s", self.base_url, exc_info=True)
+                yield "Ollama generation failed."
 
         try:
             with self.session.post(
@@ -601,6 +655,7 @@ class AIEngine:
                 r.raise_for_status()
                 buffer = ""
                 is_start = True
+                yielded = False
 
                 for line in r.iter_lines():
                     if not line:
@@ -620,21 +675,27 @@ class AIEngine:
                             clean = buffer
                             clean = re.sub(r"(?i)^(sure|here|certainly|okay).*?:\s*", "", clean)
                             clean = re.sub(r"(?i)^\*\*.*?\*\*\s*", "", clean)
+                            if clean:
+                                yielded = True
                             yield clean
                             is_start = False
                             buffer = ""
                         else:
                             if chunk:
+                                yielded = True
                                 yield chunk
 
                         if done and buffer:
+                            yielded = True
                             yield buffer
                     except Exception:
                         logger.debug("Stream chunk parse failed from %s", self.base_url, exc_info=True)
+                if not yielded:
+                    yield from _ollama_non_stream()
 
-        except Exception as e:
+        except Exception:
             logger.error("Stream generation failed for %s", self.base_url, exc_info=True)
-            yield f"\n[Error: {str(e)}]"
+            yield from _ollama_non_stream()
 
     def generate(self, prompt: str, model: str) -> Dict[str, str]:
         full_text = ""
@@ -1198,7 +1259,24 @@ def _run_ui():
             r.raise_for_status()
             return True, ""
         except Exception as exc:
-            return False, str(exc)
+            hint = ""
+            base = base_url or ""
+            if "localhost" in base or "127.0.0.1" in base:
+                alt_base = base.replace("127.0.0.1", "host.docker.internal").replace("localhost", "host.docker.internal")
+                try:
+                    normalized_alt = normalize_ollama_base_url(alt_base)
+                    alt = requests.get(f"{normalized_alt}/api/tags", timeout=5)
+                    alt.raise_for_status()
+                    hint = (
+                        " Ollama is reachable at host.docker.internal. "
+                        "Update the base URL to host.docker.internal or your host IP."
+                    )
+                except Exception:
+                    hint = (
+                        " If MANTIS Studio runs in Docker or on another machine, "
+                        "use host.docker.internal or your host IP instead of localhost."
+                    )
+            return False, f"{exc}{hint}"
 
     def test_openai_connection(base_url: str, api_key: str) -> bool:
         headers = {}
