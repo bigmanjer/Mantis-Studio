@@ -46,6 +46,11 @@ def _mantis_logo_b64() -> str:
         with open(_MANTIS_LOGO_PATH, "rb") as f:
             return base64.b64encode(f.read()).decode("utf-8")
     except Exception:
+        logging.getLogger("MANTIS").warning(
+            "Failed to load logo asset from %s",
+            _MANTIS_LOGO_PATH,
+            exc_info=True,
+        )
         return ""
 
 _MANTIS_LOGO_B64 = _mantis_logo_b64()
@@ -279,14 +284,19 @@ class Project:
         filename = f"{self.id}_{safe_title.replace(' ', '_')}.json"
         path = os.path.join(AppConfig.PROJECTS_DIR, filename)
         tmp = path + ".tmp"
-        for _ in range(3):
+        last_error: Optional[Exception] = None
+        for attempt in range(1, 4):
             try:
                 with open(tmp, "w", encoding="utf-8") as f:
                     json.dump(self.to_dict(), f, indent=2, ensure_ascii=False)
                 os.replace(tmp, path)
                 break
-            except Exception:
+            except Exception as exc:
+                last_error = exc
+                logger.warning("Save attempt %s failed for %s", attempt, path, exc_info=True)
                 time.sleep(0.1)
+        else:
+            logger.error("Save failed after retries for %s: %s", path, last_error)
 
         self.filepath = path
         self.last_modified = time.time()
@@ -325,7 +335,7 @@ class Project:
         try:
             os.remove(filepath)
         except OSError:
-            pass
+            logger.warning("Failed to delete project file: %s", filepath, exc_info=True)
 
 
 # ============================================================
@@ -345,6 +355,7 @@ class AIEngine:
             data = r.json()
             return [m.get("name") for m in data.get("models", []) if m.get("name")]
         except Exception:
+            logger.warning("Model probe failed for %s", self.base_url, exc_info=True)
             return []
 
     def generate_stream(self, prompt: str, model: str) -> Generator[str, None, None]:
@@ -398,9 +409,10 @@ class AIEngine:
                         if done and buffer:
                             yield buffer
                     except Exception:
-                        pass
+                        logger.debug("Stream chunk parse failed from %s", self.base_url, exc_info=True)
 
         except Exception as e:
+            logger.error("Stream generation failed for %s", self.base_url, exc_info=True)
             yield f"\n[Error: {str(e)}]"
 
     def generate(self, prompt: str, model: str) -> Dict[str, str]:
@@ -422,6 +434,7 @@ class AIEngine:
                 return [d]
             return None
         except Exception:
+            logger.warning("JSON parse failed for AI response", exc_info=True)
             return None
 
 
@@ -509,6 +522,7 @@ class AnalysisEngine:
                 genre = genre[:40].strip()
             return genre
         except Exception:
+            logger.warning("Genre detection failed", exc_info=True)
             return ""
 
     @staticmethod
@@ -1006,6 +1020,7 @@ def _run_ui():
                                         g = detected or (g or "General Fiction")
                                     st.toast("AI filled missing fields")
                             except Exception as e:
+                                logger.warning("AI title/genre helper failed", exc_info=True)
                                 st.warning(f"AI title/genre helper failed: {e}")
                         # Fall back to defaults if still empty
                         p = Project.create(t, author=a, genre=g or "General Fiction")
@@ -1067,7 +1082,7 @@ def _run_ui():
                                     Project.delete_file(full)
                                     st.rerun()
                         except Exception:
-                            pass
+                            logger.warning("Failed to load project metadata: %s", full, exc_info=True)
 
     def render_outline():
         p = st.session_state.project
@@ -1478,11 +1493,12 @@ def run_selftest() -> int:
         try:
             os.remove(path)
         except OSError:
-            pass
+            logger.warning("Selftest cleanup failed for %s", path, exc_info=True)
 
         print("SELFTEST RESULT: PASS")
         return 0
     except Exception as e:
+        logger.error("Selftest failed", exc_info=True)
         print("SELFTEST RESULT: FAIL")
         print(str(e))
         return 1
@@ -1529,6 +1545,7 @@ def run_repair() -> int:
             except Exception:
                 # Backup failure shouldn't block repair attempt, but count it
                 print(f"[REPAIR][WARN] Could not backup: {fn}")
+                logger.warning("Repair backup failed for %s", full, exc_info=True)
 
             # Validate/normalize via Project model
             proj = Project.load(full)
@@ -1538,6 +1555,7 @@ def run_repair() -> int:
         except Exception as e:
             failures += 1
             print(f"[REPAIR][FAIL] {fn} :: {e}")
+            logger.error("Repair failed for %s", full, exc_info=True)
 
     if failures:
         print(f"[REPAIR] Completed with failures: {failures}")
