@@ -67,7 +67,7 @@ REPAIR_MODE = "--repair" in sys.argv
 
 class AppConfig:
     APP_NAME = "MANTIS Studio"
-    VERSION = "44.1 (Chronicle • One-File)"
+    VERSION = "46 (Chronicle • One-File)"
     PROJECTS_DIR = os.getenv("MANTIS_PROJECTS_DIR", "projects")
     BACKUPS_DIR = os.path.join(PROJECTS_DIR, ".backups")
     OLLAMA_API_URL = os.getenv("OLLAMA_API_URL", "http://localhost:11434")
