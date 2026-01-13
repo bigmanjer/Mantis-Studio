@@ -27,6 +27,7 @@ import time
 import uuid
 import difflib
 import logging
+import hashlib
 from dataclasses import dataclass, field, asdict, fields
 from typing import Dict, List, Optional, Any, Generator
 
@@ -66,7 +67,7 @@ REPAIR_MODE = "--repair" in sys.argv
 
 class AppConfig:
     APP_NAME = "MANTIS Studio"
-    VERSION = "44.1 (Chronicle • One-File)"
+    VERSION = "47 (Chronicle • One-File)"
     PROJECTS_DIR = os.getenv("MANTIS_PROJECTS_DIR", "projects")
     BACKUPS_DIR = os.path.join(PROJECTS_DIR, ".backups")
     OLLAMA_API_URL = os.getenv("OLLAMA_API_URL", "http://localhost:11434")
@@ -888,6 +889,8 @@ def _run_ui():
         unsafe_allow_html=True,
     )
 
+    if "auth_user" not in st.session_state:
+        st.session_state.auth_user = None
     if "project" not in st.session_state:
         st.session_state.project = None
     if "page" not in st.session_state:
@@ -1024,6 +1027,10 @@ def _run_ui():
             else:
                 st.toast("No entities detected in this text.", icon="🤷")
 
+    if not st.session_state.auth_user:
+        render_auth()
+        return
+
     with st.sidebar:
         st.markdown(f"""
         <div class="mantis-sidebar-brand">
@@ -1039,6 +1046,27 @@ def _run_ui():
 
         st.markdown("---")
         st.markdown("### 🧠 AI Engine")
+        st.caption(f"Signed in as **{st.session_state.auth_user}**")
+
+        provider = st.selectbox("Provider", ["Ollama", "OpenAI"], key="ai_provider")
+
+        if provider == "Ollama":
+            ollama_url = st.text_input("Ollama Base URL", value=st.session_state.ollama_base_url)
+            if ollama_url != st.session_state.ollama_base_url:
+                st.session_state.ollama_base_url = ollama_url
+                AppConfig.OLLAMA_API_URL = ollama_url
+                st.cache_data.clear()
+                refresh_models()
+
+            if not st.session_state.model_list:
+                refresh_models()
+            models = st.session_state.model_list or ["Offline"]
+
+            idx = 0
+            if AppConfig.DEFAULT_MODEL in models:
+                idx = models.index(AppConfig.DEFAULT_MODEL)
+
+            st.selectbox("🧠 AI Model", models, index=idx, key="selected_model")
 
         provider = st.selectbox("Provider", ["Ollama", "OpenAI"], key="ai_provider")
 
@@ -1111,7 +1139,6 @@ def _run_ui():
 
         if st.button("💾 Save Provider Settings", use_container_width=True):
             save_provider_settings()
-
         st.divider()
 
         if st.session_state.project:
