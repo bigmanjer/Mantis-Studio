@@ -28,6 +28,7 @@ import uuid
 import difflib
 import logging
 import hashlib
+import hmac
 from dataclasses import dataclass, field, asdict, fields
 from typing import Dict, List, Optional, Any, Generator
 
@@ -70,6 +71,12 @@ class AppConfig:
     VERSION = "47 (Chronicle • One-File)"
     PROJECTS_DIR = os.getenv("MANTIS_PROJECTS_DIR", "projects")
     BACKUPS_DIR = os.path.join(PROJECTS_DIR, ".backups")
+    USERS_DB_PATH = os.getenv(
+        "MANTIS_USERS_DB_PATH",
+        os.path.join(PROJECTS_DIR, ".mantis_users.json"),
+    )
+    USERS_DIR = os.getenv("MANTIS_USERS_DIR", os.path.join(PROJECTS_DIR, "users"))
+    GUESTS_DIR = os.getenv("MANTIS_GUESTS_DIR", os.path.join(PROJECTS_DIR, "guests"))
     OLLAMA_API_URL = os.getenv("OLLAMA_API_URL", "http://localhost:11434")
     OLLAMA_TIMEOUT = int(os.getenv("OLLAMA_TIMEOUT", "300"))
     DEFAULT_MODEL = os.getenv("OLLAMA_MODEL", "mistral:latest")
@@ -86,6 +93,8 @@ class AppConfig:
 
 os.makedirs(AppConfig.PROJECTS_DIR, exist_ok=True)
 os.makedirs(AppConfig.BACKUPS_DIR, exist_ok=True)
+os.makedirs(AppConfig.USERS_DIR, exist_ok=True)
+os.makedirs(AppConfig.GUESTS_DIR, exist_ok=True)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("MANTIS")
@@ -110,6 +119,97 @@ def save_app_config(data: Dict[str, str]) -> None:
             json.dump(data, fh, indent=2)
     except Exception:
         logger.warning("Failed to save app config", exc_info=True)
+
+
+def _normalize_username(username: str) -> str:
+    return re.sub(r"\s+", "", (username or "").strip()).lower()
+
+
+def load_users_db() -> Dict[str, Dict[str, Any]]:
+    try:
+        with open(AppConfig.USERS_DB_PATH, "r", encoding="utf-8") as fh:
+            data = json.load(fh)
+            if isinstance(data, dict) and isinstance(data.get("users"), dict):
+                return data
+    except FileNotFoundError:
+        return {"users": {}}
+    except Exception:
+        logger.warning("Failed to load users database", exc_info=True)
+    return {"users": {}}
+
+
+def save_users_db(data: Dict[str, Dict[str, Any]]) -> None:
+    try:
+        with open(AppConfig.USERS_DB_PATH, "w", encoding="utf-8") as fh:
+            json.dump(data, fh, indent=2)
+    except Exception:
+        logger.warning("Failed to save users database", exc_info=True)
+
+
+def hash_password(password: str, salt: Optional[bytes] = None) -> Dict[str, str]:
+    if salt is None:
+        salt = os.urandom(16)
+    pw_hash = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, 120_000)
+    return {"salt": salt.hex(), "hash": pw_hash.hex()}
+
+
+def verify_password(password: str, salt_hex: str, hash_hex: str) -> bool:
+    try:
+        salt = bytes.fromhex(salt_hex)
+        expected = bytes.fromhex(hash_hex)
+    except ValueError:
+        return False
+    candidate = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, 120_000)
+    return hmac.compare_digest(candidate, expected)
+
+
+def create_user(username: str, display_name: str, password: str) -> Dict[str, Any]:
+    clean_username = _normalize_username(username)
+    display_name = (display_name or "").strip()
+    if not clean_username or not display_name or not password:
+        return {"ok": False, "error": "All fields are required."}
+
+    data = load_users_db()
+    if clean_username in data["users"]:
+        return {"ok": False, "error": "That username is already taken."}
+
+    creds = hash_password(password)
+    user_id = str(uuid.uuid4())
+    data["users"][clean_username] = {
+        "id": user_id,
+        "username": clean_username,
+        "display_name": display_name,
+        "password_hash": creds["hash"],
+        "password_salt": creds["salt"],
+        "created_at": time.time(),
+    }
+    save_users_db(data)
+    return {"ok": True, "user": data["users"][clean_username]}
+
+
+def authenticate_user(username: str, password: str) -> Dict[str, Any]:
+    clean_username = _normalize_username(username)
+    data = load_users_db()
+    user = data.get("users", {}).get(clean_username)
+    if not user:
+        return {"ok": False, "error": "Username or password is incorrect."}
+
+    if not verify_password(password, user.get("password_salt", ""), user.get("password_hash", "")):
+        return {"ok": False, "error": "Username or password is incorrect."}
+
+    return {"ok": True, "user": user}
+
+
+def get_user_projects_dir(user_id: str) -> str:
+    user_dir = os.path.join(AppConfig.USERS_DIR, user_id)
+    os.makedirs(user_dir, exist_ok=True)
+    return user_dir
+
+
+def get_guest_projects_dir(guest_id: str) -> str:
+    guest_dir = os.path.join(AppConfig.GUESTS_DIR, guest_id)
+    os.makedirs(guest_dir, exist_ok=True)
+    return guest_dir
 
 
 # ============================================================
@@ -201,18 +301,27 @@ class Project:
     created_at: float = field(default_factory=time.time)
     last_modified: float = field(default_factory=time.time)
     filepath: Optional[str] = None
+    storage_dir: Optional[str] = None
 
     @classmethod
-    def create(cls, title: str, author: str = "", genre: str = "") -> "Project":
+    def create(
+        cls,
+        title: str,
+        author: str = "",
+        genre: str = "",
+        storage_dir: Optional[str] = None,
+    ) -> "Project":
+        storage_dir = storage_dir or AppConfig.PROJECTS_DIR
+        os.makedirs(storage_dir, exist_ok=True)
         final_title = (title or "").strip()
         if not final_title:
             base = "Untitled Project"
             final_title = base
             counter = 1
-            if os.path.exists(AppConfig.PROJECTS_DIR):
+            if os.path.exists(storage_dir):
                 while True:
                     found = False
-                    for f in os.listdir(AppConfig.PROJECTS_DIR):
+                    for f in os.listdir(storage_dir):
                         if final_title.replace(" ", "_") in f:
                             found = True
                             break
@@ -220,7 +329,13 @@ class Project:
                         break
                     final_title = f"{base} ({counter})"
                     counter += 1
-        return cls(id=str(uuid.uuid4()), title=final_title, author=author.strip(), genre=genre.strip())
+        return cls(
+            id=str(uuid.uuid4()),
+            title=final_title,
+            author=author.strip(),
+            genre=genre.strip(),
+            storage_dir=storage_dir,
+        )
 
     def add_entity(self, name: str, category: str, desc: str = "") -> Optional[Entity]:
         """Smart Add with Fuzzy Matching."""
@@ -305,6 +420,8 @@ class Project:
 
     def to_dict(self) -> Dict[str, Any]:
         d = asdict(self)
+        d.pop("filepath", None)
+        d.pop("storage_dir", None)
         d["world_db"] = {k: asdict(v) for k, v in self.world_db.items()}
         d["chapters"] = {k: asdict(v) for k, v in self.chapters.items()}
         return d
@@ -312,7 +429,9 @@ class Project:
     def save(self) -> str:
         safe_title = re.sub(r'[<>:"/\\|?*]', "_", self.title)[:60]
         filename = f"{self.id}_{safe_title.replace(' ', '_')}.json"
-        path = os.path.join(AppConfig.PROJECTS_DIR, filename)
+        storage_dir = self.storage_dir or AppConfig.PROJECTS_DIR
+        os.makedirs(storage_dir, exist_ok=True)
+        path = os.path.join(storage_dir, filename)
         tmp = path + ".tmp"
         last_error: Optional[Exception] = None
         for attempt in range(1, 4):
@@ -329,6 +448,7 @@ class Project:
             logger.error("Save failed after retries for %s: %s", path, last_error)
 
         self.filepath = path
+        self.storage_dir = storage_dir
         self.last_modified = time.time()
         return path
 
@@ -358,6 +478,7 @@ class Project:
             clean = {key: val for key, val in v.items() if key in chap_fields}
             proj.chapters[k] = Chapter(**clean)
 
+        proj.storage_dir = os.path.dirname(path)
         proj.filepath = path
         return proj
 
@@ -892,6 +1013,14 @@ def _run_ui():
 
     if "auth_user" not in st.session_state:
         st.session_state.auth_user = None
+    if "auth_user_id" not in st.session_state:
+        st.session_state.auth_user_id = None
+    if "auth_username" not in st.session_state:
+        st.session_state.auth_username = None
+    if "auth_is_guest" not in st.session_state:
+        st.session_state.auth_is_guest = False
+    if "projects_dir" not in st.session_state:
+        st.session_state.projects_dir = None
     if "project" not in st.session_state:
         st.session_state.project = None
     if "page" not in st.session_state:
@@ -923,6 +1052,14 @@ def _run_ui():
     AppConfig.OPENAI_API_KEY = st.session_state.openai_api_key
     AppConfig.OPENAI_MODEL = st.session_state.openai_model
 
+    if st.session_state.auth_user and not st.session_state.projects_dir:
+        if st.session_state.auth_is_guest:
+            guest_id = st.session_state.get("guest_id") or st.session_state.auth_user_id or str(uuid.uuid4())
+            st.session_state.guest_id = guest_id
+            st.session_state.projects_dir = get_guest_projects_dir(guest_id)
+        elif st.session_state.auth_user_id:
+            st.session_state.projects_dir = get_user_projects_dir(st.session_state.auth_user_id)
+
     # Reliable navigation rerun (avoids Streamlit edge cases when returning early)
     if st.session_state.get("_force_nav"):
         st.session_state._force_nav = False
@@ -938,33 +1075,78 @@ def _run_ui():
         if st.session_state.project and st.session_state.auto_save:
             st.session_state.project.save()
 
+    def get_active_projects_dir() -> str:
+        return st.session_state.get("projects_dir") or AppConfig.PROJECTS_DIR
+
     def render_auth():
         st.markdown(
             """
             <div style="max-width:480px;margin:0 auto;padding:24px 12px;">
                 <h2 style="margin-bottom:8px;">Welcome to MANTIS Studio</h2>
                 <p style="margin-top:0;color:#9aa4b2;">
-                    Enter a display name to start your session.
+                    Sign in or create an account to keep your projects saved.
                 </p>
             </div>
             """,
             unsafe_allow_html=True,
         )
+        tabs = st.tabs(["Sign In", "Create Account", "Guest"])
 
-        name = st.text_input("Display name", key="auth_name_input", placeholder="e.g. Alex Writer")
-        cols = st.columns([1, 1])
-        with cols[0]:
-            if st.button("Enter Studio", use_container_width=True):
-                cleaned = (name or "").strip()
-                if not cleaned:
-                    st.error("Please enter a display name to continue.")
+        with tabs[0]:
+            username = st.text_input("Username", key="auth_login_username", placeholder="e.g. alex")
+            password = st.text_input("Password", type="password", key="auth_login_password")
+            if st.button("Sign In", use_container_width=True):
+                result = authenticate_user(username, password)
+                if not result.get("ok"):
+                    st.error(result.get("error", "Sign in failed."))
                 else:
-                    st.session_state.auth_user = cleaned
+                    user = result["user"]
+                    st.session_state.auth_user = user["display_name"]
+                    st.session_state.auth_user_id = user["id"]
+                    st.session_state.auth_username = user["username"]
+                    st.session_state.auth_is_guest = False
+                    st.session_state.projects_dir = get_user_projects_dir(user["id"])
                     st.session_state._force_nav = True
                     st.rerun()
-        with cols[1]:
+
+        with tabs[1]:
+            display_name = st.text_input(
+                "Display name",
+                key="auth_create_display_name",
+                placeholder="e.g. Alex Writer",
+            )
+            new_username = st.text_input("Username", key="auth_create_username", placeholder="e.g. alex")
+            new_password = st.text_input("Password", type="password", key="auth_create_password")
+            confirm_password = st.text_input("Confirm password", type="password", key="auth_create_confirm")
+            if st.button("Create Account", type="primary", use_container_width=True):
+                if new_password != confirm_password:
+                    st.error("Passwords do not match.")
+                elif len(new_password or "") < 6:
+                    st.error("Password must be at least 6 characters.")
+                else:
+                    result = create_user(new_username, display_name, new_password)
+                    if not result.get("ok"):
+                        st.error(result.get("error", "Could not create account."))
+                    else:
+                        user = result["user"]
+                        st.session_state.auth_user = user["display_name"]
+                        st.session_state.auth_user_id = user["id"]
+                        st.session_state.auth_username = user["username"]
+                        st.session_state.auth_is_guest = False
+                        st.session_state.projects_dir = get_user_projects_dir(user["id"])
+                        st.session_state._force_nav = True
+                        st.rerun()
+
+        with tabs[2]:
+            st.caption("Guest sessions store projects separately and may be cleared by the host.")
             if st.button("Continue as Guest", use_container_width=True):
+                guest_id = st.session_state.get("guest_id") or str(uuid.uuid4())
+                st.session_state.guest_id = guest_id
                 st.session_state.auth_user = "Guest"
+                st.session_state.auth_user_id = guest_id
+                st.session_state.auth_username = "guest"
+                st.session_state.auth_is_guest = True
+                st.session_state.projects_dir = get_guest_projects_dir(guest_id)
                 st.session_state._force_nav = True
                 st.rerun()
 
@@ -1078,6 +1260,18 @@ def _run_ui():
         st.markdown("---")
         st.markdown("### 🧠 AI Engine")
         st.caption(f"Signed in as **{st.session_state.auth_user}**")
+        if st.session_state.auth_username and not st.session_state.auth_is_guest:
+            st.caption(f"@{st.session_state.auth_username}")
+        if st.button("Sign out", use_container_width=True):
+            st.session_state.auth_user = None
+            st.session_state.auth_user_id = None
+            st.session_state.auth_username = None
+            st.session_state.auth_is_guest = False
+            st.session_state.projects_dir = None
+            st.session_state.project = None
+            st.session_state.page = "home"
+            st.session_state._force_nav = True
+            st.rerun()
 
         provider = st.selectbox("Provider", ["Ollama", "OpenAI"], key="ai_provider")
 
@@ -1088,6 +1282,7 @@ def _run_ui():
                 AppConfig.OLLAMA_API_URL = ollama_url
                 st.cache_data.clear()
                 refresh_models()
+            st.caption("Ollama must be reachable from the server hosting MANTIS Studio.")
 
             if not st.session_state.model_list:
                 refresh_models()
@@ -1156,7 +1351,7 @@ def _run_ui():
             p = st.session_state.project
             st.markdown("### 📖 Project")
             st.caption(p.title)
-            st.caption(f"🗂 Projects folder: `{AppConfig.PROJECTS_DIR}`")
+            st.caption(f"🗂 Projects folder: `{get_active_projects_dir()}`")
             st.caption(f"📚 Total words: {p.get_total_word_count()}")
 
             st.divider()
@@ -1253,7 +1448,12 @@ def _run_ui():
                                 logger.warning("AI title/genre helper failed", exc_info=True)
                                 st.warning(f"AI title/genre helper failed: {e}")
                         # Fall back to defaults if still empty
-                        p = Project.create(t, author=a, genre=g or "General Fiction")
+                        p = Project.create(
+                            t,
+                            author=a,
+                            genre=g or "General Fiction",
+                            storage_dir=get_active_projects_dir(),
+                        )
                         p.save()
                         st.session_state.project = p
                         st.session_state.page = "outline"
@@ -1267,7 +1467,7 @@ def _run_ui():
                 if uf:
                     txt = uf.read().decode("utf-8", errors="replace")
                     if st.button("Import & Analyze", use_container_width=True):
-                        p = Project.create("Imported Project")
+                        p = Project.create("Imported Project", storage_dir=get_active_projects_dir())
                         p.import_text_file(txt)
                         p.save()
                         st.session_state.project = p
@@ -1281,10 +1481,11 @@ def _run_ui():
                 st.caption("Click to open. Use 🗑 to delete the file from disk.")
 
                 files = []
-                if os.path.exists(AppConfig.PROJECTS_DIR):
+                active_dir = get_active_projects_dir()
+                if os.path.exists(active_dir):
                     files = sorted(
-                        [f for f in os.listdir(AppConfig.PROJECTS_DIR) if f.endswith(".json")],
-                        key=lambda x: os.path.getmtime(os.path.join(AppConfig.PROJECTS_DIR, x)),
+                        [f for f in os.listdir(active_dir) if f.endswith(".json")],
+                        key=lambda x: os.path.getmtime(os.path.join(active_dir, x)),
                         reverse=True,
                     )
 
@@ -1292,7 +1493,7 @@ def _run_ui():
                     st.info("📭 No projects yet. Create one on the left to get started.")
                 else:
                     for f in files[:30]:
-                        full = os.path.join(AppConfig.PROJECTS_DIR, f)
+                        full = os.path.join(active_dir, f)
                         try:
                             with open(full, "r", encoding="utf-8") as fh:
                                 meta = json.load(fh)
