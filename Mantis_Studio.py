@@ -937,6 +937,36 @@ def _run_ui():
         if st.session_state.project and st.session_state.auto_save:
             st.session_state.project.save()
 
+    def render_auth():
+        st.markdown(
+            """
+            <div style="max-width:480px;margin:0 auto;padding:24px 12px;">
+                <h2 style="margin-bottom:8px;">Welcome to MANTIS Studio</h2>
+                <p style="margin-top:0;color:#9aa4b2;">
+                    Enter a display name to start your session.
+                </p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        name = st.text_input("Display name", key="auth_name_input", placeholder="e.g. Alex Writer")
+        cols = st.columns([1, 1])
+        with cols[0]:
+            if st.button("Enter Studio", use_container_width=True):
+                cleaned = (name or "").strip()
+                if not cleaned:
+                    st.error("Please enter a display name to continue.")
+                else:
+                    st.session_state.auth_user = cleaned
+                    st.session_state._force_nav = True
+                    st.rerun()
+        with cols[1]:
+            if st.button("Continue as Guest", use_container_width=True):
+                st.session_state.auth_user = "Guest"
+                st.session_state._force_nav = True
+                st.rerun()
+
     @st.cache_data(show_spinner=False)
     def _cached_models(base_url: str) -> List[str]:
         return AIEngine().probe_models()
