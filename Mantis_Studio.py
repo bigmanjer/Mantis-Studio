@@ -67,6 +67,16 @@ REPAIR_MODE = "--repair" in sys.argv
 # 1) CONFIG
 # ============================================================
 
+def _is_running_in_docker() -> bool:
+    if os.path.exists("/.dockerenv"):
+        return True
+    try:
+        with open("/proc/1/cgroup", "r", encoding="utf-8") as fh:
+            content = fh.read()
+        return any(marker in content for marker in ("docker", "kubepods", "containerd"))
+    except Exception:
+        return False
+
 class AppConfig:
     APP_NAME = "MANTIS Studio"
     VERSION = "47 (Chronicle • One-File)"
@@ -78,7 +88,12 @@ class AppConfig:
     )
     USERS_DIR = os.getenv("MANTIS_USERS_DIR", os.path.join(PROJECTS_DIR, "users"))
     GUESTS_DIR = os.getenv("MANTIS_GUESTS_DIR", os.path.join(PROJECTS_DIR, "guests"))
-    OLLAMA_API_URL = os.getenv("OLLAMA_API_URL", "http://localhost:11434")
+    DEFAULT_OLLAMA_URL = (
+        "http://host.docker.internal:11434"
+        if _is_running_in_docker()
+        else "http://localhost:11434"
+    )
+    OLLAMA_API_URL = os.getenv("OLLAMA_API_URL", DEFAULT_OLLAMA_URL)
     OLLAMA_TIMEOUT = int(os.getenv("OLLAMA_TIMEOUT", "300"))
     DEFAULT_MODEL = os.getenv("OLLAMA_MODEL", "mistral:latest")
     OPENAI_API_URL = os.getenv("OPENAI_API_URL", "https://api.openai.com/v1")
