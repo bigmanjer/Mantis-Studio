@@ -1196,19 +1196,6 @@ def _run_ui():
         except Exception as exc:
             return False, str(exc)
 
-    def format_ollama_error(error_message: str) -> str:
-        if not error_message:
-            return "Check the base URL and server."
-        lowered = error_message.lower()
-        if "connection refused" in lowered or "failed to establish a new connection" in lowered:
-            return (
-                "Connection refused. Is Ollama running? Try `ollama serve`, "
-                "and ensure the host/port are reachable from this server."
-            )
-        if "timed out" in lowered or "timeout" in lowered:
-            return "Connection timed out. Verify network access to the Ollama host and port."
-        return error_message
-
     def test_openai_connection(base_url: str, api_key: str) -> bool:
         if not api_key:
             return False
@@ -1333,8 +1320,7 @@ def _run_ui():
                 if ok:
                     st.success("Ollama connection OK.")
                 else:
-                    friendly_error = format_ollama_error(error_message)
-                    st.error(f"Could not reach Ollama. {friendly_error}")
+                    st.error(f"Could not reach Ollama. {error_message or 'Check the base URL and server.'}")
         else:
             openai_url = st.text_input("OpenAI Base URL", value=st.session_state.openai_base_url)
             if openai_url != st.session_state.openai_base_url:
