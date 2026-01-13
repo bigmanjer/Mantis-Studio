@@ -80,43 +80,6 @@ def _is_running_in_docker() -> bool:
     except Exception:
         return False
 
-
-def _can_resolve_host(hostname: str) -> bool:
-    try:
-        socket.gethostbyname(hostname)
-        return True
-    except Exception:
-        return False
-
-
-def _detect_docker_gateway_ip() -> Optional[str]:
-    try:
-        with open("/proc/net/route", "r", encoding="utf-8") as fh:
-            for line in fh:
-                fields = line.strip().split()
-                if len(fields) < 3:
-                    continue
-                iface, dest, gateway = fields[:3]
-                if dest != "00000000":
-                    continue
-                ip = socket.inet_ntoa(struct.pack("<L", int(gateway, 16)))
-                if ip and ip != "0.0.0.0":
-                    return ip
-    except Exception:
-        return None
-    return None
-
-
-def _pick_default_ollama_url() -> str:
-    if not _is_running_in_docker():
-        return "http://localhost:11434"
-    if _can_resolve_host("host.docker.internal"):
-        return "http://host.docker.internal:11434"
-    gateway = _detect_docker_gateway_ip()
-    if gateway:
-        return f"http://{gateway}:11434"
-    return "http://localhost:11434"
-
 class AppConfig:
     APP_NAME = "MANTIS Studio"
     VERSION = "47 (Chronicle • One-File)"
@@ -128,7 +91,11 @@ class AppConfig:
     )
     USERS_DIR = os.getenv("MANTIS_USERS_DIR", os.path.join(PROJECTS_DIR, "users"))
     GUESTS_DIR = os.getenv("MANTIS_GUESTS_DIR", os.path.join(PROJECTS_DIR, "guests"))
-    DEFAULT_OLLAMA_URL = _pick_default_ollama_url()
+    DEFAULT_OLLAMA_URL = (
+        "http://host.docker.internal:11434"
+        if _is_running_in_docker()
+        else "http://localhost:11434"
+    )
     OLLAMA_API_URL = os.getenv("OLLAMA_API_URL", DEFAULT_OLLAMA_URL)
     OLLAMA_TIMEOUT = int(os.getenv("OLLAMA_TIMEOUT", "300"))
     DEFAULT_MODEL = os.getenv("OLLAMA_MODEL", "mistral:latest")
