@@ -80,10 +80,6 @@ class AppConfig:
         "MANTIS_CONFIG_PATH",
         os.path.join(PROJECTS_DIR, ".mantis_config.json"),
     )
-    USERS_PATH = os.getenv(
-        "MANTIS_USERS_PATH",
-        os.path.join(PROJECTS_DIR, ".mantis_users.json"),
-    )
     MAX_PROMPT_CHARS = 16000
     SUMMARY_CONTEXT_CHARS = 4000
 
@@ -114,38 +110,6 @@ def save_app_config(data: Dict[str, str]) -> None:
             json.dump(data, fh, indent=2)
     except Exception:
         logger.warning("Failed to save app config", exc_info=True)
-
-
-def load_users() -> Dict[str, Dict[str, str]]:
-    try:
-        with open(AppConfig.USERS_PATH, "r", encoding="utf-8") as fh:
-            data = json.load(fh)
-            if isinstance(data, dict):
-                return data.get("users", {}) if "users" in data else data
-    except FileNotFoundError:
-        return {}
-    except Exception:
-        logger.warning("Failed to load users", exc_info=True)
-    return {}
-
-
-def save_users(users: Dict[str, Dict[str, str]]) -> None:
-    try:
-        with open(AppConfig.USERS_PATH, "w", encoding="utf-8") as fh:
-            json.dump({"users": users}, fh, indent=2)
-    except Exception:
-        logger.warning("Failed to save users", exc_info=True)
-
-
-def _hash_password(password: str, salt_hex: Optional[str] = None) -> Dict[str, str]:
-    salt = bytes.fromhex(salt_hex) if salt_hex else os.urandom(16)
-    hashed = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, 100000)
-    return {"salt": salt.hex(), "hash": hashed.hex()}
-
-
-def verify_password(password: str, salt_hex: str, hash_hex: str) -> bool:
-    data = _hash_password(password, salt_hex)
-    return data["hash"] == hash_hex
 
 
 # ============================================================
@@ -761,7 +725,6 @@ def _run_ui():
     st.set_page_config(page_title=AppConfig.APP_NAME, layout="wide")
 
     config_data = load_app_config()
-    users_data = load_users()
 
     # --- BRAND HEADER (UI only) ---
     st.markdown(f"""
@@ -941,15 +904,15 @@ def _run_ui():
     if "model_list" not in st.session_state:
         st.session_state.model_list = []
     if "ai_provider" not in st.session_state:
-        st.session_state.ai_provider = "Ollama"
+        st.session_state.ai_provider = config_data.get("ai_provider", "Ollama")
     if "ollama_base_url" not in st.session_state:
-        st.session_state.ollama_base_url = AppConfig.OLLAMA_API_URL
+        st.session_state.ollama_base_url = config_data.get("ollama_base_url", AppConfig.OLLAMA_API_URL)
     if "openai_base_url" not in st.session_state:
-        st.session_state.openai_base_url = AppConfig.OPENAI_API_URL
+        st.session_state.openai_base_url = config_data.get("openai_base_url", AppConfig.OPENAI_API_URL)
     if "openai_api_key" not in st.session_state:
-        st.session_state.openai_api_key = AppConfig.OPENAI_API_KEY
+        st.session_state.openai_api_key = config_data.get("openai_api_key", AppConfig.OPENAI_API_KEY)
     if "openai_model" not in st.session_state:
-        st.session_state.openai_model = AppConfig.OPENAI_MODEL
+        st.session_state.openai_model = config_data.get("openai_model", AppConfig.OPENAI_MODEL)
 
     if "_force_nav" not in st.session_state:
         st.session_state._force_nav = False
@@ -981,70 +944,8 @@ def _run_ui():
     def refresh_models():
         st.session_state.model_list = _cached_models(AppConfig.OLLAMA_API_URL) or []
 
-    def apply_user_config(username: str):
-        user_configs = config_data.get("users", {}) if isinstance(config_data, dict) else {}
-        stored = user_configs.get(username, {})
-        st.session_state.ai_provider = stored.get("ai_provider", st.session_state.ai_provider)
-        st.session_state.ollama_base_url = stored.get("ollama_base_url", st.session_state.ollama_base_url)
-        st.session_state.openai_base_url = stored.get("openai_base_url", st.session_state.openai_base_url)
-        st.session_state.openai_api_key = stored.get("openai_api_key", st.session_state.openai_api_key)
-        st.session_state.openai_model = stored.get("openai_model", st.session_state.openai_model)
-        AppConfig.OLLAMA_API_URL = st.session_state.ollama_base_url
-        AppConfig.OPENAI_API_URL = st.session_state.openai_base_url
-        AppConfig.OPENAI_API_KEY = st.session_state.openai_api_key
-        AppConfig.OPENAI_MODEL = st.session_state.openai_model
-        st.cache_data.clear()
-        refresh_models()
-
-    if st.session_state.auth_user and not st.session_state.get("_user_config_loaded"):
-        apply_user_config(st.session_state.auth_user)
-        st.session_state._user_config_loaded = True
-
-    def render_auth():
-        st.markdown("## 🔐 Sign in to MANTIS Studio")
-        if not users_data:
-            st.info("No users yet. Create the first admin account to get started.")
-        with st.form("auth_form", clear_on_submit=False):
-            username = st.text_input("Username")
-            password = st.text_input("Password", type="password")
-            create = st.checkbox("Create a new account", value=not bool(users_data))
-            submit = st.form_submit_button("Continue", type="primary", use_container_width=True)
-            if submit:
-                clean_user = (username or "").strip().lower()
-                if len(clean_user) < 3:
-                    st.error("Username must be at least 3 characters.")
-                    return
-                if len(password) < 8:
-                    st.error("Password must be at least 8 characters.")
-                    return
-                existing = users_data.get(clean_user)
-                if create:
-                    if existing:
-                        st.error("That username already exists.")
-                        return
-                    users_data[clean_user] = _hash_password(password)
-                    save_users(users_data)
-                    st.session_state.auth_user = clean_user
-                    apply_user_config(clean_user)
-                    st.success("Account created. You're signed in.")
-                    st.rerun()
-                else:
-                    if not existing:
-                        st.error("Account not found. Enable 'Create a new account' to register.")
-                        return
-                    if not verify_password(password, existing.get("salt", ""), existing.get("hash", "")):
-                        st.error("Incorrect password.")
-                        return
-                    st.session_state.auth_user = clean_user
-                    apply_user_config(clean_user)
-                    st.success("Signed in.")
-                    st.rerun()
-
     def save_provider_settings():
-        data = load_app_config()
-        user_key = st.session_state.auth_user or "default"
-        data.setdefault("users", {})
-        data["users"][user_key] = {
+        data = {
             "ai_provider": st.session_state.ai_provider,
             "ollama_base_url": st.session_state.ollama_base_url,
             "openai_base_url": st.session_state.openai_base_url,
@@ -1167,12 +1068,25 @@ def _run_ui():
 
             st.selectbox("🧠 AI Model", models, index=idx, key="selected_model")
 
-            if st.button("⚡ Use Local Ollama (localhost:11434)", use_container_width=True):
-                st.session_state.ollama_base_url = "http://localhost:11434"
-                AppConfig.OLLAMA_API_URL = st.session_state.ollama_base_url
+        provider = st.selectbox("Provider", ["Ollama", "OpenAI"], key="ai_provider")
+
+        if provider == "Ollama":
+            ollama_url = st.text_input("Ollama Base URL", value=st.session_state.ollama_base_url)
+            if ollama_url != st.session_state.ollama_base_url:
+                st.session_state.ollama_base_url = ollama_url
+                AppConfig.OLLAMA_API_URL = ollama_url
                 st.cache_data.clear()
                 refresh_models()
-                st.toast("Ollama base URL set to localhost.")
+
+            if not st.session_state.model_list:
+                refresh_models()
+            models = st.session_state.model_list or ["Offline"]
+
+            idx = 0
+            if AppConfig.DEFAULT_MODEL in models:
+                idx = models.index(AppConfig.DEFAULT_MODEL)
+
+            st.selectbox("🧠 AI Model", models, index=idx, key="selected_model")
 
             if st.button("🔌 Test Ollama Connection", use_container_width=True):
                 ok = test_ollama_connection(st.session_state.ollama_base_url)
@@ -1225,25 +1139,6 @@ def _run_ui():
 
         if st.button("💾 Save Provider Settings", use_container_width=True):
             save_provider_settings()
-
-        with st.expander("🌐 Deployment & Hosting", expanded=False):
-            st.markdown(
-                "- **Public access** requires hosting both the Streamlit app and an "
-                "Ollama endpoint (or using OpenAI)."
-            )
-            st.markdown(
-                "- **Local use** works with a local Ollama install (localhost:11434)."
-            )
-            st.markdown(
-                "- For hosted Ollama, set the **Ollama Base URL** to your cloud endpoint."
-            )
-
-        if st.button("🚪 Sign out", use_container_width=True):
-            st.session_state.auth_user = None
-            st.session_state.project = None
-            st.session_state.page = "home"
-            st.rerun()
-
         st.divider()
 
         if st.session_state.project:
