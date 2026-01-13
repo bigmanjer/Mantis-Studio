@@ -1483,13 +1483,20 @@ def _run_ui():
 
             if not st.session_state.model_list:
                 refresh_models()
-            models = st.session_state.model_list or ["Offline"]
+            models = st.session_state.model_list or []
 
-            idx = 0
-            if AppConfig.DEFAULT_MODEL in models:
-                idx = models.index(AppConfig.DEFAULT_MODEL)
-
-            st.selectbox("🧠 AI Model", models, index=idx, key="selected_model")
+            if models:
+                idx = 0
+                if AppConfig.DEFAULT_MODEL in models:
+                    idx = models.index(AppConfig.DEFAULT_MODEL)
+                st.selectbox("🧠 AI Model", models, index=idx, key="selected_model")
+            else:
+                st.warning("No Ollama models detected. Enter a model name manually or pull one in Ollama.")
+                st.text_input(
+                    "🧠 AI Model (manual)",
+                    value=st.session_state.get("selected_model", AppConfig.DEFAULT_MODEL),
+                    key="selected_model",
+                )
 
             if st.button("🔌 Test Ollama Connection", use_container_width=True):
                 ok, error_message = test_ollama_connection(st.session_state.ollama_base_url)
