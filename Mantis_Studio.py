@@ -72,6 +72,13 @@ class AppConfig:
     OLLAMA_API_URL = os.getenv("OLLAMA_API_URL", "http://localhost:11434")
     OLLAMA_TIMEOUT = int(os.getenv("OLLAMA_TIMEOUT", "300"))
     DEFAULT_MODEL = os.getenv("OLLAMA_MODEL", "mistral:latest")
+    OPENAI_API_URL = os.getenv("OPENAI_API_URL", "https://api.openai.com/v1")
+    OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+    OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+    CONFIG_PATH = os.getenv(
+        "MANTIS_CONFIG_PATH",
+        os.path.join(PROJECTS_DIR, ".mantis_config.json"),
+    )
     MAX_PROMPT_CHARS = 16000
     SUMMARY_CONTEXT_CHARS = 4000
 
@@ -81,6 +88,27 @@ os.makedirs(AppConfig.BACKUPS_DIR, exist_ok=True)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("MANTIS")
+
+
+def load_app_config() -> Dict[str, str]:
+    try:
+        with open(AppConfig.CONFIG_PATH, "r", encoding="utf-8") as fh:
+            data = json.load(fh)
+            if isinstance(data, dict):
+                return data
+    except FileNotFoundError:
+        return {}
+    except Exception:
+        logger.warning("Failed to load app config", exc_info=True)
+    return {}
+
+
+def save_app_config(data: Dict[str, str]) -> None:
+    try:
+        with open(AppConfig.CONFIG_PATH, "w", encoding="utf-8") as fh:
+            json.dump(data, fh, indent=2)
+    except Exception:
+        logger.warning("Failed to save app config", exc_info=True)
 
 
 # ============================================================
@@ -365,6 +393,57 @@ class AIEngine:
             yield "AI is offline."
             return
 
+        if model.startswith("openai:"):
+            openai_model = model.split("openai:", 1)[1].strip()
+            if not openai_model:
+                yield "OpenAI model not configured."
+                return
+            api_key = (AppConfig.OPENAI_API_KEY or "").strip()
+            if not api_key:
+                yield "OpenAI API key not configured."
+                return
+
+            payload = {
+                "model": openai_model,
+                "messages": [{"role": "user", "content": prompt}],
+                "stream": True,
+            }
+            headers = {
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            }
+            try:
+                with self.session.post(
+                    f"{AppConfig.OPENAI_API_URL.rstrip('/')}/chat/completions",
+                    json=payload,
+                    headers=headers,
+                    stream=True,
+                    timeout=self.timeout,
+                ) as r:
+                    r.raise_for_status()
+                    for raw in r.iter_lines():
+                        if not raw:
+                            continue
+                        line = raw.decode("utf-8").strip()
+                        if not line.startswith("data:"):
+                            continue
+                        data = line.replace("data:", "", 1).strip()
+                        if data == "[DONE]":
+                            break
+                        try:
+                            chunk = json.loads(data)
+                        except json.JSONDecodeError:
+                            continue
+                        delta = chunk.get("choices", [{}])[0].get("delta", {})
+                        content = delta.get("content")
+                        if content:
+                            yield content
+                return
+            except Exception:
+                logger.warning("OpenAI generation failed", exc_info=True)
+                yield "OpenAI generation failed."
+                return
+
         payload = {
             "model": model,
             "prompt": (prompt or "")[-AppConfig.MAX_PROMPT_CHARS:],
@@ -644,6 +723,7 @@ def _run_ui():
 
     st.set_page_config(page_title=AppConfig.APP_NAME, layout="wide")
 
+    config_data = load_app_config()
 
     # --- BRAND HEADER (UI only) ---
     st.markdown(f"""
@@ -820,9 +900,24 @@ def _run_ui():
         st.session_state.first_run = True
     if "model_list" not in st.session_state:
         st.session_state.model_list = []
+    if "ai_provider" not in st.session_state:
+        st.session_state.ai_provider = config_data.get("ai_provider", "Ollama")
+    if "ollama_base_url" not in st.session_state:
+        st.session_state.ollama_base_url = config_data.get("ollama_base_url", AppConfig.OLLAMA_API_URL)
+    if "openai_base_url" not in st.session_state:
+        st.session_state.openai_base_url = config_data.get("openai_base_url", AppConfig.OPENAI_API_URL)
+    if "openai_api_key" not in st.session_state:
+        st.session_state.openai_api_key = config_data.get("openai_api_key", AppConfig.OPENAI_API_KEY)
+    if "openai_model" not in st.session_state:
+        st.session_state.openai_model = config_data.get("openai_model", AppConfig.OPENAI_MODEL)
 
     if "_force_nav" not in st.session_state:
         st.session_state._force_nav = False
+
+    AppConfig.OLLAMA_API_URL = st.session_state.ollama_base_url
+    AppConfig.OPENAI_API_URL = st.session_state.openai_base_url
+    AppConfig.OPENAI_API_KEY = st.session_state.openai_api_key
+    AppConfig.OPENAI_MODEL = st.session_state.openai_model
 
     # Reliable navigation rerun (avoids Streamlit edge cases when returning early)
     if st.session_state.get("_force_nav"):
@@ -830,6 +925,9 @@ def _run_ui():
         st.rerun()
 
     def get_ai_model() -> str:
+        provider = st.session_state.get("ai_provider", "Ollama")
+        if provider == "OpenAI":
+            return f"openai:{st.session_state.get('openai_model', AppConfig.OPENAI_MODEL)}"
         return st.session_state.get("selected_model", AppConfig.DEFAULT_MODEL)
 
     def save_p():
@@ -842,6 +940,39 @@ def _run_ui():
 
     def refresh_models():
         st.session_state.model_list = _cached_models(AppConfig.OLLAMA_API_URL) or []
+
+    def save_provider_settings():
+        data = {
+            "ai_provider": st.session_state.ai_provider,
+            "ollama_base_url": st.session_state.ollama_base_url,
+            "openai_base_url": st.session_state.openai_base_url,
+            "openai_api_key": st.session_state.openai_api_key,
+            "openai_model": st.session_state.openai_model,
+        }
+        save_app_config(data)
+        st.toast("Provider settings saved.")
+
+    def test_ollama_connection(base_url: str) -> bool:
+        try:
+            r = requests.get(f"{base_url.rstrip('/')}/api/tags", timeout=5)
+            r.raise_for_status()
+            return True
+        except Exception:
+            return False
+
+    def test_openai_connection(base_url: str, api_key: str) -> bool:
+        if not api_key:
+            return False
+        try:
+            r = requests.get(
+                f"{base_url.rstrip('/')}/models",
+                headers={"Authorization": f"Bearer {api_key}"},
+                timeout=5,
+            )
+            r.raise_for_status()
+            return True
+        except Exception:
+            return False
 
     def extract_entities_ui(text: str, label: str):
         """Scan text for entities and update the World Bible.
@@ -909,23 +1040,77 @@ def _run_ui():
         st.markdown("---")
         st.markdown("### 🧠 AI Engine")
 
-        if not st.session_state.model_list:
-            refresh_models()
-        models = st.session_state.model_list or ["Offline"]
+        provider = st.selectbox("Provider", ["Ollama", "OpenAI"], key="ai_provider")
 
-        idx = 0
-        if AppConfig.DEFAULT_MODEL in models:
-            idx = models.index(AppConfig.DEFAULT_MODEL)
+        if provider == "Ollama":
+            ollama_url = st.text_input("Ollama Base URL", value=st.session_state.ollama_base_url)
+            if ollama_url != st.session_state.ollama_base_url:
+                st.session_state.ollama_base_url = ollama_url
+                AppConfig.OLLAMA_API_URL = ollama_url
+                st.cache_data.clear()
+                refresh_models()
 
-        st.selectbox("🧠 AI Model", models, index=idx, key="selected_model")
+            if not st.session_state.model_list:
+                refresh_models()
+            models = st.session_state.model_list or ["Offline"]
+
+            idx = 0
+            if AppConfig.DEFAULT_MODEL in models:
+                idx = models.index(AppConfig.DEFAULT_MODEL)
+
+            st.selectbox("🧠 AI Model", models, index=idx, key="selected_model")
+
+            if st.button("🔌 Test Ollama Connection", use_container_width=True):
+                ok = test_ollama_connection(st.session_state.ollama_base_url)
+                if ok:
+                    st.success("Ollama connection OK.")
+                else:
+                    st.error("Could not reach Ollama. Check the base URL and server.")
+        else:
+            openai_url = st.text_input("OpenAI Base URL", value=st.session_state.openai_base_url)
+            if openai_url != st.session_state.openai_base_url:
+                st.session_state.openai_base_url = openai_url
+                AppConfig.OPENAI_API_URL = openai_url
+
+            openai_key = st.text_input(
+                "OpenAI API Key",
+                value=st.session_state.openai_api_key,
+                type="password",
+                help="Store your key locally in the session (not saved to disk).",
+            )
+            if openai_key != st.session_state.openai_api_key:
+                st.session_state.openai_api_key = openai_key
+                AppConfig.OPENAI_API_KEY = openai_key
+
+            openai_model = st.text_input("OpenAI Model", value=st.session_state.openai_model)
+            if openai_model != st.session_state.openai_model:
+                st.session_state.openai_model = openai_model
+                AppConfig.OPENAI_MODEL = openai_model
+
+            st.markdown(
+                "[Create an OpenAI account](https://platform.openai.com/signup) to get an API key."
+            )
+            if st.button("🔌 Test OpenAI Connection", use_container_width=True):
+                ok = test_openai_connection(
+                    st.session_state.openai_base_url,
+                    st.session_state.openai_api_key,
+                )
+                if ok:
+                    st.success("OpenAI connection OK.")
+                else:
+                    st.error("OpenAI connection failed. Check your key and base URL.")
+
         colm1, colm2 = st.columns([1, 1])
         with colm1:
             st.checkbox("Auto-save", key="auto_save")
         with colm2:
-            if st.button("↻ Refresh", use_container_width=True):
+            if provider == "Ollama" and st.button("↻ Refresh", use_container_width=True):
                 st.cache_data.clear()
                 refresh_models()
                 st.toast("Model list refreshed")
+
+        if st.button("💾 Save Provider Settings", use_container_width=True):
+            save_provider_settings()
 
         st.divider()
 
