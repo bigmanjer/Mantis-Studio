@@ -165,6 +165,7 @@ class Project:
     author: str = ""
     genre: str = ""
     outline: str = ""
+    memory: str = ""
     default_word_count: int = 1000
     world_db: Dict[str, Entity] = field(default_factory=dict)
     chapters: Dict[str, Chapter] = field(default_factory=dict)
@@ -311,6 +312,7 @@ class Project:
         proj.author = data.get("author", "")
         proj.genre = data.get("genre", "")
         proj.outline = data.get("outline", "")
+        proj.memory = data.get("memory", data.get("memory_notes", ""))
         proj.default_word_count = data.get("default_word_count", 1000)
         proj.created_at = data.get("created_at", time.time())
         proj.last_modified = data.get("last_modified", time.time())
@@ -545,6 +547,8 @@ class StoryEngine:
 
     @staticmethod
     def generate_chapter_prompt(project: Project, chapter_index: int, target_words: int) -> str:
+        memory_context = (project.memory or "").strip()[:1500]
+        memory_block = f"PROJECT MEMORY:\n{memory_context}\n\n" if memory_context else ""
         outline_context = (project.outline or "")[:3000]
         match = re.search(rf"(?i)Chapter {chapter_index}[:\s]+(.*?)(?=\n|$)", project.outline or "")
         if match:
@@ -564,6 +568,7 @@ class StoryEngine:
 
         prompt = (
             f"TITLE: {project.title}\nGENRE: {project.genre}\n"
+            f"{memory_block}"
             f"OUTLINE CONTEXT:\n{outline_context}\n\n"
             f"{story_so_far}"
             f"{prev_text}\n"
@@ -613,6 +618,9 @@ def project_to_markdown(project: Project) -> str:
     if project.outline:
         md.append("## Outline")
         md.append(project.outline + "\n")
+    if project.memory:
+        md.append("## Memory")
+        md.append(project.memory + "\n")
     md.append("## World Bible")
     for c in project.world_db.values():
         md.append(f"- **{c.name}** ({c.category}): {c.description}")
@@ -1258,13 +1266,89 @@ def _run_ui():
                         with d2:
                             st.caption(f"Created: {time.strftime('%Y-%m-%d', time.localtime(e.created_at))}")
 
+        def render_analytics():
+            with st.container(border=True):
+                st.markdown("### Analytics")
+                chaps = p.get_ordered_chapters()
+                total_words = p.get_total_word_count()
+                total_chapters = len(chaps)
+                avg_words = int(total_words / total_chapters) if total_chapters else 0
+                total_target = sum(c.target_words for c in chaps)
+
+                m1, m2, m3, m4 = st.columns(4)
+                m1.metric("Total Words", f"{total_words:,}")
+                m2.metric("Chapters", total_chapters)
+                m3.metric("Avg Words / Chapter", f"{avg_words:,}")
+                m4.metric("Target Words", f"{total_target:,}")
+
+                if chaps:
+                    df = pd.DataFrame(
+                        [
+                            {
+                                "Chapter": f"{c.index}. {c.title}",
+                                "Words": c.word_count,
+                                "Target": c.target_words,
+                            }
+                            for c in chaps
+                        ]
+                    )
+                    fig = px.bar(
+                        df,
+                        x="Chapter",
+                        y=["Words", "Target"],
+                        barmode="group",
+                        title="Chapter Word Counts vs Targets",
+                    )
+                    fig.update_layout(xaxis_title="", yaxis_title="Words", height=360, legend_title_text="")
+                    st.plotly_chart(fig, use_container_width=True)
+                else:
+                    st.info("📭 No chapters yet. Create chapters to unlock word count analytics.")
+
+                cat_counts: Dict[str, int] = {}
+                for ent in p.world_db.values():
+                    cat_counts[ent.category] = cat_counts.get(ent.category, 0) + 1
+
+                if cat_counts:
+                    st.markdown("#### World Bible Coverage")
+                    cat_df = pd.DataFrame(
+                        [{"Category": k, "Entries": v} for k, v in sorted(cat_counts.items())]
+                    )
+                    fig2 = px.bar(cat_df, x="Category", y="Entries", title="World Bible Entries by Category")
+                    fig2.update_layout(xaxis_title="", yaxis_title="Entries", height=300)
+                    st.plotly_chart(fig2, use_container_width=True)
+                else:
+                    st.info("No World Bible entries yet. Add or scan entities to see coverage.")
+
+        def render_memory():
+            with st.container(border=True):
+                st.markdown("### Memory")
+                st.caption("Store high-level canon details you want the AI to remember.")
+                mem_txt = st.text_area("Story Memory", p.memory, height=220, key="mem_txt")
+                if mem_txt != p.memory:
+                    p.memory = mem_txt
+                    save_p()
+
+                st.divider()
+                st.markdown("#### Chapter Summaries")
+                chaps = p.get_ordered_chapters()
+                if not chaps:
+                    st.info("📭 No chapters yet. Add chapters to start building a timeline.")
+                else:
+                    for c in chaps:
+                        label = f"{c.index}. {c.title or 'Untitled'}"
+                        with st.expander(label):
+                            if c.summary:
+                                st.write(c.summary)
+                            else:
+                                st.info("No summary yet. Generate one from the chapter editor.")
+
         with t1: render_cat("Character")
         with t2: render_cat("Location")
         with t3: render_cat("Item")
         with t4: render_cat("Lore")
         with t5: render_cat("Faction")
-        with t6: render_cat("Analytics")
-        with t7: render_cat("Memory")
+        with t6: render_analytics()
+        with t7: render_memory()
 
     def render_chapters():
         p = st.session_state.project
