@@ -374,8 +374,9 @@ class Project:
 # ============================================================
 
 class AIEngine:
-    def __init__(self, timeout: int = AppConfig.OLLAMA_TIMEOUT):
-        self.base_url = AppConfig.OLLAMA_API_URL.rstrip("/")
+    def __init__(self, timeout: int = AppConfig.OLLAMA_TIMEOUT, base_url: Optional[str] = None):
+        resolved_base = base_url or AppConfig.OLLAMA_API_URL
+        self.base_url = resolved_base.rstrip("/")
         self.timeout = timeout
         self.session = requests.Session()
 
@@ -969,7 +970,7 @@ def _run_ui():
 
     @st.cache_data(show_spinner=False)
     def _cached_models(base_url: str) -> List[str]:
-        return AIEngine().probe_models()
+        return AIEngine(base_url=base_url).probe_models()
 
     def refresh_models():
         st.session_state.model_list = _cached_models(AppConfig.OLLAMA_API_URL) or []
@@ -1198,7 +1199,6 @@ def _run_ui():
             )
             if pmap[nav] != st.session_state.page:
                 st.session_state.page = pmap[nav]
-                st.rerun()
                 st.rerun()
 
             st.divider()
