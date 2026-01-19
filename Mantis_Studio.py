@@ -2058,13 +2058,12 @@ def _run_ui():
         st.divider()
         st.markdown("### 🧭 Navigation")
 
-        nav_labels = ["Dashboard", "Roadmap", "AI Settings"]
-        pmap = {"Dashboard": "home", "Roadmap": "roadmap", "AI Settings": "ai"}
+        nav_labels = ["Dashboard", "AI Settings"]
+        pmap = {"Dashboard": "home", "AI Settings": "ai"}
         if st.session_state.project:
-            nav_labels = ["Dashboard", "Roadmap", "Outline", "Chapters", "World Bible", "Export", "AI Settings"]
+            nav_labels = ["Dashboard", "Outline", "Chapters", "World Bible", "Export", "AI Settings"]
             pmap = {
                 "Dashboard": "home",
-                "Roadmap": "roadmap",
                 "Outline": "outline",
                 "World Bible": "world",
                 "Chapters": "chapters",
@@ -2308,168 +2307,125 @@ and quick start modules so you can draft fast and refine later.
                         st.rerun()
 
         st.markdown("## Story Workspace")
-        st.caption("Create a project, resume a story, or import text to begin drafting.")
+        st.caption("A focused pipeline: start new work, import existing drafts, then manage your library.")
 
-        colA, colB = st.columns([1.1, 1.3])
-
-        with colA:
-            with st.container(border=True):
-                st.markdown("### ✨ New Project")
-                with st.form("new_project_form", clear_on_submit=False):
+        st.markdown(
+            """
+            <div class="mantis-section-header">
+                <div>
+                    <div class="mantis-section-title">1. Start a new project</div>
+                    <div class="mantis-hero-caption">Set a title, genre, and author details to build your base.</div>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        with st.container(border=True):
+            with st.form("new_project_form", clear_on_submit=False):
+                c1, c2 = st.columns([2, 1])
+                with c1:
                     t = st.text_input("Title", placeholder="e.g., The Chronicle of Ash")
+                with c2:
                     g = st.text_input("Genre", placeholder="e.g., Dark Fantasy, Sci-Fi Noir")
-                    a = st.text_input("Author (optional)", placeholder="Your name")
-                    submitted = st.form_submit_button("🚀 Initialize Project", type="primary", use_container_width=True)
-                    if submitted:
-                        # If title or genre are missing, try to use AI to fill them in.
-                        if not t or not g:
-                            try:
-                                with st.spinner("Generating missing title/genre using AI..."):
-                                    outline_hint = "A new story project with mystery and character development."
-                                    model = get_ai_model()
-                                    if not t:
-                                        t = AnalysisEngine.generate_title(outline_hint, g or "General Fiction", model)
-                                    if not g:
-                                        detected = AnalysisEngine.detect_genre(outline_hint, model) or ""
-                                        g = detected or (g or "General Fiction")
-                                    st.toast("AI filled missing fields")
-                            except Exception as e:
-                                logger.warning("AI title/genre helper failed", exc_info=True)
-                                st.warning(f"AI title/genre helper failed: {e}")
-                        # Fall back to defaults if still empty
-                        p = Project.create(
-                            t,
-                            author=a,
-                            genre=g or "General Fiction",
-                            storage_dir=get_active_projects_dir(),
-                        )
+                a = st.text_input("Author (optional)", placeholder="Your name")
+                submitted = st.form_submit_button("🚀 Initialize Project", type="primary", use_container_width=True)
+                if submitted:
+                    # If title or genre are missing, try to use AI to fill them in.
+                    if not t or not g:
+                        try:
+                            with st.spinner("Generating missing title/genre using AI..."):
+                                outline_hint = "A new story project with mystery and character development."
+                                model = get_ai_model()
+                                if not t:
+                                    t = AnalysisEngine.generate_title(outline_hint, g or "General Fiction", model)
+                                if not g:
+                                    detected = AnalysisEngine.detect_genre(outline_hint, model) or ""
+                                    g = detected or (g or "General Fiction")
+                                st.toast("AI filled missing fields")
+                        except Exception as e:
+                            logger.warning("AI title/genre helper failed", exc_info=True)
+                            st.warning(f"AI title/genre helper failed: {e}")
+                    # Fall back to defaults if still empty
+                    p = Project.create(
+                        t,
+                        author=a,
+                        genre=g or "General Fiction",
+                        storage_dir=get_active_projects_dir(),
+                    )
+                    p.save()
+                    st.session_state.project = p
+                    st.session_state.page = "outline"
+                    st.session_state.first_run = False
+                    st.rerun()
+
+        st.markdown(
+            """
+            <div class="mantis-section-header">
+                <div>
+                    <div class="mantis-section-title">2. Import an existing draft</div>
+                    <div class="mantis-hero-caption">Upload a .txt or .md file to split into chapters.</div>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        with st.container(border=True):
+            uf = st.file_uploader("Upload file", type=["txt", "md"])
+            if uf:
+                max_bytes = AppConfig.MAX_UPLOAD_MB * 1024 * 1024
+                uf_size = getattr(uf, "size", None)
+                if uf_size and uf_size > max_bytes:
+                    st.error(
+                        f"File too large. Max size is {AppConfig.MAX_UPLOAD_MB} MB."
+                    )
+                else:
+                    txt = uf.read().decode("utf-8", errors="replace")
+                    if st.button("Import & Analyze", use_container_width=True):
+                        p = Project.create("Imported Project", storage_dir=get_active_projects_dir())
+                        p.import_text_file(txt)
                         p.save()
                         st.session_state.project = p
-                        st.session_state.page = "outline"
+                        st.session_state.page = "chapters"
                         st.session_state.first_run = False
                         st.rerun()
 
-                st.divider()
-                st.markdown("### 📥 Import Story")
-                st.caption("Upload a .txt or .md and MANTIS will split it into chapters when possible.")
-                uf = st.file_uploader("Upload file", type=["txt", "md"])
-                if uf:
-                    max_bytes = AppConfig.MAX_UPLOAD_MB * 1024 * 1024
-                    uf_size = getattr(uf, "size", None)
-                    if uf_size and uf_size > max_bytes:
-                        st.error(
-                            f"File too large. Max size is {AppConfig.MAX_UPLOAD_MB} MB."
-                        )
-                    else:
-                        txt = uf.read().decode("utf-8", errors="replace")
-                        if st.button("Import & Analyze", use_container_width=True):
-                            p = Project.create("Imported Project", storage_dir=get_active_projects_dir())
-                            p.import_text_file(txt)
-                            p.save()
-                            st.session_state.project = p
-                            st.session_state.page = "chapters"
-                            st.session_state.first_run = False
-                            st.rerun()
-
-        with colB:
-            with st.container(border=True):
-                st.markdown("### 🕘 Recent Projects")
-                st.caption("Click to open. Use 🗑 to delete the file from disk.")
-
-                if not recent_projects:
-                    st.info("📭 No projects yet. Create one on the left to get started.")
-                else:
-                    for project_entry in recent_projects[:30]:
-                        full = project_entry["path"]
-                        try:
-                            meta = project_entry["meta"]
-                            filename = os.path.basename(full)
-                            title = meta.get("title") or filename
-                            genre = meta.get("genre") or ""
-                            row1, row2, row3 = st.columns([6, 2, 1])
-                            with row1:
-                                if st.button(f"📂 {title}", key=f"open_{full}", use_container_width=True):
-                                    st.session_state.project = Project.load(full)
-                                    st.session_state.page = "chapters"
-                                    st.session_state.first_run = False
-                                    st.rerun()
-                            with row2:
-                                st.caption(genre)
-                            with row3:
-                                if st.button("🗑", key=f"del_{full}", use_container_width=True):
-                                    Project.delete_file(full)
-                                    st.rerun()
-                        except Exception:
-                            logger.warning("Failed to load project metadata: %s", full, exc_info=True)
-
-    def render_roadmap():
-        st.markdown("## MANTIS Studio Project Plan & Enhancement Roadmap")
-        st.caption("Crafting the “Narrative Operating System” for writers.")
-
-        with st.container(border=True):
-            st.markdown("### 🔎 Vision & Objective")
-            st.write("Transform Mantis Studio into a Narrative Operating System that surpasses NovelAI.")
-
-        st.markdown("### 🧩 Key Features to Add & Enhance")
-        feature_cols = st.columns(3)
-        with feature_cols[0]:
-            with st.container(border=True):
-                st.markdown("**Long-Form Narrative**")
-                st.markdown("- Multi-Chapter Editor")
-                st.markdown("- Revision History")
-                st.markdown("- World Bible Integration")
-        with feature_cols[1]:
-            with st.container(border=True):
-                st.markdown("**Story & Genre Modules**")
-                st.markdown("- Genre Presets")
-                st.markdown("- Outline & Character Builders")
-                st.markdown("- Canon Consistency Checks")
-        with feature_cols[2]:
-            with st.container(border=True):
-                st.markdown("**Writer’s Toolbox**")
-                st.markdown("- Rewrite & Expand")
-                st.markdown("- Tone & Style Control")
-                st.markdown("- Entity Extraction")
-
-        st.markdown("### 🛠️ Development Phases")
-        phase_rows = st.columns(2)
-        with phase_rows[0]:
-            with st.container(border=True):
-                st.markdown("**Phase 1: Stability & Foundations**")
-                st.markdown("- State Management")
-                st.markdown("- Save/Load Projects")
-                st.markdown("- Session Fixes")
-        with phase_rows[1]:
-            with st.container(border=True):
-                st.markdown("**Phase 2: Achieve NovelAI Parity**")
-                st.markdown("- World Bible System")
-                st.markdown("- Generation History")
-                st.markdown("- Genre Presets")
-
-        phase_rows_2 = st.columns(2)
-        with phase_rows_2[0]:
-            with st.container(border=True):
-                st.markdown("**Phase 3: Competitive Advantage**")
-                st.markdown("- Advanced Toolbox")
-                st.markdown("- Canon Validation")
-                st.markdown("- Image Generation")
-        with phase_rows_2[1]:
-            with st.container(border=True):
-                st.markdown("**Phase 4: SaaS & Monetization**")
-                st.markdown("- User Accounts")
-                st.markdown("- Premium Tiers")
-                st.markdown("- Analytics")
-
-        with st.container(border=True):
-            st.markdown("### 📊 Success Metrics")
-            st.markdown("- User Engagement & Retention")
-            st.markdown("- Story Quality & Consistency")
-            st.markdown("- Revenue Growth")
-
         st.markdown(
-            "**Goal:** Elevate Mantis Studio to be the best-in-class writing platform with unmatched creative and "
-            "editing power."
+            """
+            <div class="mantis-section-header">
+                <div>
+                    <div class="mantis-section-title">3. Your recent projects</div>
+                    <div class="mantis-hero-caption">Open a project or clean up older drafts.</div>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
         )
+        with st.container(border=True):
+            if not recent_projects:
+                st.info("📭 No projects yet. Start a new project above to get going.")
+            else:
+                for project_entry in recent_projects[:30]:
+                    full = project_entry["path"]
+                    try:
+                        meta = project_entry["meta"]
+                        filename = os.path.basename(full)
+                        title = meta.get("title") or filename
+                        genre = meta.get("genre") or ""
+                        row1, row2, row3 = st.columns([6, 2, 1])
+                        with row1:
+                            if st.button(f"📂 {title}", key=f"open_{full}", use_container_width=True):
+                                st.session_state.project = Project.load(full)
+                                st.session_state.page = "chapters"
+                                st.session_state.first_run = False
+                                st.rerun()
+                        with row2:
+                            st.caption(genre)
+                        with row3:
+                            if st.button("🗑", key=f"del_{full}", use_container_width=True):
+                                Project.delete_file(full)
+                                st.rerun()
+                    except Exception:
+                        logger.warning("Failed to load project metadata: %s", full, exc_info=True)
 
     def render_outline():
         p = st.session_state.project
@@ -3033,8 +2989,6 @@ and quick start modules so you can draft fast and refine later.
 
     if st.session_state.page == "home":
         render_home()
-    elif st.session_state.page == "roadmap":
-        render_roadmap()
     elif st.session_state.page == "ai":
         render_ai_settings()
     elif st.session_state.project:
