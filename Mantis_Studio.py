@@ -1285,6 +1285,94 @@ def _run_ui():
     def get_active_projects_dir() -> str:
         return st.session_state.get("projects_dir") or AppConfig.PROJECTS_DIR
 
+    @st.cache_data(show_spinner=False)
+    def _cached_models(base_url: str, api_key: str) -> List[str]:
+        return AIEngine(base_url=base_url).probe_models(api_key)
+
+    def refresh_models():
+        st.session_state.groq_model_list = _cached_models(
+            st.session_state.groq_base_url,
+            st.session_state.groq_api_key,
+        ) or []
+
+    def save_app_settings():
+        data = {
+            "groq_base_url": st.session_state.groq_base_url,
+            "groq_api_key": st.session_state.groq_api_key,
+            "groq_model": st.session_state.groq_model,
+            "openai_base_url": st.session_state.openai_base_url,
+            "openai_api_key": st.session_state.openai_api_key,
+            "openai_model": st.session_state.openai_model,
+            "ui_theme": st.session_state.ui_theme,
+            "daily_word_goal": int(st.session_state.daily_word_goal),
+            "weekly_sessions_goal": int(st.session_state.weekly_sessions_goal),
+            "focus_minutes": int(st.session_state.focus_minutes),
+            "activity_log": list(st.session_state.activity_log),
+            "remember_me": bool(st.session_state.remember_me),
+        }
+        save_app_config(data)
+        st.toast("Settings saved.")
+
+    def save_auth_remember(user: Optional[Dict[str, Any]], is_guest: bool, remember: bool, guest_id: str = ""):
+        data = dict(config_data)
+        if remember and user:
+            data.update(
+                {
+                    "remember_me": True,
+                    "remembered_username": user.get("username", ""),
+                    "remembered_user_id": user.get("id", ""),
+                    "remembered_display_name": user.get("display_name", ""),
+                    "remembered_is_guest": bool(is_guest),
+                    "remembered_guest_id": guest_id or "",
+                }
+            )
+        else:
+            data.update(
+                {
+                    "remember_me": False,
+                    "remembered_username": "",
+                    "remembered_user_id": "",
+                    "remembered_display_name": "",
+                    "remembered_is_guest": False,
+                    "remembered_guest_id": "",
+                }
+            )
+        config_data.clear()
+        config_data.update(data)
+        st.session_state.remember_me = bool(data.get("remember_me", False))
+        save_app_config(data)
+
+    def _restore_remembered_session() -> None:
+        if st.session_state.auth_user or not config_data.get("remember_me"):
+            return
+        if config_data.get("remembered_is_guest"):
+            guest_id = config_data.get("remembered_guest_id") or str(uuid.uuid4())
+            st.session_state.guest_id = guest_id
+            st.session_state.auth_user = config_data.get("remembered_display_name") or "Guest"
+            st.session_state.auth_user_id = guest_id
+            st.session_state.auth_username = "guest"
+            st.session_state.auth_is_guest = True
+            st.session_state.projects_dir = get_guest_projects_dir(guest_id)
+            return
+
+        username = config_data.get("remembered_username", "")
+        user_id = config_data.get("remembered_user_id", "")
+        if not username or not user_id:
+            save_auth_remember(None, False, False)
+            return
+
+        data = load_users_db()
+        user = data.get("users", {}).get(username)
+        if not user or user.get("id") != user_id:
+            save_auth_remember(None, False, False)
+            return
+
+        st.session_state.auth_user = user.get("display_name") or username
+        st.session_state.auth_user_id = user.get("id")
+        st.session_state.auth_username = user.get("username")
+        st.session_state.auth_is_guest = False
+        st.session_state.projects_dir = get_user_projects_dir(user.get("id", ""))
+
     def render_auth():
         saved_username = config_data.get("last_username", "")
         st.checkbox(
@@ -1382,15 +1470,14 @@ def _run_ui():
                 st.session_state._force_nav = True
                 st.rerun()
 
-    @st.cache_data(show_spinner=False)
-    def _cached_models(base_url: str, api_key: str) -> List[str]:
-        return AIEngine(base_url=base_url).probe_models(api_key)
+    def _today_str() -> str:
+        return datetime.date.today().isoformat()
 
-    def refresh_models():
-        st.session_state.groq_model_list = _cached_models(
-            st.session_state.groq_base_url,
-            st.session_state.groq_api_key,
-        ) or []
+    def _parse_day(day: str) -> Optional[datetime.date]:
+        try:
+            return datetime.date.fromisoformat(day)
+        except ValueError:
+            return None
 
     def save_app_settings():
         data = {
@@ -1406,8 +1493,6 @@ def _run_ui():
             "focus_minutes": int(st.session_state.focus_minutes),
             "activity_log": list(st.session_state.activity_log),
         }
-        save_app_config(data)
-        st.toast("Settings saved.")
 
     def _today_str() -> str:
         return datetime.date.today().isoformat()
