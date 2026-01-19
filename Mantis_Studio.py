@@ -40,7 +40,6 @@ import sys
 
 # ===== v45 BRANDING (SAFE, ORIGINAL TEMPLATE) =====
 import base64
-from urllib.parse import urlparse
 
 _MANTIS_LOGO_PATH = "mantis_logo_trans.png"
 
@@ -67,16 +66,6 @@ REPAIR_MODE = "--repair" in sys.argv
 # 1) CONFIG
 # ============================================================
 
-def _is_running_in_docker() -> bool:
-    if os.path.exists("/.dockerenv"):
-        return True
-    try:
-        with open("/proc/1/cgroup", "r", encoding="utf-8") as fh:
-            content = fh.read()
-        return any(marker in content for marker in ("docker", "kubepods", "containerd"))
-    except Exception:
-        return False
-
 class AppConfig:
     APP_NAME = "MANTIS Studio"
     VERSION = "47 (Chronicle • One-File)"
@@ -88,50 +77,16 @@ class AppConfig:
     )
     USERS_DIR = os.getenv("MANTIS_USERS_DIR", os.path.join(PROJECTS_DIR, "users"))
     GUESTS_DIR = os.getenv("MANTIS_GUESTS_DIR", os.path.join(PROJECTS_DIR, "guests"))
-    DEFAULT_OLLAMA_URL = (
-        "http://host.docker.internal:11434"
-        if _is_running_in_docker()
-        else "http://localhost:11434"
-    )
-    OLLAMA_API_URL = os.getenv("OLLAMA_API_URL", DEFAULT_OLLAMA_URL)
-    OLLAMA_TIMEOUT = int(os.getenv("OLLAMA_TIMEOUT", "300"))
-    DEFAULT_MODEL = os.getenv("OLLAMA_MODEL", "mistral:latest")
-    OPENAI_API_URL = os.getenv("OPENAI_API_URL", "https://api.openai.com/v1")
-    OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
-    OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+    GROQ_API_URL = os.getenv("GROQ_API_URL", "https://api.groq.com/openai/v1")
+    GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
+    GROQ_TIMEOUT = int(os.getenv("GROQ_TIMEOUT", "300"))
+    DEFAULT_MODEL = os.getenv("GROQ_MODEL", "llama3-8b-8192")
     CONFIG_PATH = os.getenv(
         "MANTIS_CONFIG_PATH",
         os.path.join(PROJECTS_DIR, ".mantis_config.json"),
     )
     MAX_PROMPT_CHARS = 16000
     SUMMARY_CONTEXT_CHARS = 4000
-
-
-def normalize_ollama_base_url(url: str) -> str:
-    raw = (url or "").strip()
-    if not raw:
-        return AppConfig.OLLAMA_API_URL.rstrip("/")
-    if "://" not in raw:
-        raw = f"http://{raw}"
-    parsed = urlparse(raw)
-    path = parsed.path.rstrip("/")
-    if path.endswith("/api/v1"):
-        path = path[: -len("/api/v1")]
-    elif path.endswith("/api"):
-        path = path[: -len("/api")]
-    normalized = parsed._replace(path=path, params="", query="", fragment="").geturl()
-    return normalized.rstrip("/")
-
-
-def normalize_local_base_url(url: str) -> str:
-    raw = (url or "").strip()
-    if not raw:
-        return raw
-    if not _is_running_in_docker():
-        return raw
-    if "localhost" in raw or "127.0.0.1" in raw:
-        return raw.replace("127.0.0.1", "host.docker.internal").replace("localhost", "host.docker.internal")
-    return raw
 
 
 os.makedirs(AppConfig.PROJECTS_DIR, exist_ok=True)
@@ -538,190 +493,98 @@ class Project:
 # ============================================================
 
 class AIEngine:
-    def __init__(self, timeout: int = AppConfig.OLLAMA_TIMEOUT, base_url: Optional[str] = None):
-        resolved_base = normalize_ollama_base_url(base_url or AppConfig.OLLAMA_API_URL)
-        self.base_url = resolved_base
+    def __init__(self, timeout: int = AppConfig.GROQ_TIMEOUT, base_url: Optional[str] = None):
+        self.base_url = (base_url or AppConfig.GROQ_API_URL).rstrip("/")
         self.timeout = timeout
         self.session = requests.Session()
 
-    def probe_models(self) -> List[str]:
+    def probe_models(self, api_key: str) -> List[str]:
+        headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
         try:
-            r = self.session.get(f"{self.base_url}/api/tags", timeout=3)
+            r = self.session.get(f"{self.base_url}/models", headers=headers, timeout=5)
             r.raise_for_status()
             data = r.json()
-            return [m.get("name") for m in data.get("models", []) if m.get("name")]
+            return [m.get("id") for m in data.get("data", []) if m.get("id")]
         except Exception:
             logger.warning("Model probe failed for %s", self.base_url, exc_info=True)
             return []
 
     def generate_stream(self, prompt: str, model: str) -> Generator[str, None, None]:
-        if not model or "Offline" in model:
-            yield "AI is offline."
+        if not model:
+            yield "Groq model not configured."
             return
 
-        if model.startswith("openai:"):
-            openai_model = model.split("openai:", 1)[1].strip()
-            if not openai_model:
-                yield "OpenAI model not configured."
-                return
-            api_key = (AppConfig.OPENAI_API_KEY or "").strip()
-            openai_base = AppConfig.OPENAI_API_URL.rstrip("/")
-            if not api_key and "api.openai.com" in openai_base:
-                yield "OpenAI API key not configured."
-                return
+        api_key = (AppConfig.GROQ_API_KEY or "").strip()
+        if not api_key:
+            yield "Groq API key not configured."
+            return
 
-            headers = {"Content-Type": "application/json"}
-            if api_key:
-                headers["Authorization"] = f"Bearer {api_key}"
+        headers = {"Content-Type": "application/json"}
+        headers["Authorization"] = f"Bearer {api_key}"
 
-            def _openai_non_stream() -> Generator[str, None, None]:
-                payload = {
-                    "model": openai_model,
-                    "messages": [{"role": "user", "content": prompt}],
-                    "stream": False,
-                }
-                try:
-                    r = self.session.post(
-                        f"{openai_base}/chat/completions",
-                        json=payload,
-                        headers=headers,
-                        timeout=self.timeout,
-                    )
-                    r.raise_for_status()
-                    data = r.json()
-                    choice = (data.get("choices") or [{}])[0]
-                    content = (choice.get("message") or {}).get("content") or choice.get("text") or ""
-                    if content:
-                        yield content
-                    else:
-                        yield "OpenAI response empty."
-                except Exception:
-                    logger.warning("OpenAI non-stream generation failed", exc_info=True)
-                    yield "OpenAI generation failed."
-
+        def _groq_non_stream() -> Generator[str, None, None]:
             payload = {
-                "model": openai_model,
-                "messages": [{"role": "user", "content": prompt}],
-                "stream": True,
-            }
-            try:
-                with self.session.post(
-                    f"{openai_base}/chat/completions",
-                    json=payload,
-                    headers=headers,
-                    stream=True,
-                    timeout=self.timeout,
-                ) as r:
-                    r.raise_for_status()
-                    yielded = False
-                    for raw in r.iter_lines():
-                        if not raw:
-                            continue
-                        line = raw.decode("utf-8").strip()
-                        if not line.startswith("data:"):
-                            continue
-                        data = line.replace("data:", "", 1).strip()
-                        if data == "[DONE]":
-                            break
-                        try:
-                            chunk = json.loads(data)
-                        except json.JSONDecodeError:
-                            continue
-                        delta = chunk.get("choices", [{}])[0].get("delta", {})
-                        content = delta.get("content")
-                        if content:
-                            yielded = True
-                            yield content
-                    if not yielded:
-                        yield from _openai_non_stream()
-                return
-            except Exception:
-                logger.warning("OpenAI streaming generation failed, retrying non-stream", exc_info=True)
-                yield from _openai_non_stream()
-                return
-
-        payload = {
-            "model": model,
-            "prompt": (prompt or "")[-AppConfig.MAX_PROMPT_CHARS:],
-            "stream": True,
-            "options": {"num_ctx": 8192},
-        }
-
-        def _ollama_non_stream() -> Generator[str, None, None]:
-            payload_no_stream = {
                 "model": model,
-                "prompt": (prompt or "")[-AppConfig.MAX_PROMPT_CHARS:],
+                "messages": [{"role": "user", "content": prompt}],
                 "stream": False,
-                "options": {"num_ctx": 8192},
             }
             try:
                 r = self.session.post(
-                    f"{self.base_url}/api/generate",
-                    json=payload_no_stream,
+                    f"{self.base_url}/chat/completions",
+                    json=payload,
+                    headers=headers,
                     timeout=self.timeout,
                 )
                 r.raise_for_status()
                 data = r.json()
-                content = data.get("response", "")
+                choice = (data.get("choices") or [{}])[0]
+                content = (choice.get("message") or {}).get("content") or choice.get("text") or ""
                 if content:
                     yield content
                 else:
-                    yield "Ollama response empty."
+                    yield "Groq response empty."
             except Exception:
-                logger.error("Non-stream generation failed for %s", self.base_url, exc_info=True)
-                yield "Ollama generation failed."
+                logger.warning("Groq non-stream generation failed", exc_info=True)
+                yield "Groq generation failed."
 
+        payload = {
+            "model": model,
+            "messages": [{"role": "user", "content": prompt}],
+            "stream": True,
+        }
         try:
             with self.session.post(
-                f"{self.base_url}/api/generate",
+                f"{self.base_url}/chat/completions",
                 json=payload,
+                headers=headers,
                 stream=True,
                 timeout=self.timeout,
             ) as r:
                 r.raise_for_status()
-                buffer = ""
-                is_start = True
                 yielded = False
-
-                for line in r.iter_lines():
-                    if not line:
+                for raw in r.iter_lines():
+                    if not raw:
                         continue
-
+                    line = raw.decode("utf-8").strip()
+                    if not line.startswith("data:"):
+                        continue
+                    data = line.replace("data:", "", 1).strip()
+                    if data == "[DONE]":
+                        break
                     try:
-                        json_obj = json.loads(line.decode("utf-8"))
-                        chunk = json_obj.get("response", "")
-                        done = json_obj.get("done", False)
-
-                        if is_start:
-                            if not chunk.strip() and not done:
-                                continue
-                            buffer += chunk
-                            if len(buffer) < 40 and not done:
-                                continue
-                            clean = buffer
-                            clean = re.sub(r"(?i)^(sure|here|certainly|okay).*?:\s*", "", clean)
-                            clean = re.sub(r"(?i)^\*\*.*?\*\*\s*", "", clean)
-                            if clean:
-                                yielded = True
-                            yield clean
-                            is_start = False
-                            buffer = ""
-                        else:
-                            if chunk:
-                                yielded = True
-                                yield chunk
-
-                        if done and buffer:
-                            yielded = True
-                            yield buffer
-                    except Exception:
-                        logger.debug("Stream chunk parse failed from %s", self.base_url, exc_info=True)
+                        chunk = json.loads(data)
+                    except json.JSONDecodeError:
+                        continue
+                    delta = chunk.get("choices", [{}])[0].get("delta", {})
+                    content = delta.get("content")
+                    if content:
+                        yielded = True
+                        yield content
                 if not yielded:
-                    yield from _ollama_non_stream()
-
+                    yield from _groq_non_stream()
         except Exception:
-            logger.error("Stream generation failed for %s", self.base_url, exc_info=True)
-            yield from _ollama_non_stream()
+            logger.warning("Groq streaming generation failed, retrying non-stream", exc_info=True)
+            yield from _groq_non_stream()
 
     def generate(self, prompt: str, model: str) -> Dict[str, str]:
         full_text = ""
@@ -1275,32 +1138,23 @@ def _run_ui():
         st.session_state.ghost_text = ""
     if "first_run" not in st.session_state:
         st.session_state.first_run = True
-    if "model_list" not in st.session_state:
-        st.session_state.model_list = []
-    if "ai_provider" not in st.session_state:
-        st.session_state.ai_provider = config_data.get("ai_provider", "Ollama")
-    if "ollama_base_url" not in st.session_state:
-        st.session_state.ollama_base_url = normalize_ollama_base_url(
-            config_data.get("ollama_base_url", AppConfig.OLLAMA_API_URL)
-        )
-    if "openai_base_url" not in st.session_state:
-        st.session_state.openai_base_url = config_data.get("openai_base_url", AppConfig.OPENAI_API_URL)
-    if "openai_api_key" not in st.session_state:
-        st.session_state.openai_api_key = config_data.get("openai_api_key", AppConfig.OPENAI_API_KEY)
-    if "openai_model" not in st.session_state:
-        st.session_state.openai_model = config_data.get("openai_model", AppConfig.OPENAI_MODEL)
-    if "openai_model_list" not in st.session_state:
-        st.session_state.openai_model_list = []
-    if "openai_model_tests" not in st.session_state:
-        st.session_state.openai_model_tests = {}
+    if "groq_base_url" not in st.session_state:
+        st.session_state.groq_base_url = config_data.get("groq_base_url", AppConfig.GROQ_API_URL)
+    if "groq_api_key" not in st.session_state:
+        st.session_state.groq_api_key = config_data.get("groq_api_key", AppConfig.GROQ_API_KEY)
+    if "groq_model" not in st.session_state:
+        st.session_state.groq_model = config_data.get("groq_model", AppConfig.DEFAULT_MODEL)
+    if "groq_model_list" not in st.session_state:
+        st.session_state.groq_model_list = []
+    if "groq_model_tests" not in st.session_state:
+        st.session_state.groq_model_tests = {}
 
     if "_force_nav" not in st.session_state:
         st.session_state._force_nav = False
 
-    AppConfig.OLLAMA_API_URL = normalize_ollama_base_url(st.session_state.ollama_base_url)
-    AppConfig.OPENAI_API_URL = st.session_state.openai_base_url
-    AppConfig.OPENAI_API_KEY = st.session_state.openai_api_key
-    AppConfig.OPENAI_MODEL = st.session_state.openai_model
+    AppConfig.GROQ_API_URL = st.session_state.groq_base_url
+    AppConfig.GROQ_API_KEY = st.session_state.groq_api_key
+    AppConfig.DEFAULT_MODEL = st.session_state.groq_model
 
     if st.session_state.auth_user and not st.session_state.projects_dir:
         if st.session_state.auth_is_guest:
@@ -1316,10 +1170,7 @@ def _run_ui():
         st.rerun()
 
     def get_ai_model() -> str:
-        provider = st.session_state.get("ai_provider", "Ollama")
-        if provider == "OpenAI":
-            return f"openai:{st.session_state.get('openai_model', AppConfig.OPENAI_MODEL)}"
-        return st.session_state.get("selected_model", AppConfig.DEFAULT_MODEL)
+        return st.session_state.get("groq_model", AppConfig.DEFAULT_MODEL)
 
     def save_p():
         if st.session_state.project and st.session_state.auto_save:
@@ -1329,6 +1180,7 @@ def _run_ui():
         return st.session_state.get("projects_dir") or AppConfig.PROJECTS_DIR
 
     def render_auth():
+        saved_username = config_data.get("last_username", "")
         st.markdown(
             """
             <div style="max-width:480px;margin:0 auto;padding:24px 12px;">
@@ -1343,7 +1195,12 @@ def _run_ui():
         tabs = st.tabs(["Sign In", "Create Account", "Guest"])
 
         with tabs[0]:
-            username = st.text_input("Username", key="auth_login_username", placeholder="e.g. alex")
+            username = st.text_input(
+                "Username",
+                value=saved_username,
+                key="auth_login_username",
+                placeholder="e.g. alex",
+            )
             password = st.text_input("Password", type="password", key="auth_login_password")
             if st.button("Sign In", use_container_width=True):
                 result = authenticate_user(username, password)
@@ -1401,11 +1258,14 @@ def _run_ui():
                 st.rerun()
 
     @st.cache_data(show_spinner=False)
-    def _cached_models(base_url: str) -> List[str]:
-        return AIEngine(base_url=base_url).probe_models()
+    def _cached_models(base_url: str, api_key: str) -> List[str]:
+        return AIEngine(base_url=base_url).probe_models(api_key)
 
     def refresh_models():
-        st.session_state.model_list = _cached_models(AppConfig.OLLAMA_API_URL) or []
+        st.session_state.groq_model_list = _cached_models(
+            st.session_state.groq_base_url,
+            st.session_state.groq_api_key,
+        ) or []
 
     def save_app_settings():
         data = {
@@ -1419,33 +1279,7 @@ def _run_ui():
         save_app_config(data)
         st.toast("Settings saved.")
 
-    def test_ollama_connection(base_url: str) -> tuple[bool, str]:
-        try:
-            normalized = normalize_ollama_base_url(base_url)
-            r = requests.get(f"{normalized}/api/tags", timeout=5)
-            r.raise_for_status()
-            return True, ""
-        except Exception as exc:
-            hint = ""
-            base = base_url or ""
-            if "localhost" in base or "127.0.0.1" in base:
-                alt_base = base.replace("127.0.0.1", "host.docker.internal").replace("localhost", "host.docker.internal")
-                try:
-                    normalized_alt = normalize_ollama_base_url(alt_base)
-                    alt = requests.get(f"{normalized_alt}/api/tags", timeout=5)
-                    alt.raise_for_status()
-                    hint = (
-                        " Ollama is reachable at host.docker.internal. "
-                        "Update the base URL to host.docker.internal or your host IP."
-                    )
-                except Exception:
-                    hint = (
-                        " If MANTIS Studio runs in Docker or on another machine, "
-                        "use host.docker.internal or your host IP instead of localhost."
-                    )
-            return False, f"{exc}{hint}"
-
-    def test_openai_connection(base_url: str, api_key: str) -> bool:
+    def test_groq_connection(base_url: str, api_key: str) -> bool:
         headers = {}
         if api_key:
             headers["Authorization"] = f"Bearer {api_key}"
@@ -1460,7 +1294,7 @@ def _run_ui():
         except Exception:
             return False
 
-    def fetch_openai_models(base_url: str, api_key: str) -> tuple[List[str], str]:
+    def fetch_groq_models(base_url: str, api_key: str) -> tuple[List[str], str]:
         headers = {}
         if api_key:
             headers["Authorization"] = f"Bearer {api_key}"
@@ -1477,7 +1311,7 @@ def _run_ui():
         except Exception as exc:
             return [], str(exc)
 
-    def test_openai_model(base_url: str, api_key: str, model: str) -> tuple[bool, str]:
+    def test_groq_model(base_url: str, api_key: str, model: str) -> tuple[bool, str]:
         headers = {"Content-Type": "application/json"}
         if api_key:
             headers["Authorization"] = f"Bearer {api_key}"
@@ -1571,6 +1405,8 @@ def _run_ui():
         st.caption(f"Signed in as **{st.session_state.auth_user}**")
         if st.session_state.auth_username and not st.session_state.auth_is_guest:
             st.caption(f"@{st.session_state.auth_username}")
+        if st.button("💾 Save Account", use_container_width=True):
+            save_app_settings()
         if st.button("Sign out", use_container_width=True):
             st.session_state.auth_user = None
             st.session_state.auth_user_id = None
@@ -1602,128 +1438,96 @@ def _run_ui():
                 refresh_models()
             models = st.session_state.model_list or []
 
+        st.markdown("### 🤖 Groq AI")
+        groq_url = st.text_input("Groq Base URL", value=st.session_state.groq_base_url)
+        if groq_url != st.session_state.groq_base_url:
+            st.session_state.groq_base_url = groq_url
+            AppConfig.GROQ_API_URL = groq_url
+
+        groq_key = st.text_input(
+            "Groq API Key",
+            value=st.session_state.groq_api_key,
+            type="password",
+            help="Required for Groq cloud models.",
+        )
+        if groq_key != st.session_state.groq_api_key:
+            st.session_state.groq_api_key = groq_key
+            AppConfig.GROQ_API_KEY = groq_key
+
+        if st.button("↻ Fetch Models", use_container_width=True):
+            models, error_message = fetch_groq_models(
+                st.session_state.groq_base_url,
+                st.session_state.groq_api_key,
+            )
             if models:
-                idx = 0
-                if AppConfig.DEFAULT_MODEL in models:
-                    idx = models.index(AppConfig.DEFAULT_MODEL)
-                st.selectbox("🧠 AI Model", models, index=idx, key="selected_model")
+                st.session_state.groq_model_list = models
+                st.session_state.groq_model_tests = {}
+                st.toast(f"Loaded {len(models)} models.")
             else:
-                st.warning("No Ollama models detected. Enter a model name manually or pull one in Ollama.")
-                st.text_input(
-                    "🧠 AI Model (manual)",
-                    value=st.session_state.get("selected_model", AppConfig.DEFAULT_MODEL),
-                    key="selected_model",
-                )
+                st.session_state.groq_model_list = []
+                st.session_state.groq_model_tests = {}
+                st.error(f"Model fetch failed. {error_message or 'Check the base URL and key.'}")
 
-            if st.button("🔌 Test Ollama Connection", use_container_width=True):
-                ok, error_message = test_ollama_connection(st.session_state.ollama_base_url)
-                if ok:
-                    st.success("Ollama connection OK.")
+        if st.session_state.groq_model_list:
+            models = st.session_state.groq_model_list
+            idx = 0
+            if st.session_state.groq_model in models:
+                idx = models.index(st.session_state.groq_model)
+            groq_model = st.selectbox("Groq Model", models, index=idx)
+
+            if st.button("🧪 Test All Models", use_container_width=True):
+                results = {}
+                total = len(models)
+                progress = st.progress(0)
+                for i, model_name in enumerate(models, start=1):
+                    ok, error_message = test_groq_model(
+                        st.session_state.groq_base_url,
+                        st.session_state.groq_api_key,
+                        model_name,
+                    )
+                    results[model_name] = "" if ok else error_message
+                    progress.progress(i / total)
+                st.session_state.groq_model_tests = results
+                failures = [m for m, err in results.items() if err]
+                if failures:
+                    st.warning(f"{len(failures)} models failed. Expand results for details.")
                 else:
-                    st.error(f"Could not reach Ollama. {error_message or 'Check the base URL and server.'}")
+                    st.success("All models responded successfully.")
+
+            if st.session_state.groq_model_tests:
+                with st.expander("Model test results", expanded=False):
+                    for model_name, error_message in sorted(
+                        st.session_state.groq_model_tests.items()
+                    ):
+                        if error_message:
+                            st.error(f"{model_name}: {error_message}")
+                        else:
+                            st.success(f"{model_name}: OK")
         else:
-            openai_presets = {
-                "Custom": "",
-                "LM Studio (free local)": normalize_local_base_url("http://localhost:1234/v1"),
-                "llama.cpp server (free local)": normalize_local_base_url("http://localhost:8080/v1"),
-            }
-            preset_choice = st.selectbox("OpenAI-Compatible Preset", list(openai_presets.keys()))
-            preset_url = openai_presets.get(preset_choice, "")
-            if preset_url and preset_url != st.session_state.openai_base_url:
-                st.session_state.openai_base_url = preset_url
-                AppConfig.OPENAI_API_URL = preset_url
+            groq_model = st.text_input("Groq Model", value=st.session_state.groq_model)
 
-            openai_url = st.text_input("OpenAI Base URL", value=st.session_state.openai_base_url)
-            normalized_openai_url = normalize_local_base_url(openai_url)
-            if normalized_openai_url != st.session_state.openai_base_url:
-                st.session_state.openai_base_url = normalized_openai_url
-                AppConfig.OPENAI_API_URL = normalized_openai_url
+        if groq_model != st.session_state.groq_model:
+            st.session_state.groq_model = groq_model
+            AppConfig.DEFAULT_MODEL = groq_model
 
-            openai_key = st.text_input(
-                "OpenAI API Key (optional for local servers)",
-                value=st.session_state.openai_api_key,
-                type="password",
-                help="Leave blank for local OpenAI-compatible servers (LM Studio, llama.cpp).",
+        st.markdown(
+            "[Get a free Groq API key](https://console.groq.com/keys) to enable cloud models."
+        )
+        if st.button("🔌 Test Groq Connection", use_container_width=True):
+            ok = test_groq_connection(
+                st.session_state.groq_base_url,
+                st.session_state.groq_api_key,
             )
-            if openai_key != st.session_state.openai_api_key:
-                st.session_state.openai_api_key = openai_key
-                AppConfig.OPENAI_API_KEY = openai_key
-
-            if st.button("↻ Fetch Models", use_container_width=True):
-                models, error_message = fetch_openai_models(
-                    st.session_state.openai_base_url,
-                    st.session_state.openai_api_key,
-                )
-                if models:
-                    st.session_state.openai_model_list = models
-                    st.session_state.openai_model_tests = {}
-                    st.toast(f"Loaded {len(models)} models.")
-                else:
-                    st.session_state.openai_model_list = []
-                    st.session_state.openai_model_tests = {}
-                    st.error(f"Model fetch failed. {error_message or 'Check the base URL and key.'}")
-
-            if st.session_state.openai_model_list:
-                models = st.session_state.openai_model_list
-                idx = 0
-                if st.session_state.openai_model in models:
-                    idx = models.index(st.session_state.openai_model)
-                openai_model = st.selectbox("OpenAI Model", models, index=idx)
-
-                if st.button("🧪 Test All Models", use_container_width=True):
-                    results = {}
-                    total = len(models)
-                    progress = st.progress(0)
-                    for i, model_name in enumerate(models, start=1):
-                        ok, error_message = test_openai_model(
-                            st.session_state.openai_base_url,
-                            st.session_state.openai_api_key,
-                            model_name,
-                        )
-                        results[model_name] = "" if ok else error_message
-                        progress.progress(i / total)
-                    st.session_state.openai_model_tests = results
-                    failures = [m for m, err in results.items() if err]
-                    if failures:
-                        st.warning(f"{len(failures)} models failed. Expand results for details.")
-                    else:
-                        st.success("All models responded successfully.")
-
-                if st.session_state.openai_model_tests:
-                    with st.expander("Model test results", expanded=False):
-                        for model_name, error_message in sorted(
-                            st.session_state.openai_model_tests.items()
-                        ):
-                            if error_message:
-                                st.error(f"{model_name}: {error_message}")
-                            else:
-                                st.success(f"{model_name}: OK")
+            if ok:
+                st.success("Groq connection OK.")
             else:
-                openai_model = st.text_input("OpenAI Model", value=st.session_state.openai_model)
-
-            if openai_model != st.session_state.openai_model:
-                st.session_state.openai_model = openai_model
-                AppConfig.OPENAI_MODEL = openai_model
-
-            st.markdown(
-                "[Create an OpenAI account](https://platform.openai.com/signup) to get an API key, "
-                "or point the base URL to a local OpenAI-compatible server for free models."
-            )
-            if st.button("🔌 Test OpenAI Connection", use_container_width=True):
-                ok = test_openai_connection(
-                    st.session_state.openai_base_url,
-                    st.session_state.openai_api_key,
-                )
-                if ok:
-                    st.success("OpenAI connection OK.")
-                else:
-                    st.error("OpenAI connection failed. Check your base URL and key if required.")
+                st.error("Groq connection failed. Check your base URL and key.")
 
         colm1, colm2 = st.columns([1, 1])
         with colm1:
             st.checkbox("Auto-save", key="auto_save")
         with colm2:
-            if provider == "Ollama" and st.button("↻ Refresh", use_container_width=True):
+            if st.button("↻ Refresh Models", use_container_width=True):
                 st.cache_data.clear()
                 refresh_models()
                 st.toast("Model list refreshed")
@@ -1800,7 +1604,7 @@ def _run_ui():
                     if st.button("📌 Keep showing", use_container_width=True):
                         st.toast("Welcome panel will keep showing.")
                 with c3:
-                    st.caption("Tip: If the AI model shows Offline, start Ollama or your local provider first.")
+                    st.caption("Tip: If the AI model shows Offline, confirm your Groq API key and model access.")
             st.write("")
 
         st.markdown("## Studio Dashboard")
