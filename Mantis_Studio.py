@@ -1287,6 +1287,11 @@ def _run_ui():
 
     def render_auth():
         saved_username = config_data.get("last_username", "")
+        st.checkbox(
+            "Remember me on this device",
+            key="remember_me",
+            help="Keeps you signed in on refresh without storing your password.",
+        )
         st.markdown(
             """
             <div style="max-width:480px;margin:0 auto;padding:24px 12px;">
@@ -1319,6 +1324,7 @@ def _run_ui():
                     st.session_state.auth_username = user["username"]
                     st.session_state.auth_is_guest = False
                     st.session_state.projects_dir = get_user_projects_dir(user["id"])
+                    save_auth_remember(user, False, st.session_state.remember_me)
                     st.session_state._force_nav = True
                     st.rerun()
 
@@ -1349,6 +1355,7 @@ def _run_ui():
                             st.session_state.auth_username = user["username"]
                             st.session_state.auth_is_guest = False
                             st.session_state.projects_dir = get_user_projects_dir(user["id"])
+                            save_auth_remember(user, False, st.session_state.remember_me)
                             st.session_state._force_nav = True
                             st.rerun()
 
@@ -1362,6 +1369,16 @@ def _run_ui():
                 st.session_state.auth_username = "guest"
                 st.session_state.auth_is_guest = True
                 st.session_state.projects_dir = get_guest_projects_dir(guest_id)
+                save_auth_remember(
+                    {
+                        "id": guest_id,
+                        "username": "guest",
+                        "display_name": "Guest",
+                    },
+                    True,
+                    st.session_state.remember_me,
+                    guest_id=guest_id,
+                )
                 st.session_state._force_nav = True
                 st.rerun()
 
@@ -1581,6 +1598,8 @@ def _run_ui():
                 st.toast("No entities detected in this text.", icon="🤷")
 
     if not st.session_state.auth_user:
+        _restore_remembered_session()
+    if not st.session_state.auth_user:
         render_auth()
         return
 
@@ -1743,6 +1762,7 @@ def _run_ui():
             st.session_state.projects_dir = None
             st.session_state.project = None
             st.session_state.page = "home"
+            save_auth_remember(None, False, False)
             st.session_state._force_nav = True
             st.rerun()
 
