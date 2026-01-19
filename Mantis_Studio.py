@@ -923,8 +923,6 @@ def _run_ui():
 
     if "ui_theme" not in st.session_state:
         st.session_state.ui_theme = config_data.get("ui_theme", "Dark")
-    if "remember_me" not in st.session_state:
-        st.session_state.remember_me = bool(config_data.get("remember_me", False))
     if "daily_word_goal" not in st.session_state:
         st.session_state.daily_word_goal = int(config_data.get("daily_word_goal", 500))
     if "weekly_sessions_goal" not in st.session_state:
@@ -1471,6 +1469,30 @@ def _run_ui():
                 )
                 st.session_state._force_nav = True
                 st.rerun()
+
+    def _today_str() -> str:
+        return datetime.date.today().isoformat()
+
+    def _parse_day(day: str) -> Optional[datetime.date]:
+        try:
+            return datetime.date.fromisoformat(day)
+        except ValueError:
+            return None
+
+    def save_app_settings():
+        data = {
+            "groq_base_url": st.session_state.groq_base_url,
+            "groq_api_key": st.session_state.groq_api_key,
+            "groq_model": st.session_state.groq_model,
+            "openai_base_url": st.session_state.openai_base_url,
+            "openai_api_key": st.session_state.openai_api_key,
+            "openai_model": st.session_state.openai_model,
+            "ui_theme": st.session_state.ui_theme,
+            "daily_word_goal": int(st.session_state.daily_word_goal),
+            "weekly_sessions_goal": int(st.session_state.weekly_sessions_goal),
+            "focus_minutes": int(st.session_state.focus_minutes),
+            "activity_log": list(st.session_state.activity_log),
+        }
 
     def _today_str() -> str:
         return datetime.date.today().isoformat()
