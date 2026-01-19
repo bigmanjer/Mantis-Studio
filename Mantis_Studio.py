@@ -3059,8 +3059,19 @@ def run_selftest() -> int:
     print("[MANTIS SELFTEST]")
     try:
         os.makedirs(AppConfig.PROJECTS_DIR, exist_ok=True)
+        original_users_db = json.loads(json.dumps(load_users_db()))
+        test_username = f"selftest_{uuid.uuid4().hex[:8]}"
+        test_password = "Testpass1234"
+        user_result = create_user(test_username, "Self Test", test_password)
+        if not user_result.get("ok"):
+            raise RuntimeError(f"User create failed: {user_result.get('error', 'unknown')}")
+        auth_result = authenticate_user(test_username, test_password)
+        if not auth_result.get("ok"):
+            raise RuntimeError(f"User auth failed: {auth_result.get('error', 'unknown')}")
+        user_id = auth_result["user"]["id"]
+        user_projects_dir = get_user_projects_dir(user_id)
 
-        p = Project.create("SELFTEST_PROJECT", author="MANTIS", genre="Test")
+        p = Project.create("SELFTEST_PROJECT", author="MANTIS", genre="Test", storage_dir=user_projects_dir)
         p.outline = "Chapter 1: Test - This is a test outline."
         path = p.save()
         if not os.path.exists(path):
@@ -3087,6 +3098,15 @@ def run_selftest() -> int:
             os.remove(path)
         except OSError:
             logger.warning("Selftest cleanup failed for %s", path, exc_info=True)
+        try:
+            if os.path.isdir(user_projects_dir):
+                shutil.rmtree(user_projects_dir)
+        except OSError:
+            logger.warning("Selftest cleanup failed for %s", user_projects_dir, exc_info=True)
+        try:
+            save_users_db(original_users_db)
+        except Exception:
+            logger.warning("Selftest cleanup failed for users DB", exc_info=True)
 
         print("SELFTEST RESULT: PASS")
         return 0
