@@ -998,6 +998,8 @@ def _run_ui():
     import streamlit as st
     import pandas as pd
     import plotly.express as px
+    from pages.legal import render_copyright, render_privacy, render_terms
+    from ui.layout import render_footer
 
     st.set_page_config(page_title=AppConfig.APP_NAME, layout="wide")
 
@@ -1937,10 +1939,25 @@ def _run_ui():
             else:
                 st.toast("No entities detected in this text.", icon="🤷")
 
+    query = st.query_params.get("page")
+    if query == "privacy":
+        render_privacy()
+        render_footer()
+        return
+    if query == "terms":
+        render_terms()
+        render_footer()
+        return
+    if query == "copyright":
+        render_copyright()
+        render_footer()
+        return
+
     if not st.session_state.auth_user:
         _restore_remembered_session()
     if not st.session_state.auth_user:
         render_auth()
+        render_footer()
         return
 
     def render_ai_settings():
@@ -3135,24 +3152,39 @@ and quick start modules so you can draft fast and refine later.
             st.download_button("⬇️ Download .md", project_to_markdown(p), file_name=f"{p.title}.md", use_container_width=True)
             st.caption("Tip: You can convert .md to .docx/.pdf with many tools if needed.")
 
+    rendered_page = False
     if st.session_state.page == "home":
         render_home()
+        rendered_page = True
     elif st.session_state.page == "projects":
         render_projects()
+        rendered_page = True
     elif st.session_state.page == "ai":
         render_ai_settings()
+        rendered_page = True
     elif st.session_state.project:
         pg = st.session_state.page
-        if pg == "outline": render_outline()
-        elif pg == "world": render_world()
-        elif pg == "chapters": render_chapters()
-        elif pg == "export": render_export()
+        if pg == "outline":
+            render_outline()
+            rendered_page = True
+        elif pg == "world":
+            render_world()
+            rendered_page = True
+        elif pg == "chapters":
+            render_chapters()
+            rendered_page = True
+        elif pg == "export":
+            render_export()
+            rendered_page = True
         else:
             st.session_state.page = "home"
             st.rerun()
     else:
         st.session_state.page = "home"
         st.rerun()
+
+    if rendered_page:
+        render_footer()
 
 
 def run_selftest() -> int:
