@@ -923,8 +923,6 @@ def _run_ui():
 
     if "ui_theme" not in st.session_state:
         st.session_state.ui_theme = config_data.get("ui_theme", "Dark")
-    if "remember_me" not in st.session_state:
-        st.session_state.remember_me = bool(config_data.get("remember_me", False))
     if "daily_word_goal" not in st.session_state:
         st.session_state.daily_word_goal = int(config_data.get("daily_word_goal", 500))
     if "weekly_sessions_goal" not in st.session_state:
@@ -1407,70 +1405,9 @@ def _run_ui():
             "weekly_sessions_goal": int(st.session_state.weekly_sessions_goal),
             "focus_minutes": int(st.session_state.focus_minutes),
             "activity_log": list(st.session_state.activity_log),
-            "remember_me": bool(st.session_state.remember_me),
         }
         save_app_config(data)
         st.toast("Settings saved.")
-
-    def save_auth_remember(user: Optional[Dict[str, Any]], is_guest: bool, remember: bool, guest_id: str = ""):
-        data = dict(config_data)
-        if remember and user:
-            data.update(
-                {
-                    "remember_me": True,
-                    "remembered_username": user.get("username", ""),
-                    "remembered_user_id": user.get("id", ""),
-                    "remembered_display_name": user.get("display_name", ""),
-                    "remembered_is_guest": bool(is_guest),
-                    "remembered_guest_id": guest_id or "",
-                }
-            )
-        else:
-            data.update(
-                {
-                    "remember_me": False,
-                    "remembered_username": "",
-                    "remembered_user_id": "",
-                    "remembered_display_name": "",
-                    "remembered_is_guest": False,
-                    "remembered_guest_id": "",
-                }
-            )
-        config_data.clear()
-        config_data.update(data)
-        st.session_state.remember_me = bool(data.get("remember_me", False))
-        save_app_config(data)
-
-    def _restore_remembered_session() -> None:
-        if st.session_state.auth_user or not config_data.get("remember_me"):
-            return
-        if config_data.get("remembered_is_guest"):
-            guest_id = config_data.get("remembered_guest_id") or str(uuid.uuid4())
-            st.session_state.guest_id = guest_id
-            st.session_state.auth_user = config_data.get("remembered_display_name") or "Guest"
-            st.session_state.auth_user_id = guest_id
-            st.session_state.auth_username = "guest"
-            st.session_state.auth_is_guest = True
-            st.session_state.projects_dir = get_guest_projects_dir(guest_id)
-            return
-
-        username = config_data.get("remembered_username", "")
-        user_id = config_data.get("remembered_user_id", "")
-        if not username or not user_id:
-            save_auth_remember(None, False, False)
-            return
-
-        data = load_users_db()
-        user = data.get("users", {}).get(username)
-        if not user or user.get("id") != user_id:
-            save_auth_remember(None, False, False)
-            return
-
-        st.session_state.auth_user = user.get("display_name") or username
-        st.session_state.auth_user_id = user.get("id")
-        st.session_state.auth_username = user.get("username")
-        st.session_state.auth_is_guest = False
-        st.session_state.projects_dir = get_user_projects_dir(user.get("id", ""))
 
     def _today_str() -> str:
         return datetime.date.today().isoformat()
