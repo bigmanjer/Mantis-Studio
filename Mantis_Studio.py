@@ -955,45 +955,45 @@ def _run_ui():
     theme = st.session_state.ui_theme if st.session_state.ui_theme in ("Dark", "Light") else "Dark"
     theme_tokens = {
         "Dark": {
-            "bg": "#0b0f14",
-            "bg_glow": "radial-gradient(circle at 20% 20%, rgba(62,227,122,0.18), transparent 45%), radial-gradient(circle at 80% 0%, rgba(16,185,129,0.18), transparent 40%)",
-            "text": "#edf9f1",
-            "muted": "#a8c5b2",
+            "bg": "#0b0f1a",
+            "bg_glow": "radial-gradient(circle at 20% 20%, rgba(123,97,255,0.18), transparent 45%), radial-gradient(circle at 80% 0%, rgba(75,139,255,0.2), transparent 40%)",
+            "text": "#e6e9f4",
+            "muted": "#a2a6bd",
             "input_bg": "#0f1526",
-            "input_border": "#1f2e2a",
-            "button_bg": "linear-gradient(180deg, #162821, #101f19)",
-            "button_border": "#2a3d35",
-            "button_hover_border": "#3ee37a",
-            "primary_bg": "linear-gradient(135deg, #3ee37a, #10b981)",
-            "primary_border": "rgba(62,227,122,0.55)",
-            "primary_hover_border": "#6bf59c",
-            "card_bg": "linear-gradient(180deg, rgba(16,30,26,0.95), rgba(10,20,18,0.95))",
-            "card_border": "#21362f",
-            "sidebar_bg": "linear-gradient(180deg, #0b1411, #0c1a15)",
-            "sidebar_border": "#172822",
-            "sidebar_title": "#7ef5b0",
-            "divider": "#1e3029",
-            "expander_border": "#28413a",
-            "header_gradient": "radial-gradient(circle at top left, rgba(62,227,122,0.45), rgba(10,18,14,0.3)), linear-gradient(135deg, #0f1d18, #12261f)",
-            "header_logo_bg": "rgba(62,227,122,0.25)",
-            "header_sub": "#c5f0d7",
-            "shadow_strong": "0 14px 32px rgba(0,0,0,0.45)",
-            "shadow_button": "0 8px 18px rgba(0,0,0,0.35)",
-            "sidebar_brand_bg": "linear-gradient(180deg, rgba(18,32,26,0.9), rgba(9,18,15,0.95))",
-            "sidebar_brand_border": "rgba(62,227,122,0.25)",
-            "sidebar_logo_bg": "rgba(236,255,244,0.9)",
-            "accent": "#3ee37a",
-            "accent_soft": "rgba(62,227,122,0.18)",
-            "surface": "rgba(14,26,22,0.88)",
-            "surface_alt": "rgba(11,20,17,0.92)",
+            "input_border": "#1f2840",
+            "button_bg": "linear-gradient(180deg, #1b2237, #111726)",
+            "button_border": "#2a3554",
+            "button_hover_border": "#7b61ff",
+            "primary_bg": "linear-gradient(135deg, #7b61ff, #4b8bff)",
+            "primary_border": "rgba(123,97,255,0.55)",
+            "primary_hover_border": "#9f8bff",
+            "card_bg": "linear-gradient(180deg, rgba(18,24,42,0.95), rgba(12,16,30,0.95))",
+            "card_border": "#1f2942",
+            "sidebar_bg": "linear-gradient(180deg, #090c16, #0b1221)",
+            "sidebar_border": "#182036",
+            "sidebar_title": "#b7a9ff",
+            "divider": "#1d2740",
+            "expander_border": "#25314f",
+            "header_gradient": "radial-gradient(circle at top left, rgba(123,97,255,0.55), rgba(10,15,29,0.4)), linear-gradient(135deg, #0f1526, #121a30)",
+            "header_logo_bg": "rgba(123,97,255,0.2)",
+            "header_sub": "#c5d0ff",
+            "shadow_strong": "0 18px 40px rgba(0,0,0,0.55)",
+            "shadow_button": "0 10px 22px rgba(0,0,0,0.4)",
+            "sidebar_brand_bg": "linear-gradient(180deg, rgba(18,24,42,0.85), rgba(9,12,22,0.95))",
+            "sidebar_brand_border": "rgba(123,97,255,0.25)",
+            "sidebar_logo_bg": "rgba(123,97,255,0.12)",
+            "accent": "#7b61ff",
+            "accent_soft": "rgba(123,97,255,0.18)",
+            "surface": "rgba(16,22,40,0.85)",
+            "surface_alt": "rgba(12,17,32,0.9)",
             "success": "#22c55e",
             "warning": "#f59e0b",
         },
         "Light": {
             "bg": "#f8fafc",
-            "bg_glow": "radial-gradient(circle at 20% 20%, rgba(34,197,94,0.18), transparent 45%), radial-gradient(circle at 80% 0%, rgba(16,185,129,0.18), transparent 40%)",
-            "text": "#0c1a12",
-            "muted": "#60756a",
+            "bg_glow": "radial-gradient(circle at 20% 20%, rgba(34,197,94,0.18), transparent 45%), radial-gradient(circle at 80% 0%, rgba(59,130,246,0.18), transparent 40%)",
+            "text": "#0f172a",
+            "muted": "#6b7280",
             "input_bg": "#ffffff",
             "input_border": "#cce5d6",
             "button_bg": "linear-gradient(180deg, #ffffff, #ecfdf3)",
@@ -1016,11 +1016,11 @@ def _run_ui():
             "shadow_button": "0 8px 16px rgba(12,26,18,0.12)",
             "sidebar_brand_bg": "linear-gradient(180deg, rgba(241,251,245,0.95), rgba(226,245,236,0.95))",
             "sidebar_brand_border": "rgba(21,128,61,0.18)",
-            "sidebar_logo_bg": "#ecfdf3",
+            "sidebar_logo_bg": "rgba(15,23,42,0.06)",
             "accent": "#22c55e",
             "accent_soft": "rgba(34,197,94,0.18)",
-            "surface": "rgba(255,255,255,0.92)",
-            "surface_alt": "rgba(236,253,243,0.95)",
+            "surface": "rgba(255,255,255,0.9)",
+            "surface_alt": "rgba(241,245,249,0.95)",
             "success": "#16a34a",
             "warning": "#d97706",
         },
@@ -1075,7 +1075,7 @@ def _run_ui():
     .block-container {{ padding-top: 2.6rem; padding-bottom: 2.6rem; max-width: 1380px; }}
     header[data-testid="stHeader"] {{ height: 2.6rem; }}
     h1, h2, h3 {{ letter-spacing: -0.02em; font-family: 'Space Grotesk', sans-serif; }}
-    .stTextInput input, .stSelectbox div, .stNumberInput input {{ background-color: var(--mantis-input-bg) !important; color: var(--mantis-text) !important; border: 1px solid var(--mantis-input-border) !important; border-radius: 14px !important; }}
+    .stTextInput input, .stSelectbox div, .stNumberInput input {{ background-color: var(--mantis-input-bg) !important; color: var(--mantis-text) !important; border: 1px solid var(--mantis-input-border) !important; }}
     .stTextArea textarea {{ background-color: var(--mantis-input-bg) !important; color: var(--mantis-text) !important; font-family: 'Crimson Pro', serif !important; font-size: 18px !important; line-height: 1.65 !important; border: 1px solid var(--mantis-input-border) !important; }}
 
     .mantis-muted {{ color: var(--mantis-muted); }}
@@ -1237,7 +1237,7 @@ def _run_ui():
         font-weight:600;
         background: var(--mantis-accent-soft);
         color: var(--mantis-text);
-        border: 1px solid rgba(62,227,122,0.3);
+        border: 1px solid rgba(123,97,255,0.3);
     }}
     .mantis-kpi-grid {{
         display:grid;
@@ -1261,25 +1261,6 @@ def _run_ui():
     .mantis-kpi-value {{
         font-size:20px;
         font-weight:700;
-    }}
-    .mantis-dashboard-grid {{
-        display:grid;
-        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-        gap:16px;
-        margin-top: 12px;
-    }}
-    .mantis-dashboard-card {{
-        background: var(--mantis-surface-alt);
-        border-radius: 18px;
-        padding: 16px;
-        border: 1px solid var(--mantis-card-border);
-    }}
-    .mantis-dashboard-card h4 {{
-        margin: 0 0 8px 0;
-        font-size: 14px;
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-        color: var(--mantis-muted);
     }}
     .mantis-section-title {{
         font-size:20px;
@@ -1378,12 +1359,12 @@ def _run_ui():
                         MANTIS Studio
                     </div>
                     <div class="mantis-header-sub">
-                        Modern, minty writing HQ
+                        Story OS for immersive drafting
                     </div>
                 </div>
             </div>
             <div class="mantis-header-right">
-                <span class="mantis-pill">Mantis Green</span>
+                <span class="mantis-pill">Workspace</span>
                 <span class="mantis-pill">v{AppConfig.VERSION}</span>
             </div>
         </div>
@@ -2140,78 +2121,68 @@ def _run_ui():
                     <div class="mantis-tag">Dashboard</div>
                     <div class="mantis-hero-title">Welcome back, {st.session_state.auth_user}</div>
                     <div class="mantis-hero-sub">
-                        MANTIS keeps your worlds cute, cohesive, and ready to grow.
+                        Build worlds, draft chapters, and keep your narrative canon in sync.
                     </div>
                 </div>
                 """,
                 unsafe_allow_html=True,
             )
-            st.markdown(
-                f"""
-                <div class="mantis-dashboard-grid">
-                    <div class="mantis-dashboard-card">
-                        <h4>Quick launch</h4>
-                        <div class="mantis-hero-caption">Jump back into your latest project or start fresh.</div>
-                    </div>
-                    <div class="mantis-dashboard-card">
-                        <h4>Workspace status</h4>
-                        <div class="mantis-kpi-grid">
-                            <div class="mantis-kpi-card">
-                                <div class="mantis-kpi-label">Active projects</div>
-                                <div class="mantis-kpi-value">{len(recent_projects)}</div>
-                            </div>
-                            <div class="mantis-kpi-card">
-                                <div class="mantis-kpi-label">Latest genre</div>
-                                <div class="mantis-kpi-value">{(recent_snapshot or {}).get("genre", "—")}</div>
-                            </div>
-                            <div class="mantis-kpi-card">
-                                <div class="mantis-kpi-label">Writing streak</div>
-                                <div class="mantis-kpi-value">{streak} days</div>
-                            </div>
-                            <div class="mantis-kpi-card">
-                                <div class="mantis-kpi-label">Weekly sessions</div>
-                                <div class="mantis-kpi-value">{weekly_count}/{weekly_goal}</div>
-                            </div>
+            hero_left, hero_right = st.columns([1.4, 1])
+            with hero_left:
+                st.markdown("#### Quick launch")
+                q1, q2, q3 = st.columns(3)
+                with q1:
+                    if st.button("➕ New Project", type="primary", use_container_width=True):
+                        st.toast("Scroll down to the New Project form.")
+                with q2:
+                    if st.button("📂 Resume Latest", use_container_width=True, disabled=not recent_projects):
+                        if recent_projects:
+                            st.session_state.project = Project.load(recent_projects[0]["path"])
+                            st.session_state.page = "chapters"
+                            st.rerun()
+                with q3:
+                    if st.button("🧭 Outline Mode", use_container_width=True, disabled=not recent_projects):
+                        if recent_projects:
+                            st.session_state.project = Project.load(recent_projects[0]["path"])
+                            st.session_state.page = "outline"
+                            st.rerun()
+
+                st.markdown("#### Workspace status")
+                st.markdown(
+                    f"""
+                    <div class="mantis-kpi-grid">
+                        <div class="mantis-kpi-card">
+                            <div class="mantis-kpi-label">Active projects</div>
+                            <div class="mantis-kpi-value">{len(recent_projects)}</div>
+                        </div>
+                        <div class="mantis-kpi-card">
+                            <div class="mantis-kpi-label">Latest genre</div>
+                            <div class="mantis-kpi-value">{(recent_snapshot or {}).get("genre", "—")}</div>
+                        </div>
+                        <div class="mantis-kpi-card">
+                            <div class="mantis-kpi-label">Writing streak</div>
+                            <div class="mantis-kpi-value">{streak} days</div>
+                        </div>
+                        <div class="mantis-kpi-card">
+                            <div class="mantis-kpi-label">Weekly sessions</div>
+                            <div class="mantis-kpi-value">{weekly_count}/{weekly_goal}</div>
                         </div>
                     </div>
-                    <div class="mantis-dashboard-card">
-                        <h4>Studio signals</h4>
-                        <div class="mantis-kpi-grid">
-                            <div class="mantis-kpi-card">
-                                <div class="mantis-kpi-label">Groq</div>
-                                <div class="mantis-kpi-value">{'Connected' if st.session_state.groq_api_key else 'Add key'}</div>
-                            </div>
-                            <div class="mantis-kpi-card">
-                                <div class="mantis-kpi-label">OpenAI</div>
-                                <div class="mantis-kpi-value">{'Connected' if st.session_state.openai_api_key else 'Add key'}</div>
-                            </div>
-                            <div class="mantis-kpi-card">
-                                <div class="mantis-kpi-label">Model</div>
-                                <div class="mantis-kpi-value">{st.session_state.groq_model or AppConfig.DEFAULT_MODEL}</div>
-                            </div>
-                        </div>
-                        <div class="mantis-hero-caption">Projects dir: <code>{active_dir}</code></div>
-                    </div>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
-            q1, q2, q3 = st.columns(3)
-            with q1:
-                if st.button("➕ New Project", type="primary", use_container_width=True):
-                    st.toast("Scroll down to the New Project form.")
-            with q2:
-                if st.button("📂 Resume Latest", use_container_width=True, disabled=not recent_projects):
-                    if recent_projects:
-                        st.session_state.project = Project.load(recent_projects[0]["path"])
-                        st.session_state.page = "chapters"
-                        st.rerun()
-            with q3:
-                if st.button("🧭 Outline Mode", use_container_width=True, disabled=not recent_projects):
-                    if recent_projects:
-                        st.session_state.project = Project.load(recent_projects[0]["path"])
-                        st.session_state.page = "outline"
-                        st.rerun()
+                    """,
+                    unsafe_allow_html=True,
+                )
+
+            with hero_right:
+                st.markdown("#### Studio signals")
+                st.caption("Model, storage, and AI readiness at a glance.")
+                status_card = st.container(border=True)
+                with status_card:
+                    groq_status = "Connected" if st.session_state.groq_api_key else "Add key"
+                    openai_status = "Connected" if st.session_state.openai_api_key else "Add key"
+                    st.metric("Groq", groq_status)
+                    st.metric("OpenAI", openai_status)
+                    st.metric("Model", st.session_state.groq_model or AppConfig.DEFAULT_MODEL)
+                    st.caption(f"Projects dir: `{active_dir}`")
 
         if st.session_state.get("first_run", True):
             with st.container(border=True):
