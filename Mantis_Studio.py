@@ -24,6 +24,7 @@ import os
 import re
 import json
 import time
+import datetime
 import uuid
 import difflib
 import logging
@@ -922,6 +923,16 @@ def _run_ui():
 
     if "ui_theme" not in st.session_state:
         st.session_state.ui_theme = config_data.get("ui_theme", "Dark")
+    if "remember_me" not in st.session_state:
+        st.session_state.remember_me = bool(config_data.get("remember_me", False))
+    if "daily_word_goal" not in st.session_state:
+        st.session_state.daily_word_goal = int(config_data.get("daily_word_goal", 500))
+    if "weekly_sessions_goal" not in st.session_state:
+        st.session_state.weekly_sessions_goal = int(config_data.get("weekly_sessions_goal", 4))
+    if "focus_minutes" not in st.session_state:
+        st.session_state.focus_minutes = int(config_data.get("focus_minutes", 25))
+    if "activity_log" not in st.session_state:
+        st.session_state.activity_log = list(config_data.get("activity_log", []))
 
     theme = st.session_state.ui_theme if st.session_state.ui_theme in ("Dark", "Light") else "Dark"
     theme_tokens = {
@@ -1276,8 +1287,100 @@ def _run_ui():
     def get_active_projects_dir() -> str:
         return st.session_state.get("projects_dir") or AppConfig.PROJECTS_DIR
 
+    @st.cache_data(show_spinner=False)
+    def _cached_models(base_url: str, api_key: str) -> List[str]:
+        return AIEngine(base_url=base_url).probe_models(api_key)
+
+    def refresh_models():
+        st.session_state.groq_model_list = _cached_models(
+            st.session_state.groq_base_url,
+            st.session_state.groq_api_key,
+        ) or []
+
+    def save_app_settings():
+        data = {
+            "groq_base_url": st.session_state.groq_base_url,
+            "groq_api_key": st.session_state.groq_api_key,
+            "groq_model": st.session_state.groq_model,
+            "openai_base_url": st.session_state.openai_base_url,
+            "openai_api_key": st.session_state.openai_api_key,
+            "openai_model": st.session_state.openai_model,
+            "ui_theme": st.session_state.ui_theme,
+            "daily_word_goal": int(st.session_state.daily_word_goal),
+            "weekly_sessions_goal": int(st.session_state.weekly_sessions_goal),
+            "focus_minutes": int(st.session_state.focus_minutes),
+            "activity_log": list(st.session_state.activity_log),
+            "remember_me": bool(st.session_state.remember_me),
+        }
+        save_app_config(data)
+        st.toast("Settings saved.")
+
+    def save_auth_remember(user: Optional[Dict[str, Any]], is_guest: bool, remember: bool, guest_id: str = ""):
+        data = dict(config_data)
+        if remember and user:
+            data.update(
+                {
+                    "remember_me": True,
+                    "remembered_username": user.get("username", ""),
+                    "remembered_user_id": user.get("id", ""),
+                    "remembered_display_name": user.get("display_name", ""),
+                    "remembered_is_guest": bool(is_guest),
+                    "remembered_guest_id": guest_id or "",
+                }
+            )
+        else:
+            data.update(
+                {
+                    "remember_me": False,
+                    "remembered_username": "",
+                    "remembered_user_id": "",
+                    "remembered_display_name": "",
+                    "remembered_is_guest": False,
+                    "remembered_guest_id": "",
+                }
+            )
+        config_data.clear()
+        config_data.update(data)
+        save_app_config(data)
+
+    def _restore_remembered_session() -> None:
+        if st.session_state.auth_user or not config_data.get("remember_me"):
+            return
+        if config_data.get("remembered_is_guest"):
+            guest_id = config_data.get("remembered_guest_id") or str(uuid.uuid4())
+            st.session_state.guest_id = guest_id
+            st.session_state.auth_user = config_data.get("remembered_display_name") or "Guest"
+            st.session_state.auth_user_id = guest_id
+            st.session_state.auth_username = "guest"
+            st.session_state.auth_is_guest = True
+            st.session_state.projects_dir = get_guest_projects_dir(guest_id)
+            return
+
+        username = config_data.get("remembered_username", "")
+        user_id = config_data.get("remembered_user_id", "")
+        if not username or not user_id:
+            save_auth_remember(None, False, False)
+            return
+
+        data = load_users_db()
+        user = data.get("users", {}).get(username)
+        if not user or user.get("id") != user_id:
+            save_auth_remember(None, False, False)
+            return
+
+        st.session_state.auth_user = user.get("display_name") or username
+        st.session_state.auth_user_id = user.get("id")
+        st.session_state.auth_username = user.get("username")
+        st.session_state.auth_is_guest = False
+        st.session_state.projects_dir = get_user_projects_dir(user.get("id", ""))
+
     def render_auth():
         saved_username = config_data.get("last_username", "")
+        st.checkbox(
+            "Remember me on this device",
+            key="remember_me",
+            help="Keeps you signed in on refresh without storing your password.",
+        )
         st.markdown(
             """
             <div style="max-width:480px;margin:0 auto;padding:24px 12px;">
@@ -1310,6 +1413,7 @@ def _run_ui():
                     st.session_state.auth_username = user["username"]
                     st.session_state.auth_is_guest = False
                     st.session_state.projects_dir = get_user_projects_dir(user["id"])
+                    save_auth_remember(user, False, st.session_state.remember_me)
                     st.session_state._force_nav = True
                     st.rerun()
 
@@ -1340,6 +1444,7 @@ def _run_ui():
                             st.session_state.auth_username = user["username"]
                             st.session_state.auth_is_guest = False
                             st.session_state.projects_dir = get_user_projects_dir(user["id"])
+                            save_auth_remember(user, False, st.session_state.remember_me)
                             st.session_state._force_nav = True
                             st.rerun()
 
@@ -1353,31 +1458,102 @@ def _run_ui():
                 st.session_state.auth_username = "guest"
                 st.session_state.auth_is_guest = True
                 st.session_state.projects_dir = get_guest_projects_dir(guest_id)
+                save_auth_remember(
+                    {
+                        "id": guest_id,
+                        "username": "guest",
+                        "display_name": "Guest",
+                    },
+                    True,
+                    st.session_state.remember_me,
+                    guest_id=guest_id,
+                )
                 st.session_state._force_nav = True
                 st.rerun()
 
-    @st.cache_data(show_spinner=False)
-    def _cached_models(base_url: str, api_key: str) -> List[str]:
-        return AIEngine(base_url=base_url).probe_models(api_key)
+    def _today_str() -> str:
+        return datetime.date.today().isoformat()
 
-    def refresh_models():
-        st.session_state.groq_model_list = _cached_models(
-            st.session_state.groq_base_url,
-            st.session_state.groq_api_key,
-        ) or []
+    def _parse_day(day: str) -> Optional[datetime.date]:
+        try:
+            return datetime.date.fromisoformat(day)
+        except ValueError:
+            return None
 
-    def save_app_settings():
-        data = {
-            "groq_base_url": st.session_state.groq_base_url,
-            "groq_api_key": st.session_state.groq_api_key,
-            "groq_model": st.session_state.groq_model,
-            "openai_base_url": st.session_state.openai_base_url,
-            "openai_api_key": st.session_state.openai_api_key,
-            "openai_model": st.session_state.openai_model,
-            "ui_theme": st.session_state.ui_theme,
+    def _log_activity():
+        today = _today_str()
+        log = set(st.session_state.activity_log)
+        log.add(today)
+        st.session_state.activity_log = sorted(log)
+        save_app_settings()
+
+    def _weekly_activity_count() -> int:
+        today = datetime.date.today()
+        cutoff = today - datetime.timedelta(days=6)
+        count = 0
+        for day in st.session_state.activity_log:
+            parsed = _parse_day(day)
+            if parsed and parsed >= cutoff:
+                count += 1
+        return count
+
+    def _activity_streak() -> int:
+        if not st.session_state.activity_log:
+            return 0
+        days = sorted(
+            {d for d in (_parse_day(day) for day in st.session_state.activity_log) if d}
+        )
+        if not days:
+            return 0
+        streak = 0
+        cursor = datetime.date.today()
+        day_set = set(days)
+        while cursor in day_set:
+            streak += 1
+            cursor -= datetime.timedelta(days=1)
+        return streak
+
+    def _activity_series() -> List[Dict[str, Any]]:
+        today = datetime.date.today()
+        labels = []
+        counts = []
+        log_set = set(st.session_state.activity_log)
+        for offset in range(6, -1, -1):
+            day = today - datetime.timedelta(days=offset)
+            labels.append(day.strftime("%a"))
+            counts.append(1 if day.isoformat() in log_set else 0)
+        return [{"day": label, "sessions": count} for label, count in zip(labels, counts)]
+
+    def _load_recent_projects(active_dir: str) -> List[Dict[str, Any]]:
+        if not os.path.exists(active_dir):
+            return []
+        files = sorted(
+            [f for f in os.listdir(active_dir) if f.endswith(".json")],
+            key=lambda x: os.path.getmtime(os.path.join(active_dir, x)),
+            reverse=True,
+        )
+        projects = []
+        for filename in files:
+            full_path = os.path.join(active_dir, filename)
+            try:
+                with open(full_path, "r", encoding="utf-8") as fh:
+                    meta = json.load(fh)
+                projects.append({"path": full_path, "meta": meta})
+            except Exception:
+                logger.warning("Failed to load project metadata: %s", full_path, exc_info=True)
+        return projects
+
+    def _project_snapshot(meta: Dict[str, Any]) -> Dict[str, Any]:
+        chapters = meta.get("chapters", {}) or {}
+        chapter_list = list(chapters.values())
+        word_count = sum(int(c.get("word_count") or 0) for c in chapter_list)
+        return {
+            "title": meta.get("title") or "Untitled Project",
+            "genre": meta.get("genre") or "General Fiction",
+            "chapters": len(chapter_list),
+            "words": word_count,
+            "modified_at": meta.get("last_modified") or meta.get("modified_at"),
         }
-        save_app_config(data)
-        st.toast("Settings saved.")
 
     def test_groq_connection(base_url: str, api_key: str) -> bool:
         headers = {}
@@ -1483,6 +1659,8 @@ def _run_ui():
             else:
                 st.toast("No entities detected in this text.", icon="🤷")
 
+    if not st.session_state.auth_user:
+        _restore_remembered_session()
     if not st.session_state.auth_user:
         render_auth()
         return
@@ -1646,6 +1824,7 @@ def _run_ui():
             st.session_state.projects_dir = None
             st.session_state.project = None
             st.session_state.page = "home"
+            save_auth_remember(None, False, False)
             st.session_state._force_nav = True
             st.rerun()
 
@@ -1751,6 +1930,97 @@ def _run_ui():
                         use_container_width=True,
                     )
 
+        active_dir = get_active_projects_dir()
+        recent_projects = _load_recent_projects(active_dir)
+        recent_snapshot = _project_snapshot(recent_projects[0]["meta"]) if recent_projects else None
+        streak = _activity_streak()
+        weekly_count = _weekly_activity_count()
+        weekly_goal = max(int(st.session_state.weekly_sessions_goal), 1)
+        weekly_progress = min(weekly_count / weekly_goal, 1.0)
+
+        with st.container(border=True):
+            st.markdown("### 🚀 Creator Momentum")
+            st.caption("Keep your writing habit alive with quick goals and a clear next action.")
+
+            if recent_snapshot:
+                headline = f"**Resume:** {recent_snapshot['title']} · {recent_snapshot['genre']}"
+                st.markdown(headline)
+                metrics = st.columns(4)
+                metrics[0].metric("Words written", f"{recent_snapshot['words']:,}")
+                metrics[1].metric("Chapters", recent_snapshot["chapters"])
+                metrics[2].metric("Streak", f"{streak} day(s)")
+                metrics[3].metric("Sessions this week", f"{weekly_count}/{weekly_goal}")
+            else:
+                st.info("Create a project to unlock your momentum stats and quick actions.")
+
+            goal_cols = st.columns(3)
+            with goal_cols[0]:
+                st.number_input("Daily word goal", min_value=100, max_value=5000, step=50, key="daily_word_goal")
+            with goal_cols[1]:
+                st.number_input(
+                    "Weekly sessions goal",
+                    min_value=1,
+                    max_value=14,
+                    step=1,
+                    key="weekly_sessions_goal",
+                )
+            with goal_cols[2]:
+                st.number_input(
+                    "Focus sprint (minutes)",
+                    min_value=10,
+                    max_value=90,
+                    step=5,
+                    key="focus_minutes",
+                )
+
+            progress_cols = st.columns([2, 1])
+            with progress_cols[0]:
+                st.progress(weekly_progress, text="Weekly writing progress")
+                if st.button("✅ Log a writing session", use_container_width=True):
+                    _log_activity()
+                    st.toast("Session logged. Keep the streak going!")
+                    st.rerun()
+            with progress_cols[1]:
+                if st.button("💾 Save studio goals", use_container_width=True):
+                    save_app_settings()
+
+            if st.session_state.activity_log:
+                activity_df = pd.DataFrame(_activity_series())
+                activity_chart = px.bar(
+                    activity_df,
+                    x="day",
+                    y="sessions",
+                    title="Last 7 days",
+                    text_auto=True,
+                )
+                activity_chart.update_layout(
+                    height=240,
+                    margin=dict(l=10, r=10, t=50, b=10),
+                    yaxis=dict(range=[0, 1], tickmode="array", tickvals=[0, 1]),
+                )
+                st.plotly_chart(activity_chart, use_container_width=True)
+
+            st.markdown("#### Next best action")
+            action_cols = st.columns(3)
+            with action_cols[0]:
+                if st.button("✍️ Start writing", type="primary", use_container_width=True):
+                    if recent_projects:
+                        st.session_state.project = Project.load(recent_projects[0]["path"])
+                        st.session_state.page = "chapters"
+                        st.rerun()
+            with action_cols[1]:
+                if st.button("🧭 Build outline", use_container_width=True):
+                    if recent_projects:
+                        st.session_state.project = Project.load(recent_projects[0]["path"])
+                        st.session_state.page = "outline"
+                        st.rerun()
+            with action_cols[2]:
+                if st.button("🌍 Expand world bible", use_container_width=True):
+                    if recent_projects:
+                        st.session_state.project = Project.load(recent_projects[0]["path"])
+                        st.session_state.page = "world"
+                        st.rerun()
+
         st.markdown("## Studio Dashboard")
         st.caption("Create a project, load a recent one, or import a story to start building.")
 
@@ -1820,28 +2090,19 @@ def _run_ui():
                 st.markdown("### 🕘 Recent Projects")
                 st.caption("Click to open. Use 🗑 to delete the file from disk.")
 
-                files = []
-                active_dir = get_active_projects_dir()
-                if os.path.exists(active_dir):
-                    files = sorted(
-                        [f for f in os.listdir(active_dir) if f.endswith(".json")],
-                        key=lambda x: os.path.getmtime(os.path.join(active_dir, x)),
-                        reverse=True,
-                    )
-
-                if not files:
+                if not recent_projects:
                     st.info("📭 No projects yet. Create one on the left to get started.")
                 else:
-                    for f in files[:30]:
-                        full = os.path.join(active_dir, f)
+                    for project_entry in recent_projects[:30]:
+                        full = project_entry["path"]
                         try:
-                            with open(full, "r", encoding="utf-8") as fh:
-                                meta = json.load(fh)
-                            title = meta.get("title") or f
+                            meta = project_entry["meta"]
+                            filename = os.path.basename(full)
+                            title = meta.get("title") or filename
                             genre = meta.get("genre") or ""
                             row1, row2, row3 = st.columns([6, 2, 1])
                             with row1:
-                                if st.button(f"📂 {title}", key=f"open_{f}", use_container_width=True):
+                                if st.button(f"📂 {title}", key=f"open_{full}", use_container_width=True):
                                     st.session_state.project = Project.load(full)
                                     st.session_state.page = "chapters"
                                     st.session_state.first_run = False
@@ -1849,7 +2110,7 @@ def _run_ui():
                             with row2:
                                 st.caption(genre)
                             with row3:
-                                if st.button("🗑", key=f"del_{f}", use_container_width=True):
+                                if st.button("🗑", key=f"del_{full}", use_container_width=True):
                                     Project.delete_file(full)
                                     st.rerun()
                         except Exception:
