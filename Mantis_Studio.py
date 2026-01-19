@@ -2112,6 +2112,13 @@ def _run_ui():
         weekly_count = _weekly_activity_count()
         weekly_goal = max(int(st.session_state.weekly_sessions_goal), 1)
         weekly_progress = min(weekly_count / weekly_goal, 1.0)
+        has_project = bool(recent_projects)
+        has_outline = any((p["meta"].get("outline") or "").strip() for p in recent_projects)
+        has_chapter = any(
+            (c.get("word_count") or 0) > 0
+            for p in recent_projects
+            for c in (p["meta"].get("chapters") or {}).values()
+        )
 
         with st.container(border=True):
             st.markdown(
@@ -2182,6 +2189,32 @@ def _run_ui():
                     st.metric("OpenAI", openai_status)
                     st.metric("Model", st.session_state.groq_model or AppConfig.DEFAULT_MODEL)
                     st.caption(f"Projects dir: `{active_dir}`")
+
+        with st.container(border=True):
+            st.markdown("### 🧭 Guided first session")
+            st.caption("Complete these three steps to unlock the full studio workflow.")
+            progress = sum([has_project, has_outline, has_chapter]) / 3
+            st.progress(progress, text=f"{sum([has_project, has_outline, has_chapter])}/3 steps complete")
+            s1, s2, s3 = st.columns([1.2, 1.2, 1.4])
+            with s1:
+                st.checkbox("Create a project", value=has_project, disabled=True)
+                if not has_project:
+                    if st.button("Start here", type="primary", use_container_width=True):
+                        st.toast("Scroll down to the New Project form.")
+            with s2:
+                st.checkbox("Draft an outline", value=has_outline, disabled=True)
+                if has_project and not has_outline:
+                    if st.button("Open outline", use_container_width=True):
+                        st.session_state.project = Project.load(recent_projects[0]["path"])
+                        st.session_state.page = "outline"
+                        st.rerun()
+            with s3:
+                st.checkbox("Write a chapter", value=has_chapter, disabled=True)
+                if has_project and not has_chapter:
+                    if st.button("Start writing", use_container_width=True):
+                        st.session_state.project = Project.load(recent_projects[0]["path"])
+                        st.session_state.page = "chapters"
+                        st.rerun()
 
         if st.session_state.get("first_run", True):
             with st.container(border=True):
