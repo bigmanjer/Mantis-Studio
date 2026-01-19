@@ -33,3 +33,12 @@ export GROQ_TIMEOUT="300"
 ---
 
 Need help choosing a Groq model or tuning prompts? Tell me what you’re building.
+
+## Legal and policy documents
+
+- [Copyright ownership](COPYRIGHT.md)
+- [Terms of Service](TERMS_OF_SERVICE.md)
+- [Privacy Policy](PRIVACY_POLICY.md)
+- [Brand / IP clarity](BRAND_IP_CLARITY.md)
+- [License](LICENSE.md)
+- [Trademark path](TRADEMARK_PATH.md)
