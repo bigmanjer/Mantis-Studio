@@ -951,47 +951,50 @@ def _run_ui():
         st.session_state.focus_minutes = int(config_data.get("focus_minutes", 25))
     if "activity_log" not in st.session_state:
         st.session_state.activity_log = list(config_data.get("activity_log", []))
+    if "remember_me" not in st.session_state:
+        st.session_state.remember_me = bool(config_data.get("remember_me", False))
 
     theme = st.session_state.ui_theme if st.session_state.ui_theme in ("Dark", "Light") else "Dark"
     theme_tokens = {
         "Dark": {
-            "bg": "#0b0f1a",
-            "bg_glow": "radial-gradient(circle at 20% 20%, rgba(123,97,255,0.18), transparent 45%), radial-gradient(circle at 80% 0%, rgba(75,139,255,0.2), transparent 40%)",
-            "text": "#e6e9f4",
-            "muted": "#a2a6bd",
-            "input_bg": "#0f1526",
-            "input_border": "#1f2840",
-            "button_bg": "linear-gradient(180deg, #1b2237, #111726)",
-            "button_border": "#2a3554",
-            "button_hover_border": "#7b61ff",
-            "primary_bg": "linear-gradient(135deg, #7b61ff, #4b8bff)",
-            "primary_border": "rgba(123,97,255,0.55)",
-            "primary_hover_border": "#9f8bff",
-            "card_bg": "linear-gradient(180deg, rgba(18,24,42,0.95), rgba(12,16,30,0.95))",
-            "card_border": "#1f2942",
-            "sidebar_bg": "linear-gradient(180deg, #090c16, #0b1221)",
-            "sidebar_border": "#182036",
-            "sidebar_title": "#b7a9ff",
-            "divider": "#1d2740",
-            "expander_border": "#25314f",
-            "header_gradient": "radial-gradient(circle at top left, rgba(123,97,255,0.55), rgba(10,15,29,0.4)), linear-gradient(135deg, #0f1526, #121a30)",
-            "header_logo_bg": "rgba(123,97,255,0.2)",
-            "header_sub": "#c5d0ff",
+            "bg": "#020617",
+            "bg_glow": "radial-gradient(circle at 20% 20%, rgba(34,197,94,0.18), transparent 45%), radial-gradient(circle at 80% 0%, rgba(74,222,128,0.18), transparent 40%)",
+            "text": "#ecfdf5",
+            "muted": "#b6c3d1",
+            "input_bg": "#0b1216",
+            "input_border": "#166534",
+            "button_bg": "linear-gradient(180deg, #0f1a15, #0b1411)",
+            "button_border": "#163f2a",
+            "button_hover_border": "#22c55e",
+            "primary_bg": "linear-gradient(135deg, #15803d, #22c55e)",
+            "primary_border": "rgba(34,197,94,0.55)",
+            "primary_hover_border": "#4ade80",
+            "card_bg": "linear-gradient(180deg, rgba(6,18,14,0.95), rgba(4,12,10,0.95))",
+            "card_border": "#163523",
+            "sidebar_bg": "linear-gradient(180deg, #020617, #07150f)",
+            "sidebar_border": "#123123",
+            "sidebar_title": "#7dd3a7",
+            "divider": "#143023",
+            "expander_border": "#1f3b2d",
+            "header_gradient": "radial-gradient(circle at top left, rgba(34,197,94,0.35), rgba(2,6,23,0.6)), linear-gradient(135deg, #0b1216, #0f1a15)",
+            "header_logo_bg": "rgba(34,197,94,0.2)",
+            "header_sub": "#c7f2da",
             "shadow_strong": "0 18px 40px rgba(0,0,0,0.55)",
             "shadow_button": "0 10px 22px rgba(0,0,0,0.4)",
-            "sidebar_brand_bg": "linear-gradient(180deg, rgba(18,24,42,0.85), rgba(9,12,22,0.95))",
-            "sidebar_brand_border": "rgba(123,97,255,0.25)",
-            "sidebar_logo_bg": "rgba(123,97,255,0.12)",
-            "accent": "#7b61ff",
-            "accent_soft": "rgba(123,97,255,0.18)",
-            "surface": "rgba(16,22,40,0.85)",
-            "surface_alt": "rgba(12,17,32,0.9)",
+            "sidebar_brand_bg": "linear-gradient(180deg, rgba(6,18,14,0.85), rgba(4,10,8,0.95))",
+            "sidebar_brand_border": "rgba(34,197,94,0.25)",
+            "sidebar_logo_bg": "rgba(34,197,94,0.12)",
+            "accent": "#22c55e",
+            "accent_soft": "rgba(34,197,94,0.18)",
+            "accent_glow": "rgba(34,197,94,0.35)",
+            "surface": "rgba(6,18,14,0.85)",
+            "surface_alt": "rgba(5,14,11,0.9)",
             "success": "#22c55e",
             "warning": "#f59e0b",
         },
         "Light": {
             "bg": "#f8fafc",
-            "bg_glow": "radial-gradient(circle at 20% 20%, rgba(34,197,94,0.18), transparent 45%), radial-gradient(circle at 80% 0%, rgba(59,130,246,0.18), transparent 40%)",
+            "bg_glow": "radial-gradient(circle at 20% 20%, rgba(34,197,94,0.18), transparent 45%), radial-gradient(circle at 80% 0%, rgba(74,222,128,0.18), transparent 40%)",
             "text": "#0f172a",
             "muted": "#6b7280",
             "input_bg": "#ffffff",
@@ -1019,6 +1022,7 @@ def _run_ui():
             "sidebar_logo_bg": "rgba(15,23,42,0.06)",
             "accent": "#22c55e",
             "accent_soft": "rgba(34,197,94,0.18)",
+            "accent_glow": "rgba(34,197,94,0.35)",
             "surface": "rgba(255,255,255,0.9)",
             "surface_alt": "rgba(241,245,249,0.95)",
             "success": "#16a34a",
@@ -1061,6 +1065,7 @@ def _run_ui():
         --mantis-sidebar-logo-bg: {tokens["sidebar_logo_bg"]};
         --mantis-accent: {tokens["accent"]};
         --mantis-accent-soft: {tokens["accent_soft"]};
+        --mantis-accent-glow: {tokens["accent_glow"]};
         --mantis-surface: {tokens["surface"]};
         --mantis-surface-alt: {tokens["surface_alt"]};
         --mantis-success: {tokens["success"]};
@@ -1089,7 +1094,7 @@ def _run_ui():
         padding:18px 24px;
         border-radius:22px;
         background: var(--mantis-header-gradient);
-        border: 1px solid rgba(123,97,255,0.25);
+        border: 1px solid var(--mantis-primary-border);
         margin-top: 18px;
         margin-bottom: 18px;
         box-shadow: var(--mantis-shadow-strong);
@@ -1197,7 +1202,7 @@ def _run_ui():
         border-radius:999px;
         font-size:12px;
         background: var(--mantis-accent-soft);
-        border: 1px solid rgba(62,227,122,0.35);
+        border: 1px solid var(--mantis-accent-glow);
         color: var(--mantis-text);
         letter-spacing: 0.02em;
     }}
@@ -1237,7 +1242,7 @@ def _run_ui():
         font-weight:600;
         background: var(--mantis-accent-soft);
         color: var(--mantis-text);
-        border: 1px solid rgba(123,97,255,0.3);
+        border: 1px solid var(--mantis-accent-glow);
     }}
     .mantis-kpi-grid {{
         display:grid;
@@ -1340,7 +1345,7 @@ def _run_ui():
     }}
     div[role="radiogroup"] > label:has(input:checked) {{
         border-color: var(--mantis-accent);
-        box-shadow: 0 0 0 1px rgba(123,97,255,0.3);
+        box-shadow: 0 0 0 1px var(--mantis-accent-glow);
     }}
 </style>
     """,
@@ -1541,11 +1546,6 @@ def _run_ui():
 
     def render_auth():
         saved_username = config_data.get("last_username", "")
-        st.checkbox(
-            "Remember me on this device",
-            key="remember_me",
-            help="Keeps you signed in on refresh without storing your password.",
-        )
         hero_left, hero_right = st.columns([1.1, 1.3])
         with hero_left:
             st.markdown(
@@ -1554,7 +1554,7 @@ def _run_ui():
                     <div class="mantis-tag">Welcome</div>
                     <div class="mantis-hero-title">Enter your story studio</div>
                     <div class="mantis-hero-sub">
-                        Sign in to save projects, sync across sessions, and keep your canon organized.
+                        Start writing instantly. Sign in later to save and sync.
                     </div>
                 </div>
                 """,
@@ -1579,14 +1579,37 @@ def _run_ui():
                 """
                 <div class="mantis-section-title">Account access</div>
                 <p class="mantis-muted" style="margin-top:0;">
-                    Choose a sign-in method to continue.
+                    Choose how you want to start writing.
                 </p>
                 """,
                 unsafe_allow_html=True,
             )
-            tabs = st.tabs(["Sign In", "Create Account", "Guest"])
+            tabs = st.tabs(["Start Writing (Guest)", "Sign In", "Create Account"])
 
             with tabs[0]:
+                st.caption("Guest mode lets you write immediately. Projects are not saved.")
+                if st.button("✍️ Start Writing (Guest)", type="primary", use_container_width=True):
+                    guest_id = st.session_state.get("guest_id") or str(uuid.uuid4())
+                    st.session_state.guest_id = guest_id
+                    st.session_state.auth_user = "Guest"
+                    st.session_state.auth_user_id = guest_id
+                    st.session_state.auth_username = "guest"
+                    st.session_state.auth_is_guest = True
+                    st.session_state.projects_dir = get_guest_projects_dir(guest_id)
+                    save_auth_remember(
+                        {
+                            "id": guest_id,
+                            "username": "guest",
+                            "display_name": "Guest",
+                        },
+                        True,
+                        st.session_state.remember_me,
+                        guest_id=guest_id,
+                    )
+                    st.session_state._force_nav = True
+                    st.rerun()
+
+            with tabs[1]:
                 username = st.text_input(
                     "Username",
                     value=saved_username,
@@ -1609,7 +1632,7 @@ def _run_ui():
                         st.session_state._force_nav = True
                         st.rerun()
 
-            with tabs[1]:
+            with tabs[2]:
                 display_name = st.text_input(
                     "Display name",
                     key="auth_create_display_name",
@@ -1636,32 +1659,9 @@ def _run_ui():
                                 st.session_state.auth_username = user["username"]
                                 st.session_state.auth_is_guest = False
                                 st.session_state.projects_dir = get_user_projects_dir(user["id"])
-                                save_auth_remember(user, False, st.session_state.remember_me)
-                                st.session_state._force_nav = True
-                                st.rerun()
-
-            with tabs[2]:
-                st.caption("Guest sessions store projects separately and may be cleared by the host.")
-                if st.button("Continue as Guest", use_container_width=True):
-                    guest_id = st.session_state.get("guest_id") or str(uuid.uuid4())
-                    st.session_state.guest_id = guest_id
-                    st.session_state.auth_user = "Guest"
-                    st.session_state.auth_user_id = guest_id
-                    st.session_state.auth_username = "guest"
-                    st.session_state.auth_is_guest = True
-                    st.session_state.projects_dir = get_guest_projects_dir(guest_id)
-                    save_auth_remember(
-                        {
-                            "id": guest_id,
-                            "username": "guest",
-                            "display_name": "Guest",
-                        },
-                        True,
-                        st.session_state.remember_me,
-                        guest_id=guest_id,
-                    )
-                    st.session_state._force_nav = True
-                    st.rerun()
+                            save_auth_remember(user, False, st.session_state.remember_me)
+                            st.session_state._force_nav = True
+                            st.rerun()
 
     def _today_str() -> str:
         return datetime.date.today().isoformat()
@@ -2058,17 +2058,30 @@ def _run_ui():
         st.divider()
         st.markdown("### 🧭 Navigation")
 
-        nav_labels = ["Dashboard", "AI Settings"]
-        pmap = {"Dashboard": "home", "AI Settings": "ai"}
+        nav_labels = ["Dashboard", "Projects", "AI Tools"]
+        pmap = {
+            "Dashboard": "home",
+            "Projects": "projects",
+            "AI Tools": "ai",
+        }
         if st.session_state.project:
-            nav_labels = ["Dashboard", "Outline", "Chapters", "World Bible", "Export", "AI Settings"]
+            nav_labels = [
+                "Dashboard",
+                "Projects",
+                "Editor",
+                "Outline",
+                "World Bible",
+                "Export",
+                "AI Tools",
+            ]
             pmap = {
                 "Dashboard": "home",
+                "Projects": "projects",
+                "Editor": "chapters",
                 "Outline": "outline",
                 "World Bible": "world",
-                "Chapters": "chapters",
                 "Export": "export",
-                "AI Settings": "ai",
+                "AI Tools": "ai",
             }
         current_page = st.session_state.page
         reverse_map = {v: k for k, v in pmap.items()}
@@ -2135,23 +2148,12 @@ def _run_ui():
             )
             hero_left, hero_right = st.columns([1.4, 1])
             with hero_left:
-                st.markdown("#### Quick launch")
-                q1, q2, q3 = st.columns(3)
-                with q1:
-                    if st.button("➕ New Project", type="primary", use_container_width=True):
-                        st.toast("Scroll down to the New Project form.")
-                with q2:
-                    if st.button("📂 Resume Latest", use_container_width=True, disabled=not recent_projects):
-                        if recent_projects:
-                            st.session_state.project = Project.load(recent_projects[0]["path"])
-                            st.session_state.page = "chapters"
-                            st.rerun()
-                with q3:
-                    if st.button("🧭 Outline Mode", use_container_width=True, disabled=not recent_projects):
-                        if recent_projects:
-                            st.session_state.project = Project.load(recent_projects[0]["path"])
-                            st.session_state.page = "outline"
-                            st.rerun()
+                st.markdown("#### Resume writing")
+                if st.button("📂 Resume latest project", type="primary", use_container_width=True, disabled=not recent_projects):
+                    if recent_projects:
+                        st.session_state.project = Project.load(recent_projects[0]["path"])
+                        st.session_state.page = "chapters"
+                        st.rerun()
 
                 st.markdown("#### Workspace status")
                 st.markdown(
@@ -2200,7 +2202,8 @@ def _run_ui():
                 st.checkbox("Create a project", value=has_project, disabled=True)
                 if not has_project:
                     if st.button("Start here", type="primary", use_container_width=True):
-                        st.toast("Scroll down to the New Project form.")
+                        st.session_state.page = "projects"
+                        st.rerun()
             with s2:
                 st.checkbox("Draft an outline", value=has_outline, disabled=True)
                 if has_project and not has_outline:
@@ -2318,35 +2321,18 @@ and quick start modules so you can draft fast and refine later.
                 )
                 st.plotly_chart(activity_chart, use_container_width=True)
 
-            st.markdown("#### Next best action")
-            action_cols = st.columns(3)
-            with action_cols[0]:
-                if st.button("✍️ Start writing", type="primary", use_container_width=True):
-                    if recent_projects:
-                        st.session_state.project = Project.load(recent_projects[0]["path"])
-                        st.session_state.page = "chapters"
-                        st.rerun()
-            with action_cols[1]:
-                if st.button("🧭 Build outline", use_container_width=True):
-                    if recent_projects:
-                        st.session_state.project = Project.load(recent_projects[0]["path"])
-                        st.session_state.page = "outline"
-                        st.rerun()
-            with action_cols[2]:
-                if st.button("🌍 Expand world bible", use_container_width=True):
-                    if recent_projects:
-                        st.session_state.project = Project.load(recent_projects[0]["path"])
-                        st.session_state.page = "world"
-                        st.rerun()
+    def render_projects():
+        active_dir = get_active_projects_dir()
+        recent_projects = _load_recent_projects(active_dir)
 
-        st.markdown("## Story Workspace")
-        st.caption("A focused pipeline: start new work, import existing drafts, then manage your library.")
+        st.markdown("## Projects")
+        st.caption("Create, import, and manage your story worlds.")
 
         st.markdown(
             """
             <div class="mantis-section-header">
                 <div>
-                    <div class="mantis-section-title">1. Start a new project</div>
+                    <div class="mantis-section-title">Start a new project</div>
                     <div class="mantis-hero-caption">Set a title, genre, and author details to build your base.</div>
                 </div>
             </div>
@@ -2395,7 +2381,7 @@ and quick start modules so you can draft fast and refine later.
             """
             <div class="mantis-section-header">
                 <div>
-                    <div class="mantis-section-title">2. Import an existing draft</div>
+                    <div class="mantis-section-title">Import an existing draft</div>
                     <div class="mantis-hero-caption">Upload a .txt or .md file to split into chapters.</div>
                 </div>
             </div>
@@ -2426,8 +2412,8 @@ and quick start modules so you can draft fast and refine later.
             """
             <div class="mantis-section-header">
                 <div>
-                    <div class="mantis-section-title">3. Your recent projects</div>
-                    <div class="mantis-hero-caption">Open a project or clean up older drafts.</div>
+                    <div class="mantis-section-title">Your projects</div>
+                    <div class="mantis-hero-caption">Open, export, or clean up older drafts.</div>
                 </div>
             </div>
             """,
@@ -2444,7 +2430,7 @@ and quick start modules so you can draft fast and refine later.
                         filename = os.path.basename(full)
                         title = meta.get("title") or filename
                         genre = meta.get("genre") or ""
-                        row1, row2, row3 = st.columns([6, 2, 1])
+                        row1, row2, row3, row4 = st.columns([5, 2, 1.5, 1])
                         with row1:
                             if st.button(f"📂 {title}", key=f"open_{full}", use_container_width=True):
                                 st.session_state.project = Project.load(full)
@@ -2454,11 +2440,17 @@ and quick start modules so you can draft fast and refine later.
                         with row2:
                             st.caption(genre)
                         with row3:
+                            if st.button("⬇️ Export", key=f"export_{full}", use_container_width=True):
+                                st.session_state.project = Project.load(full)
+                                st.session_state.page = "export"
+                                st.rerun()
+                        with row4:
                             if st.button("🗑", key=f"del_{full}", use_container_width=True):
                                 Project.delete_file(full)
                                 st.rerun()
                     except Exception:
                         logger.warning("Failed to load project metadata: %s", full, exc_info=True)
+
 
     def render_outline():
         p = st.session_state.project
@@ -3022,6 +3014,8 @@ and quick start modules so you can draft fast and refine later.
 
     if st.session_state.page == "home":
         render_home()
+    elif st.session_state.page == "projects":
+        render_projects()
     elif st.session_state.page == "ai":
         render_ai_settings()
     elif st.session_state.project:
