@@ -995,26 +995,26 @@ def _run_ui():
             "text": "#0f172a",
             "muted": "#6b7280",
             "input_bg": "#ffffff",
-            "input_border": "#d0d7e2",
-            "button_bg": "linear-gradient(180deg, #ffffff, #e2e8f0)",
-            "button_border": "#cbd5e1",
-            "button_hover_border": "#16a34a",
-            "primary_bg": "linear-gradient(135deg, #22c55e, #15803d)",
-            "primary_border": "rgba(21,128,61,0.25)",
+            "input_border": "#cce5d6",
+            "button_bg": "linear-gradient(180deg, #ffffff, #ecfdf3)",
+            "button_border": "#cdebd9",
+            "button_hover_border": "#22c55e",
+            "primary_bg": "linear-gradient(135deg, #34d399, #22c55e)",
+            "primary_border": "rgba(34,197,94,0.25)",
             "primary_hover_border": "#16a34a",
             "card_bg": "#ffffff",
-            "card_border": "#e2e8f0",
-            "sidebar_bg": "linear-gradient(180deg, #f1f5f9, #e2e8f0)",
-            "sidebar_border": "#e2e8f0",
-            "sidebar_title": "#15803d",
-            "divider": "#e2e8f0",
-            "expander_border": "#dbe2ea",
-            "header_gradient": "linear-gradient(135deg, #e8f5e9, #c8e6c9)",
-            "header_logo_bg": "#d1fae5",
+            "card_border": "#e1efe6",
+            "sidebar_bg": "linear-gradient(180deg, #f1f7f3, #e7f4ed)",
+            "sidebar_border": "#dbeee2",
+            "sidebar_title": "#1f7a4f",
+            "divider": "#deeee3",
+            "expander_border": "#d7e9df",
+            "header_gradient": "linear-gradient(135deg, #e6f9ef, #c7f4dc)",
+            "header_logo_bg": "#e7fdf1",
             "header_sub": "#2f6f43",
-            "shadow_strong": "0 12px 24px rgba(15,23,42,0.08)",
-            "shadow_button": "0 8px 16px rgba(15,23,42,0.12)",
-            "sidebar_brand_bg": "linear-gradient(180deg, rgba(241,245,249,0.95), rgba(226,232,240,0.95))",
+            "shadow_strong": "0 12px 24px rgba(12,26,18,0.08)",
+            "shadow_button": "0 8px 16px rgba(12,26,18,0.12)",
+            "sidebar_brand_bg": "linear-gradient(180deg, rgba(241,251,245,0.95), rgba(226,245,236,0.95))",
             "sidebar_brand_border": "rgba(21,128,61,0.18)",
             "sidebar_logo_bg": "rgba(15,23,42,0.06)",
             "accent": "#22c55e",
@@ -1105,21 +1105,21 @@ def _run_ui():
         align-items:center;
     }}
     .mantis-header-logo {{
-        width:46px;
-        height:46px;
-        border-radius:14px;
+        width:52px;
+        height:52px;
+        border-radius:16px;
         background: var(--mantis-header-logo-bg);
         display:flex;
         align-items:center;
         justify-content:center;
         overflow:hidden;
-        box-shadow: inset 0 0 0 1px rgba(255,255,255,0.12);
+        box-shadow: inset 0 0 0 1px rgba(255,255,255,0.2), 0 8px 20px rgba(0,0,0,0.25);
     }}
     .mantis-header-logo img {{
-        height:28px;
+        height:32px;
         width:auto;
         padding:6px;
-        border-radius:10px;
+        border-radius:12px;
     }}
     .mantis-header-title {{
         font-size:22px;
@@ -1196,8 +1196,8 @@ def _run_ui():
         padding:6px 10px;
         border-radius:999px;
         font-size:12px;
-        background: rgba(123,97,255,0.15);
-        border: 1px solid rgba(123,97,255,0.35);
+        background: var(--mantis-accent-soft);
+        border: 1px solid rgba(62,227,122,0.35);
         color: var(--mantis-text);
         letter-spacing: 0.02em;
     }}
@@ -1301,19 +1301,19 @@ def _run_ui():
         box-shadow: var(--mantis-shadow-button);
     }}
     .mantis-sidebar-logo{{
-        width:54px;
-        height:54px;
-        border-radius: 12px;
+        width:56px;
+        height:56px;
+        border-radius: 14px;
         background: var(--mantis-sidebar-logo-bg);
         display:flex;
         align-items:center;
         justify-content:center;
         overflow:hidden;
-        box-shadow: inset 0 0 0 1px rgba(255,255,255,0.12);
+        box-shadow: inset 0 0 0 1px rgba(0,0,0,0.05), 0 6px 16px rgba(0,0,0,0.2);
         flex: 0 0 auto;
     }}
     .mantis-sidebar-logo img{{
-        height:36px;
+        height:38px;
         width:auto;
         display:block;
     }}
