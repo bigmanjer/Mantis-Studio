@@ -955,60 +955,74 @@ def _run_ui():
     theme = st.session_state.ui_theme if st.session_state.ui_theme in ("Dark", "Light") else "Dark"
     theme_tokens = {
         "Dark": {
-            "bg": "#0b0f1a",
-            "text": "#e6e9f4",
-            "muted": "#a2a6bd",
-            "input_bg": "#0f1526",
-            "input_border": "#1f2840",
-            "button_bg": "linear-gradient(180deg, #1b2237, #111726)",
-            "button_border": "#2a3554",
-            "button_hover_border": "#7b61ff",
-            "primary_bg": "linear-gradient(135deg, #7b61ff, #4b8bff)",
-            "primary_border": "rgba(123,97,255,0.55)",
-            "primary_hover_border": "#9f8bff",
-            "card_bg": "linear-gradient(180deg, rgba(18,24,42,0.95), rgba(12,16,30,0.95))",
-            "card_border": "#1f2942",
-            "sidebar_bg": "linear-gradient(180deg, #090c16, #0b1221)",
-            "sidebar_border": "#182036",
-            "sidebar_title": "#b7a9ff",
-            "divider": "#1d2740",
-            "expander_border": "#25314f",
-            "header_gradient": "radial-gradient(circle at top left, rgba(123,97,255,0.55), rgba(10,15,29,0.4)), linear-gradient(135deg, #0f1526, #121a30)",
-            "header_logo_bg": "rgba(123,97,255,0.2)",
-            "header_sub": "#c5d0ff",
-            "shadow_strong": "0 18px 40px rgba(0,0,0,0.55)",
-            "shadow_button": "0 10px 22px rgba(0,0,0,0.4)",
-            "sidebar_brand_bg": "linear-gradient(180deg, rgba(18,24,42,0.85), rgba(9,12,22,0.95))",
-            "sidebar_brand_border": "rgba(123,97,255,0.25)",
-            "sidebar_logo_bg": "rgba(123,97,255,0.12)",
+            "bg": "#0b0f14",
+            "bg_glow": "radial-gradient(circle at 20% 20%, rgba(62,227,122,0.18), transparent 45%), radial-gradient(circle at 80% 0%, rgba(16,185,129,0.18), transparent 40%)",
+            "text": "#edf9f1",
+            "muted": "#a8c5b2",
+            "input_bg": "#101b17",
+            "input_border": "#1f2e2a",
+            "button_bg": "linear-gradient(180deg, #162821, #101f19)",
+            "button_border": "#2a3d35",
+            "button_hover_border": "#3ee37a",
+            "primary_bg": "linear-gradient(135deg, #3ee37a, #10b981)",
+            "primary_border": "rgba(62,227,122,0.55)",
+            "primary_hover_border": "#6bf59c",
+            "card_bg": "linear-gradient(180deg, rgba(16,30,26,0.95), rgba(10,20,18,0.95))",
+            "card_border": "#21362f",
+            "sidebar_bg": "linear-gradient(180deg, #0b1411, #0c1a15)",
+            "sidebar_border": "#172822",
+            "sidebar_title": "#7ef5b0",
+            "divider": "#1e3029",
+            "expander_border": "#28413a",
+            "header_gradient": "radial-gradient(circle at top left, rgba(62,227,122,0.45), rgba(10,18,14,0.3)), linear-gradient(135deg, #0f1d18, #12261f)",
+            "header_logo_bg": "rgba(62,227,122,0.25)",
+            "header_sub": "#c5f0d7",
+            "shadow_strong": "0 18px 36px rgba(3,12,8,0.55)",
+            "shadow_button": "0 10px 20px rgba(3,12,8,0.4)",
+            "sidebar_brand_bg": "linear-gradient(180deg, rgba(18,32,26,0.9), rgba(9,18,15,0.95))",
+            "sidebar_brand_border": "rgba(62,227,122,0.25)",
+            "sidebar_logo_bg": "rgba(236,255,244,0.9)",
+            "accent": "#3ee37a",
+            "accent_soft": "rgba(62,227,122,0.18)",
+            "surface": "rgba(14,26,22,0.88)",
+            "surface_alt": "rgba(11,20,17,0.92)",
+            "success": "#22c55e",
+            "warning": "#f59e0b",
         },
         "Light": {
             "bg": "#f8fafc",
-            "text": "#0f172a",
-            "muted": "#6b7280",
+            "bg_glow": "radial-gradient(circle at 20% 20%, rgba(34,197,94,0.18), transparent 45%), radial-gradient(circle at 80% 0%, rgba(16,185,129,0.18), transparent 40%)",
+            "text": "#0c1a12",
+            "muted": "#60756a",
             "input_bg": "#ffffff",
-            "input_border": "#d0d7e2",
-            "button_bg": "linear-gradient(180deg, #ffffff, #e2e8f0)",
-            "button_border": "#cbd5e1",
-            "button_hover_border": "#16a34a",
-            "primary_bg": "linear-gradient(135deg, #22c55e, #15803d)",
-            "primary_border": "rgba(21,128,61,0.25)",
+            "input_border": "#cce5d6",
+            "button_bg": "linear-gradient(180deg, #ffffff, #ecfdf3)",
+            "button_border": "#cdebd9",
+            "button_hover_border": "#22c55e",
+            "primary_bg": "linear-gradient(135deg, #34d399, #22c55e)",
+            "primary_border": "rgba(34,197,94,0.25)",
             "primary_hover_border": "#16a34a",
             "card_bg": "#ffffff",
-            "card_border": "#e2e8f0",
-            "sidebar_bg": "linear-gradient(180deg, #f1f5f9, #e2e8f0)",
-            "sidebar_border": "#e2e8f0",
-            "sidebar_title": "#15803d",
-            "divider": "#e2e8f0",
-            "expander_border": "#dbe2ea",
-            "header_gradient": "linear-gradient(135deg, #e8f5e9, #c8e6c9)",
-            "header_logo_bg": "#d1fae5",
+            "card_border": "#e1efe6",
+            "sidebar_bg": "linear-gradient(180deg, #f1f7f3, #e7f4ed)",
+            "sidebar_border": "#dbeee2",
+            "sidebar_title": "#1f7a4f",
+            "divider": "#deeee3",
+            "expander_border": "#d7e9df",
+            "header_gradient": "linear-gradient(135deg, #e6f9ef, #c7f4dc)",
+            "header_logo_bg": "#e7fdf1",
             "header_sub": "#2f6f43",
-            "shadow_strong": "0 12px 24px rgba(15,23,42,0.08)",
-            "shadow_button": "0 8px 16px rgba(15,23,42,0.12)",
-            "sidebar_brand_bg": "linear-gradient(180deg, rgba(241,245,249,0.95), rgba(226,232,240,0.95))",
+            "shadow_strong": "0 12px 24px rgba(12,26,18,0.08)",
+            "shadow_button": "0 8px 16px rgba(12,26,18,0.12)",
+            "sidebar_brand_bg": "linear-gradient(180deg, rgba(241,251,245,0.95), rgba(226,245,236,0.95))",
             "sidebar_brand_border": "rgba(21,128,61,0.18)",
-            "sidebar_logo_bg": "rgba(15,23,42,0.06)",
+            "sidebar_logo_bg": "#ecfdf3",
+            "accent": "#22c55e",
+            "accent_soft": "rgba(34,197,94,0.18)",
+            "surface": "rgba(255,255,255,0.92)",
+            "surface_alt": "rgba(236,253,243,0.95)",
+            "success": "#16a34a",
+            "warning": "#d97706",
         },
     }
     tokens = theme_tokens[theme]
@@ -1016,9 +1030,10 @@ def _run_ui():
     st.markdown(
         f"""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@400;600&family=Inter:wght@400;600&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@400;600&family=Inter:wght@400;600&family=Space+Grotesk:wght@500;700&display=swap');
     :root {{
         --mantis-bg: {tokens["bg"]};
+        --mantis-bg-glow: {tokens["bg_glow"]};
         --mantis-text: {tokens["text"]};
         --mantis-muted: {tokens["muted"]};
         --mantis-input-bg: {tokens["input_bg"]};
@@ -1044,12 +1059,23 @@ def _run_ui():
         --mantis-sidebar-brand-bg: {tokens["sidebar_brand_bg"]};
         --mantis-sidebar-brand-border: {tokens["sidebar_brand_border"]};
         --mantis-sidebar-logo-bg: {tokens["sidebar_logo_bg"]};
+        --mantis-accent: {tokens["accent"]};
+        --mantis-accent-soft: {tokens["accent_soft"]};
+        --mantis-surface: {tokens["surface"]};
+        --mantis-surface-alt: {tokens["surface_alt"]};
+        --mantis-success: {tokens["success"]};
+        --mantis-warning: {tokens["warning"]};
     }}
-    .stApp {{ background-color: var(--mantis-bg); color: var(--mantis-text); font-family: 'Inter', sans-serif; }}
-    .block-container {{ padding-top: 2.6rem; padding-bottom: 2rem; }}
+    .stApp {{
+        background-color: var(--mantis-bg);
+        background-image: var(--mantis-bg-glow);
+        color: var(--mantis-text);
+        font-family: 'Inter', sans-serif;
+    }}
+    .block-container {{ padding-top: 2.6rem; padding-bottom: 2.6rem; max-width: 1380px; }}
     header[data-testid="stHeader"] {{ height: 2.6rem; }}
-    h1, h2, h3 {{ letter-spacing: -0.02em; }}
-    .stTextInput input, .stSelectbox div, .stNumberInput input {{ background-color: var(--mantis-input-bg) !important; color: var(--mantis-text) !important; border: 1px solid var(--mantis-input-border) !important; }}
+    h1, h2, h3 {{ letter-spacing: -0.02em; font-family: 'Space Grotesk', sans-serif; }}
+    .stTextInput input, .stSelectbox div, .stNumberInput input {{ background-color: var(--mantis-input-bg) !important; color: var(--mantis-text) !important; border: 1px solid var(--mantis-input-border) !important; border-radius: 14px !important; }}
     .stTextArea textarea {{ background-color: var(--mantis-input-bg) !important; color: var(--mantis-text) !important; font-family: 'Crimson Pro', serif !important; font-size: 18px !important; line-height: 1.65 !important; border: 1px solid var(--mantis-input-border) !important; }}
 
     .mantis-muted {{ color: var(--mantis-muted); }}
@@ -1063,7 +1089,7 @@ def _run_ui():
         padding:18px 24px;
         border-radius:22px;
         background: var(--mantis-header-gradient);
-        border: 1px solid rgba(123,97,255,0.2);
+        border: 1px solid rgba(62,227,122,0.28);
         margin-top: 18px;
         margin-bottom: 18px;
         box-shadow: var(--mantis-shadow-strong);
@@ -1079,21 +1105,21 @@ def _run_ui():
         align-items:center;
     }}
     .mantis-header-logo {{
-        width:46px;
-        height:46px;
-        border-radius:14px;
+        width:52px;
+        height:52px;
+        border-radius:16px;
         background: var(--mantis-header-logo-bg);
         display:flex;
         align-items:center;
         justify-content:center;
         overflow:hidden;
-        box-shadow: inset 0 0 0 1px rgba(255,255,255,0.12);
+        box-shadow: inset 0 0 0 1px rgba(255,255,255,0.2), 0 8px 20px rgba(0,0,0,0.25);
     }}
     .mantis-header-logo img {{
-        height:28px;
+        height:32px;
         width:auto;
         padding:6px;
-        border-radius:10px;
+        border-radius:12px;
     }}
     .mantis-header-title {{
         font-size:22px;
@@ -1104,6 +1130,14 @@ def _run_ui():
     .mantis-header-sub {{
         color: var(--mantis-header-sub);
         font-size:12px;
+    }}
+    .mantis-header-meta {{
+        display:flex;
+        flex-direction:column;
+        align-items:flex-end;
+        gap:4px;
+        font-size:12px;
+        color: var(--mantis-muted);
     }}
 
     .stButton>button {{
@@ -1162,8 +1196,8 @@ def _run_ui():
         padding:6px 10px;
         border-radius:999px;
         font-size:12px;
-        background: rgba(123,97,255,0.15);
-        border: 1px solid rgba(123,97,255,0.35);
+        background: var(--mantis-accent-soft);
+        border: 1px solid rgba(62,227,122,0.35);
         color: var(--mantis-text);
         letter-spacing: 0.02em;
     }}
@@ -1176,6 +1210,99 @@ def _run_ui():
         margin-top: 0;
         margin-bottom: 12px;
         color: var(--mantis-text);
+    }}
+    .mantis-hero {{
+        background: var(--mantis-surface);
+        border-radius: 22px;
+        padding: 22px 24px;
+        border: 1px solid var(--mantis-card-border);
+        box-shadow: var(--mantis-shadow-strong);
+    }}
+    .mantis-hero-title {{
+        font-size: 28px;
+        font-weight: 700;
+        margin-bottom: 6px;
+    }}
+    .mantis-hero-sub {{
+        color: var(--mantis-muted);
+        font-size: 14px;
+    }}
+    .mantis-tag {{
+        display:inline-flex;
+        align-items:center;
+        gap:6px;
+        padding:6px 12px;
+        border-radius:999px;
+        font-size:12px;
+        font-weight:600;
+        background: var(--mantis-accent-soft);
+        color: var(--mantis-text);
+        border: 1px solid rgba(62,227,122,0.3);
+    }}
+    .mantis-kpi-grid {{
+        display:grid;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap:12px;
+        margin-top: 14px;
+    }}
+    .mantis-kpi-card {{
+        padding: 12px 14px;
+        border-radius: 16px;
+        background: var(--mantis-surface-alt);
+        border: 1px solid var(--mantis-card-border);
+    }}
+    .mantis-kpi-label {{
+        font-size:11px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--mantis-muted);
+        margin-bottom: 6px;
+    }}
+    .mantis-kpi-value {{
+        font-size:20px;
+        font-weight:700;
+    }}
+    .mantis-dashboard-grid {{
+        display:grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap:16px;
+        margin-top: 12px;
+    }}
+    .mantis-dashboard-card {{
+        background: var(--mantis-surface-alt);
+        border-radius: 18px;
+        padding: 16px;
+        border: 1px solid var(--mantis-card-border);
+    }}
+    .mantis-dashboard-card h4 {{
+        margin: 0 0 8px 0;
+        font-size: 14px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--mantis-muted);
+    }}
+    .mantis-actions-row {{
+        display:flex;
+        flex-wrap: wrap;
+        gap:12px;
+        margin-top: 12px;
+    }}
+    .mantis-section-header {{
+        display:flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 12px;
+    }}
+    .mantis-section-title {{
+        font-size:20px;
+        font-weight:700;
+        margin-bottom: 6px;
+    }}
+    .mantis-soft {{
+        background: var(--mantis-surface-alt);
+        border-radius: 16px;
+        padding: 14px;
+        border: 1px solid var(--mantis-card-border);
     }}
 
     /* --- SIDEBAR POLISH --- */
@@ -1205,19 +1332,19 @@ def _run_ui():
         box-shadow: var(--mantis-shadow-button);
     }}
     .mantis-sidebar-logo{{
-        width:54px;
-        height:54px;
-        border-radius: 12px;
+        width:56px;
+        height:56px;
+        border-radius: 14px;
         background: var(--mantis-sidebar-logo-bg);
         display:flex;
         align-items:center;
         justify-content:center;
         overflow:hidden;
-        box-shadow: inset 0 0 0 1px rgba(255,255,255,0.12);
+        box-shadow: inset 0 0 0 1px rgba(0,0,0,0.05), 0 6px 16px rgba(0,0,0,0.2);
         flex: 0 0 auto;
     }}
     .mantis-sidebar-logo img{{
-        height:36px;
+        height:38px;
         width:auto;
         display:block;
     }}
@@ -1232,6 +1359,19 @@ def _run_ui():
         color: var(--mantis-muted);
         margin-top:2px;
         line-height:1.1;
+    }}
+
+    /* --- NAV RADIO STYLE --- */
+    div[role="radiogroup"] > label {{
+        background: var(--mantis-surface-alt);
+        padding: 10px 12px;
+        border-radius: 12px;
+        border: 1px solid var(--mantis-card-border);
+        margin-bottom: 8px;
+    }}
+    div[role="radiogroup"] > label:has(input:checked) {{
+        border-color: var(--mantis-accent);
+        box-shadow: 0 0 0 1px rgba(62,227,122,0.35);
     }}
 </style>
     """,
@@ -1250,13 +1390,13 @@ def _run_ui():
                         MANTIS Studio
                     </div>
                     <div class="mantis-header-sub">
-                        Story workspace • memory • drafting
+                        Modern, minty writing HQ
                     </div>
                 </div>
             </div>
             <div class="mantis-header-right">
-                <span class="mantis-pill">Workspace</span>
-                <span class="mantis-pill">NovelAI-inspired UI</span>
+                <span class="mantis-pill">Mantis Green</span>
+                <span class="mantis-pill">v{AppConfig.VERSION}</span>
             </div>
         </div>
         """, unsafe_allow_html=True)
@@ -1437,95 +1577,122 @@ def _run_ui():
             key="remember_me",
             help="Keeps you signed in on refresh without storing your password.",
         )
-        st.markdown(
-            """
-            <div style="max-width:480px;margin:0 auto;padding:24px 12px;">
-                <h2 style="margin-bottom:8px;">Welcome to MANTIS Studio</h2>
-                <p class="mantis-muted" style="margin-top:0;">
-                    Sign in or create an account to keep your projects saved.
-                </p>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-        tabs = st.tabs(["Sign In", "Create Account", "Guest"])
-
-        with tabs[0]:
-            username = st.text_input(
-                "Username",
-                value=saved_username,
-                key="auth_login_username",
-                placeholder="e.g. alex",
+        hero_left, hero_right = st.columns([1.1, 1.3])
+        with hero_left:
+            st.markdown(
+                """
+                <div class="mantis-hero">
+                    <div class="mantis-tag">Welcome</div>
+                    <div class="mantis-hero-title">Enter your story studio</div>
+                    <div class="mantis-hero-sub">
+                        Sign in to save projects, sync across sessions, and keep your canon organized.
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True,
             )
-            password = st.text_input("Password", type="password", key="auth_login_password")
-            if st.button("Sign In", use_container_width=True):
-                result = authenticate_user(username, password)
-                if not result.get("ok"):
-                    st.error(result.get("error", "Sign in failed."))
-                else:
-                    user = result["user"]
-                    st.session_state.auth_user = user["display_name"]
-                    st.session_state.auth_user_id = user["id"]
-                    st.session_state.auth_username = user["username"]
-                    st.session_state.auth_is_guest = False
-                    st.session_state.projects_dir = get_user_projects_dir(user["id"])
-                    save_auth_remember(user, False, st.session_state.remember_me)
+            st.markdown(
+                """
+                <div class="mantis-soft">
+                    <div class="mantis-section-title">What you can do</div>
+                    <ul style="margin:0; padding-left:18px;">
+                        <li>Draft chapters with AI assist</li>
+                        <li>Build and maintain your World Bible</li>
+                        <li>Track goals and writing momentum</li>
+                    </ul>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+        with hero_right:
+            st.markdown(
+                """
+                <div class="mantis-section-title">Account access</div>
+                <p class="mantis-muted" style="margin-top:0;">
+                    Choose a sign-in method to continue.
+                </p>
+                """,
+                unsafe_allow_html=True,
+            )
+            tabs = st.tabs(["Sign In", "Create Account", "Guest"])
+
+            with tabs[0]:
+                username = st.text_input(
+                    "Username",
+                    value=saved_username,
+                    key="auth_login_username",
+                    placeholder="e.g. alex",
+                )
+                password = st.text_input("Password", type="password", key="auth_login_password")
+                if st.button("Sign In", use_container_width=True):
+                    result = authenticate_user(username, password)
+                    if not result.get("ok"):
+                        st.error(result.get("error", "Sign in failed."))
+                    else:
+                        user = result["user"]
+                        st.session_state.auth_user = user["display_name"]
+                        st.session_state.auth_user_id = user["id"]
+                        st.session_state.auth_username = user["username"]
+                        st.session_state.auth_is_guest = False
+                        st.session_state.projects_dir = get_user_projects_dir(user["id"])
+                        save_auth_remember(user, False, st.session_state.remember_me)
+                        st.session_state._force_nav = True
+                        st.rerun()
+
+            with tabs[1]:
+                display_name = st.text_input(
+                    "Display name",
+                    key="auth_create_display_name",
+                    placeholder="e.g. Alex Writer",
+                )
+                new_username = st.text_input("Username", key="auth_create_username", placeholder="e.g. alex")
+                new_password = st.text_input("Password", type="password", key="auth_create_password")
+                confirm_password = st.text_input("Confirm password", type="password", key="auth_create_confirm")
+                if st.button("Create Account", type="primary", use_container_width=True):
+                    if new_password != confirm_password:
+                        st.error("Passwords do not match.")
+                    else:
+                        policy_error = _password_policy_error(new_password or "")
+                        if policy_error:
+                            st.error(policy_error)
+                        else:
+                            result = create_user(new_username, display_name, new_password)
+                            if not result.get("ok"):
+                                st.error(result.get("error", "Could not create account."))
+                            else:
+                                user = result["user"]
+                                st.session_state.auth_user = user["display_name"]
+                                st.session_state.auth_user_id = user["id"]
+                                st.session_state.auth_username = user["username"]
+                                st.session_state.auth_is_guest = False
+                                st.session_state.projects_dir = get_user_projects_dir(user["id"])
+                                save_auth_remember(user, False, st.session_state.remember_me)
+                                st.session_state._force_nav = True
+                                st.rerun()
+
+            with tabs[2]:
+                st.caption("Guest sessions store projects separately and may be cleared by the host.")
+                if st.button("Continue as Guest", use_container_width=True):
+                    guest_id = st.session_state.get("guest_id") or str(uuid.uuid4())
+                    st.session_state.guest_id = guest_id
+                    st.session_state.auth_user = "Guest"
+                    st.session_state.auth_user_id = guest_id
+                    st.session_state.auth_username = "guest"
+                    st.session_state.auth_is_guest = True
+                    st.session_state.projects_dir = get_guest_projects_dir(guest_id)
+                    save_auth_remember(
+                        {
+                            "id": guest_id,
+                            "username": "guest",
+                            "display_name": "Guest",
+                        },
+                        True,
+                        st.session_state.remember_me,
+                        guest_id=guest_id,
+                    )
                     st.session_state._force_nav = True
                     st.rerun()
-
-        with tabs[1]:
-            display_name = st.text_input(
-                "Display name",
-                key="auth_create_display_name",
-                placeholder="e.g. Alex Writer",
-            )
-            new_username = st.text_input("Username", key="auth_create_username", placeholder="e.g. alex")
-            new_password = st.text_input("Password", type="password", key="auth_create_password")
-            confirm_password = st.text_input("Confirm password", type="password", key="auth_create_confirm")
-            if st.button("Create Account", type="primary", use_container_width=True):
-                if new_password != confirm_password:
-                    st.error("Passwords do not match.")
-                else:
-                    policy_error = _password_policy_error(new_password or "")
-                    if policy_error:
-                        st.error(policy_error)
-                    else:
-                        result = create_user(new_username, display_name, new_password)
-                        if not result.get("ok"):
-                            st.error(result.get("error", "Could not create account."))
-                        else:
-                            user = result["user"]
-                            st.session_state.auth_user = user["display_name"]
-                            st.session_state.auth_user_id = user["id"]
-                            st.session_state.auth_username = user["username"]
-                            st.session_state.auth_is_guest = False
-                            st.session_state.projects_dir = get_user_projects_dir(user["id"])
-                            save_auth_remember(user, False, st.session_state.remember_me)
-                            st.session_state._force_nav = True
-                            st.rerun()
-
-        with tabs[2]:
-            st.caption("Guest sessions store projects separately and may be cleared by the host.")
-            if st.button("Continue as Guest", use_container_width=True):
-                guest_id = st.session_state.get("guest_id") or str(uuid.uuid4())
-                st.session_state.guest_id = guest_id
-                st.session_state.auth_user = "Guest"
-                st.session_state.auth_user_id = guest_id
-                st.session_state.auth_username = "guest"
-                st.session_state.auth_is_guest = True
-                st.session_state.projects_dir = get_guest_projects_dir(guest_id)
-                save_auth_remember(
-                    {
-                        "id": guest_id,
-                        "username": "guest",
-                        "display_name": "Guest",
-                    },
-                    True,
-                    st.session_state.remember_me,
-                    guest_id=guest_id,
-                )
-                st.session_state._force_nav = True
-                st.rerun()
 
     def _today_str() -> str:
         return datetime.date.today().isoformat()
@@ -1922,13 +2089,12 @@ def _run_ui():
         st.divider()
         st.markdown("### 🧭 Navigation")
 
-        nav_labels = ["Dashboard", "Roadmap", "AI Settings"]
-        pmap = {"Dashboard": "home", "Roadmap": "roadmap", "AI Settings": "ai"}
+        nav_labels = ["Dashboard", "AI Settings"]
+        pmap = {"Dashboard": "home", "AI Settings": "ai"}
         if st.session_state.project:
-            nav_labels = ["Dashboard", "Roadmap", "Outline", "Chapters", "World Bible", "Export", "AI Settings"]
+            nav_labels = ["Dashboard", "Outline", "Chapters", "World Bible", "Export", "AI Settings"]
             pmap = {
                 "Dashboard": "home",
-                "Roadmap": "roadmap",
                 "Outline": "outline",
                 "World Bible": "world",
                 "Chapters": "chapters",
@@ -1970,9 +2136,68 @@ def _run_ui():
             st.info("No project loaded.")
 
     def render_home():
+        active_dir = get_active_projects_dir()
+        recent_projects = _load_recent_projects(active_dir)
+        recent_snapshot = _project_snapshot(recent_projects[0]["meta"]) if recent_projects else None
+        streak = _activity_streak()
+        weekly_count = _weekly_activity_count()
+        weekly_goal = max(int(st.session_state.weekly_sessions_goal), 1)
+        weekly_progress = min(weekly_count / weekly_goal, 1.0)
+
+        with st.container(border=True):
+            st.markdown(
+                f"""
+                <div class="mantis-hero">
+                    <div class="mantis-tag">Dashboard</div>
+                    <div class="mantis-hero-title">Welcome back, {st.session_state.auth_user}</div>
+                    <div class="mantis-hero-sub">
+                        MANTIS keeps your worlds cute, cohesive, and ready to grow.
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+            dash_left, dash_mid, dash_right = st.columns([1.2, 1.4, 1])
+            with dash_left:
+                with st.container(border=True):
+                    st.markdown("#### Quick launch")
+                    st.caption("Pick a path and jump right in.")
+                    if st.button("➕ New Project", type="primary", use_container_width=True):
+                        st.toast("Scroll down to the New Project form.")
+                    if st.button("📂 Resume Latest", use_container_width=True, disabled=not recent_projects):
+                        if recent_projects:
+                            st.session_state.project = Project.load(recent_projects[0]["path"])
+                            st.session_state.page = "chapters"
+                            st.rerun()
+                    if st.button("🧭 Outline Mode", use_container_width=True, disabled=not recent_projects):
+                        if recent_projects:
+                            st.session_state.project = Project.load(recent_projects[0]["path"])
+                            st.session_state.page = "outline"
+                            st.rerun()
+            with dash_mid:
+                with st.container(border=True):
+                    st.markdown("#### Workspace status")
+                    st.caption("Your library and momentum in one glance.")
+                    metrics = st.columns(2)
+                    metrics[0].metric("Active projects", len(recent_projects))
+                    metrics[1].metric("Latest genre", (recent_snapshot or {}).get("genre", "—"))
+                    metrics2 = st.columns(2)
+                    metrics2[0].metric("Writing streak", f"{streak} days")
+                    metrics2[1].metric("Weekly sessions", f"{weekly_count}/{weekly_goal}")
+            with dash_right:
+                with st.container(border=True):
+                    st.markdown("#### Studio signals")
+                    st.caption("Providers and model readiness.")
+                    groq_status = "Connected" if st.session_state.groq_api_key else "Add key"
+                    openai_status = "Connected" if st.session_state.openai_api_key else "Add key"
+                    st.metric("Groq", groq_status)
+                    st.metric("OpenAI", openai_status)
+                    st.metric("Model", st.session_state.groq_model or AppConfig.DEFAULT_MODEL)
+                    st.caption(f"Projects dir: `{active_dir}`")
+
         if st.session_state.get("first_run", True):
             with st.container(border=True):
-                st.markdown("### 👋 Welcome to your Story Workspace")
+                st.markdown("### 👋 First time here?")
                 st.markdown(
                     """
 **MANTIS** now mirrors the focused NovelAI-style studio: a clean writing surface, memory tools,
@@ -1998,10 +2223,8 @@ and quick start modules so you can draft fast and refine later.
 
         if not st.session_state.groq_api_key or not st.session_state.openai_api_key:
             with st.container(border=True):
-                st.markdown("### 🔑 Get your AI keys")
-                st.caption(
-                    "To use cloud models, create a Groq or OpenAI account and paste the key in the sidebar."
-                )
+                st.markdown("### 🔑 Connect your AI providers")
+                st.caption("Unlock generation, summaries, and entity tools with API access.")
                 cta_left, cta_right = st.columns(2)
                 with cta_left:
                     st.link_button("Create Groq Account", "https://console.groq.com/keys", use_container_width=True)
@@ -2011,14 +2234,6 @@ and quick start modules so you can draft fast and refine later.
                         "https://platform.openai.com/api-keys",
                         use_container_width=True,
                     )
-
-        active_dir = get_active_projects_dir()
-        recent_projects = _load_recent_projects(active_dir)
-        recent_snapshot = _project_snapshot(recent_projects[0]["meta"]) if recent_projects else None
-        streak = _activity_streak()
-        weekly_count = _weekly_activity_count()
-        weekly_goal = max(int(st.session_state.weekly_sessions_goal), 1)
-        weekly_progress = min(weekly_count / weekly_goal, 1.0)
 
         with st.container(border=True):
             st.markdown("### 🚀 Creator Momentum")
@@ -2104,168 +2319,125 @@ and quick start modules so you can draft fast and refine later.
                         st.rerun()
 
         st.markdown("## Story Workspace")
-        st.caption("Create a project, resume a story, or import text to begin drafting.")
+        st.caption("A focused pipeline: start new work, import existing drafts, then manage your library.")
 
-        colA, colB = st.columns([1.1, 1.3])
-
-        with colA:
-            with st.container(border=True):
-                st.markdown("### ✨ New Project")
-                with st.form("new_project_form", clear_on_submit=False):
+        st.markdown(
+            """
+            <div class="mantis-section-header">
+                <div>
+                    <div class="mantis-section-title">1. Start a new project</div>
+                    <div class="mantis-hero-caption">Set a title, genre, and author details to build your base.</div>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        with st.container(border=True):
+            with st.form("new_project_form", clear_on_submit=False):
+                c1, c2 = st.columns([2, 1])
+                with c1:
                     t = st.text_input("Title", placeholder="e.g., The Chronicle of Ash")
+                with c2:
                     g = st.text_input("Genre", placeholder="e.g., Dark Fantasy, Sci-Fi Noir")
-                    a = st.text_input("Author (optional)", placeholder="Your name")
-                    submitted = st.form_submit_button("🚀 Initialize Project", type="primary", use_container_width=True)
-                    if submitted:
-                        # If title or genre are missing, try to use AI to fill them in.
-                        if not t or not g:
-                            try:
-                                with st.spinner("Generating missing title/genre using AI..."):
-                                    outline_hint = "A new story project with mystery and character development."
-                                    model = get_ai_model()
-                                    if not t:
-                                        t = AnalysisEngine.generate_title(outline_hint, g or "General Fiction", model)
-                                    if not g:
-                                        detected = AnalysisEngine.detect_genre(outline_hint, model) or ""
-                                        g = detected or (g or "General Fiction")
-                                    st.toast("AI filled missing fields")
-                            except Exception as e:
-                                logger.warning("AI title/genre helper failed", exc_info=True)
-                                st.warning(f"AI title/genre helper failed: {e}")
-                        # Fall back to defaults if still empty
-                        p = Project.create(
-                            t,
-                            author=a,
-                            genre=g or "General Fiction",
-                            storage_dir=get_active_projects_dir(),
-                        )
+                a = st.text_input("Author (optional)", placeholder="Your name")
+                submitted = st.form_submit_button("🚀 Initialize Project", type="primary", use_container_width=True)
+                if submitted:
+                    # If title or genre are missing, try to use AI to fill them in.
+                    if not t or not g:
+                        try:
+                            with st.spinner("Generating missing title/genre using AI..."):
+                                outline_hint = "A new story project with mystery and character development."
+                                model = get_ai_model()
+                                if not t:
+                                    t = AnalysisEngine.generate_title(outline_hint, g or "General Fiction", model)
+                                if not g:
+                                    detected = AnalysisEngine.detect_genre(outline_hint, model) or ""
+                                    g = detected or (g or "General Fiction")
+                                st.toast("AI filled missing fields")
+                        except Exception as e:
+                            logger.warning("AI title/genre helper failed", exc_info=True)
+                            st.warning(f"AI title/genre helper failed: {e}")
+                    # Fall back to defaults if still empty
+                    p = Project.create(
+                        t,
+                        author=a,
+                        genre=g or "General Fiction",
+                        storage_dir=get_active_projects_dir(),
+                    )
+                    p.save()
+                    st.session_state.project = p
+                    st.session_state.page = "outline"
+                    st.session_state.first_run = False
+                    st.rerun()
+
+        st.markdown(
+            """
+            <div class="mantis-section-header">
+                <div>
+                    <div class="mantis-section-title">2. Import an existing draft</div>
+                    <div class="mantis-hero-caption">Upload a .txt or .md file to split into chapters.</div>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        with st.container(border=True):
+            uf = st.file_uploader("Upload file", type=["txt", "md"])
+            if uf:
+                max_bytes = AppConfig.MAX_UPLOAD_MB * 1024 * 1024
+                uf_size = getattr(uf, "size", None)
+                if uf_size and uf_size > max_bytes:
+                    st.error(
+                        f"File too large. Max size is {AppConfig.MAX_UPLOAD_MB} MB."
+                    )
+                else:
+                    txt = uf.read().decode("utf-8", errors="replace")
+                    if st.button("Import & Analyze", use_container_width=True):
+                        p = Project.create("Imported Project", storage_dir=get_active_projects_dir())
+                        p.import_text_file(txt)
                         p.save()
                         st.session_state.project = p
-                        st.session_state.page = "outline"
+                        st.session_state.page = "chapters"
                         st.session_state.first_run = False
                         st.rerun()
 
-                st.divider()
-                st.markdown("### 📥 Import Story")
-                st.caption("Upload a .txt or .md and MANTIS will split it into chapters when possible.")
-                uf = st.file_uploader("Upload file", type=["txt", "md"])
-                if uf:
-                    max_bytes = AppConfig.MAX_UPLOAD_MB * 1024 * 1024
-                    uf_size = getattr(uf, "size", None)
-                    if uf_size and uf_size > max_bytes:
-                        st.error(
-                            f"File too large. Max size is {AppConfig.MAX_UPLOAD_MB} MB."
-                        )
-                    else:
-                        txt = uf.read().decode("utf-8", errors="replace")
-                        if st.button("Import & Analyze", use_container_width=True):
-                            p = Project.create("Imported Project", storage_dir=get_active_projects_dir())
-                            p.import_text_file(txt)
-                            p.save()
-                            st.session_state.project = p
-                            st.session_state.page = "chapters"
-                            st.session_state.first_run = False
-                            st.rerun()
-
-        with colB:
-            with st.container(border=True):
-                st.markdown("### 🕘 Recent Projects")
-                st.caption("Click to open. Use 🗑 to delete the file from disk.")
-
-                if not recent_projects:
-                    st.info("📭 No projects yet. Create one on the left to get started.")
-                else:
-                    for project_entry in recent_projects[:30]:
-                        full = project_entry["path"]
-                        try:
-                            meta = project_entry["meta"]
-                            filename = os.path.basename(full)
-                            title = meta.get("title") or filename
-                            genre = meta.get("genre") or ""
-                            row1, row2, row3 = st.columns([6, 2, 1])
-                            with row1:
-                                if st.button(f"📂 {title}", key=f"open_{full}", use_container_width=True):
-                                    st.session_state.project = Project.load(full)
-                                    st.session_state.page = "chapters"
-                                    st.session_state.first_run = False
-                                    st.rerun()
-                            with row2:
-                                st.caption(genre)
-                            with row3:
-                                if st.button("🗑", key=f"del_{full}", use_container_width=True):
-                                    Project.delete_file(full)
-                                    st.rerun()
-                        except Exception:
-                            logger.warning("Failed to load project metadata: %s", full, exc_info=True)
-
-    def render_roadmap():
-        st.markdown("## MANTIS Studio Project Plan & Enhancement Roadmap")
-        st.caption("Crafting the “Narrative Operating System” for writers.")
-
-        with st.container(border=True):
-            st.markdown("### 🔎 Vision & Objective")
-            st.write("Transform Mantis Studio into a Narrative Operating System that surpasses NovelAI.")
-
-        st.markdown("### 🧩 Key Features to Add & Enhance")
-        feature_cols = st.columns(3)
-        with feature_cols[0]:
-            with st.container(border=True):
-                st.markdown("**Long-Form Narrative**")
-                st.markdown("- Multi-Chapter Editor")
-                st.markdown("- Revision History")
-                st.markdown("- World Bible Integration")
-        with feature_cols[1]:
-            with st.container(border=True):
-                st.markdown("**Story & Genre Modules**")
-                st.markdown("- Genre Presets")
-                st.markdown("- Outline & Character Builders")
-                st.markdown("- Canon Consistency Checks")
-        with feature_cols[2]:
-            with st.container(border=True):
-                st.markdown("**Writer’s Toolbox**")
-                st.markdown("- Rewrite & Expand")
-                st.markdown("- Tone & Style Control")
-                st.markdown("- Entity Extraction")
-
-        st.markdown("### 🛠️ Development Phases")
-        phase_rows = st.columns(2)
-        with phase_rows[0]:
-            with st.container(border=True):
-                st.markdown("**Phase 1: Stability & Foundations**")
-                st.markdown("- State Management")
-                st.markdown("- Save/Load Projects")
-                st.markdown("- Session Fixes")
-        with phase_rows[1]:
-            with st.container(border=True):
-                st.markdown("**Phase 2: Achieve NovelAI Parity**")
-                st.markdown("- World Bible System")
-                st.markdown("- Generation History")
-                st.markdown("- Genre Presets")
-
-        phase_rows_2 = st.columns(2)
-        with phase_rows_2[0]:
-            with st.container(border=True):
-                st.markdown("**Phase 3: Competitive Advantage**")
-                st.markdown("- Advanced Toolbox")
-                st.markdown("- Canon Validation")
-                st.markdown("- Image Generation")
-        with phase_rows_2[1]:
-            with st.container(border=True):
-                st.markdown("**Phase 4: SaaS & Monetization**")
-                st.markdown("- User Accounts")
-                st.markdown("- Premium Tiers")
-                st.markdown("- Analytics")
-
-        with st.container(border=True):
-            st.markdown("### 📊 Success Metrics")
-            st.markdown("- User Engagement & Retention")
-            st.markdown("- Story Quality & Consistency")
-            st.markdown("- Revenue Growth")
-
         st.markdown(
-            "**Goal:** Elevate Mantis Studio to be the best-in-class writing platform with unmatched creative and "
-            "editing power."
+            """
+            <div class="mantis-section-header">
+                <div>
+                    <div class="mantis-section-title">3. Your recent projects</div>
+                    <div class="mantis-hero-caption">Open a project or clean up older drafts.</div>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
         )
+        with st.container(border=True):
+            if not recent_projects:
+                st.info("📭 No projects yet. Start a new project above to get going.")
+            else:
+                for project_entry in recent_projects[:30]:
+                    full = project_entry["path"]
+                    try:
+                        meta = project_entry["meta"]
+                        filename = os.path.basename(full)
+                        title = meta.get("title") or filename
+                        genre = meta.get("genre") or ""
+                        row1, row2, row3 = st.columns([6, 2, 1])
+                        with row1:
+                            if st.button(f"📂 {title}", key=f"open_{full}", use_container_width=True):
+                                st.session_state.project = Project.load(full)
+                                st.session_state.page = "chapters"
+                                st.session_state.first_run = False
+                                st.rerun()
+                        with row2:
+                            st.caption(genre)
+                        with row3:
+                            if st.button("🗑", key=f"del_{full}", use_container_width=True):
+                                Project.delete_file(full)
+                                st.rerun()
+                    except Exception:
+                        logger.warning("Failed to load project metadata: %s", full, exc_info=True)
 
     def render_outline():
         p = st.session_state.project
@@ -2829,8 +3001,6 @@ and quick start modules so you can draft fast and refine later.
 
     if st.session_state.page == "home":
         render_home()
-    elif st.session_state.page == "roadmap":
-        render_roadmap()
     elif st.session_state.page == "ai":
         render_ai_settings()
     elif st.session_state.project:
@@ -2855,8 +3025,19 @@ def run_selftest() -> int:
     print("[MANTIS SELFTEST]")
     try:
         os.makedirs(AppConfig.PROJECTS_DIR, exist_ok=True)
+        original_users_db = json.loads(json.dumps(load_users_db()))
+        test_username = f"selftest_{uuid.uuid4().hex[:8]}"
+        test_password = "Testpass1234"
+        user_result = create_user(test_username, "Self Test", test_password)
+        if not user_result.get("ok"):
+            raise RuntimeError(f"User create failed: {user_result.get('error', 'unknown')}")
+        auth_result = authenticate_user(test_username, test_password)
+        if not auth_result.get("ok"):
+            raise RuntimeError(f"User auth failed: {auth_result.get('error', 'unknown')}")
+        user_id = auth_result["user"]["id"]
+        user_projects_dir = get_user_projects_dir(user_id)
 
-        p = Project.create("SELFTEST_PROJECT", author="MANTIS", genre="Test")
+        p = Project.create("SELFTEST_PROJECT", author="MANTIS", genre="Test", storage_dir=user_projects_dir)
         p.outline = "Chapter 1: Test - This is a test outline."
         path = p.save()
         if not os.path.exists(path):
@@ -2883,6 +3064,15 @@ def run_selftest() -> int:
             os.remove(path)
         except OSError:
             logger.warning("Selftest cleanup failed for %s", path, exc_info=True)
+        try:
+            if os.path.isdir(user_projects_dir):
+                shutil.rmtree(user_projects_dir)
+        except OSError:
+            logger.warning("Selftest cleanup failed for %s", user_projects_dir, exc_info=True)
+        try:
+            save_users_db(original_users_db)
+        except Exception:
+            logger.warning("Selftest cleanup failed for users DB", exc_info=True)
 
         print("SELFTEST RESULT: PASS")
         return 0
