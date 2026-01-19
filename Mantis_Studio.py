@@ -1395,7 +1395,8 @@ def _run_ui():
             )
         config_data.clear()
         config_data.update(data)
-        st.session_state.remember_me = bool(data.get("remember_me", False))
+        if "remember_me" not in st.session_state:
+            st.session_state.remember_me = bool(data.get("remember_me", False))
         save_app_config(data)
 
     def _restore_remembered_session() -> None:
@@ -1921,12 +1922,13 @@ def _run_ui():
         st.divider()
         st.markdown("### 🧭 Navigation")
 
-        nav_labels = ["Dashboard", "AI Settings"]
-        pmap = {"Dashboard": "home", "AI Settings": "ai"}
+        nav_labels = ["Dashboard", "Roadmap", "AI Settings"]
+        pmap = {"Dashboard": "home", "Roadmap": "roadmap", "AI Settings": "ai"}
         if st.session_state.project:
-            nav_labels = ["Dashboard", "Outline", "Chapters", "World Bible", "Export", "AI Settings"]
+            nav_labels = ["Dashboard", "Roadmap", "Outline", "Chapters", "World Bible", "Export", "AI Settings"]
             pmap = {
                 "Dashboard": "home",
+                "Roadmap": "roadmap",
                 "Outline": "outline",
                 "World Bible": "world",
                 "Chapters": "chapters",
@@ -2195,6 +2197,75 @@ and quick start modules so you can draft fast and refine later.
                                     st.rerun()
                         except Exception:
                             logger.warning("Failed to load project metadata: %s", full, exc_info=True)
+
+    def render_roadmap():
+        st.markdown("## MANTIS Studio Project Plan & Enhancement Roadmap")
+        st.caption("Crafting the “Narrative Operating System” for writers.")
+
+        with st.container(border=True):
+            st.markdown("### 🔎 Vision & Objective")
+            st.write("Transform Mantis Studio into a Narrative Operating System that surpasses NovelAI.")
+
+        st.markdown("### 🧩 Key Features to Add & Enhance")
+        feature_cols = st.columns(3)
+        with feature_cols[0]:
+            with st.container(border=True):
+                st.markdown("**Long-Form Narrative**")
+                st.markdown("- Multi-Chapter Editor")
+                st.markdown("- Revision History")
+                st.markdown("- World Bible Integration")
+        with feature_cols[1]:
+            with st.container(border=True):
+                st.markdown("**Story & Genre Modules**")
+                st.markdown("- Genre Presets")
+                st.markdown("- Outline & Character Builders")
+                st.markdown("- Canon Consistency Checks")
+        with feature_cols[2]:
+            with st.container(border=True):
+                st.markdown("**Writer’s Toolbox**")
+                st.markdown("- Rewrite & Expand")
+                st.markdown("- Tone & Style Control")
+                st.markdown("- Entity Extraction")
+
+        st.markdown("### 🛠️ Development Phases")
+        phase_rows = st.columns(2)
+        with phase_rows[0]:
+            with st.container(border=True):
+                st.markdown("**Phase 1: Stability & Foundations**")
+                st.markdown("- State Management")
+                st.markdown("- Save/Load Projects")
+                st.markdown("- Session Fixes")
+        with phase_rows[1]:
+            with st.container(border=True):
+                st.markdown("**Phase 2: Achieve NovelAI Parity**")
+                st.markdown("- World Bible System")
+                st.markdown("- Generation History")
+                st.markdown("- Genre Presets")
+
+        phase_rows_2 = st.columns(2)
+        with phase_rows_2[0]:
+            with st.container(border=True):
+                st.markdown("**Phase 3: Competitive Advantage**")
+                st.markdown("- Advanced Toolbox")
+                st.markdown("- Canon Validation")
+                st.markdown("- Image Generation")
+        with phase_rows_2[1]:
+            with st.container(border=True):
+                st.markdown("**Phase 4: SaaS & Monetization**")
+                st.markdown("- User Accounts")
+                st.markdown("- Premium Tiers")
+                st.markdown("- Analytics")
+
+        with st.container(border=True):
+            st.markdown("### 📊 Success Metrics")
+            st.markdown("- User Engagement & Retention")
+            st.markdown("- Story Quality & Consistency")
+            st.markdown("- Revenue Growth")
+
+        st.markdown(
+            "**Goal:** Elevate Mantis Studio to be the best-in-class writing platform with unmatched creative and "
+            "editing power."
+        )
 
     def render_outline():
         p = st.session_state.project
@@ -2758,6 +2829,8 @@ and quick start modules so you can draft fast and refine later.
 
     if st.session_state.page == "home":
         render_home()
+    elif st.session_state.page == "roadmap":
+        render_roadmap()
     elif st.session_state.page == "ai":
         render_ai_settings()
     elif st.session_state.project:
