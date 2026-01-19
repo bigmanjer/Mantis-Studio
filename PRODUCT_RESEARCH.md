@@ -154,5 +154,49 @@ This captures a lightweight product audit, competitive scan, and a pragmatic tes
 3. **Trust & control**: AI previews, undo history, confirmations.
 4. **Instrumentation**: privacy-friendly local analytics + optional export.
 
+## Product plan & enhancement roadmap (internal)
+**Vision & objective**
+- Transform Mantis Studio into a Narrative Operating System that surpasses NovelAI.
+
+**Key features to add & enhance**
+- **Long-form narrative**
+  - Multi-chapter editor
+  - Revision history
+  - World Bible integration
+- **Story & genre modules**
+  - Genre presets
+  - Outline & character builders
+  - Canon consistency checks
+- **Writer’s toolbox**
+  - Rewrite & expand
+  - Tone & style control
+  - Entity extraction
+
+**Development phases**
+- **Phase 1: Stability & foundations**
+  - State management
+  - Save/load projects
+  - Session fixes
+- **Phase 2: Achieve NovelAI parity**
+  - World Bible system
+  - Generation history
+  - Genre presets
+- **Phase 3: Competitive advantage**
+  - Advanced toolbox
+  - Canon validation
+  - Image generation
+- **Phase 4: SaaS & monetization**
+  - User accounts
+  - Premium tiers
+  - Analytics
+
+**Success metrics**
+- User engagement & retention
+- Story quality & consistency
+- Revenue growth
+
+**Goal**
+- Elevate Mantis Studio to be the best-in-class writing platform with unmatched creative and editing power.
+
 ---
 If you want, I can turn this into an in-app “Product Settings” section and a release checklist.
