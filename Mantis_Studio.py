@@ -351,6 +351,8 @@ class Project:
     genre: str = ""
     outline: str = ""
     memory: str = ""
+    author_note: str = ""
+    style_guide: str = ""
     default_word_count: int = 1000
     world_db: Dict[str, Entity] = field(default_factory=dict)
     chapters: Dict[str, Chapter] = field(default_factory=dict)
@@ -538,6 +540,8 @@ class Project:
         proj.genre = data.get("genre", "")
         proj.outline = data.get("outline", "")
         proj.memory = data.get("memory", data.get("memory_notes", ""))
+        proj.author_note = data.get("author_note", data.get("authors_note", ""))
+        proj.style_guide = data.get("style_guide", data.get("style_note", ""))
         proj.default_word_count = data.get("default_word_count", 1000)
         proj.created_at = data.get("created_at", time.time())
         proj.last_modified = data.get("last_modified", time.time())
@@ -787,6 +791,8 @@ class AnalysisEngine:
     @staticmethod
     def coherence_check(
         memory: str,
+        author_note: str,
+        style_guide: str,
         outline: str,
         world_bible: str,
         chapters: List[Dict[str, Any]],
@@ -804,6 +810,8 @@ class AnalysisEngine:
             "- suggested_rewrite (replacement text to fix coherence)\n"
             "- confidence (low|medium|high)\n\n"
             f"PROJECT MEMORY:\n{(memory or '')[:2000]}\n\n"
+            f"AUTHOR NOTE:\n{(author_note or '')[:1200]}\n\n"
+            f"STYLE GUIDE:\n{(style_guide or '')[:1200]}\n\n"
             f"WORLD BIBLE:\n{(world_bible or '')[:2400]}\n\n"
             f"OUTLINE:\n{(outline or '')[:2000]}\n\n"
             "CHAPTERS (summaries + excerpts):\n"
@@ -824,6 +832,10 @@ class StoryEngine:
     def generate_chapter_prompt(project: Project, chapter_index: int, target_words: int) -> str:
         memory_context = (project.memory or "").strip()[:1500]
         memory_block = f"PROJECT MEMORY:\n{memory_context}\n\n" if memory_context else ""
+        author_note = (project.author_note or "").strip()[:1200]
+        author_block = f"AUTHOR NOTE:\n{author_note}\n\n" if author_note else ""
+        style_guide = (project.style_guide or "").strip()[:1200]
+        style_block = f"STYLE GUIDE:\n{style_guide}\n\n" if style_guide else ""
         outline_context = (project.outline or "")[:3000]
         match = re.search(rf"(?i)Chapter {chapter_index}[:\s]+(.*?)(?=\n|$)", project.outline or "")
         if match:
@@ -844,6 +856,8 @@ class StoryEngine:
         prompt = (
             f"TITLE: {project.title}\nGENRE: {project.genre}\n"
             f"{memory_block}"
+            f"{author_block}"
+            f"{style_block}"
             f"OUTLINE CONTEXT:\n{outline_context}\n\n"
             f"{story_so_far}"
             f"{prev_text}\n"
@@ -896,6 +910,12 @@ def project_to_markdown(project: Project) -> str:
     if project.memory:
         md.append("## Memory")
         md.append(project.memory + "\n")
+    if project.author_note:
+        md.append("## Author Note")
+        md.append(project.author_note + "\n")
+    if project.style_guide:
+        md.append("## Style Guide")
+        md.append(project.style_guide + "\n")
     md.append("## World Bible")
     for c in project.world_db.values():
         md.append(f"- **{c.name}** ({c.category}): {c.description}")
@@ -935,32 +955,32 @@ def _run_ui():
     theme = st.session_state.ui_theme if st.session_state.ui_theme in ("Dark", "Light") else "Dark"
     theme_tokens = {
         "Dark": {
-            "bg": "#0e1117",
-            "text": "#e6edf3",
-            "muted": "#9aa4b2",
-            "input_bg": "#0f1521",
-            "input_border": "#253041",
-            "button_bg": "linear-gradient(180deg, #1e293b, #0f172a)",
-            "button_border": "#2a3750",
-            "button_hover_border": "#4caf50",
-            "primary_bg": "linear-gradient(135deg, #43a047, #1b5e20)",
-            "primary_border": "rgba(255,255,255,0.14)",
-            "primary_hover_border": "#81c784",
-            "card_bg": "linear-gradient(180deg, #111827, #0b1220)",
-            "card_border": "#1f2937",
-            "sidebar_bg": "linear-gradient(180deg, #020617, #020617)",
-            "sidebar_border": "#1e2936",
-            "sidebar_title": "#4caf50",
-            "divider": "#1e2636",
-            "expander_border": "#253041",
-            "header_gradient": "linear-gradient(135deg, #43a047, #1b5e20)",
-            "header_logo_bg": "#0b3d1f",
-            "header_sub": "#c8e6c9",
-            "shadow_strong": "0 12px 28px rgba(0,0,0,0.45)",
-            "shadow_button": "0 8px 18px rgba(0,0,0,0.35)",
-            "sidebar_brand_bg": "linear-gradient(180deg, rgba(17,24,39,0.75), rgba(2,6,23,0.9))",
-            "sidebar_brand_border": "rgba(76,175,80,0.18)",
-            "sidebar_logo_bg": "rgba(0,0,0,0.20)",
+            "bg": "#0b0f1a",
+            "text": "#e6e9f4",
+            "muted": "#a2a6bd",
+            "input_bg": "#0f1526",
+            "input_border": "#1f2840",
+            "button_bg": "linear-gradient(180deg, #1b2237, #111726)",
+            "button_border": "#2a3554",
+            "button_hover_border": "#7b61ff",
+            "primary_bg": "linear-gradient(135deg, #7b61ff, #4b8bff)",
+            "primary_border": "rgba(123,97,255,0.55)",
+            "primary_hover_border": "#9f8bff",
+            "card_bg": "linear-gradient(180deg, rgba(18,24,42,0.95), rgba(12,16,30,0.95))",
+            "card_border": "#1f2942",
+            "sidebar_bg": "linear-gradient(180deg, #090c16, #0b1221)",
+            "sidebar_border": "#182036",
+            "sidebar_title": "#b7a9ff",
+            "divider": "#1d2740",
+            "expander_border": "#25314f",
+            "header_gradient": "radial-gradient(circle at top left, rgba(123,97,255,0.55), rgba(10,15,29,0.4)), linear-gradient(135deg, #0f1526, #121a30)",
+            "header_logo_bg": "rgba(123,97,255,0.2)",
+            "header_sub": "#c5d0ff",
+            "shadow_strong": "0 18px 40px rgba(0,0,0,0.55)",
+            "shadow_button": "0 10px 22px rgba(0,0,0,0.4)",
+            "sidebar_brand_bg": "linear-gradient(180deg, rgba(18,24,42,0.85), rgba(9,12,22,0.95))",
+            "sidebar_brand_border": "rgba(123,97,255,0.25)",
+            "sidebar_logo_bg": "rgba(123,97,255,0.12)",
         },
         "Light": {
             "bg": "#f8fafc",
@@ -1038,13 +1058,25 @@ def _run_ui():
     .mantis-header {{
         display:flex;
         align-items:center;
+        justify-content: space-between;
         gap:14px;
-        padding:14px 20px;
-        border-radius:18px;
+        padding:18px 24px;
+        border-radius:22px;
         background: var(--mantis-header-gradient);
+        border: 1px solid rgba(123,97,255,0.2);
         margin-top: 18px;
         margin-bottom: 18px;
         box-shadow: var(--mantis-shadow-strong);
+    }}
+    .mantis-header-left {{
+        display:flex;
+        align-items:center;
+        gap:14px;
+    }}
+    .mantis-header-right {{
+        display:flex;
+        gap:10px;
+        align-items:center;
     }}
     .mantis-header-logo {{
         width:46px;
@@ -1064,13 +1096,14 @@ def _run_ui():
         border-radius:10px;
     }}
     .mantis-header-title {{
-        font-size:24px;
+        font-size:22px;
         font-weight:800;
         color: var(--mantis-text);
+        letter-spacing: 0.01em;
     }}
     .mantis-header-sub {{
         color: var(--mantis-header-sub);
-        font-size:13px;
+        font-size:12px;
     }}
 
     .stButton>button {{
@@ -1121,6 +1154,23 @@ def _run_ui():
         border: 1px solid var(--mantis-card-border) !important;
         box-shadow: var(--mantis-shadow-strong);
         margin-bottom: 18px;
+    }}
+    .mantis-pill {{
+        display:inline-flex;
+        align-items:center;
+        gap:6px;
+        padding:6px 10px;
+        border-radius:999px;
+        font-size:12px;
+        background: rgba(123,97,255,0.15);
+        border: 1px solid rgba(123,97,255,0.35);
+        color: var(--mantis-text);
+        letter-spacing: 0.02em;
+    }}
+    .mantis-hero-caption {{
+        font-size:12px;
+        color: var(--mantis-muted);
+        margin-top:4px;
     }}
     div[data-testid="stContainer"] h3 {{
         margin-top: 0;
@@ -1191,16 +1241,22 @@ def _run_ui():
     # --- BRAND HEADER (UI only) ---
     st.markdown(f"""
         <div class="mantis-header">
-            <div class="mantis-header-logo">
-                <img src="data:image/png;base64,{_MANTIS_LOGO_B64}" />
+            <div class="mantis-header-left">
+                <div class="mantis-header-logo">
+                    <img src="data:image/png;base64,{_MANTIS_LOGO_B64}" />
+                </div>
+                <div style="line-height:1.15;">
+                    <div class="mantis-header-title">
+                        MANTIS Studio
+                    </div>
+                    <div class="mantis-header-sub">
+                        Story workspace • memory • drafting
+                    </div>
+                </div>
             </div>
-            <div style="line-height:1.15;">
-                <div class="mantis-header-title">
-                    MANTIS Studio
-                </div>
-                <div class="mantis-header-sub">
-                    Plan • Write • Grow your story with AI
-                </div>
+            <div class="mantis-header-right">
+                <span class="mantis-pill">Workspace</span>
+                <span class="mantis-pill">NovelAI-inspired UI</span>
             </div>
         </div>
         """, unsafe_allow_html=True)
@@ -1914,15 +1970,16 @@ def _run_ui():
     def render_home():
         if st.session_state.get("first_run", True):
             with st.container(border=True):
-                st.markdown("### 👋 Welcome")
+                st.markdown("### 👋 Welcome to your Story Workspace")
                 st.markdown(
                     """
-**MANTIS** helps you plan, write, and grow a story with AI — without losing control.
+**MANTIS** now mirrors the focused NovelAI-style studio: a clean writing surface, memory tools,
+and quick start modules so you can draft fast and refine later.
 
 **Quick path**
 1) Create a project  
-2) Add or generate an outline  
-3) Write chapters (use AI only when you want)
+2) Build a structured outline or lore entries  
+3) Draft chapters with AI assists on demand
 """
                 )
                 c1, c2, c3 = st.columns([1, 1, 2])
@@ -1963,7 +2020,7 @@ def _run_ui():
 
         with st.container(border=True):
             st.markdown("### 🚀 Creator Momentum")
-            st.caption("Keep your writing habit alive with quick goals and a clear next action.")
+            st.caption("Track your writing rhythm and jump back in with a single click.")
 
             if recent_snapshot:
                 headline = f"**Resume:** {recent_snapshot['title']} · {recent_snapshot['genre']}"
@@ -2044,8 +2101,8 @@ def _run_ui():
                         st.session_state.page = "world"
                         st.rerun()
 
-        st.markdown("## Studio Dashboard")
-        st.caption("Create a project, load a recent one, or import a story to start building.")
+        st.markdown("## Story Workspace")
+        st.caption("Create a project, resume a story, or import text to begin drafting.")
 
         colA, colB = st.columns([1.1, 1.3])
 
@@ -2369,11 +2426,35 @@ def _run_ui():
         def render_memory():
             with st.container(border=True):
                 st.markdown("### Memory")
-                st.caption("Store high-level canon details you want the AI to remember.")
-                mem_txt = st.text_area("Story Memory", p.memory, height=220, key="mem_txt")
+                st.caption("Store canon, tone, and guardrails the AI should always respect.")
+                mem_txt = st.text_area("Story Memory", p.memory, height=180, key="mem_txt")
                 if mem_txt != p.memory:
                     p.memory = mem_txt
                     save_p()
+
+                note_cols = st.columns(2)
+                with note_cols[0]:
+                    author_txt = st.text_area(
+                        "Author Note",
+                        p.author_note,
+                        height=150,
+                        key="author_note_txt",
+                        placeholder="E.g., 'Keep POV close and intimate. Avoid modern slang.'",
+                    )
+                    if author_txt != p.author_note:
+                        p.author_note = author_txt
+                        save_p()
+                with note_cols[1]:
+                    style_txt = st.text_area(
+                        "Style Guide",
+                        p.style_guide,
+                        height=150,
+                        key="style_guide_txt",
+                        placeholder="E.g., 'Short sentences, cinematic beats, vivid sensory detail.'",
+                    )
+                    if style_txt != p.style_guide:
+                        p.style_guide = style_txt
+                        save_p()
 
                 st.divider()
                 st.markdown("#### Coherence Check")
@@ -2417,6 +2498,8 @@ def _run_ui():
                                 )
                             results = AnalysisEngine.coherence_check(
                                 p.memory or "",
+                                p.author_note or "",
+                                p.style_guide or "",
                                 p.outline or "",
                                 build_world_bible_text(),
                                 chapter_payload,
