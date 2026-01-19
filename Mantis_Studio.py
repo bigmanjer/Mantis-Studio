@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-# mantis_onefile_v44.py — MANTIS Studio v44 (Chronicle) — SINGLE FILE EDITION
+# Mantis_Studio.py — MANTIS Studio v47 (Chronicle) — SINGLE FILE EDITION
 #
 # Run:
-#   python -m streamlit run mantis_onefile_v44.py
+#   python -m streamlit run Mantis_Studio.py
 #
 # Requirements:
 #   streamlit>=1.30.0
@@ -12,7 +12,7 @@
 #   plotly
 #
 # Notes:
-# - This preserves ALL current features from your v44 generator build:
+# - This preserves ALL current features from your v47 generator build:
 #   Projects (create/load/delete), Outline generation/title generation/reverse engineer,
 #   Entity scanning & enrich, World Bible categories, Chapters w/ AI autowrite,
 #   Summaries, Rewrite presets, Export markdown, Import story text, Auto-save, Ghost text flow.
@@ -29,6 +29,7 @@ import difflib
 import logging
 import hashlib
 import hmac
+import shutil
 from dataclasses import dataclass, field, asdict, fields
 from typing import Dict, List, Optional, Any, Generator
 
@@ -87,6 +88,9 @@ class AppConfig:
     )
     MAX_PROMPT_CHARS = 16000
     SUMMARY_CONTEXT_CHARS = 4000
+    MAX_UPLOAD_MB = int(os.getenv("MANTIS_MAX_UPLOAD_MB", "10"))
+    SAVE_LOCK_TIMEOUT = int(os.getenv("MANTIS_SAVE_LOCK_TIMEOUT", "5"))
+    SAVE_LOCK_RETRY_SLEEP = float(os.getenv("MANTIS_SAVE_LOCK_RETRY_SLEEP", "0.1"))
 
 
 os.makedirs(AppConfig.PROJECTS_DIR, exist_ok=True)
@@ -144,6 +148,53 @@ def save_users_db(data: Dict[str, Dict[str, Any]]) -> None:
         logger.warning("Failed to save users database", exc_info=True)
 
 
+def _truncate_prompt(prompt: str, limit: int) -> str:
+    if not prompt:
+        return prompt
+    if len(prompt) <= limit:
+        return prompt
+    logger.warning("Prompt length %s exceeded limit %s; truncating", len(prompt), limit)
+    return prompt[:limit]
+
+
+def _password_policy_error(password: str) -> Optional[str]:
+    if len(password or "") < 10:
+        return "Password must be at least 10 characters."
+    if not re.search(r"[A-Za-z]", password or "") or not re.search(r"\d", password or ""):
+        return "Password must include at least one letter and one number."
+    return None
+
+
+def _acquire_lock(lock_path: str, timeout: int, retry_sleep: float) -> bool:
+    start = time.time()
+    while True:
+        try:
+            fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            with os.fdopen(fd, "w", encoding="utf-8") as lock_file:
+                lock_file.write(str(os.getpid()))
+            return True
+        except FileExistsError:
+            try:
+                age = time.time() - os.path.getmtime(lock_path)
+            except OSError:
+                age = 0
+            if age > max(timeout * 5, 5):
+                try:
+                    os.remove(lock_path)
+                except OSError:
+                    pass
+            if time.time() - start >= timeout:
+                return False
+            time.sleep(retry_sleep)
+
+
+def _release_lock(lock_path: str) -> None:
+    try:
+        os.remove(lock_path)
+    except OSError:
+        pass
+
+
 def hash_password(password: str, salt: Optional[bytes] = None) -> Dict[str, str]:
     if salt is None:
         salt = os.urandom(16)
@@ -166,6 +217,9 @@ def create_user(username: str, display_name: str, password: str) -> Dict[str, An
     display_name = (display_name or "").strip()
     if not clean_username or not display_name or not password:
         return {"ok": False, "error": "All fields are required."}
+    policy_error = _password_policy_error(password)
+    if policy_error:
+        return {"ok": False, "error": policy_error}
 
     data = load_users_db()
     if clean_username in data["users"]:
@@ -430,20 +484,40 @@ class Project:
         storage_dir = self.storage_dir or AppConfig.PROJECTS_DIR
         os.makedirs(storage_dir, exist_ok=True)
         path = os.path.join(storage_dir, filename)
+        lock_path = path + ".lock"
         tmp = path + ".tmp"
         last_error: Optional[Exception] = None
-        for attempt in range(1, 4):
-            try:
-                with open(tmp, "w", encoding="utf-8") as f:
-                    json.dump(self.to_dict(), f, indent=2, ensure_ascii=False)
-                os.replace(tmp, path)
-                break
-            except Exception as exc:
-                last_error = exc
-                logger.warning("Save attempt %s failed for %s", attempt, path, exc_info=True)
-                time.sleep(0.1)
-        else:
-            logger.error("Save failed after retries for %s: %s", path, last_error)
+        if not _acquire_lock(
+            lock_path,
+            AppConfig.SAVE_LOCK_TIMEOUT,
+            AppConfig.SAVE_LOCK_RETRY_SLEEP,
+        ):
+            logger.error("Save lock timeout for %s", path)
+            return path
+        try:
+            for attempt in range(1, 4):
+                try:
+                    if os.path.exists(path):
+                        os.makedirs(AppConfig.BACKUPS_DIR, exist_ok=True)
+                        stamp = time.strftime("%Y%m%d_%H%M%S")
+                        backup_name = f"{stamp}__{os.path.basename(path)}"
+                        backup_path = os.path.join(AppConfig.BACKUPS_DIR, backup_name)
+                        try:
+                            shutil.copy2(path, backup_path)
+                        except Exception:
+                            logger.warning("Backup failed for %s", path, exc_info=True)
+                    with open(tmp, "w", encoding="utf-8") as f:
+                        json.dump(self.to_dict(), f, indent=2, ensure_ascii=False)
+                    os.replace(tmp, path)
+                    break
+                except Exception as exc:
+                    last_error = exc
+                    logger.warning("Save attempt %s failed for %s", attempt, path, exc_info=True)
+                    time.sleep(0.1)
+            else:
+                logger.error("Save failed after retries for %s: %s", path, last_error)
+        finally:
+            _release_lock(lock_path)
 
         self.filepath = path
         self.storage_dir = storage_dir
@@ -519,6 +593,7 @@ class AIEngine:
             yield "Groq API key not configured."
             return
 
+        prompt = _truncate_prompt(prompt, AppConfig.MAX_PROMPT_CHARS)
         headers = {"Content-Type": "application/json"}
         headers["Authorization"] = f"Bearer {api_key}"
 
@@ -1228,21 +1303,23 @@ def _run_ui():
             if st.button("Create Account", type="primary", use_container_width=True):
                 if new_password != confirm_password:
                     st.error("Passwords do not match.")
-                elif len(new_password or "") < 6:
-                    st.error("Password must be at least 6 characters.")
                 else:
-                    result = create_user(new_username, display_name, new_password)
-                    if not result.get("ok"):
-                        st.error(result.get("error", "Could not create account."))
+                    policy_error = _password_policy_error(new_password or "")
+                    if policy_error:
+                        st.error(policy_error)
                     else:
-                        user = result["user"]
-                        st.session_state.auth_user = user["display_name"]
-                        st.session_state.auth_user_id = user["id"]
-                        st.session_state.auth_username = user["username"]
-                        st.session_state.auth_is_guest = False
-                        st.session_state.projects_dir = get_user_projects_dir(user["id"])
-                        st.session_state._force_nav = True
-                        st.rerun()
+                        result = create_user(new_username, display_name, new_password)
+                        if not result.get("ok"):
+                            st.error(result.get("error", "Could not create account."))
+                        else:
+                            user = result["user"]
+                            st.session_state.auth_user = user["display_name"]
+                            st.session_state.auth_user_id = user["id"]
+                            st.session_state.auth_username = user["username"]
+                            st.session_state.auth_is_guest = False
+                            st.session_state.projects_dir = get_user_projects_dir(user["id"])
+                            st.session_state._force_nav = True
+                            st.rerun()
 
         with tabs[2]:
             st.caption("Guest sessions store projects separately and may be cleared by the host.")
@@ -1272,7 +1349,6 @@ def _run_ui():
             "ai_provider": st.session_state.ai_provider,
             "ollama_base_url": st.session_state.ollama_base_url,
             "openai_base_url": st.session_state.openai_base_url,
-            "openai_api_key": st.session_state.openai_api_key,
             "openai_model": st.session_state.openai_model,
             "ui_theme": st.session_state.ui_theme,
         }
@@ -1654,15 +1730,22 @@ def _run_ui():
                 st.caption("Upload a .txt or .md and MANTIS will split it into chapters when possible.")
                 uf = st.file_uploader("Upload file", type=["txt", "md"])
                 if uf:
-                    txt = uf.read().decode("utf-8", errors="replace")
-                    if st.button("Import & Analyze", use_container_width=True):
-                        p = Project.create("Imported Project", storage_dir=get_active_projects_dir())
-                        p.import_text_file(txt)
-                        p.save()
-                        st.session_state.project = p
-                        st.session_state.page = "chapters"
-                        st.session_state.first_run = False
-                        st.rerun()
+                    max_bytes = AppConfig.MAX_UPLOAD_MB * 1024 * 1024
+                    uf_size = getattr(uf, "size", None)
+                    if uf_size and uf_size > max_bytes:
+                        st.error(
+                            f"File too large. Max size is {AppConfig.MAX_UPLOAD_MB} MB."
+                        )
+                    else:
+                        txt = uf.read().decode("utf-8", errors="replace")
+                        if st.button("Import & Analyze", use_container_width=True):
+                            p = Project.create("Imported Project", storage_dir=get_active_projects_dir())
+                            p.import_text_file(txt)
+                            p.save()
+                            st.session_state.project = p
+                            st.session_state.page = "chapters"
+                            st.session_state.first_run = False
+                            st.rerun()
 
         with colB:
             with st.container(border=True):
