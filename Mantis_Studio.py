@@ -979,169 +979,281 @@ def _run_ui():
 
     config_data = load_app_config()
 
-    # --- BRAND HEADER (UI only) ---
-    st.markdown(f"""
-        <div style="
-            display:flex;
-            align-items:center;
-            gap:14px;
-            padding:14px 20px;
-            border-radius:18px;
-            background: linear-gradient(135deg, #43a047, #1b5e20);
-            margin-top: 18px;
-            margin-bottom: 18px;
-            box-shadow: 0 8px 22px rgba(0,0,0,0.32);
-        ">
-            <div style="
-                width:46px;
-                height:46px;
-                border-radius:14px;
-                background:#0b3d1f;
-                display:flex;
-                align-items:center;
-                justify-content:center;
-                overflow:hidden;
-                box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08);
-            ">
-                <img src="data:image/png;base64,{_MANTIS_LOGO_B64}" style="height:28px; width:auto; padding:6px; border-radius:10px;" />
-            </div>
-            <div style="line-height:1.15;">
-                <div style="font-size:24px;font-weight:800;color:white;">
-                    MANTIS Studio
-                </div>
-                <div style="color:#c8e6c9;font-size:13px;">
-                    Plan • Write • Grow your story with AI
-                </div>
-            </div>
-        </div>
-        """ , unsafe_allow_html=True)
+    if "ui_theme" not in st.session_state:
+        st.session_state.ui_theme = config_data.get("ui_theme", "Dark")
 
-
+    theme = st.session_state.ui_theme if st.session_state.ui_theme in ("Dark", "Light") else "Dark"
+    theme_tokens = {
+        "Dark": {
+            "bg": "#0e1117",
+            "text": "#e6edf3",
+            "muted": "#9aa4b2",
+            "input_bg": "#0f1521",
+            "input_border": "#253041",
+            "button_bg": "linear-gradient(180deg, #1e293b, #0f172a)",
+            "button_border": "#2a3750",
+            "button_hover_border": "#4caf50",
+            "primary_bg": "linear-gradient(135deg, #43a047, #1b5e20)",
+            "primary_border": "rgba(255,255,255,0.14)",
+            "primary_hover_border": "#81c784",
+            "card_bg": "linear-gradient(180deg, #111827, #0b1220)",
+            "card_border": "#1f2937",
+            "sidebar_bg": "linear-gradient(180deg, #020617, #020617)",
+            "sidebar_border": "#1e2936",
+            "sidebar_title": "#4caf50",
+            "divider": "#1e2636",
+            "expander_border": "#253041",
+            "header_gradient": "linear-gradient(135deg, #43a047, #1b5e20)",
+            "header_logo_bg": "#0b3d1f",
+            "header_sub": "#c8e6c9",
+            "shadow_strong": "0 12px 28px rgba(0,0,0,0.45)",
+            "shadow_button": "0 8px 18px rgba(0,0,0,0.35)",
+            "sidebar_brand_bg": "linear-gradient(180deg, rgba(17,24,39,0.75), rgba(2,6,23,0.9))",
+            "sidebar_brand_border": "rgba(76,175,80,0.18)",
+            "sidebar_logo_bg": "rgba(0,0,0,0.20)",
+        },
+        "Light": {
+            "bg": "#f8fafc",
+            "text": "#0f172a",
+            "muted": "#6b7280",
+            "input_bg": "#ffffff",
+            "input_border": "#d0d7e2",
+            "button_bg": "linear-gradient(180deg, #ffffff, #e2e8f0)",
+            "button_border": "#cbd5e1",
+            "button_hover_border": "#16a34a",
+            "primary_bg": "linear-gradient(135deg, #22c55e, #15803d)",
+            "primary_border": "rgba(21,128,61,0.25)",
+            "primary_hover_border": "#16a34a",
+            "card_bg": "#ffffff",
+            "card_border": "#e2e8f0",
+            "sidebar_bg": "linear-gradient(180deg, #f1f5f9, #e2e8f0)",
+            "sidebar_border": "#e2e8f0",
+            "sidebar_title": "#15803d",
+            "divider": "#e2e8f0",
+            "expander_border": "#dbe2ea",
+            "header_gradient": "linear-gradient(135deg, #e8f5e9, #c8e6c9)",
+            "header_logo_bg": "#d1fae5",
+            "header_sub": "#2f6f43",
+            "shadow_strong": "0 12px 24px rgba(15,23,42,0.08)",
+            "shadow_button": "0 8px 16px rgba(15,23,42,0.12)",
+            "sidebar_brand_bg": "linear-gradient(180deg, rgba(241,245,249,0.95), rgba(226,232,240,0.95))",
+            "sidebar_brand_border": "rgba(21,128,61,0.18)",
+            "sidebar_logo_bg": "rgba(15,23,42,0.06)",
+        },
+    }
+    tokens = theme_tokens[theme]
 
     st.markdown(
-        """
+        f"""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@400;600&family=Inter:wght@400;600&display=swap');
-    .stApp { background-color: #0e1117; color: #e6edf3; font-family: 'Inter', sans-serif; }
-    .block-container { padding-top: 2.6rem; padding-bottom: 2rem; }
-    header[data-testid="stHeader"] { height: 2.6rem; }
-    h1, h2, h3 { letter-spacing: -0.02em; }
-    .stTextInput input, .stSelectbox div, .stNumberInput input { background-color: #0f1521 !important; color: #e6edf3 !important; border: 1px solid #253041 !important; }
-    .stTextArea textarea { background-color: #0f1521 !important; color: #e6edf3 !important; font-family: 'Crimson Pro', serif !important; font-size: 18px !important; line-height: 1.65 !important; border: 1px solid #253041 !important; }
-    
-    .stButton>button {
+    :root {{
+        --mantis-bg: {tokens["bg"]};
+        --mantis-text: {tokens["text"]};
+        --mantis-muted: {tokens["muted"]};
+        --mantis-input-bg: {tokens["input_bg"]};
+        --mantis-input-border: {tokens["input_border"]};
+        --mantis-button-bg: {tokens["button_bg"]};
+        --mantis-button-border: {tokens["button_border"]};
+        --mantis-button-hover-border: {tokens["button_hover_border"]};
+        --mantis-primary-bg: {tokens["primary_bg"]};
+        --mantis-primary-border: {tokens["primary_border"]};
+        --mantis-primary-hover-border: {tokens["primary_hover_border"]};
+        --mantis-card-bg: {tokens["card_bg"]};
+        --mantis-card-border: {tokens["card_border"]};
+        --mantis-sidebar-bg: {tokens["sidebar_bg"]};
+        --mantis-sidebar-border: {tokens["sidebar_border"]};
+        --mantis-sidebar-title: {tokens["sidebar_title"]};
+        --mantis-divider: {tokens["divider"]};
+        --mantis-expander-border: {tokens["expander_border"]};
+        --mantis-header-gradient: {tokens["header_gradient"]};
+        --mantis-header-logo-bg: {tokens["header_logo_bg"]};
+        --mantis-header-sub: {tokens["header_sub"]};
+        --mantis-shadow-strong: {tokens["shadow_strong"]};
+        --mantis-shadow-button: {tokens["shadow_button"]};
+        --mantis-sidebar-brand-bg: {tokens["sidebar_brand_bg"]};
+        --mantis-sidebar-brand-border: {tokens["sidebar_brand_border"]};
+        --mantis-sidebar-logo-bg: {tokens["sidebar_logo_bg"]};
+    }}
+    .stApp {{ background-color: var(--mantis-bg); color: var(--mantis-text); font-family: 'Inter', sans-serif; }}
+    .block-container {{ padding-top: 2.6rem; padding-bottom: 2rem; }}
+    header[data-testid="stHeader"] {{ height: 2.6rem; }}
+    h1, h2, h3 {{ letter-spacing: -0.02em; }}
+    .stTextInput input, .stSelectbox div, .stNumberInput input {{ background-color: var(--mantis-input-bg) !important; color: var(--mantis-text) !important; border: 1px solid var(--mantis-input-border) !important; }}
+    .stTextArea textarea {{ background-color: var(--mantis-input-bg) !important; color: var(--mantis-text) !important; font-family: 'Crimson Pro', serif !important; font-size: 18px !important; line-height: 1.65 !important; border: 1px solid var(--mantis-input-border) !important; }}
+
+    .mantis-muted {{ color: var(--mantis-muted); }}
+    div[data-testid="stCaptionContainer"] {{ color: var(--mantis-muted); }}
+
+    .mantis-header {{
+        display:flex;
+        align-items:center;
+        gap:14px;
+        padding:14px 20px;
+        border-radius:18px;
+        background: var(--mantis-header-gradient);
+        margin-top: 18px;
+        margin-bottom: 18px;
+        box-shadow: var(--mantis-shadow-strong);
+    }}
+    .mantis-header-logo {{
+        width:46px;
+        height:46px;
+        border-radius:14px;
+        background: var(--mantis-header-logo-bg);
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        overflow:hidden;
+        box-shadow: inset 0 0 0 1px rgba(255,255,255,0.12);
+    }}
+    .mantis-header-logo img {{
+        height:28px;
+        width:auto;
+        padding:6px;
+        border-radius:10px;
+    }}
+    .mantis-header-title {{
+        font-size:24px;
+        font-weight:800;
+        color: var(--mantis-text);
+    }}
+    .mantis-header-sub {{
+        color: var(--mantis-header-sub);
+        font-size:13px;
+    }}
+
+    .stButton>button {{
         border-radius: 16px !important;
         font-weight: 600 !important;
         padding: 0.7rem 1.1rem !important;
         transition: all 0.15s ease-in-out;
-        border: 1px solid #2a3750 !important;
-        background: linear-gradient(180deg, #1e293b, #0f172a) !important;
-        color: #e6edf3 !important;
-    }
-    .stButton>button:hover {
+        border: 1px solid var(--mantis-button-border) !important;
+        background: var(--mantis-button-bg) !important;
+        color: var(--mantis-text) !important;
+    }}
+    .stButton>button:hover {{
         transform: translateY(-1px);
-        border-color: #4caf50 !important;
-        box-shadow: 0 8px 18px rgba(0,0,0,0.35);
-    }
-    .stButton>button:active { transform: translateY(0); }
-    .stButton>button:focus { outline: none !important; box-shadow: none !important; }
+        border-color: var(--mantis-button-hover-border) !important;
+        box-shadow: var(--mantis-shadow-button);
+    }}
+    .stButton>button:active {{ transform: translateY(0); }}
+    .stButton>button:focus {{ outline: none !important; box-shadow: none !important; }}
 
     /* --- BUTTON HIERARCHY --- */
-    .stButton>button[kind="primary"] {
-        background: linear-gradient(135deg, #43a047, #1b5e20) !important;
-        border-color: rgba(255,255,255,0.14) !important;
-        box-shadow: 0 10px 22px rgba(0,0,0,0.35);
-    }
-    .stButton>button[kind="primary"]:hover {
-        border-color: #81c784 !important;
-        box-shadow: 0 12px 26px rgba(0,0,0,0.45);
-    }
-    .stButton>button[kind="secondary"] {
-        background: linear-gradient(180deg, #1e293b, #0f172a) !important;
-    }
+    .stButton>button[kind="primary"] {{
+        background: var(--mantis-primary-bg) !important;
+        border-color: var(--mantis-primary-border) !important;
+        box-shadow: var(--mantis-shadow-button);
+        color: #ffffff !important;
+    }}
+    .stButton>button[kind="primary"]:hover {{
+        border-color: var(--mantis-primary-hover-border) !important;
+        box-shadow: var(--mantis-shadow-strong);
+    }}
+    .stButton>button[kind="secondary"] {{
+        background: var(--mantis-button-bg) !important;
+    }}
 
 
-    [data-testid="stVerticalBlock"] [data-testid="stContainer"] { border-radius: 16px !important; }
-    .stExpander { border: 1px solid #253041 !important; border-radius: 16px !important; }
-    hr { border-color: #1e2636 !important; }
-    section[data-testid="stSidebar"] { background-color: #0b1019; border-right: 1px solid #1e2636; }
-    section[data-testid="stSidebar"] h1, section[data-testid="stSidebar"] h2, section[data-testid="stSidebar"] h3 { color: #e6edf3; }
-    div[data-testid="stToast"] { border-radius: 14px !important; }
-    
+    [data-testid="stVerticalBlock"] [data-testid="stContainer"] {{ border-radius: 16px !important; }}
+    .stExpander {{ border: 1px solid var(--mantis-expander-border) !important; border-radius: 16px !important; }}
+    hr {{ border-color: var(--mantis-divider) !important; }}
+    section[data-testid="stSidebar"] {{ background: var(--mantis-sidebar-bg); border-right: 1px solid var(--mantis-sidebar-border); }}
+    section[data-testid="stSidebar"] h1, section[data-testid="stSidebar"] h2, section[data-testid="stSidebar"] h3 {{ color: var(--mantis-text); }}
+    div[data-testid="stToast"] {{ border-radius: 14px !important; }}
+
     /* --- CARD POLISH --- */
-    div[data-testid="stContainer"] {
-        background: linear-gradient(180deg, #111827, #0b1220);
+    div[data-testid="stContainer"] {{
+        background: var(--mantis-card-bg);
         border-radius: 20px !important;
         padding: 22px !important;
-        border: 1px solid #1f2937 !important;
-        box-shadow: 0 12px 28px rgba(0,0,0,0.45);
+        border: 1px solid var(--mantis-card-border) !important;
+        box-shadow: var(--mantis-shadow-strong);
         margin-bottom: 18px;
-    }
-    div[data-testid="stContainer"] h3 {
+    }}
+    div[data-testid="stContainer"] h3 {{
         margin-top: 0;
         margin-bottom: 12px;
-        color: #e5e7eb;
-    }
+        color: var(--mantis-text);
+    }}
 
     /* --- SIDEBAR POLISH --- */
-    section[data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #020617, #020617);
-        border-right: 1px solid #1e2936;
-    }
-    section[data-testid="stSidebar"] h3 {
-        color: #4caf50;
+    section[data-testid="stSidebar"] {{
+        background: var(--mantis-sidebar-bg);
+        border-right: 1px solid var(--mantis-sidebar-border);
+    }}
+    section[data-testid="stSidebar"] h3 {{
+        color: var(--mantis-sidebar-title);
         font-weight: 700;
         letter-spacing: 0.04em;
         text-transform: uppercase;
         font-size: 12px;
-    }
+    }}
 
-    
+
     /* --- SIDEBAR BRAND --- */
-    .mantis-sidebar-brand{
+    .mantis-sidebar-brand{{
         display:flex;
         gap:12px;
         align-items:center;
         padding:14px 12px 12px 12px;
         margin: 4px 8px 10px 8px;
         border-radius: 16px;
-        background: linear-gradient(180deg, rgba(17,24,39,0.75), rgba(2,6,23,0.9));
-        border: 1px solid rgba(76,175,80,0.18);
-        box-shadow: 0 10px 22px rgba(0,0,0,0.35);
-    }
-    .mantis-sidebar-logo{
+        background: var(--mantis-sidebar-brand-bg);
+        border: 1px solid var(--mantis-sidebar-brand-border);
+        box-shadow: var(--mantis-shadow-button);
+    }}
+    .mantis-sidebar-logo{{
         width:54px;
         height:54px;
         border-radius: 12px;
-        background: rgba(0,0,0,0.20);
+        background: var(--mantis-sidebar-logo-bg);
         display:flex;
         align-items:center;
         justify-content:center;
         overflow:hidden;
-        box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08);
+        box-shadow: inset 0 0 0 1px rgba(255,255,255,0.12);
         flex: 0 0 auto;
-    }
-    .mantis-sidebar-logo img{
+    }}
+    .mantis-sidebar-logo img{{
         height:36px;
         width:auto;
         display:block;
-    }
-    .mantis-sidebar-title{
+    }}
+    .mantis-sidebar-title{{
         font-weight:800;
         font-size:14px;
-        color:#e6edf3;
+        color: var(--mantis-text);
         line-height:1.1;
-    }
-    .mantis-sidebar-sub{
+    }}
+    .mantis-sidebar-sub{{
         font-size:12px;
-        color:#9aa4b2;
+        color: var(--mantis-muted);
         margin-top:2px;
         line-height:1.1;
-    }
+    }}
 </style>
     """,
         unsafe_allow_html=True,
     )
+
+    # --- BRAND HEADER (UI only) ---
+    st.markdown(f"""
+        <div class="mantis-header">
+            <div class="mantis-header-logo">
+                <img src="data:image/png;base64,{_MANTIS_LOGO_B64}" />
+            </div>
+            <div style="line-height:1.15;">
+                <div class="mantis-header-title">
+                    MANTIS Studio
+                </div>
+                <div class="mantis-header-sub">
+                    Plan • Write • Grow your story with AI
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
 
     if "auth_user" not in st.session_state:
         st.session_state.auth_user = None
@@ -1221,7 +1333,7 @@ def _run_ui():
             """
             <div style="max-width:480px;margin:0 auto;padding:24px 12px;">
                 <h2 style="margin-bottom:8px;">Welcome to MANTIS Studio</h2>
-                <p style="margin-top:0;color:#9aa4b2;">
+                <p class="mantis-muted" style="margin-top:0;">
                     Sign in or create an account to keep your projects saved.
                 </p>
             </div>
@@ -1295,16 +1407,17 @@ def _run_ui():
     def refresh_models():
         st.session_state.model_list = _cached_models(AppConfig.OLLAMA_API_URL) or []
 
-    def save_provider_settings():
+    def save_app_settings():
         data = {
             "ai_provider": st.session_state.ai_provider,
             "ollama_base_url": st.session_state.ollama_base_url,
             "openai_base_url": st.session_state.openai_base_url,
             "openai_api_key": st.session_state.openai_api_key,
             "openai_model": st.session_state.openai_model,
+            "ui_theme": st.session_state.ui_theme,
         }
         save_app_config(data)
-        st.toast("Provider settings saved.")
+        st.toast("Settings saved.")
 
     def test_ollama_connection(base_url: str) -> tuple[bool, str]:
         try:
@@ -1469,6 +1582,10 @@ def _run_ui():
             st.session_state._force_nav = True
             st.rerun()
 
+        st.markdown("### 🎨 Appearance")
+        st.selectbox("Theme", ["Dark", "Light"], key="ui_theme")
+        st.divider()
+
         provider = st.selectbox("Provider", ["Ollama", "OpenAI"], key="ai_provider")
 
         if provider == "Ollama":
@@ -1611,8 +1728,8 @@ def _run_ui():
                 refresh_models()
                 st.toast("Model list refreshed")
 
-        if st.button("💾 Save Provider Settings", use_container_width=True):
-            save_provider_settings()
+        if st.button("💾 Save Settings", use_container_width=True):
+            save_app_settings()
         st.divider()
 
         if st.session_state.project:
