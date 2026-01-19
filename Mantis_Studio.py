@@ -395,6 +395,58 @@ class Project:
             storage_dir=storage_dir,
         )
 
+    @staticmethod
+    def _normalize_entity_name(name: str) -> str:
+        base = (name or "").strip().lower()
+        if not base:
+            return ""
+        base = re.sub(r"[\"'`]", "", base)
+        base = re.sub(r"\((.*?)\)", r" \1 ", base)
+        base = re.sub(r"\b(mr|mrs|ms|dr|prof|sir|madam)\.?\b", "", base)
+        base = re.sub(r"[^\w\s/-]", " ", base)
+        base = re.sub(r"\s+", " ", base).strip()
+        return base
+
+    @classmethod
+    def _entity_aliases(cls, name: str) -> List[str]:
+        normalized = cls._normalize_entity_name(name)
+        if not normalized:
+            return []
+        parts = re.split(r"\s*/\s*|\s+or\s+|\s+\|\s+", normalized)
+        aliases = []
+        for part in parts:
+            part = part.strip()
+            if part:
+                aliases.append(part)
+        if normalized not in aliases:
+            aliases.append(normalized)
+        return aliases
+
+    @staticmethod
+    def _token_set(name: str) -> set[str]:
+        return {token for token in re.split(r"\s+", name) if token}
+
+    @classmethod
+    def _names_match(cls, left: str, right: str) -> bool:
+        left_norm = cls._normalize_entity_name(left)
+        right_norm = cls._normalize_entity_name(right)
+        if not left_norm or not right_norm:
+            return False
+        if left_norm == right_norm:
+            return True
+
+        left_tokens = cls._token_set(left_norm)
+        right_tokens = cls._token_set(right_norm)
+        if left_tokens & right_tokens:
+            if left_norm in right_norm or right_norm in left_norm:
+                return True
+            if len(left_tokens) > 1 and len(right_tokens) > 1:
+                if left_tokens.intersection(right_tokens):
+                    return True
+
+        similarity = difflib.SequenceMatcher(None, left_norm, right_norm).ratio()
+        return similarity >= 0.75
+
     def add_entity(self, name: str, category: str, desc: str = "") -> Optional[Entity]:
         """Smart Add with Fuzzy Matching."""
         clean_name = (name or "").strip()
@@ -403,8 +455,18 @@ class Project:
 
         for ent in self.world_db.values():
             if ent.category == category:
-                similarity = difflib.SequenceMatcher(None, ent.name.lower(), clean_name.lower()).ratio()
-                if similarity > 0.80:
+                candidates = self._entity_aliases(ent.name)
+                incoming_aliases = self._entity_aliases(clean_name)
+                if not candidates:
+                    candidates = [ent.name]
+                if not incoming_aliases:
+                    incoming_aliases = [clean_name]
+                matched = any(
+                    self._names_match(candidate, incoming)
+                    for candidate in candidates
+                    for incoming in incoming_aliases
+                )
+                if matched:
                     ent.merge(desc)
                     self.last_modified = time.time()
                     return ent
@@ -1364,7 +1426,7 @@ def _run_ui():
                         MANTIS Studio
                     </div>
                     <div class="mantis-header-sub">
-                        Story OS for immersive drafting
+                        Modular AI Narrative Text Intelligence System
                     </div>
                 </div>
             </div>
@@ -2146,16 +2208,37 @@ def _run_ui():
                 """,
                 unsafe_allow_html=True,
             )
-            hero_left, hero_right = st.columns([1.4, 1])
+            hero_left, hero_right = st.columns([1.6, 1])
             with hero_left:
-                st.markdown("#### Resume writing")
-                if st.button("📂 Resume latest project", type="primary", use_container_width=True, disabled=not recent_projects):
-                    if recent_projects:
-                        st.session_state.project = Project.load(recent_projects[0]["path"])
-                        st.session_state.page = "chapters"
+                st.markdown("#### Quick actions")
+                action_cols = st.columns(3)
+                with action_cols[0]:
+                    if st.button(
+                        "📂 Resume",
+                        type="primary",
+                        use_container_width=True,
+                        disabled=not recent_projects,
+                    ):
+                        if recent_projects:
+                            st.session_state.project = Project.load(recent_projects[0]["path"])
+                            st.session_state.page = "chapters"
+                            st.rerun()
+                with action_cols[1]:
+                    if st.button("🧭 New project", use_container_width=True):
+                        st.session_state.page = "projects"
                         st.rerun()
+                with action_cols[2]:
+                    if st.button(
+                        "🧩 Open outline",
+                        use_container_width=True,
+                        disabled=not recent_projects,
+                    ):
+                        if recent_projects:
+                            st.session_state.project = Project.load(recent_projects[0]["path"])
+                            st.session_state.page = "outline"
+                            st.rerun()
 
-                st.markdown("#### Workspace status")
+                st.markdown("#### Workspace snapshot")
                 st.markdown(
                     f"""
                     <div class="mantis-kpi-grid">
@@ -2192,9 +2275,17 @@ def _run_ui():
                     st.metric("Model", st.session_state.groq_model or AppConfig.DEFAULT_MODEL)
                     st.caption(f"Projects dir: `{active_dir}`")
 
+                st.markdown("#### Next milestones")
+                st.caption("Keep the studio healthy with these quick checks.")
+                milestone_col = st.container(border=True)
+                with milestone_col:
+                    st.checkbox("Create a project", value=has_project, disabled=True)
+                    st.checkbox("Draft an outline", value=has_outline, disabled=True)
+                    st.checkbox("Write a chapter", value=has_chapter, disabled=True)
+
         with st.container(border=True):
             st.markdown("### 🧭 Guided first session")
-            st.caption("Complete these three steps to unlock the full studio workflow.")
+            st.caption("Complete these steps to unlock the full studio workflow.")
             progress = sum([has_project, has_outline, has_chapter]) / 3
             st.progress(progress, text=f"{sum([has_project, has_outline, has_chapter])}/3 steps complete")
             s1, s2, s3 = st.columns([1.2, 1.2, 1.4])
@@ -2219,12 +2310,14 @@ def _run_ui():
                         st.session_state.page = "chapters"
                         st.rerun()
 
-        if st.session_state.get("first_run", True):
-            with st.container(border=True):
-                st.markdown("### 👋 First time here?")
-                st.markdown(
-                    """
-**MANTIS** now mirrors the focused NovelAI-style studio: a clean writing surface, memory tools,
+        onboarding_left, onboarding_right = st.columns([1.4, 1])
+        with onboarding_left:
+            if st.session_state.get("first_run", True):
+                with st.container(border=True):
+                    st.markdown("### 👋 First time here?")
+                    st.markdown(
+                        """
+**MANTIS** mirrors a focused NovelAI-style studio: a clean writing surface, memory tools,
 and quick start modules so you can draft fast and refine later.
 
 **Quick path**
@@ -2232,32 +2325,32 @@ and quick start modules so you can draft fast and refine later.
 2) Build a structured outline or lore entries  
 3) Draft chapters with AI assists on demand
 """
-                )
-                c1, c2, c3 = st.columns([1, 1, 2])
-                with c1:
-                    if st.button("✅ Got it", type="primary", use_container_width=True):
-                        st.session_state.first_run = False
-                        st.rerun()
-                with c2:
-                    if st.button("📌 Keep showing", use_container_width=True):
-                        st.toast("Welcome panel will keep showing.")
-                with c3:
-                    st.caption("Tip: If the AI model shows Offline, confirm your Groq API key and model access.")
-            st.write("")
-
-        if not st.session_state.groq_api_key or not st.session_state.openai_api_key:
-            with st.container(border=True):
-                st.markdown("### 🔑 Connect your AI providers")
-                st.caption("Unlock generation, summaries, and entity tools with API access.")
-                cta_left, cta_right = st.columns(2)
-                with cta_left:
-                    st.link_button("Create Groq Account", "https://console.groq.com/keys", use_container_width=True)
-                with cta_right:
-                    st.link_button(
-                        "Create OpenAI Account",
-                        "https://platform.openai.com/api-keys",
-                        use_container_width=True,
                     )
+                    c1, c2, c3 = st.columns([1, 1, 2])
+                    with c1:
+                        if st.button("✅ Got it", type="primary", use_container_width=True):
+                            st.session_state.first_run = False
+                            st.rerun()
+                    with c2:
+                        if st.button("📌 Keep showing", use_container_width=True):
+                            st.toast("Welcome panel will keep showing.")
+                    with c3:
+                        st.caption("Tip: If the AI model shows Offline, confirm your Groq API key and model access.")
+
+        with onboarding_right:
+            if not st.session_state.groq_api_key or not st.session_state.openai_api_key:
+                with st.container(border=True):
+                    st.markdown("### 🔑 Connect your AI providers")
+                    st.caption("Unlock generation, summaries, and entity tools with API access.")
+                    cta_left, cta_right = st.columns(2)
+                    with cta_left:
+                        st.link_button("Create Groq Account", "https://console.groq.com/keys", use_container_width=True)
+                    with cta_right:
+                        st.link_button(
+                            "Create OpenAI Account",
+                            "https://platform.openai.com/api-keys",
+                            use_container_width=True,
+                        )
 
         with st.container(border=True):
             st.markdown("### 🚀 Creator Momentum")
