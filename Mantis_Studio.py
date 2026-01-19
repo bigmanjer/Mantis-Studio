@@ -2146,16 +2146,37 @@ def _run_ui():
                 """,
                 unsafe_allow_html=True,
             )
-            hero_left, hero_right = st.columns([1.4, 1])
+            hero_left, hero_right = st.columns([1.6, 1])
             with hero_left:
-                st.markdown("#### Resume writing")
-                if st.button("📂 Resume latest project", type="primary", use_container_width=True, disabled=not recent_projects):
-                    if recent_projects:
-                        st.session_state.project = Project.load(recent_projects[0]["path"])
-                        st.session_state.page = "chapters"
+                st.markdown("#### Quick actions")
+                action_cols = st.columns(3)
+                with action_cols[0]:
+                    if st.button(
+                        "📂 Resume",
+                        type="primary",
+                        use_container_width=True,
+                        disabled=not recent_projects,
+                    ):
+                        if recent_projects:
+                            st.session_state.project = Project.load(recent_projects[0]["path"])
+                            st.session_state.page = "chapters"
+                            st.rerun()
+                with action_cols[1]:
+                    if st.button("🧭 New project", use_container_width=True):
+                        st.session_state.page = "projects"
                         st.rerun()
+                with action_cols[2]:
+                    if st.button(
+                        "🧩 Open outline",
+                        use_container_width=True,
+                        disabled=not recent_projects,
+                    ):
+                        if recent_projects:
+                            st.session_state.project = Project.load(recent_projects[0]["path"])
+                            st.session_state.page = "outline"
+                            st.rerun()
 
-                st.markdown("#### Workspace status")
+                st.markdown("#### Workspace snapshot")
                 st.markdown(
                     f"""
                     <div class="mantis-kpi-grid">
@@ -2192,9 +2213,17 @@ def _run_ui():
                     st.metric("Model", st.session_state.groq_model or AppConfig.DEFAULT_MODEL)
                     st.caption(f"Projects dir: `{active_dir}`")
 
+                st.markdown("#### Next milestones")
+                st.caption("Keep the studio healthy with these quick checks.")
+                milestone_col = st.container(border=True)
+                with milestone_col:
+                    st.checkbox("Create a project", value=has_project, disabled=True)
+                    st.checkbox("Draft an outline", value=has_outline, disabled=True)
+                    st.checkbox("Write a chapter", value=has_chapter, disabled=True)
+
         with st.container(border=True):
             st.markdown("### 🧭 Guided first session")
-            st.caption("Complete these three steps to unlock the full studio workflow.")
+            st.caption("Complete these steps to unlock the full studio workflow.")
             progress = sum([has_project, has_outline, has_chapter]) / 3
             st.progress(progress, text=f"{sum([has_project, has_outline, has_chapter])}/3 steps complete")
             s1, s2, s3 = st.columns([1.2, 1.2, 1.4])
@@ -2219,12 +2248,14 @@ def _run_ui():
                         st.session_state.page = "chapters"
                         st.rerun()
 
-        if st.session_state.get("first_run", True):
-            with st.container(border=True):
-                st.markdown("### 👋 First time here?")
-                st.markdown(
-                    """
-**MANTIS** now mirrors the focused NovelAI-style studio: a clean writing surface, memory tools,
+        onboarding_left, onboarding_right = st.columns([1.4, 1])
+        with onboarding_left:
+            if st.session_state.get("first_run", True):
+                with st.container(border=True):
+                    st.markdown("### 👋 First time here?")
+                    st.markdown(
+                        """
+**MANTIS** mirrors a focused NovelAI-style studio: a clean writing surface, memory tools,
 and quick start modules so you can draft fast and refine later.
 
 **Quick path**
@@ -2232,32 +2263,32 @@ and quick start modules so you can draft fast and refine later.
 2) Build a structured outline or lore entries  
 3) Draft chapters with AI assists on demand
 """
-                )
-                c1, c2, c3 = st.columns([1, 1, 2])
-                with c1:
-                    if st.button("✅ Got it", type="primary", use_container_width=True):
-                        st.session_state.first_run = False
-                        st.rerun()
-                with c2:
-                    if st.button("📌 Keep showing", use_container_width=True):
-                        st.toast("Welcome panel will keep showing.")
-                with c3:
-                    st.caption("Tip: If the AI model shows Offline, confirm your Groq API key and model access.")
-            st.write("")
-
-        if not st.session_state.groq_api_key or not st.session_state.openai_api_key:
-            with st.container(border=True):
-                st.markdown("### 🔑 Connect your AI providers")
-                st.caption("Unlock generation, summaries, and entity tools with API access.")
-                cta_left, cta_right = st.columns(2)
-                with cta_left:
-                    st.link_button("Create Groq Account", "https://console.groq.com/keys", use_container_width=True)
-                with cta_right:
-                    st.link_button(
-                        "Create OpenAI Account",
-                        "https://platform.openai.com/api-keys",
-                        use_container_width=True,
                     )
+                    c1, c2, c3 = st.columns([1, 1, 2])
+                    with c1:
+                        if st.button("✅ Got it", type="primary", use_container_width=True):
+                            st.session_state.first_run = False
+                            st.rerun()
+                    with c2:
+                        if st.button("📌 Keep showing", use_container_width=True):
+                            st.toast("Welcome panel will keep showing.")
+                    with c3:
+                        st.caption("Tip: If the AI model shows Offline, confirm your Groq API key and model access.")
+
+        with onboarding_right:
+            if not st.session_state.groq_api_key or not st.session_state.openai_api_key:
+                with st.container(border=True):
+                    st.markdown("### 🔑 Connect your AI providers")
+                    st.caption("Unlock generation, summaries, and entity tools with API access.")
+                    cta_left, cta_right = st.columns(2)
+                    with cta_left:
+                        st.link_button("Create Groq Account", "https://console.groq.com/keys", use_container_width=True)
+                    with cta_right:
+                        st.link_button(
+                            "Create OpenAI Account",
+                            "https://platform.openai.com/api-keys",
+                            use_container_width=True,
+                        )
 
         with st.container(border=True):
             st.markdown("### 🚀 Creator Momentum")
