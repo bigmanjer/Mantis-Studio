@@ -878,25 +878,25 @@ def _run_ui():
         "Light": {
             "bg": "#f8fafc",
             "text": "#0f172a",
-            "muted": "#475569",
+            "muted": "#6b7280",
             "input_bg": "#ffffff",
-            "input_border": "#cbd5e1",
+            "input_border": "#d0d7e2",
             "button_bg": "linear-gradient(180deg, #ffffff, #e2e8f0)",
-            "button_border": "#c0cad8",
+            "button_border": "#cbd5e1",
             "button_hover_border": "#16a34a",
             "primary_bg": "linear-gradient(135deg, #22c55e, #15803d)",
             "primary_border": "rgba(21,128,61,0.25)",
             "primary_hover_border": "#16a34a",
             "card_bg": "#ffffff",
-            "card_border": "#d6dde7",
+            "card_border": "#e2e8f0",
             "sidebar_bg": "linear-gradient(180deg, #f1f5f9, #e2e8f0)",
-            "sidebar_border": "#d6dde7",
+            "sidebar_border": "#e2e8f0",
             "sidebar_title": "#15803d",
-            "divider": "#d1d5db",
-            "expander_border": "#d6dde7",
+            "divider": "#e2e8f0",
+            "expander_border": "#dbe2ea",
             "header_gradient": "linear-gradient(135deg, #e8f5e9, #c8e6c9)",
             "header_logo_bg": "#d1fae5",
-            "header_sub": "#1f5f37",
+            "header_sub": "#2f6f43",
             "shadow_strong": "0 12px 24px rgba(15,23,42,0.08)",
             "shadow_button": "0 8px 16px rgba(15,23,42,0.12)",
             "sidebar_brand_bg": "linear-gradient(180deg, rgba(241,245,249,0.95), rgba(226,232,240,0.95))",
@@ -942,11 +942,6 @@ def _run_ui():
     .block-container {{ padding-top: 2.6rem; padding-bottom: 2rem; }}
     header[data-testid="stHeader"] {{ height: 2.6rem; }}
     h1, h2, h3 {{ letter-spacing: -0.02em; }}
-    label[data-testid="stWidgetLabel"] {{
-        color: var(--mantis-muted) !important;
-        font-weight: 600;
-        letter-spacing: 0.01em;
-    }}
     .stTextInput input, .stSelectbox div, .stNumberInput input {{ background-color: var(--mantis-input-bg) !important; color: var(--mantis-text) !important; border: 1px solid var(--mantis-input-border) !important; }}
     .stTextArea textarea {{ background-color: var(--mantis-input-bg) !important; color: var(--mantis-text) !important; font-family: 'Crimson Pro', serif !important; font-size: 18px !important; line-height: 1.65 !important; border: 1px solid var(--mantis-input-border) !important; }}
 
@@ -1274,12 +1269,12 @@ def _run_ui():
 
     def save_app_settings():
         data = {
-            "groq_base_url": st.session_state.groq_base_url,
-            "groq_api_key": st.session_state.groq_api_key,
-            "groq_model": st.session_state.groq_model,
+            "ai_provider": st.session_state.ai_provider,
+            "ollama_base_url": st.session_state.ollama_base_url,
+            "openai_base_url": st.session_state.openai_base_url,
+            "openai_api_key": st.session_state.openai_api_key,
+            "openai_model": st.session_state.openai_model,
             "ui_theme": st.session_state.ui_theme,
-            "last_username": st.session_state.get("auth_username", ""),
-            "last_display_name": st.session_state.get("auth_user", ""),
         }
         save_app_config(data)
         st.toast("Settings saved.")
@@ -1426,6 +1421,22 @@ def _run_ui():
         st.markdown("### 🎨 Appearance")
         st.selectbox("Theme", ["Dark", "Light"], key="ui_theme")
         st.divider()
+
+        provider = st.selectbox("Provider", ["Ollama", "OpenAI"], key="ai_provider")
+
+        if provider == "Ollama":
+            ollama_url = st.text_input("Ollama Base URL", value=st.session_state.ollama_base_url)
+            normalized_ollama_url = normalize_ollama_base_url(normalize_local_base_url(ollama_url))
+            if normalized_ollama_url != st.session_state.ollama_base_url:
+                st.session_state.ollama_base_url = normalized_ollama_url
+                AppConfig.OLLAMA_API_URL = normalized_ollama_url
+                st.cache_data.clear()
+                refresh_models()
+            st.caption("Ollama must be reachable from the server hosting MANTIS Studio.")
+
+            if not st.session_state.model_list:
+                refresh_models()
+            models = st.session_state.model_list or []
 
         st.markdown("### 🤖 Groq AI")
         groq_url = st.text_input("Groq Base URL", value=st.session_state.groq_base_url)
