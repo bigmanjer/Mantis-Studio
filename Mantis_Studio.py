@@ -1395,7 +1395,8 @@ def _run_ui():
             )
         config_data.clear()
         config_data.update(data)
-        st.session_state.remember_me = bool(data.get("remember_me", False))
+        if "remember_me" not in st.session_state:
+            st.session_state.remember_me = bool(data.get("remember_me", False))
         save_app_config(data)
 
     def _restore_remembered_session() -> None:
