@@ -2279,9 +2279,24 @@ def _run_ui():
                 st.caption("Keep the studio healthy with these quick checks.")
                 milestone_col = st.container(border=True)
                 with milestone_col:
-                    st.checkbox("Create a project", value=has_project, disabled=True)
-                    st.checkbox("Draft an outline", value=has_outline, disabled=True)
-                    st.checkbox("Write a chapter", value=has_chapter, disabled=True)
+                    st.checkbox(
+                        "Create a project",
+                        value=has_project,
+                        disabled=True,
+                        key="milestone_create_project",
+                    )
+                    st.checkbox(
+                        "Draft an outline",
+                        value=has_outline,
+                        disabled=True,
+                        key="milestone_draft_outline",
+                    )
+                    st.checkbox(
+                        "Write a chapter",
+                        value=has_chapter,
+                        disabled=True,
+                        key="milestone_write_chapter",
+                    )
 
         with st.container(border=True):
             st.markdown("### 🧭 Guided first session")
@@ -2290,20 +2305,35 @@ def _run_ui():
             st.progress(progress, text=f"{sum([has_project, has_outline, has_chapter])}/3 steps complete")
             s1, s2, s3 = st.columns([1.2, 1.2, 1.4])
             with s1:
-                st.checkbox("Create a project", value=has_project, disabled=True)
+                st.checkbox(
+                    "Create a project",
+                    value=has_project,
+                    disabled=True,
+                    key="guided_create_project",
+                )
                 if not has_project:
                     if st.button("Start here", type="primary", use_container_width=True):
                         st.session_state.page = "projects"
                         st.rerun()
             with s2:
-                st.checkbox("Draft an outline", value=has_outline, disabled=True)
+                st.checkbox(
+                    "Draft an outline",
+                    value=has_outline,
+                    disabled=True,
+                    key="guided_draft_outline",
+                )
                 if has_project and not has_outline:
                     if st.button("Open outline", use_container_width=True):
                         st.session_state.project = Project.load(recent_projects[0]["path"])
                         st.session_state.page = "outline"
                         st.rerun()
             with s3:
-                st.checkbox("Write a chapter", value=has_chapter, disabled=True)
+                st.checkbox(
+                    "Write a chapter",
+                    value=has_chapter,
+                    disabled=True,
+                    key="guided_write_chapter",
+                )
                 if has_project and not has_chapter:
                     if st.button("Start writing", use_container_width=True):
                         st.session_state.project = Project.load(recent_projects[0]["path"])
