@@ -82,7 +82,6 @@ class AppConfig:
     GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
     GROQ_TIMEOUT = int(os.getenv("GROQ_TIMEOUT", "300"))
     DEFAULT_MODEL = os.getenv("GROQ_MODEL", "llama3-8b-8192")
-    OLLAMA_API_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
     OPENAI_API_URL = os.getenv("OPENAI_API_URL", "https://api.openai.com/v1")
     OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
     OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
@@ -129,25 +128,6 @@ def save_app_config(data: Dict[str, str]) -> None:
 
 def _normalize_username(username: str) -> str:
     return re.sub(r"\s+", "", (username or "").strip()).lower()
-
-
-def normalize_local_base_url(url: str) -> str:
-    value = (url or "").strip()
-    if not value:
-        return value
-    if not re.match(r"^https?://", value):
-        value = f"http://{value}"
-    return value.rstrip("/")
-
-
-def normalize_ollama_base_url(url: str) -> str:
-    value = (url or "").strip()
-    if not value:
-        return AppConfig.OLLAMA_API_URL
-    value = value.rstrip("/")
-    if value.endswith("/v1"):
-        value = value[: -len("/v1")]
-    return value
 
 
 def load_users_db() -> Dict[str, Dict[str, Any]]:
@@ -1236,13 +1216,6 @@ def _run_ui():
         st.session_state.ghost_text = ""
     if "first_run" not in st.session_state:
         st.session_state.first_run = True
-    if "ai_provider" not in st.session_state:
-        st.session_state.ai_provider = config_data.get("ai_provider", "Ollama")
-    if "ollama_base_url" not in st.session_state:
-        st.session_state.ollama_base_url = config_data.get(
-            "ollama_base_url",
-            AppConfig.OLLAMA_API_URL,
-        )
     if "openai_base_url" not in st.session_state:
         st.session_state.openai_base_url = config_data.get(
             "openai_base_url",
@@ -1270,16 +1243,12 @@ def _run_ui():
         st.session_state.groq_model_list = []
     if "groq_model_tests" not in st.session_state:
         st.session_state.groq_model_tests = {}
-    if "model_list" not in st.session_state:
-        st.session_state.model_list = []
-
     if "_force_nav" not in st.session_state:
         st.session_state._force_nav = False
 
     AppConfig.GROQ_API_URL = st.session_state.groq_base_url
     AppConfig.GROQ_API_KEY = st.session_state.groq_api_key
     AppConfig.DEFAULT_MODEL = st.session_state.groq_model
-    AppConfig.OLLAMA_API_URL = st.session_state.ollama_base_url
     AppConfig.OPENAI_API_URL = st.session_state.openai_base_url
     AppConfig.OPENAI_API_KEY = st.session_state.openai_api_key
     AppConfig.OPENAI_MODEL = st.session_state.openai_model
@@ -1399,9 +1368,11 @@ def _run_ui():
 
     def save_app_settings():
         data = {
-            "ai_provider": st.session_state.ai_provider,
-            "ollama_base_url": st.session_state.ollama_base_url,
+            "groq_base_url": st.session_state.groq_base_url,
+            "groq_api_key": st.session_state.groq_api_key,
+            "groq_model": st.session_state.groq_model,
             "openai_base_url": st.session_state.openai_base_url,
+            "openai_api_key": st.session_state.openai_api_key,
             "openai_model": st.session_state.openai_model,
             "ui_theme": st.session_state.ui_theme,
         }
@@ -1516,58 +1487,11 @@ def _run_ui():
         render_auth()
         return
 
-    with st.sidebar:
-        st.markdown(f"""
-        <div class="mantis-sidebar-brand">
-            <div class="mantis-sidebar-logo">
-                <img src="data:image/png;base64,{_MANTIS_LOGO_B64}" />
-            </div>
-            <div>
-                <div class="mantis-sidebar-title">MANTIS Studio</div>
-                <div class="mantis-sidebar-sub">v{AppConfig.VERSION}</div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+    def render_ai_settings():
+        st.markdown("## 🧠 AI Settings")
+        st.caption("Configure your AI providers and models.")
 
-        st.markdown("---")
-        st.markdown("### 🧠 AI Engine")
-        st.caption(f"Signed in as **{st.session_state.auth_user}**")
-        if st.session_state.auth_username and not st.session_state.auth_is_guest:
-            st.caption(f"@{st.session_state.auth_username}")
-        if st.button("💾 Save Account", use_container_width=True):
-            save_app_settings()
-        if st.button("Sign out", use_container_width=True):
-            st.session_state.auth_user = None
-            st.session_state.auth_user_id = None
-            st.session_state.auth_username = None
-            st.session_state.auth_is_guest = False
-            st.session_state.projects_dir = None
-            st.session_state.project = None
-            st.session_state.page = "home"
-            st.session_state._force_nav = True
-            st.rerun()
-
-        st.markdown("### 🎨 Appearance")
-        st.selectbox("Theme", ["Dark", "Light"], key="ui_theme")
-        st.divider()
-
-        provider = st.selectbox("Provider", ["Ollama", "OpenAI"], key="ai_provider")
-
-        if provider == "Ollama":
-            ollama_url = st.text_input("Ollama Base URL", value=st.session_state.ollama_base_url)
-            normalized_ollama_url = normalize_ollama_base_url(normalize_local_base_url(ollama_url))
-            if normalized_ollama_url != st.session_state.ollama_base_url:
-                st.session_state.ollama_base_url = normalized_ollama_url
-                AppConfig.OLLAMA_API_URL = normalized_ollama_url
-                st.cache_data.clear()
-                refresh_models()
-            st.caption("Ollama must be reachable from the server hosting MANTIS Studio.")
-
-            if not st.session_state.model_list:
-                refresh_models()
-            models = st.session_state.model_list or []
-
-        st.markdown("### 🤖 Groq AI")
+        st.markdown("### 🤖 Groq")
         groq_url = st.text_input("Groq Base URL", value=st.session_state.groq_base_url)
         if groq_url != st.session_state.groq_base_url:
             st.session_state.groq_base_url = groq_url
@@ -1583,7 +1507,7 @@ def _run_ui():
             st.session_state.groq_api_key = groq_key
             AppConfig.GROQ_API_KEY = groq_key
 
-        if st.button("↻ Fetch Models", use_container_width=True):
+        if st.button("↻ Fetch Groq Models", use_container_width=True):
             models, error_message = fetch_groq_models(
                 st.session_state.groq_base_url,
                 st.session_state.groq_api_key,
@@ -1604,7 +1528,7 @@ def _run_ui():
                 idx = models.index(st.session_state.groq_model)
             groq_model = st.selectbox("Groq Model", models, index=idx)
 
-            if st.button("🧪 Test All Models", use_container_width=True):
+            if st.button("🧪 Test All Groq Models", use_container_width=True):
                 results = {}
                 total = len(models)
                 progress = st.progress(0)
@@ -1624,7 +1548,7 @@ def _run_ui():
                     st.success("All models responded successfully.")
 
             if st.session_state.groq_model_tests:
-                with st.expander("Model test results", expanded=False):
+                with st.expander("Groq model test results", expanded=False):
                     for model_name, error_message in sorted(
                         st.session_state.groq_model_tests.items()
                     ):
@@ -1642,6 +1566,8 @@ def _run_ui():
         st.markdown(
             "[Get a free Groq API key](https://console.groq.com/keys) to enable cloud models."
         )
+        if not st.session_state.groq_api_key:
+            st.info("No Groq API key yet. Create one above and paste it here to unlock Groq models.")
         if st.button("🔌 Test Groq Connection", use_container_width=True):
             ok = test_groq_connection(
                 st.session_state.groq_base_url,
@@ -1652,17 +1578,79 @@ def _run_ui():
             else:
                 st.error("Groq connection failed. Check your base URL and key.")
 
+        st.divider()
+        st.markdown("### ✨ OpenAI")
+        openai_url = st.text_input("OpenAI Base URL", value=st.session_state.openai_base_url)
+        if openai_url != st.session_state.openai_base_url:
+            st.session_state.openai_base_url = openai_url
+            AppConfig.OPENAI_API_URL = openai_url
+
+        openai_key = st.text_input(
+            "OpenAI API Key",
+            value=st.session_state.openai_api_key,
+            type="password",
+            help="Required for OpenAI cloud models.",
+        )
+        if openai_key != st.session_state.openai_api_key:
+            st.session_state.openai_api_key = openai_key
+            AppConfig.OPENAI_API_KEY = openai_key
+        if not st.session_state.openai_api_key:
+            st.info("No OpenAI API key yet. Create one and paste it here to unlock OpenAI models.")
+
+        openai_model = st.text_input("OpenAI Model", value=st.session_state.openai_model)
+        if openai_model != st.session_state.openai_model:
+            st.session_state.openai_model = openai_model
+            AppConfig.OPENAI_MODEL = openai_model
+
+        st.markdown(
+            "[Create an OpenAI account](https://platform.openai.com/api-keys) to get an API key."
+        )
+
         colm1, colm2 = st.columns([1, 1])
         with colm1:
             st.checkbox("Auto-save", key="auto_save")
         with colm2:
-            if st.button("↻ Refresh Models", use_container_width=True):
+            if st.button("↻ Refresh Groq Models", use_container_width=True):
                 st.cache_data.clear()
                 refresh_models()
                 st.toast("Model list refreshed")
 
-        if st.button("💾 Save Settings", use_container_width=True):
+        if st.button("💾 Save AI Settings", use_container_width=True):
             save_app_settings()
+
+    with st.sidebar:
+        st.markdown(f"""
+        <div class="mantis-sidebar-brand">
+            <div class="mantis-sidebar-logo">
+                <img src="data:image/png;base64,{_MANTIS_LOGO_B64}" />
+            </div>
+            <div>
+                <div class="mantis-sidebar-title">MANTIS Studio</div>
+                <div class="mantis-sidebar-sub">v{AppConfig.VERSION}</div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        st.markdown("---")
+        st.markdown("### 👤 Account")
+        st.caption(f"Signed in as **{st.session_state.auth_user}**")
+        if st.session_state.auth_username and not st.session_state.auth_is_guest:
+            st.caption(f"@{st.session_state.auth_username}")
+        if st.button("💾 Save Account", use_container_width=True):
+            save_app_settings()
+        if st.button("Sign out", use_container_width=True):
+            st.session_state.auth_user = None
+            st.session_state.auth_user_id = None
+            st.session_state.auth_username = None
+            st.session_state.auth_is_guest = False
+            st.session_state.projects_dir = None
+            st.session_state.project = None
+            st.session_state.page = "home"
+            st.session_state._force_nav = True
+            st.rerun()
+
+        st.markdown("### 🎨 Appearance")
+        st.selectbox("Theme", ["Dark", "Light"], key="ui_theme")
         st.divider()
 
         if st.session_state.project:
@@ -1672,28 +1660,39 @@ def _run_ui():
             st.caption(f"🗂 Projects folder: `{get_active_projects_dir()}`")
             st.caption(f"📚 Total words: {p.get_total_word_count()}")
 
-            st.divider()
-            st.markdown("### 🧭 Navigation")
+        st.divider()
+        st.markdown("### 🧭 Navigation")
 
-            nav_labels = ["Dashboard", "Outline", "Chapters", "World Bible", "Export"]
-            pmap = {"Dashboard": "home", "Outline": "outline", "World Bible": "world", "Chapters": "chapters", "Export": "export"}
-            current_page = st.session_state.page
-            reverse_map = {v: k for k, v in pmap.items()}
-            current_label = reverse_map.get(current_page, "Dashboard")
-            try:
-                current_index = nav_labels.index(current_label)
-            except ValueError:
-                current_index = 0
-            nav = st.radio(
-                "Navigation",
-                nav_labels,
-                index=current_index,
-                label_visibility="collapsed",
-            )
-            if pmap[nav] != st.session_state.page:
-                st.session_state.page = pmap[nav]
-                st.rerun()
+        nav_labels = ["Dashboard", "AI Settings"]
+        pmap = {"Dashboard": "home", "AI Settings": "ai"}
+        if st.session_state.project:
+            nav_labels = ["Dashboard", "Outline", "Chapters", "World Bible", "Export", "AI Settings"]
+            pmap = {
+                "Dashboard": "home",
+                "Outline": "outline",
+                "World Bible": "world",
+                "Chapters": "chapters",
+                "Export": "export",
+                "AI Settings": "ai",
+            }
+        current_page = st.session_state.page
+        reverse_map = {v: k for k, v in pmap.items()}
+        current_label = reverse_map.get(current_page, "Dashboard")
+        try:
+            current_index = nav_labels.index(current_label)
+        except ValueError:
+            current_index = 0
+        nav = st.radio(
+            "Navigation",
+            nav_labels,
+            index=current_index,
+            label_visibility="collapsed",
+        )
+        if pmap[nav] != st.session_state.page:
+            st.session_state.page = pmap[nav]
+            st.rerun()
 
+        if st.session_state.project:
             st.divider()
 
             cA, cB = st.columns(2)
@@ -1735,6 +1734,22 @@ def _run_ui():
                 with c3:
                     st.caption("Tip: If the AI model shows Offline, confirm your Groq API key and model access.")
             st.write("")
+
+        if not st.session_state.groq_api_key or not st.session_state.openai_api_key:
+            with st.container(border=True):
+                st.markdown("### 🔑 Get your AI keys")
+                st.caption(
+                    "To use cloud models, create a Groq or OpenAI account and paste the key in the sidebar."
+                )
+                cta_left, cta_right = st.columns(2)
+                with cta_left:
+                    st.link_button("Create Groq Account", "https://console.groq.com/keys", use_container_width=True)
+                with cta_right:
+                    st.link_button(
+                        "Create OpenAI Account",
+                        "https://platform.openai.com/api-keys",
+                        use_container_width=True,
+                    )
 
         st.markdown("## Studio Dashboard")
         st.caption("Create a project, load a recent one, or import a story to start building.")
@@ -2376,6 +2391,8 @@ def _run_ui():
 
     if st.session_state.page == "home":
         render_home()
+    elif st.session_state.page == "ai":
+        render_ai_settings()
     elif st.session_state.project:
         pg = st.session_state.page
         if pg == "outline": render_outline()

@@ -221,23 +221,20 @@ echo.>>"%DIAG_FILE%"
 
 call :diag_system
 call :diag_streamlit
-call :diag_ollama
 call :diag_ports
 
 notepad "%DIAG_FILE%"
 
 echo --------------------------------------------------
 echo   F) Fix and Relaunch
-echo   R) Restart Ollama
 echo   B) Back to menu
 echo --------------------------------------------------
-choice /c FRB /n /m "Select: "
+choice /c FB /n /m "Select: "
 
 set "DCHOICE=%ERRORLEVEL%"
 
 if "%DCHOICE%"=="1" goto diag_fix
-if "%DCHOICE%"=="2" goto ollama_restart
-if "%DCHOICE%"=="3" goto menu
+if "%DCHOICE%"=="2" goto menu
 goto menu
 
 :: ==============================================================
@@ -262,24 +259,6 @@ call :sleep 120
 goto launch
 
 :: ==============================================================
-:: RESTART OLLAMA
-:: ==============================================================
-:ollama_restart
-cls
-call :banner
-color %CLR_WARN%
-echo Restarting Ollama...
-
-taskkill /IM ollama.exe /F >nul 2>&1
-call :sleep 200
-start "" ollama
-
-color %CLR_OK%
-echo Ollama restarted.
-pause
-goto diag
-
-:: ==============================================================
 :: DIAG HELPERS
 :: ==============================================================
 :diag_system
@@ -298,26 +277,6 @@ echo [STREAMLIT]
 ) || (
   echo FAIL Streamlit import
   echo FAIL Streamlit import>>"%DIAG_FILE%"
-)
-echo.
-exit /b
-
-:diag_ollama
-echo [OLLAMA]
-if "%HAVE_PS%"=="1" (
-  powershell -NoProfile -Command ^
-    "try{(Invoke-WebRequest 'http://localhost:11434/api/tags' -TimeoutSec 2).Content}catch{''}" >"%TEMP%\oll_models.json"
-)
-
-if exist "%TEMP%\oll_models.json" (
-  echo PASS Ollama reachable
-  echo PASS Ollama reachable>>"%DIAG_FILE%"
-  %PYTHON_CMD% -c "import json;d=json.load(open(r'%TEMP%\oll_models.json'));print('Models:');[print(' -',m['name']) for m in d.get('models',[])]"
-  type "%TEMP%\oll_models.json">>"%DIAG_FILE%"
-  del "%TEMP%\oll_models.json"
-) else (
-  echo WARN Ollama offline
-  echo WARN Ollama offline>>"%DIAG_FILE%"
 )
 echo.
 exit /b
