@@ -395,6 +395,58 @@ class Project:
             storage_dir=storage_dir,
         )
 
+    @staticmethod
+    def _normalize_entity_name(name: str) -> str:
+        base = (name or "").strip().lower()
+        if not base:
+            return ""
+        base = re.sub(r"[\"'`]", "", base)
+        base = re.sub(r"\((.*?)\)", r" \1 ", base)
+        base = re.sub(r"\b(mr|mrs|ms|dr|prof|sir|madam)\.?\b", "", base)
+        base = re.sub(r"[^\w\s/-]", " ", base)
+        base = re.sub(r"\s+", " ", base).strip()
+        return base
+
+    @classmethod
+    def _entity_aliases(cls, name: str) -> List[str]:
+        normalized = cls._normalize_entity_name(name)
+        if not normalized:
+            return []
+        parts = re.split(r"\s*/\s*|\s+or\s+|\s+\|\s+", normalized)
+        aliases = []
+        for part in parts:
+            part = part.strip()
+            if part:
+                aliases.append(part)
+        if normalized not in aliases:
+            aliases.append(normalized)
+        return aliases
+
+    @staticmethod
+    def _token_set(name: str) -> set[str]:
+        return {token for token in re.split(r"\s+", name) if token}
+
+    @classmethod
+    def _names_match(cls, left: str, right: str) -> bool:
+        left_norm = cls._normalize_entity_name(left)
+        right_norm = cls._normalize_entity_name(right)
+        if not left_norm or not right_norm:
+            return False
+        if left_norm == right_norm:
+            return True
+
+        left_tokens = cls._token_set(left_norm)
+        right_tokens = cls._token_set(right_norm)
+        if left_tokens & right_tokens:
+            if left_norm in right_norm or right_norm in left_norm:
+                return True
+            if len(left_tokens) > 1 and len(right_tokens) > 1:
+                if left_tokens.intersection(right_tokens):
+                    return True
+
+        similarity = difflib.SequenceMatcher(None, left_norm, right_norm).ratio()
+        return similarity >= 0.75
+
     def add_entity(self, name: str, category: str, desc: str = "") -> Optional[Entity]:
         """Smart Add with Fuzzy Matching."""
         clean_name = (name or "").strip()
@@ -403,8 +455,18 @@ class Project:
 
         for ent in self.world_db.values():
             if ent.category == category:
-                similarity = difflib.SequenceMatcher(None, ent.name.lower(), clean_name.lower()).ratio()
-                if similarity > 0.80:
+                candidates = self._entity_aliases(ent.name)
+                incoming_aliases = self._entity_aliases(clean_name)
+                if not candidates:
+                    candidates = [ent.name]
+                if not incoming_aliases:
+                    incoming_aliases = [clean_name]
+                matched = any(
+                    self._names_match(candidate, incoming)
+                    for candidate in candidates
+                    for incoming in incoming_aliases
+                )
+                if matched:
                     ent.merge(desc)
                     self.last_modified = time.time()
                     return ent
@@ -1364,7 +1426,7 @@ def _run_ui():
                         MANTIS Studio
                     </div>
                     <div class="mantis-header-sub">
-                        Story OS for immersive drafting
+                        Modular AI Narrative Text Intelligence System
                     </div>
                 </div>
             </div>
