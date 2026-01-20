@@ -2542,124 +2542,223 @@ def _run_ui():
             st.info("No project loaded.")
 
     def render_home():
-        # ---- Small compat helpers ----
-        def _btn(label, *, key, primary=False):
-            return st.button(
-                label,
-                key=key,
-                type=("primary" if primary else "secondary"),
-                width="stretch",
+        active_dir = get_active_projects_dir()
+        recent_projects = _load_recent_projects(active_dir)
+        recent_snapshot = _project_snapshot(recent_projects[0]["meta"]) if recent_projects else None
+        has_project = bool(recent_projects)
+        has_outline = any((p["meta"].get("outline") or "").strip() for p in recent_projects)
+        has_chapter = any(
+            (c.get("word_count") or 0) > 0
+            for p in recent_projects
+            for c in (p["meta"].get("chapters") or {}).values()
+        )
+
+        active_project = st.session_state.project
+        project_title = (
+            (active_project.title if active_project else None)
+            or (recent_snapshot or {}).get("title")
+            or "Your next story"
+        )
+        weekly_goal = max(1, int(st.session_state.weekly_sessions_goal))
+        weekly_count = _weekly_activity_count()
+        canon_icon, _ = get_canon_health()
+        latest_chapter_label = "You last worked on Chapter — · recently"
+        latest_chapter_index = None
+        latest_chapter_id = None
+        latest_chapter_ts = None
+        if active_project and active_project.chapters:
+            latest_chapter = max(
+                active_project.chapters.values(),
+                key=lambda c: c.modified_at or c.created_at,
             )
 
         def _pill(label, *, key):
             return st.button(label, key=key, width="stretch")
 
-        def _go(page: str, **state):
-            for k, v in state.items():
-                st.session_state[k] = v
-            st.session_state.page = page
-            st.rerun()
+        with st.container(border=True):
+            st.markdown("### 👋 Welcome back")
+            st.markdown(f"## {project_title}")
+            st.caption(latest_chapter_label)
 
-        st.markdown("# 🏠 Home")
+        st.markdown("#### Quick actions")
+        quick_cols = st.columns(3)
+        with quick_cols[0]:
+            if st.button("🌍 World Bible", key="qa_world_bible", width="stretch"):
+                if recent_projects and not st.session_state.project:
+                    st.session_state.project = Project.load(recent_projects[0]["path"])
+                st.session_state.page = "world"
+                st.rerun()
+        with quick_cols[1]:
+            if st.button("🧠 Memory", key="qa_memory", width="stretch"):
+                if recent_projects and not st.session_state.project:
+                    st.session_state.project = Project.load(recent_projects[0]["path"])
+                st.session_state.page = "world"
+                st.rerun()
+        with quick_cols[2]:
+            if st.button("📈 Insights", key="qa_insights", width="stretch"):
+                if recent_projects and not st.session_state.project:
+                    st.session_state.project = Project.load(recent_projects[0]["path"])
+                st.session_state.page = "world"
+                st.rerun()
+
+        primary_label = "✨ Start your story"
+        primary_target = "projects"
+        if canon_icon == "🔴":
+            primary_label = "🛠 Fix story issues"
+            primary_target = "world"
+        elif has_chapter and latest_chapter_index:
+            primary_label = f"▶ Continue writing Chapter {latest_chapter_index}"
+            primary_target = "chapters"
+        elif has_outline:
+            primary_label = "📝 Build your outline"
+            primary_target = "outline"
+
+        primary_cols = st.columns([1, 2, 1])
+        with primary_cols[1]:
+            if st.button(primary_label, type="primary", width="stretch"):
+                if recent_projects and not st.session_state.project:
+                    st.session_state.project = Project.load(recent_projects[0]["path"])
+                if primary_target == "chapters" and latest_chapter_id:
+                    st.session_state.curr_chap_id = latest_chapter_id
+                st.session_state.page = primary_target
+                st.rerun()
+
+        nav_row_one = st.columns(2)
+        with nav_row_one[0]:
+            with st.container(border=True):
+                st.markdown("### 🌍 World Bible")
+                st.caption("Characters, places, factions, and lore")
+                if st.button("Open", key="nav_world", width="stretch"):
+                    if recent_projects and not st.session_state.project:
+                        st.session_state.project = Project.load(recent_projects[0]["path"])
+                    st.session_state.page = "world"
+                    st.rerun()
+        with nav_row_one[1]:
+            with st.container(border=True):
+                st.markdown("### 📝 Outline")
+                st.caption("Blueprint your story beats and arcs")
+                if st.button("Open", key="nav_outline", width="stretch"):
+                    if recent_projects and not st.session_state.project:
+                        st.session_state.project = Project.load(recent_projects[0]["path"])
+                    st.session_state.page = "outline"
+                    st.rerun()
+
+        nav_row_two = st.columns(2)
+        with nav_row_two[0]:
+            with st.container(border=True):
+                st.markdown("### 🧠 Memory")
+                st.caption("Canon rules, guidance, and style notes")
+                if st.button("Open", key="nav_memory", width="stretch"):
+                    if recent_projects and not st.session_state.project:
+                        st.session_state.project = Project.load(recent_projects[0]["path"])
+                    st.session_state.page = "world"
+                    st.rerun()
+        with nav_row_two[1]:
+            with st.container(border=True):
+                st.markdown("### 📊 Insights")
+                st.caption("Analytics and canon health insights")
+                if st.button("Open", key="nav_analytics", width="stretch"):
+                    if recent_projects and not st.session_state.project:
+                        st.session_state.project = Project.load(recent_projects[0]["path"])
+                    st.session_state.page = "world"
+                    st.rerun()
 
         project = st.session_state.get("project", None)
         project_title = getattr(project, "title", None) or "No active project"
 
-        last_label = ""
-        try:
-            chapters = list(getattr(project, "chapters", {}).values()) if project else []
-            if chapters:
-                last = chapters[-1]
-                last_name = getattr(last, "title", "a chapter") or "a chapter"
-                last_label = f"Last worked on **{last_name}**"
-        except Exception:
-            last_label = ""
+        with st.container(border=True):
+            st.markdown("#### Project actions")
+            action_cols = st.columns(3)
+            with action_cols[0]:
+                if st.button(
+                    "📂 Resume",
+                    width="stretch",
+                    disabled=not recent_projects,
+                ):
+                    if recent_projects:
+                        st.session_state.project = Project.load(recent_projects[0]["path"])
+                        st.session_state.page = "chapters"
+                        st.rerun()
+            with action_cols[1]:
+                if st.button("🧭 New project", width="stretch"):
+                    st.session_state.page = "projects"
+                    st.rerun()
+            with action_cols[2]:
+                if st.button(
+                    "🧩 Open outline",
+                    width="stretch",
+                    disabled=not recent_projects,
+                ):
+                    if recent_projects:
+                        st.session_state.project = Project.load(recent_projects[0]["path"])
+                        st.session_state.page = "outline"
+                        st.rerun()
+
+            st.markdown("#### Workspace snapshot")
+            snapshot_cols = st.columns(3)
+            snapshot_cols[0].metric("Active projects", len(recent_projects))
+            snapshot_cols[1].metric("Latest genre", (recent_snapshot or {}).get("genre", "—"))
+            snapshot_cols[2].metric("Weekly sessions", f"{weekly_count}/{weekly_goal}")
 
         with st.container(border=True):
-            c1, c2 = st.columns([3, 1], vertical_alignment="center")
+            st.markdown("### 🧭 Getting started")
+            completed_steps = sum([has_project, has_outline, has_chapter])
+            progress = completed_steps / 3
+            st.progress(progress, text=f"{completed_steps}/3 steps complete")
 
-            with c1:
-                if project:
-                    st.markdown(f"### 👋 Welcome back\n**{project_title}**")
-                    if last_label:
-                        st.caption(last_label)
-                else:
-                    st.markdown("### 👋 Welcome to MANTIS Studio")
-                    st.caption("Pick a project to start writing.")
+            onboarding_text = """
+**MANTIS** mirrors a focused studio: a clean writing surface, memory tools,
+and quick start modules so you can draft fast and refine later.
 
-            with c2:
-                if project:
-                    if _btn("▶ Continue writing", key="home_continue", primary=True):
-                        _go("chapters")
-                else:
-                    if _btn("✨ Start a project", key="home_start_project", primary=True):
-                        _go("projects")
+**Quick path**
+1) Create a project  
+2) Build a structured outline or lore entries  
+3) Draft chapters with AI assists on demand
+"""
+            if st.session_state.get("first_run", True):
+                st.markdown(onboarding_text)
+                c1, c2, c3 = st.columns([1, 1, 2])
+                with c1:
+                    if st.button("✅ Got it", type="primary", width="stretch"):
+                        st.session_state.first_run = False
+                        st.rerun()
+                with c2:
+                    if st.button("📌 Keep showing", width="stretch"):
+                        st.toast("Welcome panel will keep showing.")
+                with c3:
+                    st.caption("Tip: If the AI model shows Offline, confirm your Groq API key and model access.")
 
-        st.markdown("## Quick actions")
+            cta_label = "🧭 Start a project"
+            cta_target = "projects"
+            if has_project and not has_outline:
+                cta_label = "📝 Draft your outline"
+                cta_target = "outline"
+            elif has_outline and not has_chapter:
+                cta_label = "▶ Write your first chapter"
+                cta_target = "chapters"
+            elif canon_icon == "🔴":
+                cta_label = "🛠 Review canon issues"
+                cta_target = "world"
 
-        qa = st.columns(3)
-        with qa[0]:
-            if _pill("🌍 World Bible", key="home_qa_world"):
-                _go("world", world_focus_tab="Characters")
-        with qa[1]:
-            if _pill("🧠 Memory", key="home_qa_memory"):
-                _go("world", world_focus_tab="Memory")
-        with qa[2]:
-            if _pill("📈 Insights", key="home_qa_insights"):
-                _go("world", world_focus_tab="Analytics")
+            if st.button(cta_label, type="primary", width="stretch"):
+                if recent_projects and not st.session_state.project:
+                    st.session_state.project = Project.load(recent_projects[0]["path"])
+                st.session_state.page = cta_target
+                st.rerun()
 
-        st.markdown("## Workspace")
-
-        m1, m2 = st.columns(2)
-        with m1:
+        if not st.session_state.groq_api_key or not st.session_state.openai_api_key:
             with st.container(border=True):
-                st.markdown("### ✍️ Editor")
-                st.caption("Write and revise chapters.")
-                if _btn("Open Editor", key="home_open_editor", primary=True):
-                    _go("chapters")
-
-            with st.container(border=True):
-                st.markdown("### 🧩 Outline")
-                st.caption("Plan beats, arcs, and structure.")
-                if _btn("Open Outline", key="home_open_outline"):
-                    _go("outline")
-
-        with m2:
-            with st.container(border=True):
-                st.markdown("### 🗂️ Projects")
-                st.caption("Switch or create projects.")
-                if _btn("Open Projects", key="home_open_projects"):
-                    _go("projects")
-
-            with st.container(border=True):
-                st.markdown("### 🤖 AI Tools")
-                st.caption("Generate, refine, and assist.")
-                if _btn("Open AI Tools", key="home_open_ai"):
-                    _go("ai")
-
-        st.markdown("## Your world at a glance")
-        with st.container(border=True):
-            ent_total = 0
-            breakdown = ""
-            try:
-                wb_entries = list(project.world_db.values()) if project else []
-                counts: Dict[str, int] = {}
-                for ent in wb_entries:
-                    category = Project._normalize_category(ent.category)
-                    counts[category] = counts.get(category, 0) + 1
-                ent_total = sum(counts.values())
-                breakdown = ", ".join(
-                    f"{cat} ({count})" for cat, count in counts.items() if count
-                )
-            except Exception:
-                breakdown = ""
-
-            cols = st.columns(3)
-            cols[0].metric("Entities", ent_total)
-            cols[1].metric("Active project", "Yes" if project else "No")
-            cols[2].metric("Categories", breakdown if breakdown else "—")
-
-        st.write("")
+                st.markdown("### 🔑 Connect your AI providers")
+                st.caption("Unlock generation, summaries, and entity tools with API access.")
+                cta_left, cta_right = st.columns(2)
+                with cta_left:
+                    st.link_button("Create Groq Account", "https://console.groq.com/keys", width="stretch")
+                with cta_right:
+                    st.link_button(
+                        "Create OpenAI Account",
+                        "https://platform.openai.com/api-keys",
+                        width="stretch",
+                    )
 
 
     def render_projects():
@@ -2883,11 +2982,10 @@ def _run_ui():
                         save_p()
                         st.rerun()
 
-    def build_expander_label(label: str, idx: int) -> str:
-        cleaned = (label or "").strip()
-        if not cleaned:
-            cleaned = "Untitled"
-        return f"{idx + 1}. {cleaned}"
+    def build_expander_label(base: str, suffix: Optional[str] = None) -> str:
+        if suffix:
+            return f"{base} · {suffix}"
+        return base
 
     def render_world():
         p = st.session_state.project
@@ -3080,7 +3178,7 @@ def _run_ui():
                 st.caption("AI suggestions are queued for review. Apply to update canon.")
                 for idx, item in enumerate(list(review_queue)):
                     label = f"{item.get('name', 'Unnamed')} • {item.get('category', 'Lore')}"
-                    expander_label = build_expander_label(label, idx)
+                    expander_label = build_expander_label(label, str(idx))
                     with st.expander(expander_label):
                         st.markdown(f"**Type:** {item.get('type', 'new').title()}")
                         confidence = item.get("confidence")
@@ -3224,8 +3322,9 @@ def _run_ui():
                         if issues:
                             st.caption(f"⚠️ {' • '.join(issues)}")
 
-                        expander_label = build_expander_label(e.name, idx)
-                        with st.expander(expander_label, expanded=e.id == focus_entity):
+                        detail_suffix = f"{e.name} ({e.id})" if e.id else e.name
+                        detail_label = build_expander_label("Details", detail_suffix)
+                        with st.expander(detail_label, expanded=e.id == focus_entity):
                             c1, c2 = st.columns([4, 1])
                             new_desc = c1.text_area("Notes", e.description, key=f"desc_{e.id}", height=140)
                             if new_desc != e.description:
