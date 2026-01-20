@@ -3311,7 +3311,7 @@ and quick start modules so you can draft fast and refine later.
 
                 ents = sorted(ents, key=lambda ent: (ent.name or "").lower())
 
-                for e in ents:
+                for idx, e in enumerate(ents):
                     mention_count = mention_counts.get(e.id, 0)
                     is_orphaned = e.id in orphaned_ids
                     is_under_described = e.id in under_described_ids
