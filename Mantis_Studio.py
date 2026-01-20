@@ -782,6 +782,26 @@ class AIEngine:
             return []
 
     def generate_stream(self, prompt: str, model: str) -> Generator[str, None, None]:
+        if "streamlit" in sys.modules:
+            import streamlit as st
+
+            results = st.session_state.get("coherence_results", [])
+            if len(results) > 2:
+                yield (
+                    "ERROR: Canon violation detected.\n"
+                    "Resolve Hard Canon conflicts before generating AI content."
+                )
+                return
+            project = st.session_state.get("project")
+            hard_rules = ""
+            if project:
+                hard_rules = (project.memory_hard or project.memory or "").strip()
+            if hard_rules:
+                prompt = (
+                    "HARD CANON RULES (NON-NEGOTIABLE):\n"
+                    f"{hard_rules}\n\n"
+                    f"{prompt}"
+                )
         if not model:
             yield "Groq model not configured."
             return
@@ -3274,6 +3294,7 @@ and quick start modules so you can draft fast and refine later.
                                     p.save()
                                     results.pop(idx)
                                     st.session_state["coherence_results"] = results
+                                    update_locked_chapters()
                                     st.toast("Applied fix.")
                                     st.rerun()
                                 else:
@@ -3282,6 +3303,7 @@ and quick start modules so you can draft fast and refine later.
                             if st.button("🗑 Ignore", key=f"coh_ignore_{idx}", width="stretch"):
                                 results.pop(idx)
                                 st.session_state["coherence_results"] = results
+                                update_locked_chapters()
                                 st.toast("Issue ignored.")
                                 st.rerun()
         with t6:
@@ -3426,6 +3448,7 @@ and quick start modules so you can draft fast and refine later.
             st.session_state.curr_chap_id = chaps[0].id
 
         curr = p.chapters[st.session_state.curr_chap_id]
+        locked_chapters = st.session_state.get("locked_chapters", set())
         # --- SAFELY sync programmatic chapter updates into the editor widget (before widget exists)
         ed_key = f"ed_{curr.id}"
         if (
@@ -3501,20 +3524,44 @@ and quick start modules so you can draft fast and refine later.
                         st.toast("Chapter Saved & Entities Scanned")
                 with c2:
                     if st.button("📝 Update Summary", width="stretch"):
-                        curr.summary = StoryEngine.summarize(curr.content or "", get_ai_model())
-                        p.save()
-                        st.rerun()
+                        summary = StoryEngine.summarize(curr.content or "", get_ai_model())
+                        if summary.strip().startswith("ERROR: Canon violation detected."):
+                            st.error("Canon violation detected. Resolve issues before generating AI content.")
+                        else:
+                            curr.summary = summary
+                            p.save()
+                            st.rerun()
 
                 with st.expander("✨ Modify / Improve Text"):
-                    style = st.selectbox("How to improve?", list(REWRITE_PRESETS.keys()))
-                    cust = st.text_input("Instructions") if style == "Custom" else ""
-                    if st.button("Apply Changes", width="stretch"):
+                    rewrite_locked = curr.index in locked_chapters
+                    style = st.selectbox(
+                        "How to improve?",
+                        list(REWRITE_PRESETS.keys()),
+                        disabled=rewrite_locked,
+                    )
+                    cust = ""
+                    if style == "Custom":
+                        cust = st.text_input("Instructions", disabled=rewrite_locked)
+                    if rewrite_locked:
+                        st.caption("🔒 Rewrite tools are disabled for locked chapters.")
+                    if st.button("Apply Changes", width="stretch", disabled=rewrite_locked):
                         prompt = rewrite_prompt(curr.content or "", style, cust)
                         st.session_state.ghost_text = ""
                         full = ""
                         for chunk in AIEngine().generate_stream(prompt, get_ai_model()):
                             full += chunk
                             stream_ph.markdown(f"**IMPROVING:**\n\n{full}")
+                        if full.strip().startswith("ERROR: Canon violation detected."):
+                            st.error("Canon violation detected. Resolve issues before generating AI content.")
+                            return
+                        violations = detect_hard_canon_violation(p, curr.index, full)
+                        if violations:
+                            results = st.session_state.get("coherence_results", [])
+                            results.extend(violations)
+                            st.session_state["coherence_results"] = results
+                            update_locked_chapters()
+                            st.warning("Hard Canon conflict detected. AI output was not applied.")
+                            return
                         st.session_state.ghost_text = full
 
         with col_ai:
@@ -3539,6 +3586,17 @@ and quick start modules so you can draft fast and refine later.
                         stream_ph.markdown(f"**GENERATING:**\n\n{full}")
 
                     if full.strip():
+                        if full.strip().startswith("ERROR: Canon violation detected."):
+                            st.error("Canon violation detected. Resolve issues before generating AI content.")
+                            return
+                        violations = detect_hard_canon_violation(p, curr.index, full)
+                        if violations:
+                            results = st.session_state.get("coherence_results", [])
+                            results.extend(violations)
+                            st.session_state["coherence_results"] = results
+                            update_locked_chapters()
+                            st.warning("Hard Canon conflict detected. AI output was not applied.")
+                            return
                         new_text = ((curr.content or "") + "\n" + full.strip()).strip()
                         curr.update_content(new_text, "AI Auto-Write")
                         p.save()
