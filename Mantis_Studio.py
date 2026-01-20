@@ -2761,54 +2761,64 @@ def _run_ui():
                 )
 
         with st.container(border=True):
-            st.markdown("### 🧭 Guided first session")
-            st.caption("Complete these steps to unlock the full studio workflow.")
-            progress = sum([has_project, has_outline, has_chapter]) / 3
-            st.progress(progress, text=f"{sum([has_project, has_outline, has_chapter])}/3 steps complete")
-            s1, s2, s3 = st.columns([1.2, 1.2, 1.4])
-            with s1:
+            st.markdown("#### Studio signals")
+            st.caption("Model, storage, and AI readiness at a glance.")
+            status_card = st.container(border=True)
+            with status_card:
+                groq_status = "Connected" if st.session_state.groq_api_key else "Add key"
+                openai_status = "Connected" if st.session_state.openai_api_key else "Add key"
+                st.metric("Groq", groq_status)
+                st.metric("OpenAI", openai_status)
+                st.metric("Model", st.session_state.groq_model or AppConfig.DEFAULT_MODEL)
+                st.caption(f"Projects dir: `{active_dir}`")
+
+            st.markdown("#### Next milestones")
+            st.caption("Keep the studio healthy with these quick checks.")
+            milestone_col = st.container(border=True)
+            with milestone_col:
                 st.checkbox(
                     "Create a project",
                     value=has_project,
                     disabled=True,
-                    key="guided_create_project",
+                    key="milestone_create_project",
                 )
-                if not has_project:
-                    if st.button("Start here", type="primary", width="stretch"):
-                        st.session_state.page = "projects"
-                        st.rerun()
-            with s2:
                 st.checkbox(
                     "Draft an outline",
                     value=has_outline,
                     disabled=True,
-                    key="guided_draft_outline",
+                    key="milestone_draft_outline",
                 )
-                if has_project and not has_outline:
-                    if st.button("Open outline", width="stretch"):
-                        st.session_state.project = Project.load(recent_projects[0]["path"])
-                        st.session_state.page = "outline"
-                        st.rerun()
-            with s3:
                 st.checkbox(
                     "Write a chapter",
                     value=has_chapter,
                     disabled=True,
-                    key="guided_write_chapter",
+                    key="milestone_write_chapter",
                 )
-                if has_project and not has_chapter:
-                    if st.button("Start writing", width="stretch"):
-                        st.session_state.project = Project.load(recent_projects[0]["path"])
-                        st.session_state.page = "chapters"
-                        st.rerun()
 
-        onboarding_left, onboarding_right = st.columns([1.4, 1])
-        with onboarding_left:
-            if st.session_state.get("first_run", True):
-                with st.container(border=True):
-                    st.markdown("### 👋 First time here?")
-                    st.markdown(
-                        """
+        with st.container(border=True):
+            st.markdown("### ✨ Welcome to your writing nook")
+            canon_status = "steady" if canon_icon == "🟢" else "needs a quick review"
+            encouragements = [
+                "Small steps today add up to big chapters tomorrow.",
+                "You’ve already done the hardest part — showing up.",
+                "Let’s keep the story cozy and consistent.",
+                "A few focused minutes can move the whole draft forward.",
+            ]
+            completed_steps = sum([has_project, has_outline, has_chapter])
+            st.caption(encouragements[completed_steps % len(encouragements)])
+
+            st.caption(f"• Project setup: {completed_steps}/3 steps complete")
+            st.caption(f"• Canon status: {canon_status}")
+
+            st.caption("Soft checklist")
+            st.caption(f"• Create a project{' ✅' if has_project else ''}")
+            st.caption(f"• Draft an outline{' ✅' if has_outline else ''}")
+            st.caption(f"• Write a chapter{' ✅' if has_chapter else ''}")
+
+            progress = completed_steps / 3
+            st.progress(progress, text=f"{completed_steps}/3 steps complete")
+
+            onboarding_text = """
 **MANTIS** mirrors a focused NovelAI-style studio: a clean writing surface, memory tools,
 and quick start modules so you can draft fast and refine later.
 
@@ -2817,32 +2827,50 @@ and quick start modules so you can draft fast and refine later.
 2) Build a structured outline or lore entries  
 3) Draft chapters with AI assists on demand
 """
-                    )
-                    c1, c2, c3 = st.columns([1, 1, 2])
-                    with c1:
-                        if st.button("✅ Got it", type="primary", width="stretch"):
-                            st.session_state.first_run = False
-                            st.rerun()
-                    with c2:
-                        if st.button("📌 Keep showing", width="stretch"):
-                            st.toast("Welcome panel will keep showing.")
-                    with c3:
-                        st.caption("Tip: If the AI model shows Offline, confirm your Groq API key and model access.")
+            if st.session_state.get("first_run", True):
+                st.markdown(onboarding_text)
+                c1, c2, c3 = st.columns([1, 1, 2])
+                with c1:
+                    if st.button("✅ Got it", type="primary", width="stretch"):
+                        st.session_state.first_run = False
+                        st.rerun()
+                with c2:
+                    if st.button("📌 Keep showing", width="stretch"):
+                        st.toast("Welcome panel will keep showing.")
+                with c3:
+                    st.caption("Tip: If the AI model shows Offline, confirm your Groq API key and model access.")
 
-        with onboarding_right:
+            cta_label = "🧭 Start a project"
+            cta_target = "projects"
+            if has_project and not has_outline:
+                cta_label = "📝 Draft your outline"
+                cta_target = "outline"
+            elif has_outline and not has_chapter:
+                cta_label = "▶ Write your first chapter"
+                cta_target = "chapters"
+            elif canon_icon == "🔴":
+                cta_label = "🛠 Review canon issues"
+                cta_target = "world"
+
+            if st.button(cta_label, type="primary", width="stretch"):
+                if recent_projects and not st.session_state.project:
+                    st.session_state.project = Project.load(recent_projects[0]["path"])
+                st.session_state.page = cta_target
+                st.rerun()
+
             if not st.session_state.groq_api_key or not st.session_state.openai_api_key:
-                with st.container(border=True):
-                    st.markdown("### 🔑 Connect your AI providers")
-                    st.caption("Unlock generation, summaries, and entity tools with API access.")
-                    cta_left, cta_right = st.columns(2)
-                    with cta_left:
-                        st.link_button("Create Groq Account", "https://console.groq.com/keys", width="stretch")
-                    with cta_right:
-                        st.link_button(
-                            "Create OpenAI Account",
-                            "https://platform.openai.com/api-keys",
-                            width="stretch",
-                        )
+                st.divider()
+                st.markdown("### 🔑 Connect your AI providers")
+                st.caption("Unlock generation, summaries, and entity tools with API access.")
+                cta_left, cta_right = st.columns(2)
+                with cta_left:
+                    st.link_button("Create Groq Account", "https://console.groq.com/keys", width="stretch")
+                with cta_right:
+                    st.link_button(
+                        "Create OpenAI Account",
+                        "https://platform.openai.com/api-keys",
+                        width="stretch",
+                    )
 
         with st.container(border=True):
             st.markdown("### 🚀 Creator Momentum")
