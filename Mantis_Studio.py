@@ -23,6 +23,7 @@
 import os
 import re
 import json
+import random
 import time
 import datetime
 import uuid
@@ -1071,9 +1072,9 @@ def _run_ui():
             "primary_hover_border": "#16a34a",
             "card_bg": "#ffffff",
             "card_border": "#e1efe6",
-            "sidebar_bg": "linear-gradient(180deg, #f1f7f3, #e7f4ed)",
-            "sidebar_border": "#dbeee2",
-            "sidebar_title": "#1f7a4f",
+            "sidebar_bg": "linear-gradient(180deg, #f3f4f6, #e5e7eb)",
+            "sidebar_border": "#d1d5db",
+            "sidebar_title": "#166534",
             "divider": "#deeee3",
             "expander_border": "#d7e9df",
             "header_gradient": "linear-gradient(135deg, #e6f9ef, #c7f4dc)",
@@ -1081,9 +1082,9 @@ def _run_ui():
             "header_sub": "#2f6f43",
             "shadow_strong": "0 12px 24px rgba(12,26,18,0.08)",
             "shadow_button": "0 8px 16px rgba(12,26,18,0.12)",
-            "sidebar_brand_bg": "linear-gradient(180deg, rgba(241,251,245,0.95), rgba(226,245,236,0.95))",
-            "sidebar_brand_border": "rgba(21,128,61,0.18)",
-            "sidebar_logo_bg": "rgba(15,23,42,0.06)",
+            "sidebar_brand_bg": "linear-gradient(180deg, rgba(255,255,255,0.9), rgba(243,244,246,0.95))",
+            "sidebar_brand_border": "rgba(15,23,42,0.08)",
+            "sidebar_logo_bg": "rgba(15,23,42,0.08)",
             "accent": "#22c55e",
             "accent_soft": "rgba(34,197,94,0.18)",
             "accent_glow": "rgba(34,197,94,0.35)",
@@ -1144,7 +1145,31 @@ def _run_ui():
     .block-container {{ padding-top: 2.6rem; padding-bottom: 2.6rem; max-width: 1380px; }}
     header[data-testid="stHeader"] {{ height: 2.6rem; }}
     h1, h2, h3 {{ letter-spacing: -0.02em; font-family: 'Space Grotesk', sans-serif; }}
-    .stTextInput input, .stSelectbox div, .stNumberInput input {{ background-color: var(--mantis-input-bg) !important; color: var(--mantis-text) !important; border: 1px solid var(--mantis-input-border) !important; }}
+    .stTextInput input,
+    .stNumberInput input,
+    .stSelectbox div[data-baseweb="select"] > div,
+    .stMultiSelect div[data-baseweb="select"] > div {{
+        background-color: var(--mantis-input-bg) !important;
+        color: var(--mantis-text) !important;
+        border: 1px solid var(--mantis-input-border) !important;
+    }}
+    div[data-baseweb="select"] input {{
+        color: var(--mantis-text) !important;
+    }}
+    div[data-baseweb="select"] span {{
+        color: var(--mantis-text) !important;
+    }}
+    div[data-baseweb="menu"] {{
+        background: var(--mantis-card-bg) !important;
+        border: 1px solid var(--mantis-card-border) !important;
+    }}
+    div[data-baseweb="option"] {{
+        color: var(--mantis-text) !important;
+        background: transparent !important;
+    }}
+    div[data-baseweb="option"]:hover {{
+        background: var(--mantis-accent-soft) !important;
+    }}
     .stTextArea textarea {{ background-color: var(--mantis-input-bg) !important; color: var(--mantis-text) !important; font-family: 'Crimson Pro', serif !important; font-size: 18px !important; line-height: 1.65 !important; border: 1px solid var(--mantis-input-border) !important; }}
 
     .mantis-muted {{ color: var(--mantis-muted); }}
@@ -1355,6 +1380,11 @@ def _run_ui():
         text-transform: uppercase;
         font-size: 12px;
     }}
+    section[data-testid="stSidebar"] .stMarkdown,
+    section[data-testid="stSidebar"] p,
+    section[data-testid="stSidebar"] label {{
+        color: var(--mantis-text);
+    }}
 
 
     /* --- SIDEBAR BRAND --- */
@@ -1406,6 +1436,9 @@ def _run_ui():
         border-radius: 12px;
         border: 1px solid var(--mantis-card-border);
         margin-bottom: 8px;
+    }}
+    div[role="radiogroup"] > label span {{
+        color: var(--mantis-text);
     }}
     div[role="radiogroup"] > label:has(input:checked) {{
         border-color: var(--mantis-accent);
@@ -1834,6 +1867,80 @@ def _run_ui():
             "words": word_count,
             "modified_at": meta.get("last_modified") or meta.get("modified_at"),
         }
+
+    def _random_project_title() -> str:
+        adjectives = [
+            "Ashen",
+            "Verdant",
+            "Crimson",
+            "Celestial",
+            "Obsidian",
+            "Luminous",
+            "Forgotten",
+            "Gilded",
+            "Veiled",
+            "Hollow",
+            "Radiant",
+            "Stormbound",
+            "Ivory",
+            "Eclipsed",
+            "Thorned",
+            "Mythic",
+        ]
+        nouns = [
+            "Crown",
+            "Archive",
+            "Sanctum",
+            "Labyrinth",
+            "Harbor",
+            "Citadel",
+            "Oath",
+            "Chronicle",
+            "Constellation",
+            "Axiom",
+            "Ember",
+            "Signal",
+            "Throne",
+            "Vesper",
+            "Pulse",
+            "Emissary",
+        ]
+        suffixes = [
+            "of Hollowlight",
+            "of the Verdant Sea",
+            "of the Last Meridian",
+            "of Emberglass",
+            "of the Drowned Sky",
+            "of Ironfall",
+            "of the Crystal District",
+            "of Midnight Bloom",
+            "of the Sunken Choir",
+            "of Starward",
+        ]
+        return f"The {random.choice(adjectives)} {random.choice(nouns)} {random.choice(suffixes)}"
+
+    def _random_project_genres() -> str:
+        genres = [
+            "Solarpunk",
+            "Mythic Fantasy",
+            "Cosmic Horror",
+            "Techno-Thriller",
+            "Romantic Suspense",
+            "Gaslamp Adventure",
+            "Urban Fantasy",
+            "Dark Academia",
+            "Political Intrigue",
+            "Epic Fantasy",
+            "Noir Mystery",
+            "Found Family",
+            "Post-Apocalyptic",
+            "Speculative Romance",
+            "Spy Drama",
+            "Weird Western",
+        ]
+        genre_count = min(4, len(genres))
+        picks = random.sample(genres, k=genre_count)
+        return " · ".join(picks)
 
     def test_groq_connection(base_url: str, api_key: str) -> bool:
         headers = {}
@@ -2489,26 +2596,14 @@ and quick start modules so you can draft fast and refine later.
                 a = st.text_input("Author (optional)", placeholder="Your name")
                 submitted = st.form_submit_button("🚀 Initialize Project", type="primary", use_container_width=True)
                 if submitted:
-                    # If title or genre are missing, try to use AI to fill them in.
-                    if not t or not g:
-                        try:
-                            with st.spinner("Generating missing title/genre using AI..."):
-                                outline_hint = "A new story project with mystery and character development."
-                                model = get_ai_model()
-                                if not t:
-                                    t = AnalysisEngine.generate_title(outline_hint, g or "General Fiction", model)
-                                if not g:
-                                    detected = AnalysisEngine.detect_genre(outline_hint, model) or ""
-                                    g = detected or (g or "General Fiction")
-                                st.toast("AI filled missing fields")
-                        except Exception as e:
-                            logger.warning("AI title/genre helper failed", exc_info=True)
-                            st.warning(f"AI title/genre helper failed: {e}")
-                    # Fall back to defaults if still empty
+                    if not t:
+                        t = _random_project_title()
+                    if not g:
+                        g = _random_project_genres()
                     p = Project.create(
                         t,
                         author=a,
-                        genre=g or "General Fiction",
+                        genre=g,
                         storage_dir=get_active_projects_dir(),
                     )
                     p.save()
