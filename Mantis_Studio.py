@@ -2676,11 +2676,6 @@ def _run_ui():
             )
             st.caption(f"• Things to review: {things_to_review}")
 
-        if st.session_state.activity_log:
-            st.markdown("### ✨ Recent moments")
-            for entry in list(reversed(st.session_state.activity_log))[:5]:
-                st.caption(f"• Writing session logged on {entry}")
-
         with st.container(border=True):
             st.markdown("#### Quick actions")
             action_cols = st.columns(3)
@@ -2716,25 +2711,8 @@ def _run_ui():
             snapshot_cols[2].metric("Weekly sessions", f"{weekly_count}/{weekly_goal}")
 
         with st.container(border=True):
-            st.markdown("### ✨ Welcome to your writing nook")
-            canon_status = "steady" if canon_icon == "🟢" else "needs a quick review"
-            encouragements = [
-                "Small steps today add up to big chapters tomorrow.",
-                "You’ve already done the hardest part — showing up.",
-                "Let’s keep the story cozy and consistent.",
-                "A few focused minutes can move the whole draft forward.",
-            ]
+            st.markdown("### 🧭 Getting started")
             completed_steps = sum([has_project, has_outline, has_chapter])
-            st.caption(encouragements[completed_steps % len(encouragements)])
-
-            st.caption(f"• Project setup: {completed_steps}/3 steps complete")
-            st.caption(f"• Canon status: {canon_status}")
-
-            st.caption("Soft checklist")
-            st.caption(f"• Create a project{' ✅' if has_project else ''}")
-            st.caption(f"• Draft an outline{' ✅' if has_outline else ''}")
-            st.caption(f"• Write a chapter{' ✅' if has_chapter else ''}")
-
             progress = completed_steps / 3
             st.progress(progress, text=f"{completed_steps}/3 steps complete")
 
