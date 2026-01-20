@@ -2602,8 +2602,6 @@ def _run_ui():
         with st.container(border=True):
             st.markdown("### 👋 Welcome back")
             st.markdown(f"## {project_title}")
-            st.caption(canon_line)
-            st.caption(ai_ready)
             st.caption(latest_chapter_label)
 
         primary_label = "✨ Start your story"
