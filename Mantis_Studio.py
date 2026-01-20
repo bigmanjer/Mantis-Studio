@@ -2559,6 +2559,10 @@ def _run_ui():
             for c in (p["meta"].get("chapters") or {}).values()
         )
 
+        def milestone_row(done: bool, label: str):
+            icon = "✅" if done else "⬜"
+            st.markdown(f"{icon} {label}")
+
         active_project = st.session_state.project
         project_title = (
             (active_project.title if active_project else None)
@@ -2737,28 +2741,12 @@ def _run_ui():
                 st.metric("Model", st.session_state.groq_model or AppConfig.DEFAULT_MODEL)
                 st.caption(f"Projects dir: `{active_dir}`")
 
-            st.markdown("#### Next milestones")
-            st.caption("Keep the studio healthy with these quick checks.")
+            st.markdown("#### 🧭 Studio setup")
             milestone_col = st.container(border=True)
             with milestone_col:
-                st.checkbox(
-                    "Create a project",
-                    value=has_project,
-                    disabled=True,
-                    key="milestone_create_project",
-                )
-                st.checkbox(
-                    "Draft an outline",
-                    value=has_outline,
-                    disabled=True,
-                    key="milestone_draft_outline",
-                )
-                st.checkbox(
-                    "Write a chapter",
-                    value=has_chapter,
-                    disabled=True,
-                    key="milestone_write_chapter",
-                )
+                milestone_row(has_project, "Create a project")
+                milestone_row(has_outline, "Draft an outline")
+                milestone_row(has_chapter, "Write a chapter")
 
         with st.container(border=True):
             st.markdown("#### Studio signals")
@@ -2772,28 +2760,12 @@ def _run_ui():
                 st.metric("Model", st.session_state.groq_model or AppConfig.DEFAULT_MODEL)
                 st.caption(f"Projects dir: `{active_dir}`")
 
-            st.markdown("#### Next milestones")
-            st.caption("Keep the studio healthy with these quick checks.")
+            st.markdown("#### 🧭 Studio setup")
             milestone_col = st.container(border=True)
             with milestone_col:
-                st.checkbox(
-                    "Create a project",
-                    value=has_project,
-                    disabled=True,
-                    key="milestone_create_project",
-                )
-                st.checkbox(
-                    "Draft an outline",
-                    value=has_outline,
-                    disabled=True,
-                    key="milestone_draft_outline",
-                )
-                st.checkbox(
-                    "Write a chapter",
-                    value=has_chapter,
-                    disabled=True,
-                    key="milestone_write_chapter",
-                )
+                milestone_row(has_project, "Create a project")
+                milestone_row(has_outline, "Draft an outline")
+                milestone_row(has_chapter, "Write a chapter")
 
         with st.container(border=True):
             st.markdown("### ✨ Welcome to your writing nook")
