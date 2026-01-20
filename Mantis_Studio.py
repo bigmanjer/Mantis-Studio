@@ -44,7 +44,10 @@ import sys
 # ===== v45 BRANDING (SAFE, ORIGINAL TEMPLATE) =====
 import base64
 
-_MANTIS_LOGO_PATH = "mantis_logo_trans.png"
+_MANTIS_LOGO_PATH = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    "mantis_logo_trans.png",
+)
 
 def _mantis_logo_b64() -> str:
     try:
@@ -1129,6 +1132,15 @@ def project_to_markdown(project: Project) -> str:
 def _run_ui():
     import streamlit as st
 
+    def get_canon_health() -> tuple[str, str]:
+        results = st.session_state.get("coherence_results", [])
+        issue_count = len(results)
+        if issue_count == 0:
+            return "🟢", "Canon Stable"
+        if issue_count <= 2:
+            return "🟡", "Minor Canon Drift"
+        return "🔴", "High Canon Risk"
+
     def render_privacy():
         st.markdown("## Privacy Policy\n\nLocal-only storage. No analytics.")
 
@@ -1174,6 +1186,7 @@ def _run_ui():
         st.session_state.activity_log = list(config_data.get("activity_log", []))
     if "remember_me" not in st.session_state:
         st.session_state.remember_me = bool(config_data.get("remember_me", False))
+    st.session_state.setdefault("canon_health_log", [])
 
     theme = st.session_state.ui_theme if st.session_state.ui_theme in ("Dark", "Light") else "Dark"
     theme_tokens = {
@@ -1197,7 +1210,7 @@ def _run_ui():
             "sidebar_title": "#7dd3a7",
             "divider": "#143023",
             "expander_border": "#1f3b2d",
-            "header_gradient": "radial-gradient(circle at top left, rgba(34,197,94,0.35), rgba(2,6,23,0.6)), linear-gradient(135deg, #0b1216, #0f1a15)",
+            "header_gradient": "linear-gradient(135deg, #0b1216, #0f1a15)",
             "header_logo_bg": "rgba(34,197,94,0.2)",
             "header_sub": "#c7f2da",
             "shadow_strong": "0 18px 40px rgba(0,0,0,0.55)",
@@ -1355,21 +1368,23 @@ def _run_ui():
         align-items:center;
     }}
     .mantis-header-logo {{
-        width:52px;
-        height:52px;
-        border-radius:16px;
-        background: var(--mantis-header-logo-bg);
+        width:72px;
+        height:72px;
+        border-radius:18px;
+        background: rgba(0,0,0,0.35);
         display:flex;
         align-items:center;
         justify-content:center;
         overflow:hidden;
-        box-shadow: inset 0 0 0 1px rgba(255,255,255,0.2), 0 8px 20px rgba(0,0,0,0.25);
+        box-shadow:
+            inset 0 0 0 1px rgba(255,255,255,0.15),
+            0 0 18px rgba(34,197,94,0.45);
     }}
     .mantis-header-logo img {{
-        height:32px;
+        height:48px;
         width:auto;
-        padding:6px;
-        border-radius:12px;
+        padding:0;
+        border-radius:0;
     }}
     .mantis-header-title {{
         font-size:22px;
@@ -3206,6 +3221,16 @@ and quick start modules so you can draft fast and refine later.
                         model=get_ai_model(),
                     )
                 st.session_state["coherence_results"] = results or []
+                canon_icon, canon_label = get_canon_health()
+                st.session_state.setdefault("canon_health_log", [])
+                st.session_state["canon_health_log"].append(
+                    {
+                        "timestamp": time.time(),
+                        "status": canon_icon,
+                        "issue_count": len(st.session_state.get("coherence_results", [])),
+                    }
+                )
+                st.session_state["canon_health_log"] = st.session_state["canon_health_log"][-30:]
                 if results:
                     st.toast("Coherence issues found.")
                 else:
@@ -3281,6 +3306,23 @@ and quick start modules so you can draft fast and refine later.
                 "Last Updated",
                 time.strftime("%Y-%m-%d", time.localtime(p.last_modified)),
             )
+
+            st.divider()
+            if not st.session_state.get("is_premium", False):
+                st.info("🔒 Canon history is a Premium feature.")
+            else:
+                st.markdown("### 🧠 Canon Health History")
+                for entry in st.session_state.get("canon_health_log", []):
+                    st.caption(
+                        f"{time.strftime('%Y-%m-%d %H:%M', time.localtime(entry['timestamp']))} "
+                        f"{entry['status']} ({entry['issue_count']} issues)"
+                    )
+
+            st.divider()
+            st.markdown("### ⏱ Timeline Heatmap")
+            for chap in p.get_ordered_chapters():
+                intensity = min(1.0, chap.word_count / 2000)
+                st.progress(intensity, text=f"Chapter {chap.index}: {chap.word_count} words")
 
             st.divider()
             st.markdown("#### 📌 Entity Utilization")
@@ -3480,7 +3522,16 @@ and quick start modules so you can draft fast and refine later.
                 st.markdown("### 🤖 Assistant")
                 st.caption("Generate new prose from your outline + previous context.")
 
-                if st.button("✨ Auto-Write Chapter", type="primary", width="stretch"):
+                canon_icon, canon_label = get_canon_health()
+                canon_blocked = canon_icon == "🔴"
+                if canon_blocked:
+                    st.button(
+                        "🚫 Auto-Write Disabled (Canon Risk)",
+                        disabled=True,
+                        use_container_width=True,
+                        help="Resolve canon issues in World Bible → Memory before generating.",
+                    )
+                elif st.button("✨ Auto-Write Chapter", type="primary", use_container_width=True):
                     prompt = StoryEngine.generate_chapter_prompt(p, curr.index, int(curr.target_words))
                     full = ""
                     for chunk in AIEngine().generate_stream(prompt, get_ai_model()):
