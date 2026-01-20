@@ -1144,7 +1144,31 @@ def _run_ui():
     .block-container {{ padding-top: 2.6rem; padding-bottom: 2.6rem; max-width: 1380px; }}
     header[data-testid="stHeader"] {{ height: 2.6rem; }}
     h1, h2, h3 {{ letter-spacing: -0.02em; font-family: 'Space Grotesk', sans-serif; }}
-    .stTextInput input, .stSelectbox div, .stNumberInput input {{ background-color: var(--mantis-input-bg) !important; color: var(--mantis-text) !important; border: 1px solid var(--mantis-input-border) !important; }}
+    .stTextInput input,
+    .stNumberInput input,
+    .stSelectbox div[data-baseweb="select"] > div,
+    .stMultiSelect div[data-baseweb="select"] > div {{
+        background-color: var(--mantis-input-bg) !important;
+        color: var(--mantis-text) !important;
+        border: 1px solid var(--mantis-input-border) !important;
+    }}
+    div[data-baseweb="select"] input {{
+        color: var(--mantis-text) !important;
+    }}
+    div[data-baseweb="select"] span {{
+        color: var(--mantis-text) !important;
+    }}
+    div[data-baseweb="menu"] {{
+        background: var(--mantis-card-bg) !important;
+        border: 1px solid var(--mantis-card-border) !important;
+    }}
+    div[data-baseweb="option"] {{
+        color: var(--mantis-text) !important;
+        background: transparent !important;
+    }}
+    div[data-baseweb="option"]:hover {{
+        background: var(--mantis-accent-soft) !important;
+    }}
     .stTextArea textarea {{ background-color: var(--mantis-input-bg) !important; color: var(--mantis-text) !important; font-family: 'Crimson Pro', serif !important; font-size: 18px !important; line-height: 1.65 !important; border: 1px solid var(--mantis-input-border) !important; }}
 
     .mantis-muted {{ color: var(--mantis-muted); }}
