@@ -498,7 +498,7 @@ class Project:
         normalized_existing = {
             cls._normalize_entity_name(entity.name)
         }
-        for alias in getattr(entity, "aliases", []) or []:
+        for alias in entity.aliases:
             normalized_existing.add(cls._normalize_entity_name(alias))
         for alias in incoming:
             clean = (alias or "").strip()
@@ -534,7 +534,7 @@ class Project:
         for ent in self.world_db.values():
             if self._normalize_category(ent.category) != normalized_category:
                 continue
-            candidates = [ent.name] + (getattr(ent, "aliases", []) or [])
+            candidates = [ent.name] + (ent.aliases or [])
             matched = any(
                 self._names_match(candidate, incoming)
                 for candidate in candidates
@@ -566,7 +566,7 @@ class Project:
             if self._normalize_category(ent.category) != normalized_category:
                 continue
 
-            candidates = [ent.name] + (getattr(ent, "aliases", []) or [])
+            candidates = [ent.name] + (ent.aliases or [])
             matched = any(
                 self._names_match(candidate, incoming)
                 for candidate in candidates
@@ -3076,7 +3076,7 @@ and quick start modules so you can draft fast and refine later.
                         e
                         for e in ents
                         if q in (e.name or "").lower()
-                        or any(q in alias.lower() for alias in (getattr(e, "aliases", []) or []))
+                        or any(q in alias.lower() for alias in (e.aliases or []))
                     ]
 
                 if not ents:
@@ -3091,13 +3091,12 @@ and quick start modules so you can draft fast and refine later.
                             e.description = new_desc
                             p.save()
 
-                        existing_aliases = getattr(e, "aliases", []) or []
                         alias_text = c1.text_input(
                             "Aliases (comma-separated)",
-                            value=", ".join(existing_aliases),
+                            value=", ".join(e.aliases or []),
                             key=f"aliases_{e.id}",
                         )
-                        if alias_text != ", ".join(existing_aliases):
+                        if alias_text != ", ".join(e.aliases or []):
                             e.aliases = [a.strip() for a in alias_text.split(",") if a.strip()]
                             p.save()
 
