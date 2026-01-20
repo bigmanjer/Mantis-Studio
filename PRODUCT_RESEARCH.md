@@ -9,63 +9,9 @@ This captures a lightweight product audit, competitive scan, and a pragmatic tes
 | Scrivener | Deep project organization + export | Project trees, custom templates | Steep learning curve, dated UI | Emphasize fast onboarding + AI assist without overload |
 | Plottr | Visual outlining | Visual timelines, beat sheets | Limited prose writing, export friction | Seamless outline → chapter drafting, no export friction |
 | Sudowrite | AI writing assistant | Frequent AI prompts + suggestions | Can feel “AI-first,” less control | Keep author control + AI only on demand |
-| NovelAI | AI fiction generation | Persistent memory, story tools | UX complexity for beginners | “Beginner-safe mode” with progressive disclosure |
 | Notion/Docs | Familiar docs UX | Collaboration, low friction | Not story-specific | Story-specific guardrails + auto-structure |
 
-## NovelAI comparison (UI + workflow depth)
-**What NovelAI does well**
-- **Studio-first canvas**: A single writing surface with adjacent “modules” (memory, lorebook, author’s note).
-- **Tight hierarchy**: Left navigation keeps projects + story tools in view without overwhelming the editor.
-- **Distinctive dark theme**: Purple-blue gradients, glassy cards, bright accent for primary actions.
-- **Rapid entry**: Story template selection + quick prompt fields reduce blank-page friction.
-- **Memory scaffolding**: Persistent context (memory/author note) is clearly labeled and easy to edit.
-
-**Where MANTIS differs today**
-- **Dashboard-first flow**: Powerful, but the home screen can feel like a control panel vs. a focused studio.
-- **Tool density**: Features are spread across sections (outline/world/chapters) instead of adjacent modules.
-- **Visual hierarchy**: Green accent and card-heavy layout reads as a productivity tool vs. a creative studio.
-
-**Alignment targets for a “NovelAI-close” experience**
-1. **Studio-first layout**
-   - Emphasize the writing surface and reduce top-level dashboard noise.
-   - Keep quick modules (outline/world bible/chapters) in a tight cluster.
-2. **Memory modules up front**
-   - Display author’s note, style note, and summary cards near the editor entry point.
-3. **Dark, luminous theme**
-   - Shift to purple-blue accents, glassy cards, and subtle glow for primary actions.
-4. **Frictionless start**
-   - Add a short “create story” workflow with template-like starter fields.
-5. **Narrative flow controls**
-   - Bring rewrite, style presets, and AI guidance closer to the editor.
-
-## NovelAI deep-dive audit checklist (use during live review)
-> Note: This checklist is meant for a hands-on audit. Capture screenshots and timings when you have access.
-
-**Entry + onboarding**
-- How quickly can a new user start a blank story vs. template?
-- What fields are required before the first generation?
-- Where does the UI explain “memory” vs. “lorebook” concepts?
-
-**Writer workspace**
-- Editor width and focus: is the canvas centered or full-width?
-- Context modules placement: are memory/lore blocks adjacent to the editor?
-- Generation controls: are settings visible without leaving the editor?
-
-**Story memory systems**
-- Are “author’s note” and “style” notes separate?
-- How is memory scope explained (global vs. story)?
-- Does the UI show what context will be injected into the prompt?
-
-**Navigation + hierarchy**
-- How many clicks to reach: editor, lorebook, settings, export?
-- Does navigation emphasize “continue writing” over tooling?
-
-**Visual system**
-- Accent color use for primary action
-- Card treatment (glass, borders, subtle glow)
-- Typography hierarchy between editor, labels, and metadata
-
-## MANTIS enhancement ideas (NovelAI-inspired, non-derivative)
+## MANTIS enhancement ideas (inspired by modern writing studios)
 1. **Context stack panel**
    - Show “Memory / Author Note / Style Guide / Outline” as editable cards with visibility toggles.
 2. **Focus-first editor**
@@ -156,7 +102,7 @@ This captures a lightweight product audit, competitive scan, and a pragmatic tes
 
 ## Product plan & enhancement roadmap (internal)
 **Vision & objective**
-- Transform Mantis Studio into a Narrative Operating System that surpasses NovelAI.
+- Transform Mantis Studio into a Narrative Operating System that surpasses current writing tools.
 
 **Key features to add & enhance**
 - **Long-form narrative**
@@ -177,7 +123,7 @@ This captures a lightweight product audit, competitive scan, and a pragmatic tes
   - State management
   - Save/load projects
   - Session fixes
-- **Phase 2: Achieve NovelAI parity**
+- **Phase 2: Achieve feature parity**
   - World Bible system
   - Generation history
   - Genre presets
