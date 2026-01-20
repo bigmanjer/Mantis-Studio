@@ -96,6 +96,7 @@ class AppConfig:
     MAX_UPLOAD_MB = int(os.getenv("MANTIS_MAX_UPLOAD_MB", "10"))
     SAVE_LOCK_TIMEOUT = int(os.getenv("MANTIS_SAVE_LOCK_TIMEOUT", "5"))
     SAVE_LOCK_RETRY_SLEEP = float(os.getenv("MANTIS_SAVE_LOCK_RETRY_SLEEP", "0.1"))
+    WORLD_BIBLE_CONFIDENCE = float(os.getenv("MANTIS_WORLD_BIBLE_CONFIDENCE", "0.75"))
 
 
 os.makedirs(AppConfig.PROJECTS_DIR, exist_ok=True)
@@ -279,6 +280,7 @@ class Entity:
     name: str
     category: str
     description: str = ""
+    aliases: List[str] = field(default_factory=list)
     tags: str = ""
     created_at: float = field(default_factory=time.time)
 
@@ -397,6 +399,24 @@ class Project:
         )
 
     @staticmethod
+    def _normalize_category(category: str) -> str:
+        normalized = (category or "").strip().lower()
+        mapping = {
+            "character": "Character",
+            "characters": "Character",
+            "location": "Location",
+            "locations": "Location",
+            "faction": "Faction",
+            "factions": "Faction",
+            "lore": "Lore",
+            "rule": "Lore",
+            "rules": "Lore",
+            "item": "Lore",
+            "items": "Lore",
+        }
+        return mapping.get(normalized, "Lore")
+
+    @staticmethod
     def _normalize_entity_name(name: str) -> str:
         base = (name or "").strip().lower()
         if not base:
@@ -406,7 +426,13 @@ class Project:
         base = re.sub(r"\b(mr|mrs|ms|dr|prof|sir|madam)\.?\b", "", base)
         base = re.sub(r"[^\w\s/-]", " ", base)
         base = re.sub(r"\s+", " ", base).strip()
-        return base
+        abbrev_map = {
+            "st": "saint",
+            "mt": "mount",
+            "ft": "fort",
+        }
+        tokens = [abbrev_map.get(token, token) for token in base.split()]
+        return " ".join(tokens).strip()
 
     @classmethod
     def _entity_aliases(cls, name: str) -> List[str]:
@@ -428,6 +454,22 @@ class Project:
         return {token for token in re.split(r"\s+", name) if token}
 
     @classmethod
+    def _initials_match(cls, left_norm: str, right_norm: str) -> bool:
+        left_tokens = left_norm.split()
+        right_tokens = right_norm.split()
+        if not left_tokens or not right_tokens:
+            return False
+        if left_tokens[-1] != right_tokens[-1]:
+            return False
+        left_initials = {t[0] for t in left_tokens[:-1] if len(t) == 1}
+        right_initials = {t[0] for t in right_tokens[:-1] if len(t) == 1}
+        if left_initials and right_tokens[0] and right_tokens[0][0] in left_initials:
+            return True
+        if right_initials and left_tokens[0] and left_tokens[0][0] in right_initials:
+            return True
+        return False
+
+    @classmethod
     def _names_match(cls, left: str, right: str) -> bool:
         left_norm = cls._normalize_entity_name(left)
         right_norm = cls._normalize_entity_name(right)
@@ -445,42 +487,116 @@ class Project:
                 if left_tokens.intersection(right_tokens):
                     return True
 
-        similarity = difflib.SequenceMatcher(None, left_norm, right_norm).ratio()
-        return similarity >= 0.75
+        if cls._initials_match(left_norm, right_norm):
+            return True
 
-    def add_entity(self, name: str, category: str, desc: str = "") -> Optional[Entity]:
-        """Smart Add with Fuzzy Matching."""
+        similarity = difflib.SequenceMatcher(None, left_norm, right_norm).ratio()
+        return similarity >= 0.85
+
+    @classmethod
+    def _merge_aliases(cls, entity: Entity, incoming: List[str], primary: str) -> None:
+        normalized_existing = {
+            cls._normalize_entity_name(entity.name)
+        }
+        for alias in entity.aliases:
+            normalized_existing.add(cls._normalize_entity_name(alias))
+        for alias in incoming:
+            clean = (alias or "").strip()
+            if not clean:
+                continue
+            normalized = cls._normalize_entity_name(clean)
+            if not normalized or normalized in normalized_existing:
+                continue
+            if cls._normalize_entity_name(primary) == normalized:
+                continue
+            entity.aliases.append(clean)
+            normalized_existing.add(normalized)
+
+    def _build_match_aliases(self, name: str, aliases: Optional[List[str]] = None) -> List[str]:
+        incoming_match_aliases = self._entity_aliases(name)
+        for alias in (aliases or []):
+            incoming_match_aliases.extend(self._entity_aliases(alias))
+        return incoming_match_aliases
+
+    def find_entity_match(
+        self,
+        name: str,
+        category: str,
+        aliases: Optional[List[str]] = None,
+    ) -> Optional[Entity]:
         clean_name = (name or "").strip()
         if not clean_name:
             return None
 
+        normalized_category = self._normalize_category(category)
+        incoming_match_aliases = self._build_match_aliases(clean_name, aliases)
+
         for ent in self.world_db.values():
-            if ent.category == category:
-                candidates = self._entity_aliases(ent.name)
-                incoming_aliases = self._entity_aliases(clean_name)
-                if not candidates:
-                    candidates = [ent.name]
-                if not incoming_aliases:
-                    incoming_aliases = [clean_name]
-                matched = any(
-                    self._names_match(candidate, incoming)
-                    for candidate in candidates
-                    for incoming in incoming_aliases
-                )
-                if matched:
+            if self._normalize_category(ent.category) != normalized_category:
+                continue
+            candidates = [ent.name] + (ent.aliases or [])
+            matched = any(
+                self._names_match(candidate, incoming)
+                for candidate in candidates
+                for incoming in incoming_match_aliases
+            )
+            if matched:
+                return ent
+        return None
+
+    def upsert_entity(
+        self,
+        name: str,
+        category: str,
+        desc: str = "",
+        aliases: Optional[List[str]] = None,
+        allow_merge: bool = True,
+        allow_alias: bool = True,
+    ) -> tuple[Optional[Entity], str]:
+        clean_name = (name or "").strip()
+        if not clean_name:
+            return None, "skipped"
+
+        normalized_category = self._normalize_category(category)
+        incoming_aliases = [a for a in (aliases or []) if (a or "").strip()]
+        incoming_aliases = list(dict.fromkeys([a.strip() for a in incoming_aliases if a.strip()]))
+        incoming_match_aliases = self._build_match_aliases(clean_name, incoming_aliases)
+
+        for ent in self.world_db.values():
+            if self._normalize_category(ent.category) != normalized_category:
+                continue
+
+            candidates = [ent.name] + (ent.aliases or [])
+            matched = any(
+                self._names_match(candidate, incoming)
+                for candidate in candidates
+                for incoming in incoming_match_aliases
+            )
+            if matched:
+                if allow_alias:
+                    self._merge_aliases(ent, [clean_name] + incoming_aliases, ent.name)
+                if allow_merge:
                     ent.merge(desc)
-                    self.last_modified = time.time()
-                    return ent
+                self.last_modified = time.time()
+                return ent, "matched"
 
         e = Entity(
             id=str(uuid.uuid4()),
             name=clean_name,
-            category=category,
+            category=normalized_category,
             description=(desc or "").strip(),
+            aliases=[],
         )
+        if allow_alias:
+            self._merge_aliases(e, incoming_aliases, clean_name)
         self.world_db[e.id] = e
         self.last_modified = time.time()
-        return e
+        return e, "created"
+
+    def add_entity(self, name: str, category: str, desc: str = "") -> Optional[Entity]:
+        """Smart Add with Fuzzy Matching."""
+        ent, _ = self.upsert_entity(name, category, desc, allow_merge=True, allow_alias=True)
+        return ent
 
     def delete_entity(self, eid: str):
         if eid in self.world_db:
@@ -614,6 +730,10 @@ class Project:
             if "category" not in v:
                 v["category"] = "Character"
             clean = {key: val for key, val in v.items() if key in ent_fields}
+            if "category" in clean:
+                clean["category"] = Project._normalize_category(clean["category"])
+            if "aliases" in clean and not isinstance(clean["aliases"], list):
+                clean["aliases"] = [str(clean["aliases"])]
             proj.world_db[k] = Entity(**clean)
 
         chap_fields = {f.name for f in fields(Chapter)}
@@ -761,8 +881,9 @@ class AnalysisEngine:
         if not text or len(text) < 50:
             return []
         prompt = (
-            "Analyze text. Identify Characters, Locations, Factions, and important Items/Lore.\n"
-            "Return JSON List: [{'name': 'X', 'category': 'Character|Location|Item|Lore|Faction', 'description': 'Z'}]\n"
+            "Analyze text. Identify Characters, Locations, Factions, and important Lore.\n"
+            "Return JSON List: [{'name': 'X', 'category': 'Character|Location|Faction|Lore', "
+            "'description': 'Z', 'aliases': ['Alt Name'], 'confidence': 0.0}]\n"
             f"TEXT:\n{text[:6000]}"
         )
         return AIEngine().generate_json(prompt, model) or []
@@ -1996,10 +2117,24 @@ def _run_ui():
         except Exception as exc:
             return False, str(exc)
 
+    def _queue_world_bible_suggestion(item: Dict[str, Any]) -> None:
+        queue = st.session_state.setdefault("world_bible_review", [])
+        key = (
+            f"{Project._normalize_category(item.get('category'))}|"
+            f"{Project._normalize_entity_name(item.get('name'))}|"
+            f"{(item.get('description') or '').strip().lower()}|"
+            f"{item.get('type', 'new')}"
+        )
+        existing_keys = {q.get("_key") for q in queue}
+        if key in existing_keys:
+            return
+        item["_key"] = key
+        queue.append(item)
+
     def extract_entities_ui(text: str, label: str):
         """Scan text for entities and update the World Bible.
 
-        Uses Project.add_entity's fuzzy matching so that abbreviations, nicknames,
+        Uses Project.upsert_entity fuzzy matching so that abbreviations, nicknames,
         or slightly different spellings merge into existing entries instead of
         creating duplicates.
         """
@@ -2010,7 +2145,9 @@ def _run_ui():
         ents = AnalysisEngine.extract_entities(raw_text, model)
         total_detected = len(ents)
         added = 0
-        merged = 0
+        matched = 0
+        flagged = 0
+        suggested = 0
 
         for e in ents:
             name = (e.get("name") or "").strip()
@@ -2019,27 +2156,83 @@ def _run_ui():
                 continue
 
             desc = (e.get("description") or "").strip()
+            aliases = e.get("aliases") or []
+            try:
+                confidence = float(e.get("confidence")) if e.get("confidence") is not None else 0.0
+            except (TypeError, ValueError):
+                confidence = 0.0
 
-            before = len(p.world_db)
-            ent = p.add_entity(name, category, desc)
-            after = len(p.world_db)
+            if confidence < AppConfig.WORLD_BIBLE_CONFIDENCE:
+                existing = p.find_entity_match(
+                    name,
+                    category,
+                    aliases=aliases if isinstance(aliases, list) else None,
+                )
+                if existing and desc:
+                    _queue_world_bible_suggestion(
+                        {
+                            "type": "update",
+                            "entity_id": existing.id,
+                            "name": existing.name,
+                            "category": existing.category,
+                            "description": desc,
+                            "aliases": aliases,
+                            "confidence": confidence,
+                            "source": label,
+                        }
+                    )
+                else:
+                    _queue_world_bible_suggestion(
+                        {
+                            "type": "new",
+                            "name": name,
+                            "category": Project._normalize_category(category),
+                            "description": desc,
+                            "aliases": aliases,
+                            "confidence": confidence,
+                            "source": label,
+                        }
+                    )
+                flagged += 1
+                continue
 
+            ent, status = p.upsert_entity(
+                name,
+                category,
+                desc,
+                aliases=aliases if isinstance(aliases, list) else None,
+                allow_merge=False,
+                allow_alias=True,
+            )
             if ent is None:
                 continue
 
-            if after > before:
+            if status == "created":
                 added += 1
             else:
-                merged += 1
+                matched += 1
+                if desc:
+                    _queue_world_bible_suggestion(
+                        {
+                            "type": "update",
+                            "entity_id": ent.id,
+                            "name": ent.name,
+                            "category": ent.category,
+                            "description": desc,
+                            "aliases": aliases,
+                            "confidence": confidence,
+                            "source": label,
+                        }
+                    )
+                    suggested += 1
 
         p.save()
 
-        if added > 0 and merged > 0:
-            st.toast(f"Entities: {added} new, {merged} merged into existing.", icon="🌍")
-        elif added > 0:
-            st.toast(f"Added {added} new entities to World Bible.", icon="🌍")
-        elif merged > 0:
-            st.toast(f"Merged details into {merged} existing entities.", icon="🌍")
+        if added > 0 or matched > 0 or flagged > 0:
+            summary = [f"{added} new", f"{matched} existing", f"{flagged} flagged"]
+            if suggested:
+                summary.append(f"{suggested} suggested updates")
+            st.toast(f"World Bible updated ✓ ({', '.join(summary)})", icon="🌍")
         else:
             if total_detected > 0:
                 st.toast("Detected entities, but they all matched existing entries.", icon="🤷")
@@ -2731,7 +2924,7 @@ and quick start modules so you can draft fast and refine later.
                     p.outline = val
                     save_p()
 
-                b1, b2, b3 = st.columns([1, 1, 1])
+                b1, b2 = st.columns([1, 1])
                 with b1:
                     if st.button("💾 Save Outline", use_container_width=True):
                         p.save()
@@ -2739,10 +2932,6 @@ and quick start modules so you can draft fast and refine later.
                         extract_entities_ui(p.outline or "", "Outline")
                         st.toast("Outline Saved & Entities Scanned")
                 with b2:
-                    if st.button("🌍 Scan Entities", use_container_width=True):
-                        # Manual re-scan option if user wants to refresh entities after major edits.
-                        extract_entities_ui(p.outline or "", "Outline")
-                with b3:
                     if st.button("🔄 Reverse Outline", use_container_width=True):
                         p.outline = StoryEngine.reverse_engineer_outline(p, get_ai_model())
                         st.session_state["_outline_sync"] = p.outline or ""  # apply on next rerun before widget renders
@@ -2797,10 +2986,59 @@ and quick start modules so you can draft fast and refine later.
     def render_world():
         p = st.session_state.project
         st.markdown("## World Bible")
-        st.caption("Track characters, locations, factions, items, and lore.")
+        st.caption("Track canonical characters, locations, factions, and lore.")
 
         query = st.text_input("Search", placeholder="Type a name to filter...")
-        t1, t2, t3, t4, t5, t6, t7 = st.tabs(["Characters", "Locations", "Items", "Lore", "Factions", "Analytics", "Memory"])
+        t1, t2, t3, t4 = st.tabs(["Characters", "Locations", "Factions", "Lore"])
+
+        review_queue = st.session_state.get("world_bible_review", [])
+        if review_queue:
+            with st.container(border=True):
+                st.markdown("### 🔍 Review AI Suggestions")
+                st.caption("AI suggestions are queued for review. Apply to update canon.")
+                for idx, item in enumerate(list(review_queue)):
+                    label = f"{item.get('name', 'Unnamed')} • {item.get('category', 'Lore')}"
+                    with st.expander(label):
+                        st.markdown(f"**Type:** {item.get('type', 'new').title()}")
+                        confidence = item.get("confidence")
+                        if confidence is not None:
+                            st.markdown(f"**Confidence:** {confidence:.2f}")
+                        if item.get("description"):
+                            st.markdown("**Suggested Notes**")
+                            st.write(item.get("description"))
+                        if item.get("aliases"):
+                            st.markdown("**Aliases**")
+                            st.write(", ".join(item.get("aliases") or []))
+
+                        c1, c2 = st.columns(2)
+                        with c1:
+                            if st.button("✅ Apply", key=f"apply_suggestion_{idx}", use_container_width=True):
+                                if item.get("type") == "update" and item.get("entity_id"):
+                                    ent = p.world_db.get(item.get("entity_id"))
+                                    if ent:
+                                        ent.merge(item.get("description", ""))
+                                        incoming_aliases = item.get("aliases") or []
+                                        p._merge_aliases(ent, incoming_aliases, ent.name)
+                                else:
+                                    p.upsert_entity(
+                                        item.get("name", ""),
+                                        item.get("category", "Lore"),
+                                        item.get("description", ""),
+                                        aliases=item.get("aliases") or [],
+                                        allow_merge=True,
+                                        allow_alias=True,
+                                    )
+                                review_queue.pop(idx)
+                                st.session_state["world_bible_review"] = review_queue
+                                p.save()
+                                st.toast("World Bible updated.")
+                                st.rerun()
+                        with c2:
+                            if st.button("🗑 Ignore", key=f"ignore_suggestion_{idx}", use_container_width=True):
+                                review_queue.pop(idx)
+                                st.session_state["world_bible_review"] = review_queue
+                                st.toast("Suggestion removed.")
+                                st.rerun()
 
         def render_cat(category: str):
             with st.container(border=True):
@@ -2815,13 +3053,15 @@ and quick start modules so you can draft fast and refine later.
                     with st.form(f"add_{category}"):
                         n = st.text_input("Name")
                         d = st.text_area("Description")
+                        a = st.text_input("Aliases (comma-separated)")
                         s1, s2 = st.columns(2)
                         with s1:
                             ok = st.form_submit_button("Save", type="primary", use_container_width=True)
                         with s2:
                             cancel = st.form_submit_button("Cancel", use_container_width=True)
                         if ok:
-                            p.add_entity(n, category, d)
+                            aliases = [alias.strip() for alias in (a or "").split(",") if alias.strip()]
+                            p.upsert_entity(n, category, d, aliases=aliases, allow_merge=True, allow_alias=True)
                             p.save()
                             st.session_state[f"add_open_{category}"] = False
                             st.rerun()
@@ -2831,7 +3071,13 @@ and quick start modules so you can draft fast and refine later.
 
                 ents = [e for e in p.world_db.values() if e.category == category]
                 if query:
-                    ents = [e for e in ents if query.lower() in (e.name or "").lower()]
+                    q = query.lower()
+                    ents = [
+                        e
+                        for e in ents
+                        if q in (e.name or "").lower()
+                        or any(q in alias.lower() for alias in (e.aliases or []))
+                    ]
 
                 if not ents:
                     st.info(f"📭 No {category} entries yet. Add one above or scan entities from your outline/chapters.")
@@ -2843,6 +3089,15 @@ and quick start modules so you can draft fast and refine later.
                         new_desc = c1.text_area("Notes", e.description, key=f"desc_{e.id}", height=140)
                         if new_desc != e.description:
                             e.description = new_desc
+                            p.save()
+
+                        alias_text = c1.text_input(
+                            "Aliases (comma-separated)",
+                            value=", ".join(e.aliases or []),
+                            key=f"aliases_{e.id}",
+                        )
+                        if alias_text != ", ".join(e.aliases or []):
+                            e.aliases = [a.strip() for a in alias_text.split(",") if a.strip()]
                             p.save()
 
                         if c2.button("✨ Enrich", key=f"en_{e.id}", use_container_width=True):
@@ -2861,215 +3116,14 @@ and quick start modules so you can draft fast and refine later.
                         with d2:
                             st.caption(f"Created: {time.strftime('%Y-%m-%d', time.localtime(e.created_at))}")
 
-        def render_analytics():
-            with st.container(border=True):
-                st.markdown("### Analytics")
-                chaps = p.get_ordered_chapters()
-                total_words = p.get_total_word_count()
-                total_chapters = len(chaps)
-                avg_words = int(total_words / total_chapters) if total_chapters else 0
-                total_target = sum(c.target_words for c in chaps)
-
-                m1, m2, m3, m4 = st.columns(4)
-                m1.metric("Total Words", f"{total_words:,}")
-                m2.metric("Chapters", total_chapters)
-                m3.metric("Avg Words / Chapter", f"{avg_words:,}")
-                m4.metric("Target Words", f"{total_target:,}")
-
-                if chaps:
-                    df = pd.DataFrame(
-                        [
-                            {
-                                "Chapter": f"{c.index}. {c.title}",
-                                "Words": c.word_count,
-                                "Target": c.target_words,
-                            }
-                            for c in chaps
-                        ]
-                    )
-                    fig = px.bar(
-                        df,
-                        x="Chapter",
-                        y=["Words", "Target"],
-                        barmode="group",
-                        title="Chapter Word Counts vs Targets",
-                    )
-                    fig.update_layout(xaxis_title="", yaxis_title="Words", height=360, legend_title_text="")
-                    st.plotly_chart(fig, use_container_width=True)
-                else:
-                    st.info("📭 No chapters yet. Create chapters to unlock word count analytics.")
-
-                cat_counts: Dict[str, int] = {}
-                for ent in p.world_db.values():
-                    cat_counts[ent.category] = cat_counts.get(ent.category, 0) + 1
-
-                if cat_counts:
-                    st.markdown("#### World Bible Coverage")
-                    cat_df = pd.DataFrame(
-                        [{"Category": k, "Entries": v} for k, v in sorted(cat_counts.items())]
-                    )
-                    fig2 = px.bar(cat_df, x="Category", y="Entries", title="World Bible Entries by Category")
-                    fig2.update_layout(xaxis_title="", yaxis_title="Entries", height=300)
-                    st.plotly_chart(fig2, use_container_width=True)
-                else:
-                    st.info("No World Bible entries yet. Add or scan entities to see coverage.")
-
-        def render_memory():
-            with st.container(border=True):
-                st.markdown("### Memory")
-                st.caption("Store canon, tone, and guardrails the AI should always respect.")
-                mem_txt = st.text_area("Story Memory", p.memory, height=180, key="mem_txt")
-                if mem_txt != p.memory:
-                    p.memory = mem_txt
-                    save_p()
-
-                note_cols = st.columns(2)
-                with note_cols[0]:
-                    author_txt = st.text_area(
-                        "Author Note",
-                        p.author_note,
-                        height=150,
-                        key="author_note_txt",
-                        placeholder="E.g., 'Keep POV close and intimate. Avoid modern slang.'",
-                    )
-                    if author_txt != p.author_note:
-                        p.author_note = author_txt
-                        save_p()
-                with note_cols[1]:
-                    style_txt = st.text_area(
-                        "Style Guide",
-                        p.style_guide,
-                        height=150,
-                        key="style_guide_txt",
-                        placeholder="E.g., 'Short sentences, cinematic beats, vivid sensory detail.'",
-                    )
-                    if style_txt != p.style_guide:
-                        p.style_guide = style_txt
-                        save_p()
-
-                st.divider()
-                st.markdown("#### Coherence Check")
-                st.caption("Run a focused continuity sweep. Suggestions can replace exact passages in chapters.")
-
-                chaps = p.get_ordered_chapters()
-
-                def build_world_bible_text() -> str:
-                    grouped: Dict[str, List[Entity]] = {}
-                    for ent in p.world_db.values():
-                        grouped.setdefault(ent.category, []).append(ent)
-
-                    chunks = []
-                    for category in sorted(grouped.keys()):
-                        chunks.append(f"{category}s:")
-                        for ent in sorted(grouped[category], key=lambda e: e.name.lower()):
-                            desc = (ent.description or "").strip()
-                            line = f"- {ent.name}"
-                            if desc:
-                                line += f": {desc}"
-                            chunks.append(line)
-                        chunks.append("")
-                    return "\n".join(chunks).strip()
-
-                if st.button("🧭 Run Coherence Check", type="primary", use_container_width=True):
-                    if not chaps:
-                        st.warning("Add chapters before running a coherence check.")
-                    else:
-                        with st.spinner("Checking continuity across memory, world bible, and chapters..."):
-                            chapter_payload = []
-                            for c in chaps:
-                                excerpt = (c.content or "").strip()
-                                excerpt = excerpt[:1200]
-                                chapter_payload.append(
-                                    {
-                                        "chapter_index": c.index,
-                                        "title": c.title,
-                                        "summary": c.summary,
-                                        "excerpt": excerpt,
-                                    }
-                                )
-                            results = AnalysisEngine.coherence_check(
-                                p.memory or "",
-                                p.author_note or "",
-                                p.style_guide or "",
-                                p.outline or "",
-                                build_world_bible_text(),
-                                chapter_payload,
-                                get_ai_model(),
-                            )
-                            st.session_state["coherence_results"] = results
-
-                results = st.session_state.get("coherence_results", [])
-                if results:
-                    for idx, item in enumerate(results, start=1):
-                        chap_index = item.get("chapter_index")
-                        chapter = next((c for c in chaps if c.index == chap_index), None)
-                        label = f"Issue {idx}"
-                        if chapter:
-                            label = f"Issue {idx} • Ch {chapter.index}: {chapter.title or 'Untitled'}"
-                        with st.expander(label):
-                            st.markdown(f"**Issue:** {item.get('issue', 'Unspecified')}")
-                            st.markdown(f"**Confidence:** {item.get('confidence', 'medium')}")
-                            target_excerpt = (item.get("target_excerpt") or "").strip()
-                            suggested = (item.get("suggested_rewrite") or "").strip()
-                            if target_excerpt:
-                                st.markdown("**Target Excerpt**")
-                                st.code(target_excerpt)
-                            if suggested:
-                                st.markdown("**Suggested Rewrite**")
-                                st.code(suggested)
-
-                            if chapter and target_excerpt and suggested:
-                                if target_excerpt not in (chapter.content or ""):
-                                    st.warning("Target excerpt not found in the chapter text.")
-                                elif st.button(
-                                    "✅ Replace in Chapter",
-                                    key=f"apply_fix_{idx}",
-                                    use_container_width=True,
-                                ):
-                                    updated = (chapter.content or "").replace(target_excerpt, suggested, 1)
-                                    chapter.update_content(updated, "Coherence Fix")
-                                    p.save()
-                                    st.toast("Chapter updated.")
-                else:
-                    st.info("Run a coherence check to see continuity fixes and replacement suggestions.")
-
-                st.divider()
-                st.markdown("#### World Bible Sync")
-                st.caption("Merge canon details from memory, outline, and summaries into the World Bible.")
-                if st.button("🔄 Merge World Bible Info", use_container_width=True):
-                    sync_text = "\n\n".join(
-                        [
-                            p.memory or "",
-                            p.outline or "",
-                            "\n".join([c.summary or "" for c in chaps]),
-                        ]
-                    ).strip()
-                    if sync_text:
-                        extract_entities_ui(sync_text[:8000], "Memory + Outline + Summaries")
-                        st.toast("World Bible merged from current canon.")
-                    else:
-                        st.warning("Add memory, outline, or summaries to sync the World Bible.")
-
-                st.divider()
-                st.markdown("#### Chapter Summaries")
-                if not chaps:
-                    st.info("📭 No chapters yet. Add chapters to start building a timeline.")
-                else:
-                    for c in chaps:
-                        label = f"{c.index}. {c.title or 'Untitled'}"
-                        with st.expander(label):
-                            if c.summary:
-                                st.write(c.summary)
-                            else:
-                                st.info("No summary yet. Generate one from the chapter editor.")
-
-        with t1: render_cat("Character")
-        with t2: render_cat("Location")
-        with t3: render_cat("Item")
-        with t4: render_cat("Lore")
-        with t5: render_cat("Faction")
-        with t6: render_analytics()
-        with t7: render_memory()
+        with t1:
+            render_cat("Character")
+        with t2:
+            render_cat("Location")
+        with t3:
+            render_cat("Faction")
+        with t4:
+            render_cat("Lore")
 
     def render_chapters():
         p = st.session_state.project
@@ -3157,7 +3211,7 @@ and quick start modules so you can draft fast and refine later.
 
                 st.caption(f"📝 Chapter: {curr.word_count} words • 📚 Total: {p.get_total_word_count()} words")
 
-                c1, c2, c3 = st.columns([1, 1, 1])
+                c1, c2 = st.columns([1, 1])
                 with c1:
                     if st.button("💾 Save Chapter", type="primary", use_container_width=True):
                         curr.update_content(val, "manual")
@@ -3166,10 +3220,6 @@ and quick start modules so you can draft fast and refine later.
                         extract_entities_ui(curr.content or "", f"Ch {curr.index}")
                         st.toast("Chapter Saved & Entities Scanned")
                 with c2:
-                    if st.button("🔍 Scan Entities", use_container_width=True):
-                        # Manual re-scan option for this chapter.
-                        extract_entities_ui(curr.content or "", f"Ch {curr.index}")
-                with c3:
                     if st.button("📝 Update Summary", use_container_width=True):
                         curr.summary = StoryEngine.summarize(curr.content or "", get_ai_model())
                         p.save()
