@@ -3084,8 +3084,7 @@ and quick start modules so you can draft fast and refine later.
                     return
 
                 for e in ents:
-                    expander_label = f"{e.name} · {e.id[:6]}"
-                    with st.expander(expander_label):
+                    with st.expander(f"{e.name}", key=f"world_exp_{e.id}"):
                         c1, c2 = st.columns([4, 1])
                         new_desc = c1.text_area("Notes", e.description, key=f"desc_{e.id}", height=140)
                         if new_desc != e.description:
