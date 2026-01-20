@@ -2554,6 +2554,8 @@ def _run_ui():
         )
 
         active_project = st.session_state.project
+        recent_snapshot = _project_snapshot(recent_projects[0]["meta"]) if recent_projects else None
+
         project_title = (
             (active_project.title if active_project else None)
             or (recent_snapshot or {}).get("title")
@@ -2565,11 +2567,13 @@ def _run_ui():
         latest_chapter_label = "You last worked on Chapter — · recently"
         latest_chapter_index = None
         latest_chapter_id = None
-        latest_chapter_ts = None
-        if active_project and active_project.chapters:
-            latest_chapter = max(
+        latest_chapter_index = None
+        latest_ts = None
+
+        if active_project and getattr(active_project, "chapters", None):
+            ch = max(
                 active_project.chapters.values(),
-                key=lambda c: c.modified_at or c.created_at,
+                key=lambda c: (c.modified_at or c.created_at or 0),
             )
 
         def _pill(label, *, key):
@@ -2620,11 +2624,12 @@ def _run_ui():
                     st.session_state.project = Project.load(recent_projects[0]["path"])
                 if primary_target == "chapters" and latest_chapter_id:
                     st.session_state.curr_chap_id = latest_chapter_id
-                st.session_state.page = primary_target
+                st.session_state.page = target
                 st.rerun()
 
-        nav_row_one = st.columns(2)
-        with nav_row_one[0]:
+        st.markdown("#### Quick actions")
+        r1 = st.columns(4)
+        with r1[0]:
             with st.container(border=True):
                 st.markdown("### 🌍 World Bible")
                 st.caption("Characters, places, factions, and lore")
@@ -2633,7 +2638,8 @@ def _run_ui():
                         st.session_state.project = Project.load(recent_projects[0]["path"])
                     st.session_state.page = "world"
                     st.rerun()
-        with nav_row_one[1]:
+
+        with r1[1]:
             with st.container(border=True):
                 st.markdown("### 📝 Outline")
                 st.caption("Blueprint your story beats and arcs")
@@ -2643,8 +2649,7 @@ def _run_ui():
                     st.session_state.page = "outline"
                     st.rerun()
 
-        nav_row_two = st.columns(2)
-        with nav_row_two[0]:
+        with r1[2]:
             with st.container(border=True):
                 st.markdown("### 🧠 Memory")
                 st.caption("Canon rules, guidance, and style notes")
@@ -2653,7 +2658,8 @@ def _run_ui():
                         st.session_state.project = Project.load(recent_projects[0]["path"])
                     st.session_state.page = "world"
                     st.rerun()
-        with nav_row_two[1]:
+
+        with r1[3]:
             with st.container(border=True):
                 st.markdown("### 📊 Insights")
                 st.caption("Analytics and canon health insights")
