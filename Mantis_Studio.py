@@ -1118,6 +1118,20 @@ def project_to_markdown(project: Project) -> str:
 
 def _run_ui():
     import streamlit as st
+
+    def render_privacy():
+        st.markdown("## Privacy Policy\n\nLocal-only storage. No analytics.")
+
+    def render_terms():
+        st.markdown("## Terms of Service\n\nProvided as-is for creative use.")
+
+    def render_copyright():
+        st.markdown("## Copyright\n\n© MANTIS Studio")
+
+    def render_footer():
+        st.markdown("---")
+        st.caption("© MANTIS Studio")
+
     import pandas as pd
     import plotly.express as px
 
