@@ -2593,6 +2593,27 @@ def _run_ui():
             st.markdown(f"## {project_title}")
             st.caption(latest_chapter_label)
 
+        st.markdown("#### Quick actions")
+        quick_cols = st.columns(3)
+        with quick_cols[0]:
+            if st.button("🌍 World Bible", key="qa_world_bible", width="stretch"):
+                if recent_projects and not st.session_state.project:
+                    st.session_state.project = Project.load(recent_projects[0]["path"])
+                st.session_state.page = "world"
+                st.rerun()
+        with quick_cols[1]:
+            if st.button("🧠 Memory", key="qa_memory", width="stretch"):
+                if recent_projects and not st.session_state.project:
+                    st.session_state.project = Project.load(recent_projects[0]["path"])
+                st.session_state.page = "world"
+                st.rerun()
+        with quick_cols[2]:
+            if st.button("📈 Insights", key="qa_insights", width="stretch"):
+                if recent_projects and not st.session_state.project:
+                    st.session_state.project = Project.load(recent_projects[0]["path"])
+                st.session_state.page = "world"
+                st.rerun()
+
         primary_label = "✨ Start your story"
         primary_target = "projects"
         if canon_icon == "🔴":
@@ -2677,7 +2698,7 @@ def _run_ui():
             st.caption(f"• Things to review: {things_to_review}")
 
         with st.container(border=True):
-            st.markdown("#### Quick actions")
+            st.markdown("#### Project actions")
             action_cols = st.columns(3)
             with action_cols[0]:
                 if st.button(
@@ -2756,8 +2777,8 @@ and quick start modules so you can draft fast and refine later.
                 st.session_state.page = cta_target
                 st.rerun()
 
-            if not st.session_state.groq_api_key or not st.session_state.openai_api_key:
-                st.divider()
+        if not st.session_state.groq_api_key or not st.session_state.openai_api_key:
+            with st.container(border=True):
                 st.markdown("### 🔑 Connect your AI providers")
                 st.caption("Unlock generation, summaries, and entity tools with API access.")
                 cta_left, cta_right = st.columns(2)
