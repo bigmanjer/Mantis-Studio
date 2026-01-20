@@ -498,7 +498,7 @@ class Project:
         normalized_existing = {
             cls._normalize_entity_name(entity.name)
         }
-        for alias in getattr(entity, "aliases", []) or []:
+        for alias in entity.aliases:
             normalized_existing.add(cls._normalize_entity_name(alias))
         for alias in incoming:
             clean = (alias or "").strip()
@@ -534,7 +534,7 @@ class Project:
         for ent in self.world_db.values():
             if self._normalize_category(ent.category) != normalized_category:
                 continue
-            candidates = [ent.name] + (getattr(ent, "aliases", []) or [])
+            candidates = [ent.name] + (ent.aliases or [])
             matched = any(
                 self._names_match(candidate, incoming)
                 for candidate in candidates
@@ -566,7 +566,7 @@ class Project:
             if self._normalize_category(ent.category) != normalized_category:
                 continue
 
-            candidates = [ent.name] + (getattr(ent, "aliases", []) or [])
+            candidates = [ent.name] + (ent.aliases or [])
             matched = any(
                 self._names_match(candidate, incoming)
                 for candidate in candidates
@@ -2987,9 +2987,7 @@ and quick start modules so you can draft fast and refine later.
         st.caption("Track canonical characters, locations, factions, and lore.")
 
         query = st.text_input("Search", placeholder="Type a name to filter...")
-        t1, t2, t3, t4, t5, t6 = st.tabs(
-            ["Characters", "Locations", "Factions", "Lore", "Analytics", "Memory"]
-        )
+        t1, t2, t3, t4 = st.tabs(["Characters", "Locations", "Factions", "Lore"])
 
         review_queue = st.session_state.get("world_bible_review", [])
         if review_queue:
@@ -3076,7 +3074,7 @@ and quick start modules so you can draft fast and refine later.
                         e
                         for e in ents
                         if q in (e.name or "").lower()
-                        or any(q in alias.lower() for alias in (getattr(e, "aliases", []) or []))
+                        or any(q in alias.lower() for alias in (e.aliases or []))
                     ]
 
                 if not ents:
@@ -3091,13 +3089,12 @@ and quick start modules so you can draft fast and refine later.
                             e.description = new_desc
                             p.save()
 
-                        existing_aliases = getattr(e, "aliases", []) or []
                         alias_text = c1.text_input(
                             "Aliases (comma-separated)",
-                            value=", ".join(existing_aliases),
+                            value=", ".join(e.aliases or []),
                             key=f"aliases_{e.id}",
                         )
-                        if alias_text != ", ".join(existing_aliases):
+                        if alias_text != ", ".join(e.aliases or []):
                             e.aliases = [a.strip() for a in alias_text.split(",") if a.strip()]
                             p.save()
 
@@ -3117,208 +3114,6 @@ and quick start modules so you can draft fast and refine later.
                         with d2:
                             st.caption(f"Created: {time.strftime('%Y-%m-%d', time.localtime(e.created_at))}")
 
-        def render_analytics():
-            with st.container(border=True):
-                st.markdown("### Analytics")
-                chaps = p.get_ordered_chapters()
-                total_words = p.get_total_word_count()
-                total_chapters = len(chaps)
-                avg_words = int(total_words / total_chapters) if total_chapters else 0
-                total_target = sum(c.target_words for c in chaps)
-
-                m1, m2, m3, m4 = st.columns(4)
-                m1.metric("Total Words", f"{total_words:,}")
-                m2.metric("Chapters", total_chapters)
-                m3.metric("Avg Words / Chapter", f"{avg_words:,}")
-                m4.metric("Target Words", f"{total_target:,}")
-
-                if chaps:
-                    df = pd.DataFrame(
-                        [
-                            {
-                                "Chapter": f"{c.index}. {c.title}",
-                                "Words": c.word_count,
-                                "Target": c.target_words,
-                            }
-                            for c in chaps
-                        ]
-                    )
-                    fig = px.bar(
-                        df,
-                        x="Chapter",
-                        y=["Words", "Target"],
-                        barmode="group",
-                        title="Chapter Word Counts vs Targets",
-                    )
-                    fig.update_layout(xaxis_title="", yaxis_title="Words", height=360, legend_title_text="")
-                    st.plotly_chart(fig, use_container_width=True)
-                else:
-                    st.info("📭 No chapters yet. Create chapters to unlock word count analytics.")
-
-                cat_counts: Dict[str, int] = {}
-                for ent in p.world_db.values():
-                    cat_counts[ent.category] = cat_counts.get(ent.category, 0) + 1
-
-                if cat_counts:
-                    st.markdown("#### World Bible Coverage")
-                    cat_df = pd.DataFrame(
-                        [{"Category": k, "Entries": v} for k, v in sorted(cat_counts.items())]
-                    )
-                    fig2 = px.bar(cat_df, x="Category", y="Entries", title="World Bible Entries by Category")
-                    fig2.update_layout(xaxis_title="", yaxis_title="Entries", height=300)
-                    st.plotly_chart(fig2, use_container_width=True)
-                else:
-                    st.info("No World Bible entries yet. Add or scan entities to see coverage.")
-
-        def render_memory():
-            with st.container(border=True):
-                st.markdown("### Memory")
-                st.caption("Store canon, tone, and guardrails the AI should always respect.")
-                mem_txt = st.text_area("Story Memory", p.memory, height=180, key="mem_txt")
-                if mem_txt != p.memory:
-                    p.memory = mem_txt
-                    save_p()
-
-                note_cols = st.columns(2)
-                with note_cols[0]:
-                    author_txt = st.text_area(
-                        "Author Note",
-                        p.author_note,
-                        height=150,
-                        key="author_note_txt",
-                        placeholder="E.g., 'Keep POV close and intimate. Avoid modern slang.'",
-                    )
-                    if author_txt != p.author_note:
-                        p.author_note = author_txt
-                        save_p()
-                with note_cols[1]:
-                    style_txt = st.text_area(
-                        "Style Guide",
-                        p.style_guide,
-                        height=150,
-                        key="style_guide_txt",
-                        placeholder="E.g., 'Short sentences, cinematic beats, vivid sensory detail.'",
-                    )
-                    if style_txt != p.style_guide:
-                        p.style_guide = style_txt
-                        save_p()
-
-                st.divider()
-                st.markdown("#### Coherence Check")
-                st.caption("Run a focused continuity sweep. Suggestions can replace exact passages in chapters.")
-
-                chaps = p.get_ordered_chapters()
-
-                def build_world_bible_text() -> str:
-                    grouped: Dict[str, List[Entity]] = {}
-                    for ent in p.world_db.values():
-                        grouped.setdefault(ent.category, []).append(ent)
-
-                    chunks = []
-                    for category in sorted(grouped.keys()):
-                        chunks.append(f"{category}s:")
-                        for ent in sorted(grouped[category], key=lambda e: e.name.lower()):
-                            desc = (ent.description or "").strip()
-                            line = f"- {ent.name}"
-                            if desc:
-                                line += f": {desc}"
-                            chunks.append(line)
-                        chunks.append("")
-                    return "\n".join(chunks).strip()
-
-                if st.button("🧭 Run Coherence Check", type="primary", use_container_width=True):
-                    if not chaps:
-                        st.warning("Add chapters before running a coherence check.")
-                    else:
-                        with st.spinner("Checking continuity across memory, world bible, and chapters..."):
-                            chapter_payload = []
-                            for c in chaps:
-                                excerpt = (c.content or "").strip()
-                                excerpt = excerpt[:1200]
-                                chapter_payload.append(
-                                    {
-                                        "chapter_index": c.index,
-                                        "title": c.title,
-                                        "summary": c.summary,
-                                        "excerpt": excerpt,
-                                    }
-                                )
-                            results = AnalysisEngine.coherence_check(
-                                p.memory or "",
-                                p.author_note or "",
-                                p.style_guide or "",
-                                p.outline or "",
-                                build_world_bible_text(),
-                                chapter_payload,
-                                get_ai_model(),
-                            )
-                            st.session_state["coherence_results"] = results
-
-                results = st.session_state.get("coherence_results", [])
-                if results:
-                    for idx, item in enumerate(results, start=1):
-                        chap_index = item.get("chapter_index")
-                        chapter = next((c for c in chaps if c.index == chap_index), None)
-                        label = f"Issue {idx}"
-                        if chapter:
-                            label = f"Issue {idx} • Ch {chapter.index}: {chapter.title or 'Untitled'}"
-                        with st.expander(label):
-                            st.markdown(f"**Issue:** {item.get('issue', 'Unspecified')}")
-                            st.markdown(f"**Confidence:** {item.get('confidence', 'medium')}")
-                            target_excerpt = (item.get("target_excerpt") or "").strip()
-                            suggested = (item.get("suggested_rewrite") or "").strip()
-                            if target_excerpt:
-                                st.markdown("**Target Excerpt**")
-                                st.code(target_excerpt)
-                            if suggested:
-                                st.markdown("**Suggested Rewrite**")
-                                st.code(suggested)
-
-                            if chapter and target_excerpt and suggested:
-                                if target_excerpt not in (chapter.content or ""):
-                                    st.warning("Target excerpt not found in the chapter text.")
-                                elif st.button(
-                                    "✅ Replace in Chapter",
-                                    key=f"apply_fix_{idx}",
-                                    use_container_width=True,
-                                ):
-                                    updated = (chapter.content or "").replace(target_excerpt, suggested, 1)
-                                    chapter.update_content(updated, "Coherence Fix")
-                                    p.save()
-                                    st.toast("Chapter updated.")
-                else:
-                    st.info("Run a coherence check to see continuity fixes and replacement suggestions.")
-
-                st.divider()
-                st.markdown("#### World Bible Sync")
-                st.caption("Merge canon details from memory, outline, and summaries into the World Bible.")
-                if st.button("🔄 Merge World Bible Info", use_container_width=True):
-                    sync_text = "\n\n".join(
-                        [
-                            p.memory or "",
-                            p.outline or "",
-                            "\n".join([c.summary or "" for c in chaps]),
-                        ]
-                    ).strip()
-                    if sync_text:
-                        extract_entities_ui(sync_text[:8000], "Memory + Outline + Summaries")
-                        st.toast("World Bible merged from current canon.")
-                    else:
-                        st.warning("Add memory, outline, or summaries to sync the World Bible.")
-
-                st.divider()
-                st.markdown("#### Chapter Summaries")
-                if not chaps:
-                    st.info("📭 No chapters yet. Add chapters to start building a timeline.")
-                else:
-                    for c in chaps:
-                        label = f"{c.index}. {c.title or 'Untitled'}"
-                        with st.expander(label):
-                            if c.summary:
-                                st.write(c.summary)
-                            else:
-                                st.info("No summary yet. Generate one from the chapter editor.")
-
         with t1:
             render_cat("Character")
         with t2:
@@ -3327,10 +3122,6 @@ and quick start modules so you can draft fast and refine later.
             render_cat("Faction")
         with t4:
             render_cat("Lore")
-        with t5:
-            render_analytics()
-        with t6:
-            render_memory()
 
     def render_chapters():
         p = st.session_state.project
