@@ -354,6 +354,8 @@ class Project:
     genre: str = ""
     outline: str = ""
     memory: str = ""
+    memory_hard: str = ""
+    memory_soft: str = ""
     author_note: str = ""
     style_guide: str = ""
     default_word_count: int = 1000
@@ -719,6 +721,8 @@ class Project:
         proj.genre = data.get("genre", "")
         proj.outline = data.get("outline", "")
         proj.memory = data.get("memory", data.get("memory_notes", ""))
+        proj.memory_hard = data.get("memory_hard", "")
+        proj.memory_soft = data.get("memory_soft", "")
         proj.author_note = data.get("author_note", data.get("authors_note", ""))
         proj.style_guide = data.get("style_guide", data.get("style_note", ""))
         proj.default_word_count = data.get("default_word_count", 1000)
@@ -1014,6 +1018,10 @@ class StoryEngine:
 
     @staticmethod
     def generate_chapter_prompt(project: Project, chapter_index: int, target_words: int) -> str:
+        hard_rules = (project.memory_hard or project.memory or "").strip()[:1500]
+        hard_block = f"HARD CANON RULES (STRICT):\n{hard_rules}\n\n" if hard_rules else ""
+        soft_guidelines = (project.memory_soft or "").strip()[:1500]
+        soft_block = f"SOFT GUIDELINES (STYLE/CONTEXT):\n{soft_guidelines}\n\n" if soft_guidelines else ""
         memory_context = (project.memory or "").strip()[:1500]
         memory_block = f"PROJECT MEMORY:\n{memory_context}\n\n" if memory_context else ""
         author_note = (project.author_note or "").strip()[:1200]
@@ -1039,6 +1047,8 @@ class StoryEngine:
 
         prompt = (
             f"TITLE: {project.title}\nGENRE: {project.genre}\n"
+            f"{hard_block}"
+            f"{soft_block}"
             f"{memory_block}"
             f"{author_block}"
             f"{style_block}"
@@ -3134,6 +3144,22 @@ and quick start modules so you can draft fast and refine later.
         with t5:
             st.markdown("### 🧠 World Memory")
             st.caption("Keep canon notes, timelines, and facts the AI should always know.")
+            st.markdown("#### 🔒 Hard Canon Rules")
+            hard_key = f"world_memory_hard_{p.id}"
+            hard_default = p.memory_hard or p.memory
+            hard_val = st.text_area("Hard Canon Rules", hard_default, height=160, key=hard_key)
+            if hard_val != p.memory_hard:
+                p.memory_hard = hard_val
+                save_p()
+
+            st.markdown("#### 🧭 Soft Guidelines")
+            soft_key = f"world_memory_soft_{p.id}"
+            soft_val = st.text_area("Soft Guidelines", p.memory_soft, height=160, key=soft_key)
+            if soft_val != p.memory_soft:
+                p.memory_soft = soft_val
+                save_p()
+
+            st.markdown("#### 🧠 Project Memory")
             memory_key = f"world_memory_{p.id}"
             memory_val = st.text_area("Memory", p.memory, height=320, key=memory_key)
             if memory_val != p.memory:
@@ -3142,6 +3168,97 @@ and quick start modules so you can draft fast and refine later.
             if st.button("💾 Save Memory", use_container_width=True):
                 p.save()
                 st.toast("Memory saved")
+
+            st.divider()
+            st.markdown("#### 🔍 Coherence Check")
+            scope_cols = st.columns(3)
+            with scope_cols[0]:
+                scope_outline = st.checkbox("Outline", value=True, key=f"coh_outline_{p.id}")
+            with scope_cols[1]:
+                scope_world = st.checkbox("World Bible", value=True, key=f"coh_world_{p.id}")
+            with scope_cols[2]:
+                scope_chapters = st.checkbox("Chapters", value=True, key=f"coh_chapters_{p.id}")
+
+            if st.button("🔍 Run Coherence Check", use_container_width=True):
+                compiled_world_bible = "\n".join(
+                    f"{e.name} ({e.category}): {e.description}"
+                    for e in p.world_db.values()
+                )
+                chapter_payload = [
+                    {
+                        "chapter_index": c.index,
+                        "summary": c.summary,
+                        "excerpt": (c.content or "")[:800],
+                    }
+                    for c in p.get_ordered_chapters()
+                ]
+                outline_payload = p.outline if scope_outline else ""
+                world_payload = compiled_world_bible if scope_world else ""
+                chapters_payload = chapter_payload if scope_chapters else []
+                with st.spinner("Running coherence check..."):
+                    results = AnalysisEngine.coherence_check(
+                        memory=p.memory,
+                        author_note=p.author_note,
+                        style_guide=p.style_guide,
+                        outline=outline_payload,
+                        world_bible=world_payload,
+                        chapters=chapters_payload,
+                        model=get_ai_model(),
+                    )
+                st.session_state["coherence_results"] = results or []
+                if results:
+                    st.toast("Coherence issues found.")
+                else:
+                    st.toast("No coherence issues detected.")
+
+            results = st.session_state.get("coherence_results", [])
+            if results:
+                st.markdown("#### 🧩 Coherence Issues")
+                for idx, issue in enumerate(list(results)):
+                    with st.container(border=True):
+                        chapter_idx = issue.get("chapter_index", "?")
+                        st.markdown(f"**Chapter #{chapter_idx}**")
+                        st.markdown(f"**Issue:** {issue.get('issue', 'Unspecified issue')}")
+                        st.markdown(f"**Confidence:** {issue.get('confidence', 'unknown')}")
+                        st.markdown("**Suggested Rewrite:**")
+                        st.write(issue.get("suggested_rewrite", ""))
+
+                        a1, a2 = st.columns(2)
+                        with a1:
+                            if st.button("✅ Apply Fix", key=f"coh_apply_{idx}", width="stretch"):
+                                target_excerpt = issue.get("target_excerpt", "")
+                                try:
+                                    chapter_num = int(chapter_idx)
+                                except (TypeError, ValueError):
+                                    chapter_num = None
+                                target_chapter = None
+                                if chapter_num is not None:
+                                    for c in p.get_ordered_chapters():
+                                        if c.index == chapter_num:
+                                            target_chapter = c
+                                            break
+                                if not target_chapter:
+                                    st.warning("Chapter not found for this issue.")
+                                elif target_excerpt and target_excerpt in (target_chapter.content or ""):
+                                    updated = (target_chapter.content or "").replace(
+                                        target_excerpt,
+                                        issue.get("suggested_rewrite", ""),
+                                        1,
+                                    )
+                                    target_chapter.update_content(updated, "Coherence Fix")
+                                    p.save()
+                                    results.pop(idx)
+                                    st.session_state["coherence_results"] = results
+                                    st.toast("Applied fix.")
+                                    st.rerun()
+                                else:
+                                    st.warning("Target excerpt not found in chapter content.")
+                        with a2:
+                            if st.button("🗑 Ignore", key=f"coh_ignore_{idx}", width="stretch"):
+                                results.pop(idx)
+                                st.session_state["coherence_results"] = results
+                                st.toast("Issue ignored.")
+                                st.rerun()
         with t6:
             st.markdown("### 📊 World Bible Analytics")
             st.caption("Quick stats on your current canon database.")
@@ -3164,6 +3281,84 @@ and quick start modules so you can draft fast and refine later.
                 "Last Updated",
                 time.strftime("%Y-%m-%d", time.localtime(p.last_modified)),
             )
+
+            st.divider()
+            st.markdown("#### 📌 Entity Utilization")
+            chapters = p.get_ordered_chapters()
+            chapter_texts = [c.content or "" for c in chapters]
+            utilization_rows = []
+            for ent in entries:
+                aliases = [ent.name] + (ent.aliases or [])
+                total_hits = 0
+                for text in chapter_texts:
+                    lower_text = text.lower()
+                    for alias in aliases:
+                        alias_clean = (alias or "").strip()
+                        if not alias_clean:
+                            continue
+                        pattern = rf"\\b{re.escape(alias_clean.lower())}\\b"
+                        total_hits += len(re.findall(pattern, lower_text))
+                utilization_rows.append(
+                    {
+                        "Name": ent.name,
+                        "Category": ent.category,
+                        "Appearances": total_hits,
+                        "Orphaned": total_hits == 0,
+                        "Under-described": len((ent.description or "").strip()) < 30,
+                    }
+                )
+            if utilization_rows:
+                st.dataframe(utilization_rows, use_container_width=True, hide_index=True)
+            else:
+                st.info("No entities yet to analyze.")
+
+            st.divider()
+            st.markdown("#### ⚠️ Canon Risk Flags")
+            coherence_results = st.session_state.get("coherence_results", [])
+            high_canon_drift = len(coherence_results) > 0
+
+            normalized_name_map: Dict[str, List[str]] = {}
+            for ent in entries:
+                normalized = Project._normalize_entity_name(ent.name)
+                if not normalized:
+                    continue
+                normalized_name_map.setdefault(normalized, []).append(ent.name)
+            alias_collision = any(len(names) > 1 for names in normalized_name_map.values())
+
+            timeline_dense = False
+            dense_chapters = []
+            for chap in chapters:
+                summary_text = (chap.summary or "").strip()
+                base_text = summary_text if summary_text else (chap.content or "")[:800]
+                sentence_count = len([s for s in re.split(r"[.!?]+", base_text) if s.strip()])
+                if sentence_count > 3:
+                    timeline_dense = True
+                    dense_chapters.append(chap.index)
+
+            if high_canon_drift:
+                st.warning("High Canon Drift: coherence issues detected.")
+            if alias_collision:
+                st.warning("Alias Collision: multiple entities share normalized names.")
+            if timeline_dense:
+                chap_list = ", ".join(str(idx) for idx in dense_chapters)
+                st.warning(f"Timeline Density: >3 major events in chapters {chap_list}.")
+            if not any([high_canon_drift, alias_collision, timeline_dense]):
+                st.success("No canon risk flags detected.")
+
+            st.divider()
+            st.markdown("#### ✅ AI Readiness Score")
+            readiness = 0
+            if (p.memory or "").strip():
+                readiness += 20
+            if len(entries) > 10:
+                readiness += 20
+            if (p.outline or "").strip():
+                readiness += 20
+            if chapters:
+                readiness += 20
+            if not coherence_results:
+                readiness += 20
+            st.metric("AI Readiness", f"{readiness}%")
 
     def render_chapters():
         p = st.session_state.project
