@@ -3083,13 +3083,8 @@ and quick start modules so you can draft fast and refine later.
                     st.info(f"📭 No {category} entries yet. Add one above or scan entities from your outline/chapters.")
                     return
 
-                for idx, e in enumerate(ents):
-                    # Streamlit versions without expander `key` need unique labels.
-                    # Use zero-width spaces to keep the visible label clean.
-                    safe_name = (e.name or "Unnamed").strip() or "Unnamed"
-                    zero_width = "\u200b"
-                    expander_label = f"{safe_name}{zero_width * (idx + 1)}"
-                    with st.expander(expander_label):
+                for e in ents:
+                    with st.expander(f"{e.name}", key=f"world_exp_{e.id}"):
                         c1, c2 = st.columns([4, 1])
                         new_desc = c1.text_area("Notes", e.description, key=f"desc_{e.id}", height=140)
                         if new_desc != e.description:
