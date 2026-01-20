@@ -44,7 +44,10 @@ import sys
 # ===== v45 BRANDING (SAFE, ORIGINAL TEMPLATE) =====
 import base64
 
-_MANTIS_LOGO_PATH = "mantis_logo_trans.png"
+_MANTIS_LOGO_PATH = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    "mantis_logo_trans.png",
+)
 
 def _mantis_logo_b64() -> str:
     try:
@@ -779,6 +782,26 @@ class AIEngine:
             return []
 
     def generate_stream(self, prompt: str, model: str) -> Generator[str, None, None]:
+        if "streamlit" in sys.modules:
+            import streamlit as st
+
+            results = st.session_state.get("coherence_results", [])
+            if len(results) > 2:
+                yield (
+                    "ERROR: Canon violation detected.\n"
+                    "Resolve Hard Canon conflicts before generating AI content."
+                )
+                return
+            project = st.session_state.get("project")
+            hard_rules = ""
+            if project:
+                hard_rules = (project.memory_hard or project.memory or "").strip()
+            if hard_rules:
+                prompt = (
+                    "HARD CANON RULES (NON-NEGOTIABLE):\n"
+                    f"{hard_rules}\n\n"
+                    f"{prompt}"
+                )
         if not model:
             yield "Groq model not configured."
             return
@@ -1129,6 +1152,60 @@ def project_to_markdown(project: Project) -> str:
 def _run_ui():
     import streamlit as st
 
+    def get_canon_health() -> tuple[str, str]:
+        results = st.session_state.get("coherence_results", [])
+        issue_count = len(results)
+        if issue_count == 0:
+            return "🟢", "Canon Stable"
+        if issue_count <= 2:
+            return "🟡", "Minor Canon Drift"
+        return "🔴", "High Canon Risk"
+
+    def update_locked_chapters() -> None:
+        results = st.session_state.get("coherence_results", [])
+        locked = {
+            issue.get("chapter_index")
+            for issue in results
+            if issue.get("confidence") in ("medium", "high")
+        }
+        normalized = set()
+        for item in locked:
+            try:
+                normalized.add(int(item))
+            except (TypeError, ValueError):
+                continue
+        st.session_state["locked_chapters"] = normalized
+
+    def detect_hard_canon_violation(
+        project: Project,
+        chapter_index: int,
+        candidate_text: str,
+    ) -> List[Dict[str, Any]]:
+        hard_rules = (project.memory_hard or project.memory or "").strip()
+        if not hard_rules:
+            return []
+        payload = [
+            {
+                "chapter_index": chapter_index,
+                "summary": "",
+                "excerpt": (candidate_text or "")[:800],
+            }
+        ]
+        results = AnalysisEngine.coherence_check(
+            memory=hard_rules,
+            author_note="",
+            style_guide="",
+            outline="",
+            world_bible="",
+            chapters=payload,
+            model=get_ai_model(),
+        )
+        return [
+            issue
+            for issue in (results or [])
+            if issue.get("confidence") in ("medium", "high")
+        ]
+
     def render_privacy():
         st.markdown("## Privacy Policy\n\nLocal-only storage. No analytics.")
 
@@ -1174,6 +1251,8 @@ def _run_ui():
         st.session_state.activity_log = list(config_data.get("activity_log", []))
     if "remember_me" not in st.session_state:
         st.session_state.remember_me = bool(config_data.get("remember_me", False))
+    st.session_state.setdefault("canon_health_log", [])
+    st.session_state.setdefault("locked_chapters", set())
 
     theme = st.session_state.ui_theme if st.session_state.ui_theme in ("Dark", "Light") else "Dark"
     theme_tokens = {
@@ -1197,7 +1276,7 @@ def _run_ui():
             "sidebar_title": "#7dd3a7",
             "divider": "#143023",
             "expander_border": "#1f3b2d",
-            "header_gradient": "radial-gradient(circle at top left, rgba(34,197,94,0.35), rgba(2,6,23,0.6)), linear-gradient(135deg, #0b1216, #0f1a15)",
+            "header_gradient": "linear-gradient(135deg, #0b1216, #0f1a15)",
             "header_logo_bg": "rgba(34,197,94,0.2)",
             "header_sub": "#c7f2da",
             "shadow_strong": "0 18px 40px rgba(0,0,0,0.55)",
@@ -1355,21 +1434,23 @@ def _run_ui():
         align-items:center;
     }}
     .mantis-header-logo {{
-        width:52px;
-        height:52px;
-        border-radius:16px;
-        background: var(--mantis-header-logo-bg);
+        width:72px;
+        height:72px;
+        border-radius:18px;
+        background: rgba(0,0,0,0.35);
         display:flex;
         align-items:center;
         justify-content:center;
         overflow:hidden;
-        box-shadow: inset 0 0 0 1px rgba(255,255,255,0.2), 0 8px 20px rgba(0,0,0,0.25);
+        box-shadow:
+            inset 0 0 0 1px rgba(255,255,255,0.15),
+            0 0 18px rgba(34,197,94,0.45);
     }}
     .mantis-header-logo img {{
-        height:32px;
+        height:48px;
         width:auto;
-        padding:6px;
-        border-radius:12px;
+        padding:0;
+        border-radius:0;
     }}
     .mantis-header-title {{
         font-size:22px;
@@ -3206,6 +3287,17 @@ and quick start modules so you can draft fast and refine later.
                         model=get_ai_model(),
                     )
                 st.session_state["coherence_results"] = results or []
+                canon_icon, canon_label = get_canon_health()
+                st.session_state.setdefault("canon_health_log", [])
+                st.session_state["canon_health_log"].append(
+                    {
+                        "timestamp": time.time(),
+                        "status": canon_icon,
+                        "issue_count": len(st.session_state.get("coherence_results", [])),
+                    }
+                )
+                st.session_state["canon_health_log"] = st.session_state["canon_health_log"][-30:]
+                update_locked_chapters()
                 if results:
                     st.toast("Coherence issues found.")
                 else:
@@ -3249,6 +3341,7 @@ and quick start modules so you can draft fast and refine later.
                                     p.save()
                                     results.pop(idx)
                                     st.session_state["coherence_results"] = results
+                                    update_locked_chapters()
                                     st.toast("Applied fix.")
                                     st.rerun()
                                 else:
@@ -3257,6 +3350,7 @@ and quick start modules so you can draft fast and refine later.
                             if st.button("🗑 Ignore", key=f"coh_ignore_{idx}", width="stretch"):
                                 results.pop(idx)
                                 st.session_state["coherence_results"] = results
+                                update_locked_chapters()
                                 st.toast("Issue ignored.")
                                 st.rerun()
         with t6:
@@ -3281,6 +3375,93 @@ and quick start modules so you can draft fast and refine later.
                 "Last Updated",
                 time.strftime("%Y-%m-%d", time.localtime(p.last_modified)),
             )
+
+            st.divider()
+            if not st.session_state.get("is_premium", False):
+                st.info("🔒 Canon history is a Premium feature.")
+            else:
+                st.markdown("### 🧠 Canon Health History")
+                for entry in st.session_state.get("canon_health_log", []):
+                    st.caption(
+                        f"{time.strftime('%Y-%m-%d %H:%M', time.localtime(entry['timestamp']))} "
+                        f"{entry['status']} ({entry['issue_count']} issues)"
+                    )
+
+            st.divider()
+            st.markdown("### 📉 Canon Drift Trend")
+            trend_entries = st.session_state.get("canon_health_log", [])[-10:]
+            if not trend_entries:
+                st.info("No canon drift history yet.")
+            else:
+                for entry in trend_entries:
+                    status = entry.get("status", "🟢")
+                    issue_count = int(entry.get("issue_count", 0) or 0)
+                    severity = {"🟢": 0, "🟡": 1, "🔴": 2}.get(status, 0)
+                    bar_length = min(5, max(0, issue_count))
+                    bar = "▓" * bar_length + "░" * (5 - bar_length)
+                    timestamp = time.strftime("%Y-%m-%d", time.localtime(entry["timestamp"]))
+                    st.caption(f"{timestamp}  {bar} ({issue_count} issues, severity {severity})")
+
+            st.divider()
+            st.markdown("### ⏱ Timeline Heatmap")
+            for chap in p.get_ordered_chapters():
+                intensity = min(1.0, chap.word_count / 2000)
+                st.progress(intensity, text=f"Chapter {chap.index}: {chap.word_count} words")
+
+            st.divider()
+            if not st.session_state.get("is_premium", False):
+                st.info("🔒 Canon Health export is a Premium feature.")
+            else:
+                canon_icon, canon_label = get_canon_health()
+                locked_chapters = sorted(st.session_state.get("locked_chapters", set()))
+                issues = st.session_state.get("coherence_results", [])
+                report_lines = [
+                    f"# Canon Health Report: {p.title}",
+                    f"**Generated:** {time.strftime('%Y-%m-%d %H:%M', time.localtime())}",
+                    f"**Current Canon Status:** {canon_icon} {canon_label}",
+                    "",
+                    "## Active Issues",
+                ]
+                if issues:
+                    for issue in issues:
+                        report_lines.append(
+                            f"- Chapter {issue.get('chapter_index', '?')}: "
+                            f"{issue.get('issue', 'Unspecified issue')} "
+                            f"(confidence: {issue.get('confidence', 'unknown')})"
+                        )
+                else:
+                    report_lines.append("- None")
+                report_lines.extend(
+                    [
+                        "",
+                        "## Canon Drift History (latest 10)",
+                    ]
+                )
+                if trend_entries:
+                    for entry in trend_entries:
+                        timestamp = time.strftime("%Y-%m-%d %H:%M", time.localtime(entry["timestamp"]))
+                        report_lines.append(
+                            f"- {timestamp} {entry.get('status', '🟢')} "
+                            f"({entry.get('issue_count', 0)} issues)"
+                        )
+                else:
+                    report_lines.append("- No history available.")
+                report_lines.extend(
+                    [
+                        "",
+                        "## Locked Chapters",
+                    ]
+                )
+                if locked_chapters:
+                    report_lines.append(", ".join(str(idx) for idx in locked_chapters))
+                else:
+                    report_lines.append("None")
+                report_text = "\n".join(report_lines)
+                st.download_button(
+                    "📄 Download Canon Health Report",
+                    report_text,
+                    file_name=f"{p.title}_canon_health.md",
+                )
 
             st.divider()
             st.markdown("#### 📌 Entity Utilization")
@@ -3384,6 +3565,7 @@ and quick start modules so you can draft fast and refine later.
             st.session_state.curr_chap_id = chaps[0].id
 
         curr = p.chapters[st.session_state.curr_chap_id]
+        locked_chapters = st.session_state.get("locked_chapters", set())
         # --- SAFELY sync programmatic chapter updates into the editor widget (before widget exists)
         ed_key = f"ed_{curr.id}"
         if (
@@ -3459,20 +3641,44 @@ and quick start modules so you can draft fast and refine later.
                         st.toast("Chapter Saved & Entities Scanned")
                 with c2:
                     if st.button("📝 Update Summary", width="stretch"):
-                        curr.summary = StoryEngine.summarize(curr.content or "", get_ai_model())
-                        p.save()
-                        st.rerun()
+                        summary = StoryEngine.summarize(curr.content or "", get_ai_model())
+                        if summary.strip().startswith("ERROR: Canon violation detected."):
+                            st.error("Canon violation detected. Resolve issues before generating AI content.")
+                        else:
+                            curr.summary = summary
+                            p.save()
+                            st.rerun()
 
                 with st.expander("✨ Modify / Improve Text"):
-                    style = st.selectbox("How to improve?", list(REWRITE_PRESETS.keys()))
-                    cust = st.text_input("Instructions") if style == "Custom" else ""
-                    if st.button("Apply Changes", width="stretch"):
+                    rewrite_locked = curr.index in locked_chapters
+                    style = st.selectbox(
+                        "How to improve?",
+                        list(REWRITE_PRESETS.keys()),
+                        disabled=rewrite_locked,
+                    )
+                    cust = ""
+                    if style == "Custom":
+                        cust = st.text_input("Instructions", disabled=rewrite_locked)
+                    if rewrite_locked:
+                        st.caption("🔒 Rewrite tools are disabled for locked chapters.")
+                    if st.button("Apply Changes", width="stretch", disabled=rewrite_locked):
                         prompt = rewrite_prompt(curr.content or "", style, cust)
                         st.session_state.ghost_text = ""
                         full = ""
                         for chunk in AIEngine().generate_stream(prompt, get_ai_model()):
                             full += chunk
                             stream_ph.markdown(f"**IMPROVING:**\n\n{full}")
+                        if full.strip().startswith("ERROR: Canon violation detected."):
+                            st.error("Canon violation detected. Resolve issues before generating AI content.")
+                            return
+                        violations = detect_hard_canon_violation(p, curr.index, full)
+                        if violations:
+                            results = st.session_state.get("coherence_results", [])
+                            results.extend(violations)
+                            st.session_state["coherence_results"] = results
+                            update_locked_chapters()
+                            st.warning("Hard Canon conflict detected. AI output was not applied.")
+                            return
                         st.session_state.ghost_text = full
 
         with col_ai:
@@ -3480,7 +3686,28 @@ and quick start modules so you can draft fast and refine later.
                 st.markdown("### 🤖 Assistant")
                 st.caption("Generate new prose from your outline + previous context.")
 
-                if st.button("✨ Auto-Write Chapter", type="primary", width="stretch"):
+                canon_icon, canon_label = get_canon_health()
+                canon_blocked = canon_icon == "🔴"
+                chapter_locked = curr.index in locked_chapters
+                if chapter_locked:
+                    st.warning(
+                        "🔒 This chapter is locked due to canon violations.\n"
+                        "Resolve issues in World Bible → Memory to unlock."
+                    )
+                    st.button(
+                        "🚫 Auto-Write Disabled (Chapter Locked)",
+                        disabled=True,
+                        use_container_width=True,
+                        help="Resolve canon issues in World Bible → Memory before generating.",
+                    )
+                elif canon_blocked:
+                    st.button(
+                        "🚫 Auto-Write Disabled (Canon Risk)",
+                        disabled=True,
+                        use_container_width=True,
+                        help="Resolve canon issues in World Bible → Memory before generating.",
+                    )
+                elif st.button("✨ Auto-Write Chapter", type="primary", use_container_width=True):
                     prompt = StoryEngine.generate_chapter_prompt(p, curr.index, int(curr.target_words))
                     full = ""
                     for chunk in AIEngine().generate_stream(prompt, get_ai_model()):
@@ -3488,6 +3715,17 @@ and quick start modules so you can draft fast and refine later.
                         stream_ph.markdown(f"**GENERATING:**\n\n{full}")
 
                     if full.strip():
+                        if full.strip().startswith("ERROR: Canon violation detected."):
+                            st.error("Canon violation detected. Resolve issues before generating AI content.")
+                            return
+                        violations = detect_hard_canon_violation(p, curr.index, full)
+                        if violations:
+                            results = st.session_state.get("coherence_results", [])
+                            results.extend(violations)
+                            st.session_state["coherence_results"] = results
+                            update_locked_chapters()
+                            st.warning("Hard Canon conflict detected. AI output was not applied.")
+                            return
                         new_text = ((curr.content or "") + "\n" + full.strip()).strip()
                         curr.update_content(new_text, "AI Auto-Write")
                         p.save()
