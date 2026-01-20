@@ -2999,7 +2999,7 @@ and quick start modules so you can draft fast and refine later.
                 st.caption("AI suggestions are queued for review. Apply to update canon.")
                 for idx, item in enumerate(list(review_queue)):
                     label = f"{item.get('name', 'Unnamed')} • {item.get('category', 'Lore')}"
-                    expander_label = build_expander_label(label, idx)
+                    expander_label = f"{label} #{idx}"
                     with st.expander(expander_label):
                         st.markdown(f"**Type:** {item.get('type', 'new').title()}")
                         confidence = item.get("confidence")
