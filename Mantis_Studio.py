@@ -1174,8 +1174,6 @@ def _run_ui():
         st.markdown("---")
         st.caption("© MANTIS Studio")
 
-    import pandas as pd
-    import plotly.express as px
 
     def render_privacy():
         st.markdown("## Privacy Policy\n\nLocal-only storage. No analytics.")
@@ -2544,358 +2542,125 @@ def _run_ui():
             st.info("No project loaded.")
 
     def render_home():
-        active_dir = get_active_projects_dir()
-        recent_projects = _load_recent_projects(active_dir)
-        recent_snapshot = _project_snapshot(recent_projects[0]["meta"]) if recent_projects else None
-        has_project = bool(recent_projects)
-        has_outline = any((p["meta"].get("outline") or "").strip() for p in recent_projects)
-        has_chapter = any(
-            (c.get("word_count") or 0) > 0
-            for p in recent_projects
-            for c in (p["meta"].get("chapters") or {}).values()
-        )
-
-        def milestone_row(done: bool, label: str):
-            icon = "✅" if done else "⬜"
-            st.markdown(f"{icon} {label}")
-
-        active_project = st.session_state.project
-        project_title = (
-            (active_project.title if active_project else None)
-            or (recent_snapshot or {}).get("title")
-            or "Your next story"
-        )
-        canon_icon, _ = get_canon_health()
-        latest_chapter_label = "You last worked on Chapter — · recently"
-        latest_chapter_index = None
-        latest_chapter_id = None
-        latest_chapter_ts = None
-        if active_project and active_project.chapters:
-            latest_chapter = max(
-                active_project.chapters.values(),
-                key=lambda c: c.modified_at or c.created_at,
+        # ---- Small compat helpers ----
+        def _btn(label, *, key, primary=False):
+            return st.button(
+                label,
+                key=key,
+                type=("primary" if primary else "secondary"),
+                width="stretch",
             )
-            latest_chapter_index = latest_chapter.index
-            latest_chapter_id = latest_chapter.id
-            latest_chapter_ts = latest_chapter.modified_at or latest_chapter.created_at
-        elif recent_projects:
-            chapter_meta = list((recent_projects[0]["meta"].get("chapters") or {}).values())
-            if chapter_meta:
-                latest_chapter = max(
-                    chapter_meta,
-                    key=lambda c: c.get("modified_at") or c.get("created_at") or 0,
-                )
-                latest_chapter_index = latest_chapter.get("index")
-                latest_chapter_ts = latest_chapter.get("modified_at") or latest_chapter.get("created_at")
 
-        if latest_chapter_index and latest_chapter_ts:
-            hours_ago = max(1, int((time.time() - latest_chapter_ts) / 3600))
-            latest_chapter_label = f"You last worked on Chapter {latest_chapter_index} · {hours_ago} hours ago"
+        def _pill(label, *, key):
+            return st.button(label, key=key, width="stretch")
+
+        def _go(page: str, **state):
+            for k, v in state.items():
+                st.session_state[k] = v
+            st.session_state.page = page
+            st.rerun()
+
+        st.markdown("# 🏠 Home")
+
+        project = st.session_state.get("project", None)
+        project_title = getattr(project, "title", None) or "No active project"
+
+        last_label = ""
+        try:
+            chapters = list(getattr(project, "chapters", {}).values()) if project else []
+            if chapters:
+                last = chapters[-1]
+                last_name = getattr(last, "title", "a chapter") or "a chapter"
+                last_label = f"Last worked on **{last_name}**"
+        except Exception:
+            last_label = ""
 
         with st.container(border=True):
-            st.markdown("### 👋 Welcome back")
-            st.markdown(f"## {project_title}")
-            st.caption(latest_chapter_label)
+            c1, c2 = st.columns([3, 1], vertical_alignment="center")
 
-        primary_label = "✨ Start your story"
-        primary_target = "projects"
-        if canon_icon == "🔴":
-            primary_label = "🛠 Fix story issues"
-            primary_target = "world"
-        elif has_chapter and latest_chapter_index:
-            primary_label = f"▶ Continue writing Chapter {latest_chapter_index}"
-            primary_target = "chapters"
-        elif has_outline:
-            primary_label = "📝 Build your outline"
-            primary_target = "outline"
+            with c1:
+                if project:
+                    st.markdown(f"### 👋 Welcome back\n**{project_title}**")
+                    if last_label:
+                        st.caption(last_label)
+                else:
+                    st.markdown("### 👋 Welcome to MANTIS Studio")
+                    st.caption("Pick a project to start writing.")
 
-        primary_cols = st.columns([1, 2, 1])
-        with primary_cols[1]:
-            if st.button(primary_label, type="primary", use_container_width=True):
-                if recent_projects and not st.session_state.project:
-                    st.session_state.project = Project.load(recent_projects[0]["path"])
-                if primary_target == "chapters" and latest_chapter_id:
-                    st.session_state.curr_chap_id = latest_chapter_id
-                st.session_state.page = primary_target
-                st.rerun()
+            with c2:
+                if project:
+                    if _btn("▶ Continue writing", key="home_continue", primary=True):
+                        _go("chapters")
+                else:
+                    if _btn("✨ Start a project", key="home_start_project", primary=True):
+                        _go("projects")
 
-        nav_row_one = st.columns(2)
-        with nav_row_one[0]:
+        st.markdown("## Quick actions")
+
+        qa = st.columns(3)
+        with qa[0]:
+            if _pill("🌍 World Bible", key="home_qa_world"):
+                _go("world", world_focus_tab="Characters")
+        with qa[1]:
+            if _pill("🧠 Memory", key="home_qa_memory"):
+                _go("world", world_focus_tab="Memory")
+        with qa[2]:
+            if _pill("📈 Insights", key="home_qa_insights"):
+                _go("world", world_focus_tab="Analytics")
+
+        st.markdown("## Workspace")
+
+        m1, m2 = st.columns(2)
+        with m1:
             with st.container(border=True):
-                st.markdown("### 🌍 World Bible")
-                st.caption("Characters, places, factions, and lore")
-                if st.button("Open", key="nav_world", use_container_width=True):
-                    if recent_projects and not st.session_state.project:
-                        st.session_state.project = Project.load(recent_projects[0]["path"])
-                    st.session_state.page = "world"
-                    st.rerun()
-        with nav_row_one[1]:
+                st.markdown("### ✍️ Editor")
+                st.caption("Write and revise chapters.")
+                if _btn("Open Editor", key="home_open_editor", primary=True):
+                    _go("chapters")
+
             with st.container(border=True):
-                st.markdown("### 📝 Outline")
-                st.caption("Blueprint your story beats and arcs")
-                if st.button("Open", key="nav_outline", use_container_width=True):
-                    if recent_projects and not st.session_state.project:
-                        st.session_state.project = Project.load(recent_projects[0]["path"])
-                    st.session_state.page = "outline"
-                    st.rerun()
+                st.markdown("### 🧩 Outline")
+                st.caption("Plan beats, arcs, and structure.")
+                if _btn("Open Outline", key="home_open_outline"):
+                    _go("outline")
 
-        nav_row_two = st.columns(2)
-        with nav_row_two[0]:
+        with m2:
             with st.container(border=True):
-                st.markdown("### 🧠 Memory")
-                st.caption("Canon rules, guidance, and style notes")
-                if st.button("Open", key="nav_memory", use_container_width=True):
-                    if recent_projects and not st.session_state.project:
-                        st.session_state.project = Project.load(recent_projects[0]["path"])
-                    st.session_state.page = "world"
-                    st.rerun()
-        with nav_row_two[1]:
+                st.markdown("### 🗂️ Projects")
+                st.caption("Switch or create projects.")
+                if _btn("Open Projects", key="home_open_projects"):
+                    _go("projects")
+
             with st.container(border=True):
-                st.markdown("### 📊 Insights")
-                st.caption("Analytics and canon health insights")
-                if st.button("Open", key="nav_analytics", use_container_width=True):
-                    if recent_projects and not st.session_state.project:
-                        st.session_state.project = Project.load(recent_projects[0]["path"])
-                    st.session_state.page = "world"
-                    st.rerun()
+                st.markdown("### 🤖 AI Tools")
+                st.caption("Generate, refine, and assist.")
+                if _btn("Open AI Tools", key="home_open_ai"):
+                    _go("ai")
 
-        world_entries = []
-        if active_project:
-            world_entries = list(active_project.world_db.values())
-        elif recent_projects:
-            world_entries = list((recent_projects[0]["meta"].get("world_db") or {}).values())
-        category_counts: Dict[str, int] = {}
-        for ent in world_entries:
-            category = Project._normalize_category(ent.get("category") if isinstance(ent, dict) else ent.category)
-            category_counts[category] = category_counts.get(category, 0) + 1
-        things_to_review = len(st.session_state.get("coherence_results", []))
+        st.markdown("## Your world at a glance")
         with st.container(border=True):
-            st.markdown("### 🌍 Your world at a glance")
-            st.caption(f"• Total entities: {len(world_entries)}")
-            st.caption(
-                "• Key categories: "
-                + ", ".join(f"{cat} ({count})" for cat, count in category_counts.items())
-                if category_counts
-                else "• Key categories: —"
-            )
-            st.caption(f"• Things to review: {things_to_review}")
-
-        if st.session_state.activity_log:
-            st.markdown("### ✨ Recent moments")
-            for entry in list(reversed(st.session_state.activity_log))[:5]:
-                st.caption(f"• Writing session logged on {entry}")
-
-        with st.container(border=True):
-            st.markdown("#### Quick actions")
-            action_cols = st.columns(3)
-            with action_cols[0]:
-                if st.button(
-                    "📂 Resume",
-                    width="stretch",
-                    disabled=not recent_projects,
-                ):
-                    if recent_projects:
-                        st.session_state.project = Project.load(recent_projects[0]["path"])
-                        st.session_state.page = "chapters"
-                        st.rerun()
-            with action_cols[1]:
-                if st.button("🧭 New project", width="stretch"):
-                    st.session_state.page = "projects"
-                    st.rerun()
-            with action_cols[2]:
-                if st.button(
-                    "🧩 Open outline",
-                    width="stretch",
-                    disabled=not recent_projects,
-                ):
-                    if recent_projects:
-                        st.session_state.project = Project.load(recent_projects[0]["path"])
-                        st.session_state.page = "outline"
-                        st.rerun()
-
-            st.markdown("#### Workspace snapshot")
-            snapshot_cols = st.columns(4)
-            snapshot_cols[0].metric("Active projects", len(recent_projects))
-            snapshot_cols[1].metric("Latest genre", (recent_snapshot or {}).get("genre", "—"))
-            snapshot_cols[2].metric("Writing streak", f"{streak} days")
-            snapshot_cols[3].metric("Weekly sessions", f"{weekly_count}/{weekly_goal}")
-
-        with st.container(border=True):
-            st.markdown("#### Studio signals")
-            st.caption("Model, storage, and AI readiness at a glance.")
-            status_card = st.container(border=True)
-            with status_card:
-                groq_status = "Connected" if st.session_state.groq_api_key else "Add key"
-                openai_status = "Connected" if st.session_state.openai_api_key else "Add key"
-                st.metric("Groq", groq_status)
-                st.metric("OpenAI", openai_status)
-                st.metric("Model", st.session_state.groq_model or AppConfig.DEFAULT_MODEL)
-                st.caption(f"Projects dir: `{active_dir}`")
-
-            st.markdown("#### 🧭 Studio setup")
-            milestone_col = st.container(border=True)
-            with milestone_col:
-                milestone_row(has_project, "Create a project")
-                milestone_row(has_outline, "Draft an outline")
-                milestone_row(has_chapter, "Write a chapter")
-
-        with st.container(border=True):
-            st.markdown("#### Studio signals")
-            st.caption("Model, storage, and AI readiness at a glance.")
-            status_card = st.container(border=True)
-            with status_card:
-                groq_status = "Connected" if st.session_state.groq_api_key else "Add key"
-                openai_status = "Connected" if st.session_state.openai_api_key else "Add key"
-                st.metric("Groq", groq_status)
-                st.metric("OpenAI", openai_status)
-                st.metric("Model", st.session_state.groq_model or AppConfig.DEFAULT_MODEL)
-                st.caption(f"Projects dir: `{active_dir}`")
-
-            st.markdown("#### 🧭 Studio setup")
-            milestone_col = st.container(border=True)
-            with milestone_col:
-                milestone_row(has_project, "Create a project")
-                milestone_row(has_outline, "Draft an outline")
-                milestone_row(has_chapter, "Write a chapter")
-
-        with st.container(border=True):
-            st.markdown("### ✨ Welcome to your writing nook")
-            canon_status = "steady" if canon_icon == "🟢" else "needs a quick review"
-            encouragements = [
-                "Small steps today add up to big chapters tomorrow.",
-                "You’ve already done the hardest part — showing up.",
-                "Let’s keep the story cozy and consistent.",
-                "A few focused minutes can move the whole draft forward.",
-            ]
-            completed_steps = sum([has_project, has_outline, has_chapter])
-            st.caption(encouragements[completed_steps % len(encouragements)])
-
-            st.caption(f"• Project setup: {completed_steps}/3 steps complete")
-            st.caption(f"• Canon status: {canon_status}")
-
-            st.caption("Soft checklist")
-            st.caption(f"• Create a project{' ✅' if has_project else ''}")
-            st.caption(f"• Draft an outline{' ✅' if has_outline else ''}")
-            st.caption(f"• Write a chapter{' ✅' if has_chapter else ''}")
-
-            progress = completed_steps / 3
-            st.progress(progress, text=f"{completed_steps}/3 steps complete")
-
-            onboarding_text = """
-**MANTIS** mirrors a focused NovelAI-style studio: a clean writing surface, memory tools,
-and quick start modules so you can draft fast and refine later.
-
-**Quick path**
-1) Create a project  
-2) Build a structured outline or lore entries  
-3) Draft chapters with AI assists on demand
-"""
-            if st.session_state.get("first_run", True):
-                st.markdown(onboarding_text)
-                c1, c2, c3 = st.columns([1, 1, 2])
-                with c1:
-                    if st.button("✅ Got it", type="primary", width="stretch"):
-                        st.session_state.first_run = False
-                        st.rerun()
-                with c2:
-                    if st.button("📌 Keep showing", width="stretch"):
-                        st.toast("Welcome panel will keep showing.")
-                with c3:
-                    st.caption("Tip: If the AI model shows Offline, confirm your Groq API key and model access.")
-
-            cta_label = "🧭 Start a project"
-            cta_target = "projects"
-            if has_project and not has_outline:
-                cta_label = "📝 Draft your outline"
-                cta_target = "outline"
-            elif has_outline and not has_chapter:
-                cta_label = "▶ Write your first chapter"
-                cta_target = "chapters"
-            elif canon_icon == "🔴":
-                cta_label = "🛠 Review canon issues"
-                cta_target = "world"
-
-            if st.button(cta_label, type="primary", width="stretch"):
-                if recent_projects and not st.session_state.project:
-                    st.session_state.project = Project.load(recent_projects[0]["path"])
-                st.session_state.page = cta_target
-                st.rerun()
-
-            if not st.session_state.groq_api_key or not st.session_state.openai_api_key:
-                st.divider()
-                st.markdown("### 🔑 Connect your AI providers")
-                st.caption("Unlock generation, summaries, and entity tools with API access.")
-                cta_left, cta_right = st.columns(2)
-                with cta_left:
-                    st.link_button("Create Groq Account", "https://console.groq.com/keys", width="stretch")
-                with cta_right:
-                    st.link_button(
-                        "Create OpenAI Account",
-                        "https://platform.openai.com/api-keys",
-                        width="stretch",
-                    )
-
-        with st.container(border=True):
-            st.markdown("### 🚀 Creator Momentum")
-            st.caption("Track your writing rhythm and jump back in with a single click.")
-
-            if recent_snapshot:
-                headline = f"**Resume:** {recent_snapshot['title']} · {recent_snapshot['genre']}"
-                st.markdown(headline)
-                metrics = st.columns(4)
-                metrics[0].metric("Words written", f"{recent_snapshot['words']:,}")
-                metrics[1].metric("Chapters", recent_snapshot["chapters"])
-                metrics[2].metric("Streak", f"{streak} day(s)")
-                metrics[3].metric("Sessions this week", f"{weekly_count}/{weekly_goal}")
-            else:
-                st.info("Create a project to unlock your momentum stats and quick actions.")
-
-            goal_cols = st.columns(3)
-            with goal_cols[0]:
-                st.number_input("Daily word goal", min_value=100, max_value=5000, step=50, key="daily_word_goal")
-            with goal_cols[1]:
-                st.number_input(
-                    "Weekly sessions goal",
-                    min_value=1,
-                    max_value=14,
-                    step=1,
-                    key="weekly_sessions_goal",
+            ent_total = 0
+            breakdown = ""
+            try:
+                wb_entries = list(project.world_db.values()) if project else []
+                counts: Dict[str, int] = {}
+                for ent in wb_entries:
+                    category = Project._normalize_category(ent.category)
+                    counts[category] = counts.get(category, 0) + 1
+                ent_total = sum(counts.values())
+                breakdown = ", ".join(
+                    f"{cat} ({count})" for cat, count in counts.items() if count
                 )
-            with goal_cols[2]:
-                st.number_input(
-                    "Focus sprint (minutes)",
-                    min_value=10,
-                    max_value=90,
-                    step=5,
-                    key="focus_minutes",
-                )
+            except Exception:
+                breakdown = ""
 
-            progress_cols = st.columns([2, 1])
-            with progress_cols[0]:
-                st.progress(weekly_progress, text="Weekly writing progress")
-                if st.button("✅ Log a writing session", width="stretch"):
-                    _log_activity()
-                    st.toast("Session logged. Keep the streak going!")
-                    st.rerun()
-            with progress_cols[1]:
-                if st.button("💾 Save studio goals", width="stretch"):
-                    save_app_settings()
+            cols = st.columns(3)
+            cols[0].metric("Entities", ent_total)
+            cols[1].metric("Active project", "Yes" if project else "No")
+            cols[2].metric("Categories", breakdown if breakdown else "—")
 
-            if st.session_state.activity_log:
-                activity_df = pd.DataFrame(_activity_series())
-                activity_chart = px.bar(
-                    activity_df,
-                    x="day",
-                    y="sessions",
-                    title="Last 7 days",
-                    text_auto=True,
-                )
-                activity_chart.update_layout(
-                    height=240,
-                    margin=dict(l=10, r=10, t=50, b=10),
-                    yaxis=dict(range=[0, 1], tickmode="array", tickvals=[0, 1]),
-                )
-                st.plotly_chart(activity_chart, width="stretch")
+        st.write("")
+
 
     def render_projects():
         active_dir = get_active_projects_dir()
@@ -3117,7 +2882,12 @@ and quick start modules so you can draft fast and refine later.
                         st.session_state["_outline_sync"] = new_outline  # apply on next rerun before widget renders
                         save_p()
                         st.rerun()
-            
+
+    def build_expander_label(label: str, idx: int) -> str:
+        cleaned = (label or "").strip()
+        if not cleaned:
+            cleaned = "Untitled"
+        return f"{idx + 1}. {cleaned}"
 
     def render_world():
         p = st.session_state.project
@@ -3310,7 +3080,7 @@ and quick start modules so you can draft fast and refine later.
                 st.caption("AI suggestions are queued for review. Apply to update canon.")
                 for idx, item in enumerate(list(review_queue)):
                     label = f"{item.get('name', 'Unnamed')} • {item.get('category', 'Lore')}"
-                    expander_label = f"{label} #{idx}"
+                    expander_label = build_expander_label(label, idx)
                     with st.expander(expander_label):
                         st.markdown(f"**Type:** {item.get('type', 'new').title()}")
                         confidence = item.get("confidence")
@@ -3412,7 +3182,7 @@ and quick start modules so you can draft fast and refine later.
 
                 ents = sorted(ents, key=lambda ent: (ent.name or "").lower())
 
-                for e in ents:
+                for idx, e in enumerate(ents):
                     mention_count = mention_counts.get(e.id, 0)
                     is_orphaned = e.id in orphaned_ids
                     is_under_described = e.id in under_described_ids
@@ -3454,7 +3224,8 @@ and quick start modules so you can draft fast and refine later.
                         if issues:
                             st.caption(f"⚠️ {' • '.join(issues)}")
 
-                        with st.expander("Details", expanded=e.id == focus_entity):
+                        expander_label = build_expander_label(e.name, idx)
+                        with st.expander(expander_label, expanded=e.id == focus_entity):
                             c1, c2 = st.columns([4, 1])
                             new_desc = c1.text_area("Notes", e.description, key=f"desc_{e.id}", height=140)
                             if new_desc != e.description:
@@ -3535,7 +3306,7 @@ and quick start modules so you can draft fast and refine later.
             if memory_val != p.memory:
                 p.memory = memory_val
                 save_p()
-            if st.button("💾 Save Memory", use_container_width=True):
+            if st.button("💾 Save Memory", width="stretch"):
                 p.save()
                 st.toast("Memory saved")
 
@@ -3549,7 +3320,7 @@ and quick start modules so you can draft fast and refine later.
             with scope_cols[2]:
                 scope_chapters = st.checkbox("Chapters", value=True, key=f"coh_chapters_{p.id}")
 
-            if st.button("🔍 Run Coherence Check", use_container_width=True):
+            if st.button("🔍 Run Coherence Check", width="stretch"):
                 compiled_world_bible = "\n".join(
                     f"{e.name} ({e.category}): {e.description}"
                     for e in p.world_db.values()
@@ -3697,7 +3468,7 @@ and quick start modules so you can draft fast and refine later.
                     }
                 )
             if utilization_rows:
-                st.dataframe(utilization_rows, use_container_width=True, hide_index=True)
+                st.dataframe(utilization_rows, width="stretch", hide_index=True)
             else:
                 st.info("No entities yet to analyze.")
 
@@ -3918,10 +3689,10 @@ and quick start modules so you can draft fast and refine later.
                     st.button(
                         "🚫 Auto-Write Disabled (Canon Risk)",
                         disabled=True,
-                        use_container_width=True,
+                        width="stretch",
                         help="Resolve canon issues in World Bible → Memory before generating.",
                     )
-                elif st.button("✨ Auto-Write Chapter", type="primary", use_container_width=True):
+                elif st.button("✨ Auto-Write Chapter", type="primary", width="stretch"):
                     prompt = StoryEngine.generate_chapter_prompt(p, curr.index, int(curr.target_words))
                     full = ""
                     for chunk in AIEngine().generate_stream(prompt, get_ai_model()):
