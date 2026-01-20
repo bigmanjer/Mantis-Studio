@@ -1161,51 +1161,6 @@ def _run_ui():
             return "🟡", "Minor Canon Drift"
         return "🔴", "High Canon Risk"
 
-    def update_locked_chapters() -> None:
-        results = st.session_state.get("coherence_results", [])
-        locked = {
-            issue.get("chapter_index")
-            for issue in results
-            if issue.get("confidence") in ("medium", "high")
-        }
-        normalized = set()
-        for item in locked:
-            try:
-                normalized.add(int(item))
-            except (TypeError, ValueError):
-                continue
-        st.session_state["locked_chapters"] = normalized
-
-    def detect_hard_canon_violation(
-        project: Project,
-        chapter_index: int,
-        candidate_text: str,
-    ) -> List[Dict[str, Any]]:
-        hard_rules = (project.memory_hard or project.memory or "").strip()
-        if not hard_rules:
-            return []
-        payload = [
-            {
-                "chapter_index": chapter_index,
-                "summary": "",
-                "excerpt": (candidate_text or "")[:800],
-            }
-        ]
-        results = AnalysisEngine.coherence_check(
-            memory=hard_rules,
-            author_note="",
-            style_guide="",
-            outline="",
-            world_bible="",
-            chapters=payload,
-            model=get_ai_model(),
-        )
-        return [
-            issue
-            for issue in (results or [])
-            if issue.get("confidence") in ("medium", "high")
-        ]
-
     def render_privacy():
         st.markdown("## Privacy Policy\n\nLocal-only storage. No analytics.")
 
@@ -1252,7 +1207,6 @@ def _run_ui():
     if "remember_me" not in st.session_state:
         st.session_state.remember_me = bool(config_data.get("remember_me", False))
     st.session_state.setdefault("canon_health_log", [])
-    st.session_state.setdefault("locked_chapters", set())
 
     theme = st.session_state.ui_theme if st.session_state.ui_theme in ("Dark", "Light") else "Dark"
     theme_tokens = {
@@ -3297,7 +3251,6 @@ and quick start modules so you can draft fast and refine later.
                     }
                 )
                 st.session_state["canon_health_log"] = st.session_state["canon_health_log"][-30:]
-                update_locked_chapters()
                 if results:
                     st.toast("Coherence issues found.")
                 else:
@@ -3388,80 +3341,10 @@ and quick start modules so you can draft fast and refine later.
                     )
 
             st.divider()
-            st.markdown("### 📉 Canon Drift Trend")
-            trend_entries = st.session_state.get("canon_health_log", [])[-10:]
-            if not trend_entries:
-                st.info("No canon drift history yet.")
-            else:
-                for entry in trend_entries:
-                    status = entry.get("status", "🟢")
-                    issue_count = int(entry.get("issue_count", 0) or 0)
-                    severity = {"🟢": 0, "🟡": 1, "🔴": 2}.get(status, 0)
-                    bar_length = min(5, max(0, issue_count))
-                    bar = "▓" * bar_length + "░" * (5 - bar_length)
-                    timestamp = time.strftime("%Y-%m-%d", time.localtime(entry["timestamp"]))
-                    st.caption(f"{timestamp}  {bar} ({issue_count} issues, severity {severity})")
-
-            st.divider()
             st.markdown("### ⏱ Timeline Heatmap")
             for chap in p.get_ordered_chapters():
                 intensity = min(1.0, chap.word_count / 2000)
                 st.progress(intensity, text=f"Chapter {chap.index}: {chap.word_count} words")
-
-            st.divider()
-            if not st.session_state.get("is_premium", False):
-                st.info("🔒 Canon Health export is a Premium feature.")
-            else:
-                canon_icon, canon_label = get_canon_health()
-                locked_chapters = sorted(st.session_state.get("locked_chapters", set()))
-                issues = st.session_state.get("coherence_results", [])
-                report_lines = [
-                    f"# Canon Health Report: {p.title}",
-                    f"**Generated:** {time.strftime('%Y-%m-%d %H:%M', time.localtime())}",
-                    f"**Current Canon Status:** {canon_icon} {canon_label}",
-                    "",
-                    "## Active Issues",
-                ]
-                if issues:
-                    for issue in issues:
-                        report_lines.append(
-                            f"- Chapter {issue.get('chapter_index', '?')}: "
-                            f"{issue.get('issue', 'Unspecified issue')} "
-                            f"(confidence: {issue.get('confidence', 'unknown')})"
-                        )
-                else:
-                    report_lines.append("- None")
-                report_lines.extend(
-                    [
-                        "",
-                        "## Canon Drift History (latest 10)",
-                    ]
-                )
-                if trend_entries:
-                    for entry in trend_entries:
-                        timestamp = time.strftime("%Y-%m-%d %H:%M", time.localtime(entry["timestamp"]))
-                        report_lines.append(
-                            f"- {timestamp} {entry.get('status', '🟢')} "
-                            f"({entry.get('issue_count', 0)} issues)"
-                        )
-                else:
-                    report_lines.append("- No history available.")
-                report_lines.extend(
-                    [
-                        "",
-                        "## Locked Chapters",
-                    ]
-                )
-                if locked_chapters:
-                    report_lines.append(", ".join(str(idx) for idx in locked_chapters))
-                else:
-                    report_lines.append("None")
-                report_text = "\n".join(report_lines)
-                st.download_button(
-                    "📄 Download Canon Health Report",
-                    report_text,
-                    file_name=f"{p.title}_canon_health.md",
-                )
 
             st.divider()
             st.markdown("#### 📌 Entity Utilization")
@@ -3688,19 +3571,7 @@ and quick start modules so you can draft fast and refine later.
 
                 canon_icon, canon_label = get_canon_health()
                 canon_blocked = canon_icon == "🔴"
-                chapter_locked = curr.index in locked_chapters
-                if chapter_locked:
-                    st.warning(
-                        "🔒 This chapter is locked due to canon violations.\n"
-                        "Resolve issues in World Bible → Memory to unlock."
-                    )
-                    st.button(
-                        "🚫 Auto-Write Disabled (Chapter Locked)",
-                        disabled=True,
-                        use_container_width=True,
-                        help="Resolve canon issues in World Bible → Memory before generating.",
-                    )
-                elif canon_blocked:
+                if canon_blocked:
                     st.button(
                         "🚫 Auto-Write Disabled (Canon Risk)",
                         disabled=True,
