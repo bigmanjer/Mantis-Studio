@@ -2450,7 +2450,6 @@ def _run_ui():
                 "Editor",
                 "Outline",
                 "World Bible",
-                "Export",
                 "AI Tools",
             ]
             pmap = {
@@ -2459,7 +2458,6 @@ def _run_ui():
                 "Editor": "chapters",
                 "Outline": "outline",
                 "World Bible": "world",
-                "Export": "export",
                 "AI Tools": "ai",
             }
         current_page = st.session_state.page
@@ -2869,8 +2867,7 @@ and quick start modules so you can draft fast and refine later.
                             st.caption(genre)
                         with row3:
                             if st.button("⬇️ Export", key=f"export_{full}", use_container_width=True):
-                                st.session_state.project = Project.load(full)
-                                st.session_state.page = "export"
+                                st.session_state.export_project_path = full
                                 st.rerun()
                         with row4:
                             if st.button("🗑", key=f"del_{full}", use_container_width=True):
@@ -2878,6 +2875,27 @@ and quick start modules so you can draft fast and refine later.
                                 st.rerun()
                     except Exception:
                         logger.warning("Failed to load project metadata: %s", full, exc_info=True)
+
+        export_path = st.session_state.get("export_project_path")
+        if export_path:
+            with st.container(border=True):
+                try:
+                    export_project = Project.load(export_path)
+                except Exception:
+                    st.error("Export failed. Unable to load project.")
+                    st.session_state.export_project_path = None
+                else:
+                    st.markdown("### Export Project")
+                    st.caption("Download a single markdown file containing outline, world bible, and chapters.")
+                    st.download_button(
+                        "⬇️ Download .md",
+                        project_to_markdown(export_project),
+                        file_name=f"{export_project.title}.md",
+                        use_container_width=True,
+                    )
+                    if st.button("Close export", use_container_width=True):
+                        st.session_state.export_project_path = None
+                        st.rerun()
 
 
     def render_outline():
@@ -2961,26 +2979,6 @@ and quick start modules so you can draft fast and refine later.
                         st.session_state["_outline_sync"] = new_outline  # apply on next rerun before widget renders
                         save_p()
                         st.rerun()
-
-                st.divider()
-
-                if st.button("🏷️ Generate Title", use_container_width=True):
-                    with st.spinner("Analyzing outline..."):
-                        # Auto-detect genre if empty
-                        if not (p.genre or "").strip() and (p.outline or "").strip():
-                            g_guess = AnalysisEngine.detect_genre(p.outline, get_ai_model())
-                            if g_guess:
-                                p.genre = g_guess
-                                save_p()
-                                st.toast(f"Genre detected: {g_guess}", icon="🧭")
-
-                        # Generate title using outline + genre
-                        t = AnalysisEngine.generate_title(p.outline, p.genre, get_ai_model())
-                        if t and "Untitled" not in t:
-                            p.title = t
-                            save_p()
-                            st.toast("Title Updated")
-                            st.rerun()
             
 
     def render_world():
@@ -3289,14 +3287,6 @@ and quick start modules so you can draft fast and refine later.
                         st.session_state.ghost_text = ""
                         st.rerun()
 
-    def render_export():
-        p = st.session_state.project
-        st.markdown("## Export")
-        st.caption("Download a single markdown file containing outline, world bible, and chapters.")
-        with st.container(border=True):
-            st.download_button("⬇️ Download .md", project_to_markdown(p), file_name=f"{p.title}.md", use_container_width=True)
-            st.caption("Tip: You can convert .md to .docx/.pdf with many tools if needed.")
-
     rendered_page = False
     if st.session_state.page == "home":
         render_home()
@@ -3317,9 +3307,6 @@ and quick start modules so you can draft fast and refine later.
             rendered_page = True
         elif pg == "chapters":
             render_chapters()
-            rendered_page = True
-        elif pg == "export":
-            render_export()
             rendered_page = True
         else:
             st.session_state.page = "home"
