@@ -411,8 +411,8 @@ class Project:
             "lore": "Lore",
             "rule": "Lore",
             "rules": "Lore",
-            "item": "Lore",
-            "items": "Lore",
+            "item": "Item",
+            "items": "Item",
         }
         return mapping.get(normalized, "Lore")
 
