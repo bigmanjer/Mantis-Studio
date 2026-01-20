@@ -411,8 +411,8 @@ class Project:
             "lore": "Lore",
             "rule": "Lore",
             "rules": "Lore",
-            "item": "Lore",
-            "items": "Lore",
+            "item": "Item",
+            "items": "Item",
         }
         return mapping.get(normalized, "Lore")
 
@@ -1118,10 +1118,22 @@ def project_to_markdown(project: Project) -> str:
 
 def _run_ui():
     import streamlit as st
+
+    def render_privacy():
+        st.markdown("## Privacy Policy\n\nLocal-only storage. No analytics.")
+
+    def render_terms():
+        st.markdown("## Terms of Service\n\nProvided as-is for creative use.")
+
+    def render_copyright():
+        st.markdown("## Copyright\n\n© MANTIS Studio")
+
+    def render_footer():
+        st.markdown("---")
+        st.caption("© MANTIS Studio")
+
     import pandas as pd
     import plotly.express as px
-    from pages.legal import render_copyright, render_privacy, render_terms
-    from ui.layout import render_footer
 
     st.set_page_config(page_title=AppConfig.APP_NAME, layout="wide")
 
@@ -1806,7 +1818,7 @@ def _run_ui():
 
             with tabs[0]:
                 st.caption("Guest mode lets you write immediately. Projects are not saved.")
-                if st.button("✍️ Start Writing (Guest)", type="primary", use_container_width=True):
+                if st.button("✍️ Start Writing (Guest)", type="primary", width="stretch"):
                     guest_id = st.session_state.get("guest_id") or str(uuid.uuid4())
                     st.session_state.guest_id = guest_id
                     st.session_state.auth_user = "Guest"
@@ -1835,7 +1847,7 @@ def _run_ui():
                     placeholder="e.g. alex",
                 )
                 password = st.text_input("Password", type="password", key="auth_login_password")
-                if st.button("Sign In", use_container_width=True):
+                if st.button("Sign In", width="stretch"):
                     result = authenticate_user(username, password)
                     if not result.get("ok"):
                         st.error(result.get("error", "Sign in failed."))
@@ -1859,7 +1871,7 @@ def _run_ui():
                 new_username = st.text_input("Username", key="auth_create_username", placeholder="e.g. alex")
                 new_password = st.text_input("Password", type="password", key="auth_create_password")
                 confirm_password = st.text_input("Confirm password", type="password", key="auth_create_confirm")
-                if st.button("Create Account", type="primary", use_container_width=True):
+                if st.button("Create Account", type="primary", width="stretch"):
                     if new_password != confirm_password:
                         st.error("Passwords do not match.")
                     else:
@@ -1880,30 +1892,6 @@ def _run_ui():
                             save_auth_remember(user, False, st.session_state.remember_me)
                             st.session_state._force_nav = True
                             st.rerun()
-
-    def _today_str() -> str:
-        return datetime.date.today().isoformat()
-
-    def _parse_day(day: str) -> Optional[datetime.date]:
-        try:
-            return datetime.date.fromisoformat(day)
-        except ValueError:
-            return None
-
-    def save_app_settings():
-        data = {
-            "groq_base_url": st.session_state.groq_base_url,
-            "groq_api_key": st.session_state.groq_api_key,
-            "groq_model": st.session_state.groq_model,
-            "openai_base_url": st.session_state.openai_base_url,
-            "openai_api_key": st.session_state.openai_api_key,
-            "openai_model": st.session_state.openai_model,
-            "ui_theme": st.session_state.ui_theme,
-            "daily_word_goal": int(st.session_state.daily_word_goal),
-            "weekly_sessions_goal": int(st.session_state.weekly_sessions_goal),
-            "focus_minutes": int(st.session_state.focus_minutes),
-            "activity_log": list(st.session_state.activity_log),
-        }
 
     def _today_str() -> str:
         return datetime.date.today().isoformat()
@@ -2280,7 +2268,7 @@ def _run_ui():
             st.session_state.groq_api_key = groq_key
             AppConfig.GROQ_API_KEY = groq_key
 
-        if st.button("↻ Fetch Groq Models", use_container_width=True):
+        if st.button("↻ Fetch Groq Models", width="stretch"):
             models, error_message = fetch_groq_models(
                 st.session_state.groq_base_url,
                 st.session_state.groq_api_key,
@@ -2301,7 +2289,7 @@ def _run_ui():
                 idx = models.index(st.session_state.groq_model)
             groq_model = st.selectbox("Groq Model", models, index=idx)
 
-            if st.button("🧪 Test All Groq Models", use_container_width=True):
+            if st.button("🧪 Test All Groq Models", width="stretch"):
                 results = {}
                 total = len(models)
                 progress = st.progress(0)
@@ -2341,7 +2329,7 @@ def _run_ui():
         )
         if not st.session_state.groq_api_key:
             st.info("No Groq API key yet. Create one above and paste it here to unlock Groq models.")
-        if st.button("🔌 Test Groq Connection", use_container_width=True):
+        if st.button("🔌 Test Groq Connection", width="stretch"):
             ok = test_groq_connection(
                 st.session_state.groq_base_url,
                 st.session_state.groq_api_key,
@@ -2383,12 +2371,12 @@ def _run_ui():
         with colm1:
             st.checkbox("Auto-save", key="auto_save")
         with colm2:
-            if st.button("↻ Refresh Groq Models", use_container_width=True):
+            if st.button("↻ Refresh Groq Models", width="stretch"):
                 st.cache_data.clear()
                 refresh_models()
                 st.toast("Model list refreshed")
 
-        if st.button("💾 Save AI Settings", use_container_width=True):
+        if st.button("💾 Save AI Settings", width="stretch"):
             save_app_settings()
 
     with st.sidebar:
@@ -2409,9 +2397,9 @@ def _run_ui():
         st.caption(f"Signed in as **{st.session_state.auth_user}**")
         if st.session_state.auth_username and not st.session_state.auth_is_guest:
             st.caption(f"@{st.session_state.auth_username}")
-        if st.button("💾 Save Account", use_container_width=True):
+        if st.button("💾 Save Account", width="stretch"):
             save_app_settings()
-        if st.button("Sign out", use_container_width=True):
+        if st.button("Sign out", width="stretch"):
             st.session_state.auth_user = None
             st.session_state.auth_user_id = None
             st.session_state.auth_username = None
@@ -2482,11 +2470,11 @@ def _run_ui():
 
             cA, cB = st.columns(2)
             with cA:
-                if st.button("💾 Save", type="primary", use_container_width=True):
+                if st.button("💾 Save", type="primary", width="stretch"):
                     p.save()
                     st.toast("Saved")
             with cB:
-                if st.button("✖ Close", use_container_width=True):
+                if st.button("✖ Close", width="stretch"):
                     save_p()
                     st.session_state.project = None
                     st.session_state.page = "home"
@@ -2531,7 +2519,7 @@ def _run_ui():
                     if st.button(
                         "📂 Resume",
                         type="primary",
-                        use_container_width=True,
+                        width="stretch",
                         disabled=not recent_projects,
                     ):
                         if recent_projects:
@@ -2539,13 +2527,13 @@ def _run_ui():
                             st.session_state.page = "chapters"
                             st.rerun()
                 with action_cols[1]:
-                    if st.button("🧭 New project", use_container_width=True):
+                    if st.button("🧭 New project", width="stretch"):
                         st.session_state.page = "projects"
                         st.rerun()
                 with action_cols[2]:
                     if st.button(
                         "🧩 Open outline",
-                        use_container_width=True,
+                        width="stretch",
                         disabled=not recent_projects,
                     ):
                         if recent_projects:
@@ -2627,7 +2615,7 @@ def _run_ui():
                     key="guided_create_project",
                 )
                 if not has_project:
-                    if st.button("Start here", type="primary", use_container_width=True):
+                    if st.button("Start here", type="primary", width="stretch"):
                         st.session_state.page = "projects"
                         st.rerun()
             with s2:
@@ -2638,7 +2626,7 @@ def _run_ui():
                     key="guided_draft_outline",
                 )
                 if has_project and not has_outline:
-                    if st.button("Open outline", use_container_width=True):
+                    if st.button("Open outline", width="stretch"):
                         st.session_state.project = Project.load(recent_projects[0]["path"])
                         st.session_state.page = "outline"
                         st.rerun()
@@ -2650,7 +2638,7 @@ def _run_ui():
                     key="guided_write_chapter",
                 )
                 if has_project and not has_chapter:
-                    if st.button("Start writing", use_container_width=True):
+                    if st.button("Start writing", width="stretch"):
                         st.session_state.project = Project.load(recent_projects[0]["path"])
                         st.session_state.page = "chapters"
                         st.rerun()
@@ -2673,11 +2661,11 @@ and quick start modules so you can draft fast and refine later.
                     )
                     c1, c2, c3 = st.columns([1, 1, 2])
                     with c1:
-                        if st.button("✅ Got it", type="primary", use_container_width=True):
+                        if st.button("✅ Got it", type="primary", width="stretch"):
                             st.session_state.first_run = False
                             st.rerun()
                     with c2:
-                        if st.button("📌 Keep showing", use_container_width=True):
+                        if st.button("📌 Keep showing", width="stretch"):
                             st.toast("Welcome panel will keep showing.")
                     with c3:
                         st.caption("Tip: If the AI model shows Offline, confirm your Groq API key and model access.")
@@ -2689,12 +2677,12 @@ and quick start modules so you can draft fast and refine later.
                     st.caption("Unlock generation, summaries, and entity tools with API access.")
                     cta_left, cta_right = st.columns(2)
                     with cta_left:
-                        st.link_button("Create Groq Account", "https://console.groq.com/keys", use_container_width=True)
+                        st.link_button("Create Groq Account", "https://console.groq.com/keys", width="stretch")
                     with cta_right:
                         st.link_button(
                             "Create OpenAI Account",
                             "https://platform.openai.com/api-keys",
-                            use_container_width=True,
+                            width="stretch",
                         )
 
         with st.container(border=True):
@@ -2735,12 +2723,12 @@ and quick start modules so you can draft fast and refine later.
             progress_cols = st.columns([2, 1])
             with progress_cols[0]:
                 st.progress(weekly_progress, text="Weekly writing progress")
-                if st.button("✅ Log a writing session", use_container_width=True):
+                if st.button("✅ Log a writing session", width="stretch"):
                     _log_activity()
                     st.toast("Session logged. Keep the streak going!")
                     st.rerun()
             with progress_cols[1]:
-                if st.button("💾 Save studio goals", use_container_width=True):
+                if st.button("💾 Save studio goals", width="stretch"):
                     save_app_settings()
 
             if st.session_state.activity_log:
@@ -2757,7 +2745,7 @@ and quick start modules so you can draft fast and refine later.
                     margin=dict(l=10, r=10, t=50, b=10),
                     yaxis=dict(range=[0, 1], tickmode="array", tickvals=[0, 1]),
                 )
-                st.plotly_chart(activity_chart, use_container_width=True)
+                st.plotly_chart(activity_chart, width="stretch")
 
     def render_projects():
         active_dir = get_active_projects_dir()
@@ -2785,7 +2773,7 @@ and quick start modules so you can draft fast and refine later.
                 with c2:
                     g = st.text_input("Genre", placeholder="e.g., Dark Fantasy, Sci-Fi Noir")
                 a = st.text_input("Author (optional)", placeholder="Your name")
-                submitted = st.form_submit_button("🚀 Initialize Project", type="primary", use_container_width=True)
+                submitted = st.form_submit_button("🚀 Initialize Project", type="primary", width="stretch")
                 if submitted:
                     if not t:
                         t = _random_project_title()
@@ -2825,7 +2813,7 @@ and quick start modules so you can draft fast and refine later.
                     )
                 else:
                     txt = uf.read().decode("utf-8", errors="replace")
-                    if st.button("Import & Analyze", use_container_width=True):
+                    if st.button("Import & Analyze", width="stretch"):
                         p = Project.create("Imported Project", storage_dir=get_active_projects_dir())
                         p.import_text_file(txt)
                         p.save()
@@ -2858,7 +2846,7 @@ and quick start modules so you can draft fast and refine later.
                         genre = meta.get("genre") or ""
                         row1, row2, row3, row4 = st.columns([5, 2, 1.5, 1])
                         with row1:
-                            if st.button(f"📂 {title}", key=f"open_{full}", use_container_width=True):
+                            if st.button(f"📂 {title}", key=f"open_{full}", width="stretch"):
                                 st.session_state.project = Project.load(full)
                                 st.session_state.page = "chapters"
                                 st.session_state.first_run = False
@@ -2866,11 +2854,11 @@ and quick start modules so you can draft fast and refine later.
                         with row2:
                             st.caption(genre)
                         with row3:
-                            if st.button("⬇️ Export", key=f"export_{full}", use_container_width=True):
+                            if st.button("⬇️ Export", key=f"export_{full}", width="stretch"):
                                 st.session_state.export_project_path = full
                                 st.rerun()
                         with row4:
-                            if st.button("🗑", key=f"del_{full}", use_container_width=True):
+                            if st.button("🗑", key=f"del_{full}", width="stretch"):
                                 Project.delete_file(full)
                                 st.rerun()
                     except Exception:
@@ -2891,9 +2879,9 @@ and quick start modules so you can draft fast and refine later.
                         "⬇️ Download .md",
                         project_to_markdown(export_project),
                         file_name=f"{export_project.title}.md",
-                        use_container_width=True,
+                        width="stretch",
                     )
-                    if st.button("Close export", use_container_width=True):
+                    if st.button("Close export", width="stretch"):
                         st.session_state.export_project_path = None
                         st.rerun()
 
@@ -2925,7 +2913,7 @@ and quick start modules so you can draft fast and refine later.
                     p.genre = new_genre
                     save_p()
             with top3:
-                if st.button("💾 Save Project", type="primary", use_container_width=True):
+                if st.button("💾 Save Project", type="primary", width="stretch"):
                     p.save()
                     st.toast("Saved")
 
@@ -2944,13 +2932,13 @@ and quick start modules so you can draft fast and refine later.
 
                 b1, b2 = st.columns([1, 1])
                 with b1:
-                    if st.button("💾 Save Outline", use_container_width=True):
+                    if st.button("💾 Save Outline", width="stretch"):
                         p.save()
                         # Automatically scan entities on save so World Bible stays in sync.
                         extract_entities_ui(p.outline or "", "Outline")
                         st.toast("Outline Saved & Entities Scanned")
                 with b2:
-                    if st.button("🔄 Reverse Outline", use_container_width=True):
+                    if st.button("🔄 Reverse Outline", width="stretch"):
                         p.outline = StoryEngine.reverse_engineer_outline(p, get_ai_model())
                         st.session_state["_outline_sync"] = p.outline or ""  # apply on next rerun before widget renders
                         save_p()
@@ -2962,7 +2950,7 @@ and quick start modules so you can draft fast and refine later.
                 st.caption("Generate a chapter-by-chapter outline and append it to your blueprint.")
 
                 chaps = st.number_input("Chapters", 1, 50, 12)
-                if st.button("✨ Generate Structure", type="primary", use_container_width=True):
+                if st.button("✨ Generate Structure", type="primary", width="stretch"):
                     # use outline_stream_ph defined above
                     full = ""
                     prompt = (
@@ -2987,7 +2975,155 @@ and quick start modules so you can draft fast and refine later.
         st.caption("Track canonical characters, locations, factions, and lore.")
 
         query = st.text_input("Search", placeholder="Type a name to filter...")
-        t1, t2, t3, t4 = st.tabs(["Characters", "Locations", "Factions", "Lore"])
+        t1, t2, t3, t4, t5, t6, t7 = st.tabs(
+            ["Characters", "Locations", "Items", "Lore", "Factions", "Analytics", "Memory"]
+        )
+
+        def render_analytics():
+            st.markdown("### 📊 World Bible Analytics")
+            st.caption("Measure progress across chapters and word targets.")
+
+            chapters = p.get_ordered_chapters()
+            chapter_count = len(chapters)
+            total_words = sum(
+                c.word_count if c.word_count else len((c.content or "").split())
+                for c in chapters
+            )
+            avg_words = int(total_words / chapter_count) if chapter_count else 0
+            target_words = sum(int(c.target_words or 0) for c in chapters) if chapter_count else 0
+
+            m1, m2, m3, m4 = st.columns(4)
+            m1.metric("Total words", f"{total_words:,}")
+            m2.metric("Chapters", chapter_count)
+            m3.metric("Avg words/chapter", f"{avg_words:,}")
+            m4.metric("Target words", f"{target_words:,}")
+
+            if not chapters:
+                st.info("📭 No chapters yet. Add chapters to see analytics charts.")
+                return
+
+            data = [
+                {
+                    "chapter": f"{c.index}. {c.title}",
+                    "words": c.word_count if c.word_count else len((c.content or "").split()),
+                    "target": int(c.target_words or 0),
+                }
+                for c in chapters
+            ]
+            df = pd.DataFrame(data)
+
+            chart_cols = st.columns(2)
+            with chart_cols[0]:
+                bar_chart = px.bar(
+                    df,
+                    x="chapter",
+                    y="words",
+                    title="Words per chapter",
+                    text_auto=True,
+                )
+                bar_chart.update_layout(
+                    height=320,
+                    margin=dict(l=10, r=10, t=50, b=10),
+                    xaxis_tickangle=-25,
+                )
+                st.plotly_chart(bar_chart, width="stretch")
+
+            with chart_cols[1]:
+                line_chart = px.line(
+                    df.assign(cumulative=df["words"].cumsum()),
+                    x="chapter",
+                    y="cumulative",
+                    title="Cumulative word count",
+                    markers=True,
+                )
+                line_chart.update_layout(
+                    height=320,
+                    margin=dict(l=10, r=10, t=50, b=10),
+                    xaxis_tickangle=-25,
+                )
+                st.plotly_chart(line_chart, width="stretch")
+
+        def render_memory():
+            st.markdown("### 🧠 Story Memory")
+            st.caption("Keep canon notes, timelines, and facts the AI should always know.")
+            memory_key = f"world_memory_{p.id}"
+            memory_val = st.text_area("Story Memory", p.memory, height=240, key=memory_key)
+            if memory_val != p.memory:
+                p.memory = memory_val
+                save_p()
+
+            st.markdown("### ✍️ Author Note")
+            author_note_key = f"author_note_{p.id}"
+            author_note_val = st.text_area("Author Note", p.author_note, height=160, key=author_note_key)
+            if author_note_val != p.author_note:
+                p.author_note = author_note_val
+                save_p()
+
+            st.markdown("### 🎨 Style Guide")
+            style_key = f"style_guide_{p.id}"
+            style_val = st.text_area("Style Guide", p.style_guide, height=160, key=style_key)
+            if style_val != p.style_guide:
+                p.style_guide = style_val
+                save_p()
+
+            st.markdown("### ✅ Coherence Check")
+            st.caption("Scan chapters for contradictions using your memory and world bible.")
+            coherence_key = f"coherence_results_{p.id}"
+            if st.button("Run coherence check", key=f"coherence_run_{p.id}", width="stretch"):
+                world_lines = [
+                    f"{ent.name} ({ent.category}): {ent.description}"
+                    for ent in p.world_db.values()
+                    if ent.name or ent.description
+                ]
+                world_bible = "\n".join(world_lines)
+                chapter_payload = [
+                    {
+                        "chapter_index": c.index,
+                        "title": c.title,
+                        "summary": c.summary,
+                        "excerpt": (c.content or "")[:1200],
+                    }
+                    for c in p.get_ordered_chapters()
+                ]
+                st.session_state[coherence_key] = AnalysisEngine.coherence_check(
+                    p.memory,
+                    p.author_note,
+                    p.style_guide,
+                    p.outline,
+                    world_bible,
+                    chapter_payload,
+                    get_ai_model(),
+                )
+
+            coherence_results = st.session_state.get(coherence_key, [])
+            if coherence_results:
+                st.dataframe(pd.DataFrame(coherence_results), width="stretch", hide_index=True)
+            else:
+                st.info("No coherence issues logged yet.")
+
+            st.markdown("### 🔁 World Bible Sync")
+            st.caption("Sync current World Bible entries into memory for quick AI reference.")
+            world_sync_key = f"world_bible_sync_{p.id}"
+            world_sync_text = "\n".join(
+                f"- {ent.name} ({ent.category}): {ent.description}"
+                for ent in p.world_db.values()
+                if ent.name or ent.description
+            )
+            st.text_area("World Bible Sync", world_sync_text, height=200, key=world_sync_key)
+            if st.button("Append World Bible to Memory", key=f"world_bible_sync_btn_{p.id}", width="stretch"):
+                if world_sync_text.strip():
+                    p.memory = (p.memory or "").strip()
+                    if p.memory:
+                        p.memory = f"{p.memory}\n\n{world_sync_text}"
+                    else:
+                        p.memory = world_sync_text
+                    st.session_state[memory_key] = p.memory
+                    save_p()
+                    st.toast("World Bible synced to memory.")
+
+            if st.button("💾 Save Memory", key=f"save_memory_{p.id}", width="stretch"):
+                p.save()
+                st.toast("Memory saved")
 
         review_queue = st.session_state.get("world_bible_review", [])
         if review_queue:
@@ -3010,7 +3146,7 @@ and quick start modules so you can draft fast and refine later.
 
                         c1, c2 = st.columns(2)
                         with c1:
-                            if st.button("✅ Apply", key=f"apply_suggestion_{idx}", use_container_width=True):
+                            if st.button("✅ Apply", key=f"apply_suggestion_{idx}", width="stretch"):
                                 if item.get("type") == "update" and item.get("entity_id"):
                                     ent = p.world_db.get(item.get("entity_id"))
                                     if ent:
@@ -3032,7 +3168,7 @@ and quick start modules so you can draft fast and refine later.
                                 st.toast("World Bible updated.")
                                 st.rerun()
                         with c2:
-                            if st.button("🗑 Ignore", key=f"ignore_suggestion_{idx}", use_container_width=True):
+                            if st.button("🗑 Ignore", key=f"ignore_suggestion_{idx}", width="stretch"):
                                 review_queue.pop(idx)
                                 st.session_state["world_bible_review"] = review_queue
                                 st.toast("Suggestion removed.")
@@ -3044,7 +3180,7 @@ and quick start modules so you can draft fast and refine later.
                 with top[0]:
                     st.markdown(f"### {category}")
                 with top[2]:
-                    if st.button(f"➕ Add {category}", use_container_width=True):
+                    if st.button(f"➕ Add {category}", width="stretch"):
                         st.session_state[f"add_open_{category}"] = True
 
                 if st.session_state.get(f"add_open_{category}", False):
@@ -3054,9 +3190,9 @@ and quick start modules so you can draft fast and refine later.
                         a = st.text_input("Aliases (comma-separated)")
                         s1, s2 = st.columns(2)
                         with s1:
-                            ok = st.form_submit_button("Save", type="primary", use_container_width=True)
+                            ok = st.form_submit_button("Save", type="primary", width="stretch")
                         with s2:
-                            cancel = st.form_submit_button("Cancel", use_container_width=True)
+                            cancel = st.form_submit_button("Cancel", width="stretch")
                         if ok:
                             aliases = [alias.strip() for alias in (a or "").split(",") if alias.strip()]
                             p.upsert_entity(n, category, d, aliases=aliases, allow_merge=True, allow_alias=True)
@@ -3067,7 +3203,12 @@ and quick start modules so you can draft fast and refine later.
                             st.session_state[f"add_open_{category}"] = False
                             st.rerun()
 
-                ents = [e for e in p.world_db.values() if e.category == category]
+                ents = [
+                    e
+                    for e in p.world_db.values()
+                    if Project._normalize_category(e.category)
+                    == Project._normalize_category(category)
+                ]
                 if query:
                     q = query.lower()
                     ents = [
@@ -3082,7 +3223,10 @@ and quick start modules so you can draft fast and refine later.
                     return
 
                 for e in ents:
-                    with st.expander(f"{e.name}"):
+                    # Streamlit versions without expander `key` need unique labels.
+                    # Use a visible suffix to avoid collisions for duplicate names.
+                    expander_label = f"{e.name} · {e.category}"
+                    with st.expander(expander_label):
                         c1, c2 = st.columns([4, 1])
                         new_desc = c1.text_area("Notes", e.description, key=f"desc_{e.id}", height=140)
                         if new_desc != e.description:
@@ -3098,7 +3242,7 @@ and quick start modules so you can draft fast and refine later.
                             e.aliases = [a.strip() for a in alias_text.split(",") if a.strip()]
                             p.save()
 
-                        if c2.button("✨ Enrich", key=f"en_{e.id}", use_container_width=True):
+                        if c2.button("✨ Enrich", key=f"en_{e.id}", width="stretch"):
                             new_info = AnalysisEngine.enrich_entity(e.name, e.category, e.description, get_ai_model())
                             if new_info:
                                 e.merge(new_info)
@@ -3107,7 +3251,7 @@ and quick start modules so you can draft fast and refine later.
 
                         d1, d2 = st.columns([1, 1])
                         with d1:
-                            if st.button("🗑 Delete", key=f"del_{e.id}", use_container_width=True):
+                            if st.button("🗑 Delete", key=f"del_{e.id}", width="stretch"):
                                 p.delete_entity(e.id)
                                 p.save()
                                 st.rerun()
@@ -3119,9 +3263,15 @@ and quick start modules so you can draft fast and refine later.
         with t2:
             render_cat("Location")
         with t3:
-            render_cat("Faction")
+            render_cat("Item")
         with t4:
             render_cat("Lore")
+        with t5:
+            render_cat("Faction")
+        with t6:
+            render_analytics()
+        with t7:
+            render_memory()
 
     def render_chapters():
         p = st.session_state.project
@@ -3133,12 +3283,12 @@ and quick start modules so you can draft fast and refine later.
                 st.info("📭 No chapters yet.\n\nCreate your first chapter — or let MANTIS write one from your outline.")
                 c1, c2 = st.columns([1, 1])
                 with c1:
-                    if st.button("➕ Create Chapter 1", type="primary", use_container_width=True):
+                    if st.button("➕ Create Chapter 1", type="primary", width="stretch"):
                         p.add_chapter("Chapter 1")
                         p.save()
                         st.rerun()
                 with c2:
-                    if st.button("🧩 Go to Outline", use_container_width=True):
+                    if st.button("🧩 Go to Outline", width="stretch"):
                         st.session_state.page = "outline"
                         st.session_state._force_nav = True
             return
@@ -3149,7 +3299,10 @@ and quick start modules so you can draft fast and refine later.
         curr = p.chapters[st.session_state.curr_chap_id]
         # --- SAFELY sync programmatic chapter updates into the editor widget (before widget exists)
         ed_key = f"ed_{curr.id}"
-        if st.session_state.get("_chapter_sync_id") == curr.id:
+        if (
+            st.session_state.get("_chapter_sync_id") == curr.id
+            and ed_key in st.session_state
+        ):
             st.session_state[ed_key] = st.session_state.get("_chapter_sync_text", "") or ""
             st.session_state._chapter_sync_id = None
             st.session_state._chapter_sync_text = None
@@ -3174,12 +3327,12 @@ and quick start modules so you can draft fast and refine later.
                 st.markdown("### 📍 Navigation")
                 for c in chaps:
                     lbl = f"{c.index}. {(c.title or 'Untitled')[:18]}"
-                    if st.button(lbl, key=f"n_{c.id}", type="primary" if c.id == curr.id else "secondary", use_container_width=True):
+                    if st.button(lbl, key=f"n_{c.id}", type="primary" if c.id == curr.id else "secondary", width="stretch"):
                         st.session_state.curr_chap_id = c.id
                         st.rerun()
 
                 st.divider()
-                if st.button("➕ New Chapter", use_container_width=True):
+                if st.button("➕ New Chapter", width="stretch"):
                     next_idx = len(chaps) + 1
                     pat = re.compile(rf"Chapter {next_idx}[:\s]+(.*?)(?=\n|$)", re.IGNORECASE)
                     match = pat.search(p.outline or "")
@@ -3211,14 +3364,14 @@ and quick start modules so you can draft fast and refine later.
 
                 c1, c2 = st.columns([1, 1])
                 with c1:
-                    if st.button("💾 Save Chapter", type="primary", use_container_width=True):
+                    if st.button("💾 Save Chapter", type="primary", width="stretch"):
                         curr.update_content(val, "manual")
                         p.save()
                         # Automatically scan entities from this chapter when the user explicitly saves it.
                         extract_entities_ui(curr.content or "", f"Ch {curr.index}")
                         st.toast("Chapter Saved & Entities Scanned")
                 with c2:
-                    if st.button("📝 Update Summary", use_container_width=True):
+                    if st.button("📝 Update Summary", width="stretch"):
                         curr.summary = StoryEngine.summarize(curr.content or "", get_ai_model())
                         p.save()
                         st.rerun()
@@ -3226,7 +3379,7 @@ and quick start modules so you can draft fast and refine later.
                 with st.expander("✨ Modify / Improve Text"):
                     style = st.selectbox("How to improve?", list(REWRITE_PRESETS.keys()))
                     cust = st.text_input("Instructions") if style == "Custom" else ""
-                    if st.button("Apply Changes", use_container_width=True):
+                    if st.button("Apply Changes", width="stretch"):
                         prompt = rewrite_prompt(curr.content or "", style, cust)
                         st.session_state.ghost_text = ""
                         full = ""
@@ -3240,7 +3393,7 @@ and quick start modules so you can draft fast and refine later.
                 st.markdown("### 🤖 Assistant")
                 st.caption("Generate new prose from your outline + previous context.")
 
-                if st.button("✨ Auto-Write Chapter", type="primary", use_container_width=True):
+                if st.button("✨ Auto-Write Chapter", type="primary", width="stretch"):
                     prompt = StoryEngine.generate_chapter_prompt(p, curr.index, int(curr.target_words))
                     full = ""
                     for chunk in AIEngine().generate_stream(prompt, get_ai_model()):
@@ -3272,7 +3425,7 @@ and quick start modules so you can draft fast and refine later.
                 st.warning("⚠️ Pending AI Text generated (not inserted yet).")
                 g1, g2 = st.columns([1, 1])
                 with g1:
-                    if st.button("✅ Insert into Editor", type="primary", use_container_width=True):
+                    if st.button("✅ Insert into Editor", type="primary", width="stretch"):
                         new_text = ((curr.content or "") + "\n" + (st.session_state.ghost_text or "")).strip()
                         curr.update_content(new_text, "AI Insert")
                         st.session_state.ghost_text = ""
@@ -3283,7 +3436,7 @@ and quick start modules so you can draft fast and refine later.
 
                         st.rerun()
                 with g2:
-                    if st.button("🗑 Discard", use_container_width=True):
+                    if st.button("🗑 Discard", width="stretch"):
                         st.session_state.ghost_text = ""
                         st.rerun()
 
