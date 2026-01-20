@@ -3070,7 +3070,12 @@ and quick start modules so you can draft fast and refine later.
                             st.session_state[f"add_open_{category}"] = False
                             st.rerun()
 
-                ents = [e for e in p.world_db.values() if e.category == category]
+                ents = [
+                    e
+                    for e in p.world_db.values()
+                    if Project._normalize_category(e.category)
+                    == Project._normalize_category(category)
+                ]
                 if query:
                     q = query.lower()
                     ents = [
@@ -3122,7 +3127,7 @@ and quick start modules so you can draft fast and refine later.
         with t2:
             render_cat("Location")
         with t3:
-            render_cat("Faction")
+            render_cat("Item")
         with t4:
             render_cat("Lore")
         with t5:
