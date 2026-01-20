@@ -2987,7 +2987,160 @@ and quick start modules so you can draft fast and refine later.
         st.caption("Track canonical characters, locations, factions, and lore.")
 
         query = st.text_input("Search", placeholder="Type a name to filter...")
-        t1, t2, t3, t4 = st.tabs(["Characters", "Locations", "Factions", "Lore"])
+        t1, t2, t3, t4, t5, t6, t7 = st.tabs(
+            ["Characters", "Locations", "Items", "Lore", "Factions", "Analytics", "Memory"]
+        )
+
+        def build_expander_label(base_label: str, offset: int) -> str:
+            safe_label = (base_label or "Unnamed").strip() or "Unnamed"
+            zero_width = "\u200b"
+            return f"{safe_label}{zero_width * (offset + 1)}"
+
+        def render_analytics():
+            st.markdown("### 📊 World Bible Analytics")
+            st.caption("Measure progress across chapters and word targets.")
+
+            chapters = p.get_ordered_chapters()
+            chapter_count = len(chapters)
+            total_words = sum(
+                c.word_count if c.word_count else len((c.content or "").split())
+                for c in chapters
+            )
+            avg_words = int(total_words / chapter_count) if chapter_count else 0
+            target_words = sum(int(c.target_words or 0) for c in chapters) if chapter_count else 0
+
+            m1, m2, m3, m4 = st.columns(4)
+            m1.metric("Total words", f"{total_words:,}")
+            m2.metric("Chapters", chapter_count)
+            m3.metric("Avg words/chapter", f"{avg_words:,}")
+            m4.metric("Target words", f"{target_words:,}")
+
+            if not chapters:
+                st.info("📭 No chapters yet. Add chapters to see analytics charts.")
+                return
+
+            data = [
+                {
+                    "chapter": f"{c.index}. {c.title}",
+                    "words": c.word_count if c.word_count else len((c.content or "").split()),
+                    "target": int(c.target_words or 0),
+                }
+                for c in chapters
+            ]
+            df = pd.DataFrame(data)
+
+            chart_cols = st.columns(2)
+            with chart_cols[0]:
+                bar_chart = px.bar(
+                    df,
+                    x="chapter",
+                    y="words",
+                    title="Words per chapter",
+                    text_auto=True,
+                )
+                bar_chart.update_layout(
+                    height=320,
+                    margin=dict(l=10, r=10, t=50, b=10),
+                    xaxis_tickangle=-25,
+                )
+                st.plotly_chart(bar_chart, use_container_width=True)
+
+            with chart_cols[1]:
+                line_chart = px.line(
+                    df.assign(cumulative=df["words"].cumsum()),
+                    x="chapter",
+                    y="cumulative",
+                    title="Cumulative word count",
+                    markers=True,
+                )
+                line_chart.update_layout(
+                    height=320,
+                    margin=dict(l=10, r=10, t=50, b=10),
+                    xaxis_tickangle=-25,
+                )
+                st.plotly_chart(line_chart, use_container_width=True)
+
+        def render_memory():
+            st.markdown("### 🧠 Story Memory")
+            st.caption("Keep canon notes, timelines, and facts the AI should always know.")
+            memory_key = f"world_memory_{p.id}"
+            memory_val = st.text_area("Story Memory", p.memory, height=240, key=memory_key)
+            if memory_val != p.memory:
+                p.memory = memory_val
+                save_p()
+
+            st.markdown("### ✍️ Author Note")
+            author_note_key = f"author_note_{p.id}"
+            author_note_val = st.text_area("Author Note", p.author_note, height=160, key=author_note_key)
+            if author_note_val != p.author_note:
+                p.author_note = author_note_val
+                save_p()
+
+            st.markdown("### 🎨 Style Guide")
+            style_key = f"style_guide_{p.id}"
+            style_val = st.text_area("Style Guide", p.style_guide, height=160, key=style_key)
+            if style_val != p.style_guide:
+                p.style_guide = style_val
+                save_p()
+
+            st.markdown("### ✅ Coherence Check")
+            st.caption("Scan chapters for contradictions using your memory and world bible.")
+            coherence_key = f"coherence_results_{p.id}"
+            if st.button("Run coherence check", key=f"coherence_run_{p.id}", use_container_width=True):
+                world_lines = [
+                    f"{ent.name} ({ent.category}): {ent.description}"
+                    for ent in p.world_db.values()
+                    if ent.name or ent.description
+                ]
+                world_bible = "\n".join(world_lines)
+                chapter_payload = [
+                    {
+                        "chapter_index": c.index,
+                        "title": c.title,
+                        "summary": c.summary,
+                        "excerpt": (c.content or "")[:1200],
+                    }
+                    for c in p.get_ordered_chapters()
+                ]
+                st.session_state[coherence_key] = AnalysisEngine.coherence_check(
+                    p.memory,
+                    p.author_note,
+                    p.style_guide,
+                    p.outline,
+                    world_bible,
+                    chapter_payload,
+                    get_ai_model(),
+                )
+
+            coherence_results = st.session_state.get(coherence_key, [])
+            if coherence_results:
+                st.dataframe(pd.DataFrame(coherence_results), use_container_width=True, hide_index=True)
+            else:
+                st.info("No coherence issues logged yet.")
+
+            st.markdown("### 🔁 World Bible Sync")
+            st.caption("Sync current World Bible entries into memory for quick AI reference.")
+            world_sync_key = f"world_bible_sync_{p.id}"
+            world_sync_text = "\n".join(
+                f"- {ent.name} ({ent.category}): {ent.description}"
+                for ent in p.world_db.values()
+                if ent.name or ent.description
+            )
+            st.text_area("World Bible Sync", world_sync_text, height=200, key=world_sync_key)
+            if st.button("Append World Bible to Memory", key=f"world_bible_sync_btn_{p.id}", use_container_width=True):
+                if world_sync_text.strip():
+                    p.memory = (p.memory or "").strip()
+                    if p.memory:
+                        p.memory = f"{p.memory}\n\n{world_sync_text}"
+                    else:
+                        p.memory = world_sync_text
+                    st.session_state[memory_key] = p.memory
+                    save_p()
+                    st.toast("World Bible synced to memory.")
+
+            if st.button("💾 Save Memory", key=f"save_memory_{p.id}", use_container_width=True):
+                p.save()
+                st.toast("Memory saved")
 
         review_queue = st.session_state.get("world_bible_review", [])
         if review_queue:
@@ -2996,7 +3149,8 @@ and quick start modules so you can draft fast and refine later.
                 st.caption("AI suggestions are queued for review. Apply to update canon.")
                 for idx, item in enumerate(list(review_queue)):
                     label = f"{item.get('name', 'Unnamed')} • {item.get('category', 'Lore')}"
-                    with st.expander(label):
+                    expander_label = build_expander_label(label, idx)
+                    with st.expander(expander_label):
                         st.markdown(f"**Type:** {item.get('type', 'new').title()}")
                         confidence = item.get("confidence")
                         if confidence is not None:
@@ -3067,7 +3221,12 @@ and quick start modules so you can draft fast and refine later.
                             st.session_state[f"add_open_{category}"] = False
                             st.rerun()
 
-                ents = [e for e in p.world_db.values() if e.category == category]
+                ents = [
+                    e
+                    for e in p.world_db.values()
+                    if Project._normalize_category(e.category)
+                    == Project._normalize_category(category)
+                ]
                 if query:
                     q = query.lower()
                     ents = [
@@ -3081,8 +3240,11 @@ and quick start modules so you can draft fast and refine later.
                     st.info(f"📭 No {category} entries yet. Add one above or scan entities from your outline/chapters.")
                     return
 
-                for e in ents:
-                    with st.expander(f"{e.name}"):
+                for idx, e in enumerate(ents):
+                    # Streamlit versions without expander `key` need unique labels.
+                    # Use zero-width spaces to keep the visible label clean.
+                    expander_label = build_expander_label(e.name, idx)
+                    with st.expander(expander_label):
                         c1, c2 = st.columns([4, 1])
                         new_desc = c1.text_area("Notes", e.description, key=f"desc_{e.id}", height=140)
                         if new_desc != e.description:
@@ -3119,9 +3281,15 @@ and quick start modules so you can draft fast and refine later.
         with t2:
             render_cat("Location")
         with t3:
-            render_cat("Faction")
+            render_cat("Item")
         with t4:
             render_cat("Lore")
+        with t5:
+            render_cat("Faction")
+        with t6:
+            render_analytics()
+        with t7:
+            render_memory()
 
     def render_chapters():
         p = st.session_state.project
