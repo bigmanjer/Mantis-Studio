@@ -2273,6 +2273,7 @@ def _run_ui():
                     suggested += 1
 
         p.save()
+        st.session_state["last_entity_scan"] = time.time()
 
         if added > 0 or matched > 0 or flagged > 0:
             summary = [f"{added} new", f"{matched} existing", f"{flagged} flagged"]
@@ -3032,7 +3033,181 @@ and quick start modules so you can draft fast and refine later.
         st.markdown("## World Bible")
         st.caption("Track canonical characters, locations, factions, and lore.")
 
-        query = st.text_input("Search", placeholder="Type a name to filter...")
+        st.markdown(
+            """
+            <style>
+            .world-overview-card {
+                padding: 14px 18px;
+                border-radius: 18px;
+                background: var(--mantis-surface);
+                border: 1px solid var(--mantis-card-border);
+            }
+            .world-pill {
+                display: inline-flex;
+                align-items: center;
+                gap: 6px;
+                padding: 6px 12px;
+                border-radius: 999px;
+                font-size: 0.85rem;
+                font-weight: 600;
+                border: 1px solid var(--mantis-primary-border);
+                background: var(--mantis-accent-soft);
+            }
+            .world-pill.good {
+                border-color: rgba(34,197,94,0.45);
+                background: rgba(34,197,94,0.16);
+            }
+            .world-pill.warn {
+                border-color: rgba(245,158,11,0.4);
+                background: rgba(245,158,11,0.16);
+            }
+            .world-pill.risk {
+                border-color: rgba(239,68,68,0.45);
+                background: rgba(239,68,68,0.16);
+            }
+            .world-card {
+                padding: 14px 18px;
+                border-radius: 18px;
+                background: var(--mantis-surface);
+                border: 1px solid var(--mantis-card-border);
+                box-shadow: 0 10px 22px rgba(15, 23, 42, 0.06);
+            }
+            .world-card.highlight {
+                border-color: rgba(245,158,11,0.6);
+                box-shadow: 0 12px 24px rgba(245,158,11,0.18);
+            }
+            .world-card-header {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 14px;
+            }
+            .world-card-title {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                font-size: 1.05rem;
+                font-weight: 600;
+            }
+            .world-card-meta {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                font-size: 0.85rem;
+                color: var(--mantis-muted);
+            }
+            .world-badge {
+                padding: 4px 10px;
+                border-radius: 999px;
+                background: var(--mantis-accent-soft);
+                border: 1px solid var(--mantis-primary-border);
+                color: var(--mantis-text);
+                font-weight: 600;
+                text-transform: uppercase;
+                letter-spacing: 0.06em;
+                font-size: 0.65rem;
+            }
+            .world-card-actions {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+            }
+            .world-card-metric {
+                font-weight: 600;
+                color: var(--mantis-text);
+            }
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        entries = list(p.world_db.values())
+        chapters = p.get_ordered_chapters()
+        chapter_texts = [(c, (c.content or "")) for c in chapters]
+        chapter_texts_lower = [(c, text.lower()) for c, text in chapter_texts]
+
+        def _count_mentions(aliases: List[str], text: str) -> int:
+            total = 0
+            for alias in aliases:
+                alias_clean = (alias or "").strip()
+                if not alias_clean:
+                    continue
+                pattern = rf"\\b{re.escape(alias_clean.lower())}\\b"
+                total += len(re.findall(pattern, text))
+            return total
+
+        mention_counts: Dict[str, int] = {}
+        mention_refs: Dict[str, List[Chapter]] = {}
+        for ent in entries:
+            aliases = [ent.name] + (ent.aliases or [])
+            total_hits = 0
+            hit_chapters = []
+            for chap, lower_text in chapter_texts_lower:
+                hits = _count_mentions(aliases, lower_text)
+                if hits:
+                    hit_chapters.append(chap)
+                total_hits += hits
+            mention_counts[ent.id] = total_hits
+            mention_refs[ent.id] = hit_chapters
+
+        orphaned_ids = {eid for eid, count in mention_counts.items() if count == 0}
+        under_described_ids = {
+            e.id for e in entries if len((e.description or "").strip()) < 30
+        }
+        normalized_name_map: Dict[str, List[str]] = {}
+        for ent in entries:
+            normalized = Project._normalize_entity_name(ent.name)
+            if not normalized:
+                continue
+            normalized_name_map.setdefault(normalized, []).append(ent.id)
+        collision_ids = {
+            ent_id
+            for ent_ids in normalized_name_map.values()
+            if len(ent_ids) > 1
+            for ent_id in ent_ids
+        }
+        flagged_entity_ids = orphaned_ids | under_described_ids | collision_ids
+
+        locked_entities = [
+            e for e in entries if "locked" in (e.tags or "").lower()
+        ]
+        last_scan_ts = st.session_state.get("last_entity_scan") or p.last_modified
+        canon_icon, canon_label = get_canon_health()
+        canon_class = "good"
+        if canon_icon == "🟡":
+            canon_class = "warn"
+        elif canon_icon == "🔴":
+            canon_class = "risk"
+
+        with st.container(border=True):
+            top_cols = st.columns([1, 1, 1, 1, 1.2])
+            top_cols[0].metric("Total Entities", len(entries))
+            top_cols[1].metric("Orphaned", len(orphaned_ids))
+            top_cols[2].metric("Locked", len(locked_entities))
+            top_cols[3].metric(
+                "Last Scan",
+                time.strftime("%Y-%m-%d %H:%M", time.localtime(last_scan_ts)),
+            )
+            top_cols[4].markdown(
+                f"<div class='world-pill {canon_class}'>{canon_icon} {canon_label}</div>",
+                unsafe_allow_html=True,
+            )
+
+        with st.container(border=True):
+            f1, f2, f3, f4 = st.columns([2.2, 1, 1, 1])
+            with f1:
+                query = st.text_input(
+                    "Search",
+                    placeholder="Type a name or alias to filter...",
+                    key="world_search",
+                )
+            with f2:
+                show_orphaned = st.checkbox("Orphaned only", key="world_filter_orphaned")
+            with f3:
+                show_canon_risk = st.checkbox("Canon risk only", key="world_filter_risk")
+            with f4:
+                show_recent = st.checkbox("Recently added", key="world_filter_recent")
+
         t1, t2, t3, t4, t5, t6 = st.tabs(
             ["Characters", "Locations", "Factions", "Lore", "Memory", "Analytics"]
         )
@@ -3087,6 +3262,9 @@ and quick start modules so you can draft fast and refine later.
                                 st.toast("Suggestion removed.")
                                 st.rerun()
 
+        focus_entity = st.session_state.get("world_focus_entity")
+        recent_cutoff = time.time() - (7 * 86400)
+
         def render_cat(category: str):
             with st.container(border=True):
                 top = st.columns([1, 1.2, 1])
@@ -3130,43 +3308,109 @@ and quick start modules so you can draft fast and refine later.
                         if q in (e.name or "").lower()
                         or any(q in alias.lower() for alias in (e.aliases or []))
                     ]
+                if show_orphaned:
+                    ents = [e for e in ents if e.id in orphaned_ids]
+                if show_canon_risk:
+                    ents = [e for e in ents if e.id in flagged_entity_ids]
+                if show_recent:
+                    ents = [e for e in ents if e.created_at >= recent_cutoff]
 
                 if not ents:
                     st.info(f"📭 No {category} entries yet. Add one above or scan entities from your outline/chapters.")
                     return
 
+                ents = sorted(ents, key=lambda ent: (ent.name or "").lower())
+
                 for e in ents:
-                    with st.expander(f"{e.name}"):
-                        c1, c2 = st.columns([4, 1])
-                        new_desc = c1.text_area("Notes", e.description, key=f"desc_{e.id}", height=140)
-                        if new_desc != e.description:
-                            e.description = new_desc
-                            p.save()
+                    mention_count = mention_counts.get(e.id, 0)
+                    is_orphaned = e.id in orphaned_ids
+                    is_under_described = e.id in under_described_ids
+                    is_collision = e.id in collision_ids
+                    if is_orphaned:
+                        status_icon = "💤"
+                    elif is_collision:
+                        status_icon = "🔴"
+                    elif is_under_described:
+                        status_icon = "🟡"
+                    else:
+                        status_icon = "🟢"
 
-                        alias_text = c1.text_input(
-                            "Aliases (comma-separated)",
-                            value=", ".join(e.aliases or []),
-                            key=f"aliases_{e.id}",
+                    highlight = "highlight" if e.id in flagged_entity_ids or e.id == focus_entity else ""
+
+                    with st.container(border=True):
+                        st.markdown(
+                            f"""
+                            <div class="world-card {highlight}">
+                                <div class="world-card-header">
+                                    <div class="world-card-title">{status_icon} {e.name}</div>
+                                    <div class="world-card-meta">
+                                        <span class="world-badge">{e.category}</span>
+                                        <span class="world-card-metric">📌 {mention_count} mentions</span>
+                                    </div>
+                                </div>
+                            </div>
+                            """,
+                            unsafe_allow_html=True,
                         )
-                        if alias_text != ", ".join(e.aliases or []):
-                            e.aliases = [a.strip() for a in alias_text.split(",") if a.strip()]
-                            p.save()
 
-                        if c2.button("✨ Enrich", key=f"en_{e.id}", width="stretch"):
-                            new_info = AnalysisEngine.enrich_entity(e.name, e.category, e.description, get_ai_model())
-                            if new_info:
-                                e.merge(new_info)
-                                p.save()
-                                st.rerun()
+                        issues = []
+                        if is_orphaned:
+                            issues.append("Orphaned")
+                        if is_under_described:
+                            issues.append("Needs detail")
+                        if is_collision:
+                            issues.append("Name collision")
+                        if issues:
+                            st.caption(f"⚠️ {' • '.join(issues)}")
 
-                        d1, d2 = st.columns([1, 1])
-                        with d1:
-                            if st.button("🗑 Delete", key=f"del_{e.id}", width="stretch"):
-                                p.delete_entity(e.id)
+                        with st.expander("Details", expanded=e.id == focus_entity):
+                            c1, c2 = st.columns([4, 1])
+                            new_desc = c1.text_area("Notes", e.description, key=f"desc_{e.id}", height=140)
+                            if new_desc != e.description:
+                                e.description = new_desc
                                 p.save()
-                                st.rerun()
-                        with d2:
-                            st.caption(f"Created: {time.strftime('%Y-%m-%d', time.localtime(e.created_at))}")
+
+                            alias_text = c1.text_input(
+                                "Aliases (comma-separated)",
+                                value=", ".join(e.aliases or []),
+                                key=f"aliases_{e.id}",
+                            )
+                            if alias_text != ", ".join(e.aliases or []):
+                                e.aliases = [a.strip() for a in alias_text.split(",") if a.strip()]
+                                p.save()
+
+                            if c2.button("✨ Enrich", key=f"en_{e.id}", width="stretch"):
+                                new_info = AnalysisEngine.enrich_entity(e.name, e.category, e.description, get_ai_model())
+                                if new_info:
+                                    e.merge(new_info)
+                                    p.save()
+                                    st.rerun()
+
+                            refs = mention_refs.get(e.id, [])
+                            if refs:
+                                options = {
+                                    f"Chapter {chap.index}: {chap.title}": chap.id for chap in refs
+                                }
+                                sel = st.selectbox(
+                                    "Jump to chapter",
+                                    list(options.keys()),
+                                    key=f"jump_select_{e.id}",
+                                )
+                                if st.button("📖 Jump to Chapter", key=f"jump_{e.id}", width="stretch"):
+                                    st.session_state.page = "chapters"
+                                    st.session_state.curr_chap_id = options[sel]
+                                    st.session_state._force_nav = True
+                            else:
+                                st.caption("No chapter references yet.")
+
+                            d1, d2 = st.columns([1, 1])
+                            with d1:
+                                if st.button("🗑 Delete", key=f"del_{e.id}", width="stretch"):
+                                    p.delete_entity(e.id)
+                                    p.save()
+                                    st.rerun()
+                            with d2:
+                                st.caption(f"Created: {time.strftime('%Y-%m-%d', time.localtime(e.created_at))}")
 
         with t1:
             render_cat("Character")
@@ -3348,27 +3592,17 @@ and quick start modules so you can draft fast and refine later.
 
             st.divider()
             st.markdown("#### 📌 Entity Utilization")
-            chapters = p.get_ordered_chapters()
-            chapter_texts = [c.content or "" for c in chapters]
             utilization_rows = []
             for ent in entries:
                 aliases = [ent.name] + (ent.aliases or [])
-                total_hits = 0
-                for text in chapter_texts:
-                    lower_text = text.lower()
-                    for alias in aliases:
-                        alias_clean = (alias or "").strip()
-                        if not alias_clean:
-                            continue
-                        pattern = rf"\\b{re.escape(alias_clean.lower())}\\b"
-                        total_hits += len(re.findall(pattern, lower_text))
+                total_hits = mention_counts.get(ent.id, 0)
                 utilization_rows.append(
                     {
                         "Name": ent.name,
                         "Category": ent.category,
                         "Appearances": total_hits,
-                        "Orphaned": total_hits == 0,
-                        "Under-described": len((ent.description or "").strip()) < 30,
+                        "Orphaned": ent.id in orphaned_ids,
+                        "Under-described": ent.id in under_described_ids,
                     }
                 )
             if utilization_rows:
@@ -3377,16 +3611,34 @@ and quick start modules so you can draft fast and refine later.
                 st.info("No entities yet to analyze.")
 
             st.divider()
+            st.markdown("#### 🚩 Flagged Entities")
+            flagged_entities = [ent for ent in entries if ent.id in flagged_entity_ids]
+            if flagged_entities:
+                for ent in flagged_entities:
+                    reasons = []
+                    if ent.id in orphaned_ids:
+                        reasons.append("Orphaned")
+                    if ent.id in under_described_ids:
+                        reasons.append("Needs detail")
+                    if ent.id in collision_ids:
+                        reasons.append("Name collision")
+                    with st.container(border=True):
+                        r1, r2 = st.columns([3, 1])
+                        with r1:
+                            st.markdown(f"**{ent.name}** • {ent.category}")
+                            st.caption(" • ".join(reasons))
+                        with r2:
+                            if st.button("Jump to Entity", key=f"jump_entity_{ent.id}", width="stretch"):
+                                st.session_state["world_focus_entity"] = ent.id
+                                st.session_state["world_search"] = ent.name
+                                st.toast("Entity highlighted in World Bible.")
+            else:
+                st.success("No flagged entities right now.")
+
+            st.divider()
             st.markdown("#### ⚠️ Canon Risk Flags")
             coherence_results = st.session_state.get("coherence_results", [])
             high_canon_drift = len(coherence_results) > 0
-
-            normalized_name_map: Dict[str, List[str]] = {}
-            for ent in entries:
-                normalized = Project._normalize_entity_name(ent.name)
-                if not normalized:
-                    continue
-                normalized_name_map.setdefault(normalized, []).append(ent.name)
             alias_collision = any(len(names) > 1 for names in normalized_name_map.values())
 
             timeline_dense = False
