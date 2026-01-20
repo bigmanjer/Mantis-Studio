@@ -2999,7 +2999,7 @@ and quick start modules so you can draft fast and refine later.
                 st.caption("AI suggestions are queued for review. Apply to update canon.")
                 for idx, item in enumerate(list(review_queue)):
                     label = f"{item.get('name', 'Unnamed')} • {item.get('category', 'Lore')}"
-                    expander_label = build_expander_label(label, idx)
+                    expander_label = f"{label} #{idx}"
                     with st.expander(expander_label):
                         st.markdown(f"**Type:** {item.get('type', 'new').title()}")
                         confidence = item.get("confidence")
@@ -3091,7 +3091,7 @@ and quick start modules so you can draft fast and refine later.
                     return
 
                 for e in ents:
-                    with st.expander(f"{e.name}", key=f"world_exp_{e.id}"):
+                    with st.expander(f"{e.name}"):
                         c1, c2 = st.columns([4, 1])
                         new_desc = c1.text_area("Notes", e.description, key=f"desc_{e.id}", height=140)
                         if new_desc != e.description:
