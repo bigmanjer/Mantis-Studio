@@ -39,6 +39,6 @@ Need help choosing a Groq model or tuning prompts? Tell me what you’re buildin
 - [Copyright ownership](legal/copyright.md)
 - [Terms of Service](legal/terms.md)
 - [Privacy Policy](legal/privacy.md)
-- [Brand / IP clarity](legal/BRAND_IP_CLARITY.md)
+- [Brand / IP clarity](legal/Brand_ip_Clarity.md)
 - [License](LICENSE.md)
-- [Trademark path](legal/TRADEMARK_PATH.md)
+- [Trademark path](legal/Trademark_Path.md)
