@@ -2571,22 +2571,9 @@ def _run_ui():
                 active_project.chapters.values(),
                 key=lambda c: c.modified_at or c.created_at,
             )
-            latest_chapter_index = latest_chapter.index
-            latest_chapter_id = latest_chapter.id
-            latest_chapter_ts = latest_chapter.modified_at or latest_chapter.created_at
-        elif recent_projects:
-            chapter_meta = list((recent_projects[0]["meta"].get("chapters") or {}).values())
-            if chapter_meta:
-                latest_chapter = max(
-                    chapter_meta,
-                    key=lambda c: c.get("modified_at") or c.get("created_at") or 0,
-                )
-                latest_chapter_index = latest_chapter.get("index")
-                latest_chapter_ts = latest_chapter.get("modified_at") or latest_chapter.get("created_at")
 
-        if latest_chapter_index and latest_chapter_ts:
-            hours_ago = max(1, int((time.time() - latest_chapter_ts) / 3600))
-            latest_chapter_label = f"You last worked on Chapter {latest_chapter_index} · {hours_ago} hours ago"
+        def _pill(label, *, key):
+            return st.button(label, key=key, width="stretch")
 
         with st.container(border=True):
             st.markdown("### 👋 Welcome back")
@@ -2676,26 +2663,8 @@ def _run_ui():
                     st.session_state.page = "world"
                     st.rerun()
 
-        world_entries = []
-        if active_project:
-            world_entries = list(active_project.world_db.values())
-        elif recent_projects:
-            world_entries = list((recent_projects[0]["meta"].get("world_db") or {}).values())
-        category_counts: Dict[str, int] = {}
-        for ent in world_entries:
-            category = Project._normalize_category(ent.get("category") if isinstance(ent, dict) else ent.category)
-            category_counts[category] = category_counts.get(category, 0) + 1
-        things_to_review = len(st.session_state.get("coherence_results", []))
-        with st.container(border=True):
-            st.markdown("### 🌍 Your world at a glance")
-            st.caption(f"• Total entities: {len(world_entries)}")
-            st.caption(
-                "• Key categories: "
-                + ", ".join(f"{cat} ({count})" for cat, count in category_counts.items())
-                if category_counts
-                else "• Key categories: —"
-            )
-            st.caption(f"• Things to review: {things_to_review}")
+        project = st.session_state.get("project", None)
+        project_title = getattr(project, "title", None) or "No active project"
 
         with st.container(border=True):
             st.markdown("#### Project actions")
