@@ -2547,10 +2547,6 @@ def _run_ui():
         active_dir = get_active_projects_dir()
         recent_projects = _load_recent_projects(active_dir)
         recent_snapshot = _project_snapshot(recent_projects[0]["meta"]) if recent_projects else None
-        streak = _activity_streak()
-        weekly_count = _weekly_activity_count()
-        weekly_goal = max(int(st.session_state.weekly_sessions_goal), 1)
-        weekly_progress = min(weekly_count / weekly_goal, 1.0)
         has_project = bool(recent_projects)
         has_outline = any((p["meta"].get("outline") or "").strip() for p in recent_projects)
         has_chapter = any(
@@ -2570,9 +2566,6 @@ def _run_ui():
             or "Your next story"
         )
         canon_icon, _ = get_canon_health()
-        canon_line = "🟢 Canon looks good" if canon_icon == "🟢" else "🟡 A few things to review"
-        ai_ready = "🟢 AI ready" if (st.session_state.groq_api_key or st.session_state.openai_api_key) else "🟡 AI setup needed"
-
         latest_chapter_label = "You last worked on Chapter — · recently"
         latest_chapter_index = None
         latest_chapter_id = None
@@ -2659,7 +2652,7 @@ def _run_ui():
         with nav_row_two[1]:
             with st.container(border=True):
                 st.markdown("### 📊 Insights")
-                st.caption("Analytics and canon health signals")
+                st.caption("Analytics and canon health insights")
                 if st.button("Open", key="nav_analytics", use_container_width=True):
                     if recent_projects and not st.session_state.project:
                         st.session_state.project = Project.load(recent_projects[0]["path"])
