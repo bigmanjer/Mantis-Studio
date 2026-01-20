@@ -44,7 +44,10 @@ import sys
 # ===== v45 BRANDING (SAFE, ORIGINAL TEMPLATE) =====
 import base64
 
-_MANTIS_LOGO_PATH = "mantis_logo_trans.png"
+_MANTIS_LOGO_PATH = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    "mantis_logo_trans.png",
+)
 
 def _mantis_logo_b64() -> str:
     try:
@@ -1197,7 +1200,7 @@ def _run_ui():
             "sidebar_title": "#7dd3a7",
             "divider": "#143023",
             "expander_border": "#1f3b2d",
-            "header_gradient": "radial-gradient(circle at top left, rgba(34,197,94,0.35), rgba(2,6,23,0.6)), linear-gradient(135deg, #0b1216, #0f1a15)",
+            "header_gradient": "linear-gradient(135deg, #0b1216, #0f1a15)",
             "header_logo_bg": "rgba(34,197,94,0.2)",
             "header_sub": "#c7f2da",
             "shadow_strong": "0 18px 40px rgba(0,0,0,0.55)",
@@ -1355,21 +1358,23 @@ def _run_ui():
         align-items:center;
     }}
     .mantis-header-logo {{
-        width:52px;
-        height:52px;
-        border-radius:16px;
-        background: var(--mantis-header-logo-bg);
+        width:72px;
+        height:72px;
+        border-radius:18px;
+        background: rgba(0,0,0,0.35);
         display:flex;
         align-items:center;
         justify-content:center;
         overflow:hidden;
-        box-shadow: inset 0 0 0 1px rgba(255,255,255,0.2), 0 8px 20px rgba(0,0,0,0.25);
+        box-shadow:
+            inset 0 0 0 1px rgba(255,255,255,0.15),
+            0 0 18px rgba(34,197,94,0.45);
     }}
     .mantis-header-logo img {{
-        height:32px;
+        height:48px;
         width:auto;
-        padding:6px;
-        border-radius:12px;
+        padding:0;
+        border-radius:0;
     }}
     .mantis-header-title {{
         font-size:22px;
