@@ -1132,6 +1132,15 @@ def project_to_markdown(project: Project) -> str:
 def _run_ui():
     import streamlit as st
 
+    def get_canon_health() -> tuple[str, str]:
+        results = st.session_state.get("coherence_results", [])
+        issue_count = len(results)
+        if issue_count == 0:
+            return "🟢", "Canon Stable"
+        if issue_count <= 2:
+            return "🟡", "Minor Canon Drift"
+        return "🔴", "High Canon Risk"
+
     def render_privacy():
         st.markdown("## Privacy Policy\n\nLocal-only storage. No analytics.")
 
@@ -1177,6 +1186,7 @@ def _run_ui():
         st.session_state.activity_log = list(config_data.get("activity_log", []))
     if "remember_me" not in st.session_state:
         st.session_state.remember_me = bool(config_data.get("remember_me", False))
+    st.session_state.setdefault("canon_health_log", [])
 
     theme = st.session_state.ui_theme if st.session_state.ui_theme in ("Dark", "Light") else "Dark"
     theme_tokens = {
@@ -3211,6 +3221,16 @@ and quick start modules so you can draft fast and refine later.
                         model=get_ai_model(),
                     )
                 st.session_state["coherence_results"] = results or []
+                canon_icon, canon_label = get_canon_health()
+                st.session_state.setdefault("canon_health_log", [])
+                st.session_state["canon_health_log"].append(
+                    {
+                        "timestamp": time.time(),
+                        "status": canon_icon,
+                        "issue_count": len(st.session_state.get("coherence_results", [])),
+                    }
+                )
+                st.session_state["canon_health_log"] = st.session_state["canon_health_log"][-30:]
                 if results:
                     st.toast("Coherence issues found.")
                 else:
@@ -3286,6 +3306,23 @@ and quick start modules so you can draft fast and refine later.
                 "Last Updated",
                 time.strftime("%Y-%m-%d", time.localtime(p.last_modified)),
             )
+
+            st.divider()
+            if not st.session_state.get("is_premium", False):
+                st.info("🔒 Canon history is a Premium feature.")
+            else:
+                st.markdown("### 🧠 Canon Health History")
+                for entry in st.session_state.get("canon_health_log", []):
+                    st.caption(
+                        f"{time.strftime('%Y-%m-%d %H:%M', time.localtime(entry['timestamp']))} "
+                        f"{entry['status']} ({entry['issue_count']} issues)"
+                    )
+
+            st.divider()
+            st.markdown("### ⏱ Timeline Heatmap")
+            for chap in p.get_ordered_chapters():
+                intensity = min(1.0, chap.word_count / 2000)
+                st.progress(intensity, text=f"Chapter {chap.index}: {chap.word_count} words")
 
             st.divider()
             st.markdown("#### 📌 Entity Utilization")
@@ -3485,7 +3522,16 @@ and quick start modules so you can draft fast and refine later.
                 st.markdown("### 🤖 Assistant")
                 st.caption("Generate new prose from your outline + previous context.")
 
-                if st.button("✨ Auto-Write Chapter", type="primary", width="stretch"):
+                canon_icon, canon_label = get_canon_health()
+                canon_blocked = canon_icon == "🔴"
+                if canon_blocked:
+                    st.button(
+                        "🚫 Auto-Write Disabled (Canon Risk)",
+                        disabled=True,
+                        use_container_width=True,
+                        help="Resolve canon issues in World Bible → Memory before generating.",
+                    )
+                elif st.button("✨ Auto-Write Chapter", type="primary", use_container_width=True):
                     prompt = StoryEngine.generate_chapter_prompt(p, curr.index, int(curr.target_words))
                     full = ""
                     for chunk in AIEngine().generate_stream(prompt, get_ai_model()):
