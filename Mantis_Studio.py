@@ -2559,10 +2559,6 @@ def _run_ui():
             for c in (p["meta"].get("chapters") or {}).values()
         )
 
-        def status_row(done: bool, label: str) -> None:
-            icon = "✅" if done else "⬜"
-            st.markdown(f"{icon} {label}")
-
         active_project = st.session_state.project
         project_title = (
             (active_project.title if active_project else None)
@@ -2745,9 +2741,59 @@ def _run_ui():
             st.caption("Keep the studio healthy with these quick checks.")
             milestone_col = st.container(border=True)
             with milestone_col:
-                status_row(has_project, "Create a project")
-                status_row(has_outline, "Draft an outline")
-                status_row(has_chapter, "Write a chapter")
+                st.checkbox(
+                    "Create a project",
+                    value=has_project,
+                    disabled=True,
+                    key="milestone_create_project",
+                )
+                st.checkbox(
+                    "Draft an outline",
+                    value=has_outline,
+                    disabled=True,
+                    key="milestone_draft_outline",
+                )
+                st.checkbox(
+                    "Write a chapter",
+                    value=has_chapter,
+                    disabled=True,
+                    key="milestone_write_chapter",
+                )
+
+        with st.container(border=True):
+            st.markdown("#### Studio signals")
+            st.caption("Model, storage, and AI readiness at a glance.")
+            status_card = st.container(border=True)
+            with status_card:
+                groq_status = "Connected" if st.session_state.groq_api_key else "Add key"
+                openai_status = "Connected" if st.session_state.openai_api_key else "Add key"
+                st.metric("Groq", groq_status)
+                st.metric("OpenAI", openai_status)
+                st.metric("Model", st.session_state.groq_model or AppConfig.DEFAULT_MODEL)
+                st.caption(f"Projects dir: `{active_dir}`")
+
+            st.markdown("#### Next milestones")
+            st.caption("Keep the studio healthy with these quick checks.")
+            milestone_col = st.container(border=True)
+            with milestone_col:
+                st.checkbox(
+                    "Create a project",
+                    value=has_project,
+                    disabled=True,
+                    key="milestone_create_project",
+                )
+                st.checkbox(
+                    "Draft an outline",
+                    value=has_outline,
+                    disabled=True,
+                    key="milestone_draft_outline",
+                )
+                st.checkbox(
+                    "Write a chapter",
+                    value=has_chapter,
+                    disabled=True,
+                    key="milestone_write_chapter",
+                )
 
         with st.container(border=True):
             st.markdown("### ✨ Welcome to your writing nook")
