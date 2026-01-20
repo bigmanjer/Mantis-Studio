@@ -2987,7 +2987,9 @@ and quick start modules so you can draft fast and refine later.
         st.caption("Track canonical characters, locations, factions, and lore.")
 
         query = st.text_input("Search", placeholder="Type a name to filter...")
-        t1, t2, t3, t4 = st.tabs(["Characters", "Locations", "Factions", "Lore"])
+        t1, t2, t3, t4, t5, t6 = st.tabs(
+            ["Characters", "Locations", "Factions", "Lore", "Memory", "Analytics"]
+        )
 
         review_queue = st.session_state.get("world_bible_review", [])
         if review_queue:
@@ -3081,8 +3083,13 @@ and quick start modules so you can draft fast and refine later.
                     st.info(f"📭 No {category} entries yet. Add one above or scan entities from your outline/chapters.")
                     return
 
-                for e in ents:
-                    with st.expander(f"{e.name}"):
+                for idx, e in enumerate(ents):
+                    # Streamlit versions without expander `key` need unique labels.
+                    # Use zero-width spaces to keep the visible label clean.
+                    safe_name = (e.name or "Unnamed").strip() or "Unnamed"
+                    zero_width = "\u200b"
+                    expander_label = f"{safe_name}{zero_width * (idx + 1)}"
+                    with st.expander(expander_label):
                         c1, c2 = st.columns([4, 1])
                         new_desc = c1.text_area("Notes", e.description, key=f"desc_{e.id}", height=140)
                         if new_desc != e.description:
@@ -3122,6 +3129,39 @@ and quick start modules so you can draft fast and refine later.
             render_cat("Faction")
         with t4:
             render_cat("Lore")
+        with t5:
+            st.markdown("### 🧠 World Memory")
+            st.caption("Keep canon notes, timelines, and facts the AI should always know.")
+            memory_key = f"world_memory_{p.id}"
+            memory_val = st.text_area("Memory", p.memory, height=320, key=memory_key)
+            if memory_val != p.memory:
+                p.memory = memory_val
+                save_p()
+            if st.button("💾 Save Memory", use_container_width=True):
+                p.save()
+                st.toast("Memory saved")
+        with t6:
+            st.markdown("### 📊 World Bible Analytics")
+            st.caption("Quick stats on your current canon database.")
+            entries = list(p.world_db.values())
+            total_entries = len(entries)
+            counts = {"Character": 0, "Location": 0, "Faction": 0, "Lore": 0}
+            for ent in entries:
+                category = Project._normalize_category(ent.category)
+                counts[category] = counts.get(category, 0) + 1
+
+            c1, c2, c3, c4 = st.columns(4)
+            c1.metric("Total Entries", total_entries)
+            c2.metric("Characters", counts.get("Character", 0))
+            c3.metric("Locations", counts.get("Location", 0))
+            c4.metric("Factions", counts.get("Faction", 0))
+
+            c5, c6 = st.columns(2)
+            c5.metric("Lore", counts.get("Lore", 0))
+            c6.metric(
+                "Last Updated",
+                time.strftime("%Y-%m-%d", time.localtime(p.last_modified)),
+            )
 
     def render_chapters():
         p = st.session_state.project
