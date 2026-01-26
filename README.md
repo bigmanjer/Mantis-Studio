@@ -22,6 +22,67 @@ export GROQ_API_KEY="your-key-here"
 python -m streamlit run Mantis_Studio.py
 ```
 
+## Authentication (Streamlit native OIDC)
+
+MANTIS Studio uses Streamlit’s built-in authentication (st.login/st.user/st.logout). Password
+management, MFA, and recovery are handled by your identity provider (Google, Microsoft Entra, etc.).
+
+### How to set up Google OIDC
+
+1. In Google Cloud Console, create an OAuth 2.0 Client ID (Web application).
+2. Add your redirect URI:
+   - Local: `http://localhost:8501/oauth2callback`
+   - Streamlit Cloud: `https://<your-app>.streamlit.app/oauth2callback`
+3. Add the client ID and client secret to `.streamlit/secrets.toml` under `[auth.providers.google]`.
+
+### How to set up Microsoft Entra OIDC
+
+1. In Microsoft Entra, register an application and create a client secret.
+2. Add your redirect URI:
+   - Local: `http://localhost:8501/oauth2callback`
+   - Streamlit Cloud: `https://<your-app>.streamlit.app/oauth2callback`
+3. Use the tenant issuer URL in secrets:
+   - Single tenant: `https://login.microsoftonline.com/<tenant-id>/v2.0`
+   - Multi-tenant: `https://login.microsoftonline.com/common/v2.0`
+4. Add the client ID and client secret to `.streamlit/secrets.toml` under `[auth.providers.microsoft]`.
+
+### Required secrets (template)
+
+See `.streamlit/secrets.toml` for a full template including optional allowlists and admin emails.
+At minimum, provide:
+
+```toml
+[auth]
+redirect_uri = "https://<your-app>.streamlit.app/oauth2callback"
+cookie_secret = "replace-with-a-long-random-string"
+
+[auth.providers.google]
+client_id = "..."
+client_secret = "..."
+issuer = "https://accounts.google.com"
+
+[auth.providers.microsoft]
+client_id = "..."
+client_secret = "..."
+issuer = "https://login.microsoftonline.com/<tenant-id>/v2.0"
+```
+
+### Optional authorization controls
+
+Use allowlists to restrict access or flag admins:
+
+```toml
+[authz]
+allowed_domains = ["example.com"]
+allowed_emails = ["editor@example.com"]
+admin_emails = ["admin@example.com"]
+```
+
+### Streamlit Cloud deploy notes
+
+- Set secrets in Streamlit Cloud > App settings > Secrets (do not commit real secrets).
+- Ensure the redirect URI matches your Streamlit Cloud app URL.
+
 ### Optional environment variables
 
 ```bash

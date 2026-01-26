@@ -1,0 +1,61 @@
+name: Bump version on merge
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  bump-version:
+    if: github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Guard against bump commit
+        id: guard
+        run: |
+          last_message="$(git log -1 --pretty=%s)"
+          if [[ "$last_message" == chore: bump version* ]]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Bump VERSION.txt
+        if: steps.guard.outputs.skip != 'true'
+        run: |
+          version_file="VERSION.txt"
+          if [[ ! -f "$version_file" ]]; then
+            echo "47.0" > "$version_file"
+          fi
+          current_version="$(tr -d '[:space:]' < "$version_file")"
+          IFS='.' read -r major patch _ <<< "$current_version"
+          if [[ -z "$major" ]]; then
+            major="47"
+          fi
+          if [[ -z "$patch" || ! "$patch" =~ ^[0-9]+$ ]]; then
+            patch="0"
+          fi
+          next_patch=$((patch + 1))
+          next_version="${major}.${next_patch}"
+          echo "$next_version" > "$version_file"
+
+      - name: Commit and push
+        if: steps.guard.outputs.skip != 'true'
+        run: |
+          if git diff --quiet; then
+            echo "No version changes to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add VERSION.txt
+          git commit -m "chore: bump version to $(cat VERSION.txt)"
+          git push
