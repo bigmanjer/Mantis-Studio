@@ -45,7 +45,7 @@ Need help choosing a Groq model or tuning prompts? Tell me what you’re buildin
 
 ## Assets
 
-- `NIS/mantis_logo_trans.png` is the active logo asset used by the app; unused full-size variants have been removed.
+- `mantis_logo_trans.png` is the active logo asset used by the app; unused full-size variants have been removed.
 
 ## Repository layout (product-oriented)
 
