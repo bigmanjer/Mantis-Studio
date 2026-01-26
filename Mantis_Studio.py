@@ -2897,12 +2897,7 @@ def _run_ui():
                 st.markdown("### 👋 Welcome back")
                 st.markdown(f"## {project_title}")
                 st.caption(latest_chapter_label)
-                if st.button(
-                    primary_label,
-                    type="primary",
-                    use_container_width=True,
-                    key="dashboard_primary_cta",
-                ):
+                if st.button(primary_label, type="primary", use_container_width=True):
                     if recent_projects and not st.session_state.project:
                         st.session_state.project = Project.load(recent_projects[0]["path"])
                     if primary_target == "chapters" and latest_chapter_id:
@@ -2938,42 +2933,47 @@ def _run_ui():
                 st.metric("Weekly sessions", f"{weekly_count}/{weekly_goal}")
                 st.metric("Writing streak", f"{_activity_streak()} days")
 
-        st.markdown("#### Quick actions")
+        st.markdown("#### Studio modules")
+        module_row = st.columns(4)
+        with module_row[0]:
+            with st.container(border=True):
+                st.markdown("### 🌍 World Bible")
+                st.caption("Characters, places, factions, and lore")
+                if st.button("Open", key="nav_world", use_container_width=True):
+                    if recent_projects and not st.session_state.project:
+                        st.session_state.project = Project.load(recent_projects[0]["path"])
+                    st.session_state.page = "world"
+                    st.rerun()
 
         def render_quick_action(title: str, caption: str, target: str, key: str):
             with st.container(border=True):
-                st.markdown(f"### {title}")
-                st.caption(caption)
-                title_slug = re.sub(r"[^a-z0-9]+", "_", title.lower()).strip("_")
-                button_key = f"{key}_{target}_{title_slug}"
-                if st.button("Open", use_container_width=True, key=button_key):
+                st.markdown("### 📝 Outline")
+                st.caption("Blueprint your story beats and arcs")
+                if st.button("Open", key="nav_outline", use_container_width=True):
                     if recent_projects and not st.session_state.project:
                         st.session_state.project = Project.load(recent_projects[0]["path"])
                     st.session_state.page = target
                     st.rerun()
 
-        action_rows = st.columns(3)
-        with action_rows[0]:
-            render_quick_action(
-                "🌍 World Bible",
-                "Characters, places, factions, and lore",
-                "world",
-                "dashboard_quick_world",
-            )
-        with action_rows[1]:
-            render_quick_action(
-                "🧠 Memory",
-                "Canon rules, guardrails, and style notes",
-                "world",
-                "dashboard_quick_memory",
-            )
-        with action_rows[2]:
-            render_quick_action(
-                "📊 Insights",
-                "Canon health, timeline, and utilization",
-                "world",
-                "dashboard_quick_insights",
-            )
+        def render_quick_action(title: str, caption: str, target: str, key: str):
+            with st.container(border=True):
+                st.markdown("### 🧠 Memory")
+                st.caption("Canon rules, guidance, and style notes")
+                if st.button("Open", key="nav_memory", use_container_width=True):
+                    if recent_projects and not st.session_state.project:
+                        st.session_state.project = Project.load(recent_projects[0]["path"])
+                    st.session_state.page = target
+                    st.rerun()
+
+        with module_row[3]:
+            with st.container(border=True):
+                st.markdown("### 📊 Insights")
+                st.caption("Analytics and canon health insights")
+                if st.button("Open", key="nav_analytics", use_container_width=True):
+                    if recent_projects and not st.session_state.project:
+                        st.session_state.project = Project.load(recent_projects[0]["path"])
+                    st.session_state.page = "world"
+                    st.rerun()
 
         secondary_actions = st.columns(2)
         with secondary_actions[0]:
@@ -2992,15 +2992,32 @@ def _run_ui():
             )
 
         with st.container(border=True):
-            st.markdown("#### Project center")
-            st.caption("Manage projects, exports, and imports in one place.")
-            if st.button(
-                "🗂 Go to Projects",
-                use_container_width=True,
-                key="dashboard_projects_hub",
-            ):
-                st.session_state.page = "projects"
-                st.rerun()
+            st.markdown("#### Project actions")
+            action_cols = st.columns(3)
+            with action_cols[0]:
+                if st.button(
+                    "📂 Resume",
+                    use_container_width=True,
+                    disabled=not recent_projects,
+                ):
+                    if recent_projects:
+                        st.session_state.project = Project.load(recent_projects[0]["path"])
+                        st.session_state.page = "chapters"
+                        st.rerun()
+            with action_cols[1]:
+                if st.button("🧭 New project", use_container_width=True):
+                    st.session_state.page = "projects"
+                    st.rerun()
+            with action_cols[2]:
+                if st.button(
+                    "🧩 Open outline",
+                    use_container_width=True,
+                    disabled=not recent_projects,
+                ):
+                    if recent_projects:
+                        st.session_state.project = Project.load(recent_projects[0]["path"])
+                        st.session_state.page = "outline"
+                        st.rerun()
 
         if not st.session_state.groq_api_key or not st.session_state.openai_api_key:
             with st.container(border=True):
@@ -3008,18 +3025,12 @@ def _run_ui():
                 st.caption("Unlock generation, summaries, and entity tools with API access.")
                 cta_left, cta_right = st.columns(2)
                 with cta_left:
-                    st.link_button(
-                        "Create Groq Account",
-                        "https://console.groq.com/keys",
-                        use_container_width=True,
-                        key="dashboard_groq_signup",
-                    )
+                    st.link_button("Create Groq Account", "https://console.groq.com/keys", use_container_width=True)
                 with cta_right:
                     st.link_button(
                         "Create OpenAI Account",
                         "https://platform.openai.com/api-keys",
                         use_container_width=True,
-                        key="dashboard_openai_signup",
                     )
 
 
@@ -3600,6 +3611,13 @@ def _run_ui():
                             if alias_text != ", ".join(e.aliases or []):
                                 e.aliases = [a.strip() for a in alias_text.split(",") if a.strip()]
                                 p.save()
+
+                            if c2.button("✨ Enrich", key=f"en_{e.id}", use_container_width=True):
+                                new_info = AnalysisEngine.enrich_entity(e.name, e.category, e.description, get_ai_model())
+                                if new_info:
+                                    e.merge(new_info)
+                                    p.save()
+                                    st.rerun()
 
                             refs = mention_refs.get(e.id, [])
                             if refs:
