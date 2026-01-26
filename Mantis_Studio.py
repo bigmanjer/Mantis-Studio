@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Mantis_Studio.py — MANTIS Studio v47 (Chronicle) — SINGLE FILE EDITION
+# Mantis_Studio.py — MANTIS Studio
 #
 # Run:
 #   python -m streamlit run Mantis_Studio.py
@@ -40,6 +40,7 @@ import requests
 
 import sys
 from app.utils.navigation import get_nav_config
+from app.utils.versioning import get_app_version
 
 
 # ===== v45 BRANDING (SAFE, ORIGINAL TEMPLATE) =====
@@ -56,7 +57,7 @@ REPAIR_MODE = "--repair" in sys.argv
 
 class AppConfig:
     APP_NAME = "MANTIS Studio"
-    VERSION = "47 (Chronicle • One-File)"
+    VERSION = get_app_version()
     PROJECTS_DIR = os.getenv("MANTIS_PROJECTS_DIR", "projects")
     BACKUPS_DIR = os.path.join(PROJECTS_DIR, ".backups")
     USERS_DB_PATH = os.getenv(
@@ -1927,16 +1928,15 @@ def _run_ui():
                 </div>
                 <div style="line-height:1.15;">
                     <div class="mantis-header-title">
-                        MANTIS Studio
+                        MANTIS Studio — v{AppConfig.VERSION}
                     </div>
                     <div class="mantis-header-sub">
-                        Modular AI Narrative Text Intelligence System
+                        Modular narrative workspace
                     </div>
                 </div>
             </div>
             <div class="mantis-header-right">
                 <span class="mantis-pill">Workspace</span>
-                <span class="mantis-pill">v{AppConfig.VERSION}</span>
             </div>
         </div>
         """,
@@ -2931,8 +2931,8 @@ def _run_ui():
                     {sidebar_logo_html}
                 </div>
                 <div>
-                    <div class="mantis-sidebar-title">MANTIS</div>
-                    <div class="mantis-sidebar-sub">Studio • v{AppConfig.VERSION}</div>
+                    <div class="mantis-sidebar-title">MANTIS Studio — v{AppConfig.VERSION}</div>
+                    <div class="mantis-sidebar-sub">Modular narrative workspace</div>
                 </div>
             </div>
             """,
