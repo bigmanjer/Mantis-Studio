@@ -1981,10 +1981,6 @@ def _run_ui():
     if is_guest:
         user_id = f"guest_{st.session_state['guest_session_id']}"
     else:
-        if not auth.is_user_allowed(user):
-            st.error("Your account is not authorized to access this workspace.")
-            auth.logout_button(label="Sign out", key="auth_denied_logout")
-            st.stop()
         user_id = auth.get_user_id(user)
         if not user_id:
             st.error("We could not determine a user identifier from your login. Please try again.")

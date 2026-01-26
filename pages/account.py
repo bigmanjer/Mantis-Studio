@@ -21,10 +21,6 @@ def main() -> None:
     return_page = st.session_state.get("auth_redirect_return_page", "home")
 
     if auth.is_authenticated():
-        if not auth.is_user_allowed():
-            st.error("Your account is not authorized to access this workspace.")
-            auth.logout_button(label="Sign out", key="account_denied_logout")
-            return
         st.markdown("### Welcome back")
         st.caption("Your account is already connected.")
         st.markdown(f"**{auth.get_user_display_name()}**")
