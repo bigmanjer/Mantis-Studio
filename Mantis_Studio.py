@@ -2842,7 +2842,6 @@ def _run_ui():
     def render_home():
         active_dir = get_active_projects_dir()
         recent_projects = _load_recent_projects(active_dir)
-        recent_snapshot = _project_snapshot(recent_projects[0]["meta"]) if recent_projects else None
         has_project = bool(recent_projects)
         has_outline = any((p["meta"].get("outline") or "").strip() for p in recent_projects)
         has_chapter = any(
@@ -2889,7 +2888,10 @@ def _run_ui():
             primary_label = "📝 Build your outline"
             primary_target = "outline"
 
-        header_cols = st.columns([2, 1])
+        st.markdown("## Dashboard")
+        st.caption("Your writing cockpit — jump back in, track momentum, and move between tools.")
+
+        header_cols = st.columns([2.2, 1])
         with header_cols[0]:
             with st.container(border=True):
                 st.markdown("### 👋 Welcome back")
@@ -2902,6 +2904,26 @@ def _run_ui():
                         st.session_state.curr_chap_id = latest_chapter_id
                     st.session_state.page = primary_target
                     st.rerun()
+                action_row = st.columns(2)
+                with action_row[0]:
+                    if st.button(
+                        "📂 Resume project",
+                        use_container_width=True,
+                        key="dashboard_resume_project",
+                        disabled=not recent_projects,
+                    ):
+                        if recent_projects:
+                            st.session_state.project = Project.load(recent_projects[0]["path"])
+                            st.session_state.page = "chapters"
+                            st.rerun()
+                with action_row[1]:
+                    if st.button(
+                        "🧭 New project",
+                        use_container_width=True,
+                        key="dashboard_new_project",
+                    ):
+                        st.session_state.page = "projects"
+                        st.rerun()
 
         with header_cols[1]:
             with st.container(border=True):
@@ -2909,6 +2931,7 @@ def _run_ui():
                 st.metric("Active projects", len(recent_projects))
                 st.metric("Latest genre", (recent_snapshot or {}).get("genre", "—"))
                 st.metric("Weekly sessions", f"{weekly_count}/{weekly_goal}")
+                st.metric("Writing streak", f"{_activity_streak()} days")
 
         st.markdown("#### Studio modules")
         module_row = st.columns(4)
@@ -2932,14 +2955,14 @@ def _run_ui():
                     st.session_state.page = "outline"
                     st.rerun()
 
-        with module_row[2]:
+        def render_quick_action(title: str, caption: str, target: str, key: str):
             with st.container(border=True):
                 st.markdown("### 🧠 Memory")
                 st.caption("Canon rules, guidance, and style notes")
                 if st.button("Open", key="nav_memory", use_container_width=True):
                     if recent_projects and not st.session_state.project:
                         st.session_state.project = Project.load(recent_projects[0]["path"])
-                    st.session_state.page = "world"
+                    st.session_state.page = target
                     st.rerun()
 
         with module_row[3]:
@@ -2952,8 +2975,21 @@ def _run_ui():
                     st.session_state.page = "world"
                     st.rerun()
 
-        project = st.session_state.get("project", None)
-        project_title = getattr(project, "title", None) or "No active project"
+        secondary_actions = st.columns(2)
+        with secondary_actions[0]:
+            render_quick_action(
+                "📝 Outline",
+                "Blueprint beats, arcs, and chapter plan",
+                "outline",
+                "dashboard_quick_outline",
+            )
+        with secondary_actions[1]:
+            render_quick_action(
+                "✍️ Editor",
+                "Draft chapters and summaries",
+                "chapters",
+                "dashboard_quick_editor",
+            )
 
         with st.container(border=True):
             st.markdown("#### Project actions")
