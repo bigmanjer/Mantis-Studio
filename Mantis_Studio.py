@@ -1218,17 +1218,6 @@ def _run_ui():
             return "🟡", "Minor Canon Drift"
         return "🔴", "High Canon Risk"
 
-    def update_locked_chapters() -> None:
-        results = st.session_state.get("coherence_results", [])
-        locked = set()
-        for issue in results:
-            try:
-                chapter_idx = int(issue.get("chapter_index"))
-            except (TypeError, ValueError):
-                continue
-            locked.add(chapter_idx)
-        st.session_state["locked_chapters"] = locked
-
     def detect_hard_canon_violation(project: Project, chapter_index: int, new_text: str) -> List[Dict[str, Any]]:
         hard_rules = (project.memory_hard or project.memory or "").strip()
         if not hard_rules or not (new_text or "").strip():
@@ -1856,6 +1845,12 @@ def _run_ui():
         st.session_state.groq_model_list = _cached_models(
             st.session_state.groq_base_url,
             st.session_state.groq_api_key,
+        ) or []
+
+    def refresh_openai_models():
+        st.session_state.openai_model_list = _cached_models(
+            st.session_state.openai_base_url,
+            st.session_state.openai_api_key,
         ) or []
 
     def save_app_settings():
@@ -2696,7 +2691,7 @@ def _run_ui():
 
         with st.container(border=True):
             st.markdown("### ✅ Actions")
-            action_cols = st.columns(3)
+            action_cols = st.columns(4)
             with action_cols[0]:
                 st.checkbox("Auto-save", key="auto_save")
             with action_cols[1]:
@@ -2705,6 +2700,11 @@ def _run_ui():
                     refresh_models()
                     st.toast("Model list refreshed")
             with action_cols[2]:
+                if st.button("↻ Refresh OpenAI Models", width="stretch"):
+                    st.cache_data.clear()
+                    refresh_openai_models()
+                    st.toast("OpenAI model list refreshed")
+            with action_cols[3]:
                 if st.button("💾 Save AI Settings", width="stretch"):
                     save_app_settings()
 
@@ -3710,25 +3710,6 @@ def _run_ui():
                                     update_locked_chapters()
                                     st.toast("Applied fix.")
                                     st.rerun()
-                                elif target_excerpt:
-                                    content = target_chapter.content or ""
-                                    cleaned_excerpt = target_excerpt.strip()
-                                    if cleaned_excerpt:
-                                        pattern = re.sub(r"\s+", r"\\s+", re.escape(cleaned_excerpt))
-                                        match = re.search(pattern, content, flags=re.DOTALL)
-                                        if match:
-                                            updated = (
-                                                content[: match.start()]
-                                                + (issue.get("suggested_rewrite", "") or "")
-                                                + content[match.end() :]
-                                            )
-                                            target_chapter.update_content(updated, "Coherence Fix")
-                                            p.save()
-                                            results.pop(idx)
-                                            st.session_state["coherence_results"] = results
-                                            update_locked_chapters()
-                                            st.toast("Applied fix.")
-                                            st.rerun()
                                 elif issue.get("suggested_rewrite"):
                                     insertion = issue.get("suggested_rewrite", "").strip()
                                     if insertion:
