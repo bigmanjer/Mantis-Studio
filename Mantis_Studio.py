@@ -1254,7 +1254,79 @@ def sanitize_chapter_title(title: str) -> str:
 
 def _run_ui():
     import streamlit as st
-    from app.components.ui import card, section_header, primary_button, stat_tile
+    from contextlib import contextmanager
+    from app.components.ui import action_card, card, primary_button, section_header, stat_tile
+
+    widget_counters: Dict[tuple, int] = {}
+    key_prefix_stack: List[str] = []
+
+    def _current_prefix() -> str:
+        return "__".join(key_prefix_stack) or "global"
+
+    def _slugify(value: str) -> str:
+        slug = re.sub(r"[^a-z0-9]+", "_", (value or "").lower()).strip("_")
+        return slug[:40] or "widget"
+
+    def _auto_key(widget_type: str, label: Optional[str], key: Optional[str]) -> str:
+        if key:
+            return key
+        prefix = _current_prefix()
+        slug = _slugify(label or widget_type)
+        counter_key = (prefix, widget_type, slug)
+        widget_counters[counter_key] = widget_counters.get(counter_key, 0) + 1
+        index = widget_counters[counter_key]
+        return f"{prefix}__{slug}__{index}"
+
+    @contextmanager
+    def key_scope(prefix: str) -> Generator[None, None, None]:
+        key_prefix_stack.append(prefix)
+        try:
+            yield
+        finally:
+            key_prefix_stack.pop()
+
+    def _wrap_widget(widget_fn, widget_type: str):
+        def _wrapped(label=None, *args, **kwargs):
+            kwargs["key"] = _auto_key(widget_type, label, kwargs.get("key"))
+            return widget_fn(label, *args, **kwargs)
+
+        return _wrapped
+
+    def _wrap_widget_no_label(widget_fn, widget_type: str):
+        def _wrapped(*args, **kwargs):
+            kwargs["key"] = _auto_key(widget_type, None, kwargs.get("key"))
+            return widget_fn(*args, **kwargs)
+
+        return _wrapped
+
+    def _maybe_wrap(name: str, widget_type: str, has_label: bool = True) -> None:
+        if not hasattr(st, name):
+            return
+        original = getattr(st, name)
+        wrapped = _wrap_widget(original, widget_type) if has_label else _wrap_widget_no_label(original, widget_type)
+        setattr(st, name, wrapped)
+
+    _maybe_wrap("button", "button")
+    _maybe_wrap("text_input", "text_input")
+    _maybe_wrap("text_area", "text_area")
+    _maybe_wrap("selectbox", "selectbox")
+    _maybe_wrap("radio", "radio")
+    _maybe_wrap("checkbox", "checkbox")
+    _maybe_wrap("number_input", "number_input")
+    _maybe_wrap("slider", "slider")
+    _maybe_wrap("multiselect", "multiselect")
+    _maybe_wrap("file_uploader", "file_uploader")
+    _maybe_wrap("download_button", "download_button")
+    _maybe_wrap("form_submit_button", "form_submit_button")
+    _maybe_wrap("toggle", "toggle")
+    _maybe_wrap("feedback", "feedback")
+    _maybe_wrap("date_input", "date_input")
+    _maybe_wrap("time_input", "time_input")
+    _maybe_wrap("color_picker", "color_picker")
+    _maybe_wrap("camera_input", "camera_input")
+    _maybe_wrap("audio_input", "audio_input")
+    _maybe_wrap("chat_input", "chat_input", has_label=False)
+    _maybe_wrap("page_link", "page_link")
 
     def get_canon_health() -> tuple[str, str]:
         results = st.session_state.get("coherence_results", [])
@@ -1336,6 +1408,16 @@ def _run_ui():
         st.session_state.activity_log = list(config_data.get("activity_log", []))
     if "remember_me" not in st.session_state:
         st.session_state.remember_me = bool(config_data.get("remember_me", False))
+    if "projects_refresh_token" not in st.session_state:
+        st.session_state.projects_refresh_token = 0
+    if "delete_project_path" not in st.session_state:
+        st.session_state.delete_project_path = None
+    if "delete_project_title" not in st.session_state:
+        st.session_state.delete_project_title = None
+    if "delete_entity_id" not in st.session_state:
+        st.session_state.delete_entity_id = None
+    if "delete_entity_name" not in st.session_state:
+        st.session_state.delete_entity_name = None
     st.session_state.setdefault("canon_health_log", [])
 
     theme = st.session_state.ui_theme if st.session_state.ui_theme in ("Dark", "Light") else "Dark"
@@ -2234,7 +2316,8 @@ def _run_ui():
             counts.append(1 if day.isoformat() in log_set else 0)
         return [{"day": label, "sessions": count} for label, count in zip(labels, counts)]
 
-    def _load_recent_projects(active_dir: str) -> List[Dict[str, Any]]:
+    @st.cache_data(show_spinner=False)
+    def _load_recent_projects(active_dir: str, refresh_token: int) -> List[Dict[str, Any]]:
         if not os.path.exists(active_dir):
             return []
         files = sorted(
@@ -2252,6 +2335,9 @@ def _run_ui():
             except Exception:
                 logger.warning("Failed to load project metadata: %s", full_path, exc_info=True)
         return projects
+
+    def _bump_projects_refresh() -> None:
+        st.session_state.projects_refresh_token += 1
 
     def _project_snapshot(meta: Dict[str, Any]) -> Dict[str, Any]:
         chapters = meta.get("chapters", {}) or {}
@@ -2587,13 +2673,13 @@ def _run_ui():
     if not st.session_state.auth_user:
         _restore_remembered_session()
     if not st.session_state.auth_user:
-        render_auth()
+        with key_scope("auth"):
+            render_auth()
         render_footer()
         return
 
     def render_ai_settings():
-        st.markdown("## 🧠 AI Tools")
-        st.caption("Connect providers, choose models, and validate access.")
+        section_header("AI Tools", "Connect providers, choose models, and validate access.")
 
         status_cols = st.columns(3)
         with status_cols[0]:
@@ -2802,87 +2888,89 @@ def _run_ui():
                     save_app_settings()
 
     with st.sidebar:
-        st.markdown(f"""
-        <div class="mantis-sidebar-brand">
-            <div class="mantis-sidebar-logo">
-                <img src="data:image/png;base64,{_MANTIS_LOGO_B64}" />
+        with key_scope("sidebar"):
+            st.markdown(f"""
+            <div class="mantis-sidebar-brand">
+                <div class="mantis-sidebar-logo">
+                    <img src="data:image/png;base64,{_MANTIS_LOGO_B64}" />
+                </div>
+                <div>
+                    <div class="mantis-sidebar-title">MANTIS Studio</div>
+                    <div class="mantis-sidebar-sub">v{AppConfig.VERSION}</div>
+                </div>
             </div>
-            <div>
-                <div class="mantis-sidebar-title">MANTIS Studio</div>
-                <div class="mantis-sidebar-sub">v{AppConfig.VERSION}</div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+            """, unsafe_allow_html=True)
 
-        st.markdown("---")
-        st.markdown("### 👤 Account")
-        st.caption(f"Signed in as **{st.session_state.auth_user}**")
-        if st.session_state.auth_username and not st.session_state.auth_is_guest:
-            st.caption(f"@{st.session_state.auth_username}")
-        if st.button("Sign out", use_container_width=True):
-            st.session_state.auth_user = None
-            st.session_state.auth_user_id = None
-            st.session_state.auth_username = None
-            st.session_state.auth_is_guest = False
-            st.session_state.projects_dir = None
-            st.session_state.project = None
-            st.session_state.page = "home"
-            save_auth_remember(None, False, False)
-            st.session_state._force_nav = True
-            st.rerun()
+            st.markdown("---")
+            st.markdown("### 👤 Account")
+            st.caption(f"Signed in as **{st.session_state.auth_user}**")
+            if st.session_state.auth_username and not st.session_state.auth_is_guest:
+                st.caption(f"@{st.session_state.auth_username}")
+            if st.button("Sign out", use_container_width=True):
+                st.session_state.auth_user = None
+                st.session_state.auth_user_id = None
+                st.session_state.auth_username = None
+                st.session_state.auth_is_guest = False
+                st.session_state.projects_dir = None
+                st.session_state.project = None
+                st.session_state.page = "home"
+                save_auth_remember(None, False, False)
+                st.session_state._force_nav = True
+                st.rerun()
 
-        st.markdown("### 🎨 Appearance")
-        st.selectbox("Theme", ["Dark", "Light"], key="ui_theme")
-        st.divider()
-
-        if st.session_state.project:
-            p = st.session_state.project
-            st.markdown("### 📖 Project")
-            st.caption(p.title)
-            st.caption(f"🗂 Projects folder: `{get_active_projects_dir()}`")
-            st.caption(f"📚 Total words: {p.get_total_word_count()}")
-
-        st.divider()
-        st.markdown("### 🧭 Navigation")
-
-        nav_labels, pmap = get_nav_config(bool(st.session_state.project))
-        current_page = st.session_state.page
-        reverse_map = {v: k for k, v in pmap.items()}
-        current_label = reverse_map.get(current_page, "Dashboard")
-        try:
-            current_index = nav_labels.index(current_label)
-        except ValueError:
-            current_index = 0
-        nav = st.radio(
-            "Navigation",
-            nav_labels,
-            index=current_index,
-            label_visibility="collapsed",
-        )
-        if pmap[nav] != st.session_state.page:
-            st.session_state.page = pmap[nav]
-            st.rerun()
-
-        if st.session_state.project:
+            st.markdown("### 🎨 Appearance")
+            st.selectbox("Theme", ["Dark", "Light"], key="ui_theme")
             st.divider()
 
-            cA, cB = st.columns(2)
-            with cA:
-                if st.button("💾 Save", type="primary", use_container_width=True):
-                    p.save()
-                    st.toast("Saved")
-            with cB:
-                if st.button("✖ Close", use_container_width=True):
-                    save_p()
-                    st.session_state.project = None
-                    st.session_state.page = "home"
-                    st.rerun()
-        else:
-            st.info("No project loaded.")
+            if st.session_state.project:
+                p = st.session_state.project
+                st.markdown("### 📖 Project")
+                st.caption(p.title)
+                st.caption(f"🗂 Projects folder: `{get_active_projects_dir()}`")
+                st.caption(f"📚 Total words: {p.get_total_word_count()}")
+
+            st.divider()
+            st.markdown("### 🧭 Navigation")
+            st.caption("Write • World Bible • Memory • Insights • Export • Settings")
+
+            nav_labels, pmap = get_nav_config(bool(st.session_state.project))
+            current_page = st.session_state.page
+            reverse_map = {v: k for k, v in pmap.items()}
+            current_label = reverse_map.get(current_page, "Dashboard")
+            try:
+                current_index = nav_labels.index(current_label)
+            except ValueError:
+                current_index = 0
+            nav = st.radio(
+                "Navigation",
+                nav_labels,
+                index=current_index,
+                label_visibility="collapsed",
+            )
+            if pmap[nav] != st.session_state.page:
+                st.session_state.page = pmap[nav]
+                st.rerun()
+
+            if st.session_state.project:
+                st.divider()
+
+                cA, cB = st.columns(2)
+                with cA:
+                    if st.button("💾 Save", type="primary", use_container_width=True):
+                        p.save()
+                        st.toast("Saved")
+                with cB:
+                    if st.button("✖ Close", use_container_width=True):
+                        save_p()
+                        st.session_state.project = None
+                        st.session_state.page = "home"
+                        st.rerun()
+            else:
+                st.info("No project loaded.")
 
     def render_home():
         active_dir = get_active_projects_dir()
-        recent_projects = _load_recent_projects(active_dir)
+        recent_projects = _load_recent_projects(active_dir, st.session_state.projects_refresh_token)
         has_project = bool(recent_projects)
         has_outline = any((p["meta"].get("outline") or "").strip() for p in recent_projects)
         has_chapter = any(
@@ -2901,7 +2989,7 @@ def _run_ui():
         )
         weekly_goal = max(1, int(st.session_state.weekly_sessions_goal))
         weekly_count = _weekly_activity_count()
-        canon_icon, _ = get_canon_health()
+        canon_icon, canon_label = get_canon_health()
         latest_chapter_label = "You last worked on Chapter — · recently"
         latest_chapter_index = None
         latest_chapter_id = None
@@ -2929,125 +3017,130 @@ def _run_ui():
             primary_label = "📝 Build your outline"
             primary_target = "outline"
 
-        st.markdown("## Dashboard")
-        st.caption("Your writing cockpit — jump back in, track momentum, and move between tools.")
+        def open_recent_project(target: str, focus_tab: Optional[str] = None) -> None:
+            if not recent_projects and not st.session_state.project:
+                st.session_state.page = "projects"
+                st.toast("Create or import a project to unlock this module.")
+                st.rerun()
+            if recent_projects and not st.session_state.project:
+                st.session_state.project = Project.load(recent_projects[0]["path"])
+            if focus_tab:
+                st.session_state.world_focus_tab = focus_tab
+            st.session_state.page = target
+            st.rerun()
+
+        def open_export() -> None:
+            export_path = None
+            if st.session_state.project and st.session_state.project.filepath:
+                export_path = st.session_state.project.filepath
+            elif recent_projects:
+                export_path = recent_projects[0]["path"]
+            if export_path:
+                st.session_state.export_project_path = export_path
+                st.session_state.page = "projects"
+                st.rerun()
+            else:
+                st.session_state.page = "projects"
+                st.toast("Select a project to export.")
+                st.rerun()
+
+        section_header("Dashboard", "Your writing cockpit — jump back in, track momentum, and move between tools.", tag="Home")
 
         header_cols = st.columns([2.2, 1])
         with header_cols[0]:
-            with card("👋 Welcome back"):
+            with card("Current focus", "Suggested next step based on your latest activity."):
                 st.markdown(f"## {project_title}")
                 st.caption(latest_chapter_label)
                 if st.button(primary_label, type="primary", use_container_width=True):
-                    if recent_projects and not st.session_state.project:
-                        st.session_state.project = Project.load(recent_projects[0]["path"])
                     if primary_target == "chapters" and latest_chapter_id:
                         st.session_state.curr_chap_id = latest_chapter_id
-                    st.session_state.page = primary_target
-                    st.rerun()
+                    open_recent_project(primary_target)
                 action_row = st.columns(2)
                 with action_row[0]:
-                    if st.button(
-                        "📂 Resume project",
-                        use_container_width=True,
-                        key="dashboard_resume_project",
-                        disabled=not recent_projects,
-                    ):
-                        if recent_projects:
-                            st.session_state.project = Project.load(recent_projects[0]["path"])
-                            st.session_state.page = "chapters"
-                            st.rerun()
+                    if st.button("📂 Resume project", use_container_width=True, disabled=not recent_projects):
+                        open_recent_project("chapters")
                 with action_row[1]:
-                    if st.button(
-                        "🧭 New project",
-                        use_container_width=True,
-                        key="dashboard_new_project",
-                    ):
+                    if st.button("🧭 New project", use_container_width=True):
                         st.session_state.page = "projects"
                         st.rerun()
 
         with header_cols[1]:
-            with st.container(border=True):
-                st.markdown("#### Workspace snapshot")
-                st.metric("Active projects", len(recent_projects))
-                st.metric("Latest genre", (recent_snapshot or {}).get("genre", "—"))
-                st.metric("Weekly sessions", f"{weekly_count}/{weekly_goal}")
-                st.metric("Writing streak", f"{_activity_streak()} days")
+            with card("Workspace snapshot"):
+                st.markdown("#### Project status")
+                k1, k2 = st.columns(2)
+                with k1:
+                    stat_tile("Active projects", str(len(recent_projects)), icon="📁")
+                with k2:
+                    stat_tile("Latest genre", (recent_snapshot or {}).get("genre", "—"), icon="🏷️")
+                k3, k4 = st.columns(2)
+                with k3:
+                    stat_tile("Weekly sessions", f"{weekly_count}/{weekly_goal}", icon="🗓️")
+                with k4:
+                    stat_tile("Writing streak", f"{_activity_streak()} days", icon="🔥")
+                st.caption(f"Canon health: {canon_icon} {canon_label}.")
 
-        st.markdown("#### Studio modules")
-        module_row = st.columns(4)
-        with module_row[0]:
-            with st.container(border=True):
-                st.markdown("### 🌍 World Bible")
-                st.caption("Characters, places, factions, and lore")
-                if st.button("Open", key="nav_world", use_container_width=True):
-                    if recent_projects and not st.session_state.project:
-                        st.session_state.project = Project.load(recent_projects[0]["path"])
-                    st.session_state.page = "world"
-                    st.rerun()
+        section_header("Quick actions", "Jump straight into your most-used tools.")
+        quick_row_one = st.columns(3)
+        with quick_row_one[0]:
+            if action_card("✍️ Editor", "Draft chapters and summaries.", help_text="Open the chapter editor."):
+                open_recent_project("chapters")
+        with quick_row_one[1]:
+            if action_card("📝 Outline", "Plan beats, arcs, and chapter flow."):
+                open_recent_project("outline")
+        with quick_row_one[2]:
+            if action_card("🌍 World Bible", "Characters, places, factions, lore."):
+                open_recent_project("world")
 
-        def render_quick_action(title: str, caption: str, target: str, key: str):
-            with st.container(border=True):
-                st.markdown(f"### {title}")
-                st.caption(caption)
-                if st.button("Open", key=f"{key}__open", use_container_width=True):
-                    if recent_projects and not st.session_state.project:
-                        st.session_state.project = Project.load(recent_projects[0]["path"])
-                    st.session_state.page = target
-                    st.rerun()
-
-        with module_row[3]:
-            with st.container(border=True):
-                st.markdown("### 📊 Insights")
-                st.caption("Analytics and canon health insights")
-                if st.button("Open", key="nav_analytics", use_container_width=True):
-                    if recent_projects and not st.session_state.project:
-                        st.session_state.project = Project.load(recent_projects[0]["path"])
-                    st.session_state.page = "world"
-                    st.rerun()
-
-        secondary_actions = st.columns(2)
-        with secondary_actions[0]:
-            render_quick_action(
-                "📝 Outline",
-                "Blueprint beats, arcs, and chapter plan",
-                "outline",
-                "dashboard_quick_outline",
-            )
-        with secondary_actions[1]:
-            render_quick_action(
-                "✍️ Editor",
-                "Draft chapters and summaries",
-                "chapters",
-                "dashboard_quick_editor",
-            )
+        quick_row_two = st.columns(3)
+        with quick_row_two[0]:
+            if action_card("🧠 Memory", "Hard canon rules and guidelines."):
+                open_recent_project("world", focus_tab="Memory")
+        with quick_row_two[1]:
+            if action_card("📊 Insights", "Canon health and analytics."):
+                open_recent_project("world", focus_tab="Insights")
+        with quick_row_two[2]:
+            if action_card("⬇️ Export", "Download your project as markdown.", button_label="Export"):
+                open_export()
 
         with st.container(border=True):
-            st.markdown("#### Project actions")
-            action_cols = st.columns(3)
-            with action_cols[0]:
-                if st.button(
-                    "📂 Resume",
-                    use_container_width=True,
-                    disabled=not recent_projects,
-                ):
-                    if recent_projects:
-                        st.session_state.project = Project.load(recent_projects[0]["path"])
-                        st.session_state.page = "chapters"
-                        st.rerun()
-            with action_cols[1]:
-                if st.button("🧭 New project", use_container_width=True):
-                    st.session_state.page = "projects"
+            st.markdown("#### Recent projects")
+            if not recent_projects:
+                st.info("📭 No projects yet. Create one to get started.")
+            else:
+                for project_entry in recent_projects[:5]:
+                    meta = project_entry.get("meta", {})
+                    title = meta.get("title") or os.path.basename(project_entry.get("path", "Untitled"))
+                    genre = meta.get("genre") or "—"
+                    row = st.columns([2.2, 1, 1])
+                    with row[0]:
+                        if st.button(f"📂 {title}", use_container_width=True):
+                            st.session_state.project = Project.load(project_entry["path"])
+                            st.session_state.page = "chapters"
+                            st.rerun()
+                    with row[1]:
+                        st.caption(genre)
+                    with row[2]:
+                        if st.button("Resume", use_container_width=True):
+                            st.session_state.project = Project.load(project_entry["path"])
+                            st.session_state.page = "chapters"
+                            st.rerun()
+
+        with st.container(border=True):
+            st.markdown("#### Secondary actions")
+            st.caption("Need to update settings or review policies? Jump to the essentials.")
+            s1, s2, s3 = st.columns(3)
+            with s1:
+                if st.button("⚙️ AI Settings", use_container_width=True):
+                    st.session_state.page = "ai"
                     st.rerun()
-            with action_cols[2]:
-                if st.button(
-                    "🧩 Open outline",
+            with s2:
+                st.link_button("📖 Help Docs", "https://github.com/bigmanjer/Mantis-Studio", use_container_width=True)
+            with s3:
+                st.link_button(
+                    "⚖️ Legal",
+                    "https://github.com/bigmanjer/Mantis-Studio/tree/main/legal",
                     use_container_width=True,
-                    disabled=not recent_projects,
-                ):
-                    if recent_projects:
-                        st.session_state.project = Project.load(recent_projects[0]["path"])
-                        st.session_state.page = "outline"
-                        st.rerun()
+                )
 
         if not st.session_state.groq_api_key or not st.session_state.openai_api_key:
             with card("🔑 Connect your AI providers", "Unlock generation, summaries, and entity tools with API access."):
@@ -3064,7 +3157,7 @@ def _run_ui():
 
     def render_projects():
         active_dir = get_active_projects_dir()
-        recent_projects = _load_recent_projects(active_dir)
+        recent_projects = _load_recent_projects(active_dir, st.session_state.projects_refresh_token)
 
         st.markdown("## Projects")
         st.caption("Create, import, and manage your story worlds.")
@@ -3101,6 +3194,7 @@ def _run_ui():
                         storage_dir=get_active_projects_dir(),
                     )
                     p.save()
+                    _bump_projects_refresh()
                     st.session_state.project = p
                     st.session_state.page = "outline"
                     st.session_state.first_run = False
@@ -3137,6 +3231,7 @@ def _run_ui():
                         else:
                             st.warning("Add a Groq API key and model to auto-generate an outline.")
                         p.save()
+                        _bump_projects_refresh()
                         st.session_state.project = p
                         st.session_state.page = "outline"
                         st.session_state.first_run = False
@@ -3179,10 +3274,35 @@ def _run_ui():
                                 st.rerun()
                         with row4:
                             if st.button("🗑", key=f"del_{full}", use_container_width=True):
-                                Project.delete_file(full)
-                                st.rerun()
+                                st.session_state.delete_project_path = full
+                                st.session_state.delete_project_title = title
                     except Exception:
                         logger.warning("Failed to load project metadata: %s", full, exc_info=True)
+
+        if st.session_state.delete_project_path:
+            with st.container(border=True):
+                title = st.session_state.delete_project_title or "this project"
+                st.warning(f"Delete **{title}**? This cannot be undone.")
+                d1, d2 = st.columns(2)
+                with d1:
+                    if st.button("🗑 Confirm delete", type="primary", use_container_width=True):
+                        Project.delete_file(st.session_state.delete_project_path)
+                        if (
+                            st.session_state.project
+                            and st.session_state.project.filepath == st.session_state.delete_project_path
+                        ):
+                            st.session_state.project = None
+                            st.session_state.page = "projects"
+                        st.session_state.delete_project_path = None
+                        st.session_state.delete_project_title = None
+                        _bump_projects_refresh()
+                        st.toast("Project deleted.")
+                        st.rerun()
+                with d2:
+                    if st.button("Cancel", use_container_width=True):
+                        st.session_state.delete_project_path = None
+                        st.session_state.delete_project_title = None
+                        st.rerun()
 
         export_path = st.session_state.get("export_project_path")
         if export_path:
@@ -3469,8 +3589,19 @@ def _run_ui():
             with f4:
                 show_recent = st.checkbox("Recently added", key="world_filter_recent")
 
-        t1, t2, t3, t4, t5, t6 = st.tabs(
-            ["Characters", "Locations", "Factions", "Lore", "Memory", "Analytics"]
+        tab_options = ["Characters", "Locations", "Factions", "Items", "Lore", "Memory", "Insights"]
+        focus_tab = st.session_state.pop("world_focus_tab", None)
+        if focus_tab not in tab_options:
+            focus_tab = None
+        default_tab = focus_tab or st.session_state.get("world_tabs", tab_options[0])
+        if default_tab not in tab_options:
+            default_tab = tab_options[0]
+        selected_tab = st.radio(
+            "World Bible sections",
+            tab_options,
+            index=tab_options.index(default_tab),
+            horizontal=True,
+            key="world_tabs",
         )
 
         review_queue = st.session_state.get("world_bible_review", [])
@@ -3662,27 +3793,45 @@ def _run_ui():
                                     st.session_state.page = "chapters"
                                     st.session_state.curr_chap_id = options[sel]
                                     st.session_state._force_nav = True
+                                    st.rerun()
                             else:
                                 st.caption("No chapter references yet.")
 
                             d1, d2 = st.columns([1, 1])
                             with d1:
-                                if st.button("🗑 Delete", key=f"del_{e.id}", use_container_width=True):
-                                    p.delete_entity(e.id)
-                                    p.save()
-                                    st.rerun()
+                                if st.session_state.delete_entity_id == e.id:
+                                    st.warning(f"Delete **{st.session_state.delete_entity_name or e.name}**?")
+                                    cdel1, cdel2 = st.columns(2)
+                                    with cdel1:
+                                        if st.button("Confirm", type="primary", use_container_width=True):
+                                            p.delete_entity(e.id)
+                                            p.save()
+                                            st.session_state.delete_entity_id = None
+                                            st.session_state.delete_entity_name = None
+                                            st.toast("Entity deleted.")
+                                            st.rerun()
+                                    with cdel2:
+                                        if st.button("Cancel", use_container_width=True):
+                                            st.session_state.delete_entity_id = None
+                                            st.session_state.delete_entity_name = None
+                                            st.rerun()
+                                elif st.button("🗑 Delete", key=f"del_{e.id}", use_container_width=True):
+                                    st.session_state.delete_entity_id = e.id
+                                    st.session_state.delete_entity_name = e.name
                             with d2:
                                 st.caption(f"Created: {time.strftime('%Y-%m-%d', time.localtime(e.created_at))}")
 
-        with t1:
+        if selected_tab == "Characters":
             render_cat("Character")
-        with t2:
+        elif selected_tab == "Locations":
             render_cat("Location")
-        with t3:
+        elif selected_tab == "Factions":
+            render_cat("Faction")
+        elif selected_tab == "Items":
             render_cat("Item")
-        with t4:
+        elif selected_tab == "Lore":
             render_cat("Lore")
-        with t5:
+        elif selected_tab == "Memory":
             st.markdown("### 🧠 World Memory")
             st.caption("Keep canon notes, timelines, and facts the AI should always know.")
             st.markdown("#### 🔒 Hard Canon Rules")
@@ -3824,8 +3973,8 @@ def _run_ui():
                                 update_locked_chapters()
                                 st.toast("Issue ignored.")
                                 st.rerun()
-        with t6:
-            st.markdown("### 📊 World Bible Analytics")
+        elif selected_tab == "Insights":
+            st.markdown("### 📊 World Bible Insights")
             st.caption("Quick stats on your current canon database.")
             entries = list(p.world_db.values())
             total_entries = len(entries)
@@ -3956,7 +4105,7 @@ def _run_ui():
 
         if not chaps:
             with st.container(border=True):
-                st.markdown("## Chapters")
+                section_header("Editor", "Draft chapters with AI assist and keep your draft organized.")
                 st.info("📭 No chapters yet.\n\nCreate your first chapter — or let MANTIS write one from your outline.")
                 c1, c2 = st.columns([1, 1])
                 with c1:
@@ -3968,6 +4117,7 @@ def _run_ui():
                     if st.button("🧩 Go to Outline", use_container_width=True):
                         st.session_state.page = "outline"
                         st.session_state._force_nav = True
+                        st.rerun()
             return
 
         if "curr_chap_id" not in st.session_state or st.session_state.curr_chap_id not in p.chapters:
@@ -3995,14 +4145,13 @@ def _run_ui():
                     curr.title = sanitize_chapter_title(clean)
                     p.save()
 
-        st.markdown("## Chapters")
-        st.caption("Navigate on the left, write in the center, and use AI tools on the right.")
+        section_header("Editor", "Navigate on the left, write in the center, and use AI tools on the right.")
 
         col_nav, col_editor, col_ai = st.columns([1.05, 3.2, 1.25])
 
         with col_nav:
             with st.container(border=True):
-                st.markdown("### 📍 Navigation")
+                st.markdown("### 📍 Chapters")
                 for c in chaps:
                     lbl = f"{c.index}. {(c.title or 'Untitled')[:18]}"
                     if st.button(lbl, key=f"n_{c.id}", type="primary" if c.id == curr.id else "secondary", use_container_width=True):
@@ -4010,7 +4159,7 @@ def _run_ui():
                         st.rerun()
 
                 st.divider()
-                if st.button("➕ New Chapter", use_container_width=True):
+                if st.button("➕ New Chapter", use_container_width=True, help="Create a new chapter in this project."):
                     next_idx = len(chaps) + 1
                     pat = re.compile(rf"Chapter {next_idx}[:\s]+(.*?)(?=\n|$)", re.IGNORECASE)
                     match = pat.search(p.outline or "")
@@ -4029,9 +4178,16 @@ def _run_ui():
             with st.container(border=True):
                 h1, h2 = st.columns([3, 1])
                 with h1:
-                    curr.title = st.text_input("Title", curr.title, label_visibility="collapsed")
+                    curr.title = st.text_input("Title", curr.title, label_visibility="collapsed", help="Rename this chapter.")
                 with h2:
-                    curr.target_words = st.number_input("Target", 100, 10000, int(curr.target_words), label_visibility="collapsed")
+                    curr.target_words = st.number_input(
+                        "Target",
+                        100,
+                        10000,
+                        int(curr.target_words),
+                        label_visibility="collapsed",
+                        help="Target word count for this chapter.",
+                    )
 
                 val = st.text_area("Manuscript", curr.content, height=680, label_visibility="collapsed", key=f"ed_{curr.id}")
                 if val != curr.content:
@@ -4164,24 +4320,30 @@ def _run_ui():
 
     rendered_page = False
     if st.session_state.page == "home":
-        render_home()
+        with key_scope("dashboard"):
+            render_home()
         rendered_page = True
     elif st.session_state.page == "projects":
-        render_projects()
+        with key_scope("projects"):
+            render_projects()
         rendered_page = True
     elif st.session_state.page == "ai":
-        render_ai_settings()
+        with key_scope("settings"):
+            render_ai_settings()
         rendered_page = True
     elif st.session_state.project:
         pg = st.session_state.page
         if pg == "outline":
-            render_outline()
+            with key_scope("outline"):
+                render_outline()
             rendered_page = True
         elif pg == "world":
-            render_world()
+            with key_scope("world"):
+                render_world()
             rendered_page = True
         elif pg == "chapters":
-            render_chapters()
+            with key_scope("editor"):
+                render_chapters()
             rendered_page = True
         else:
             st.session_state.page = "home"
