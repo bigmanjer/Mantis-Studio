@@ -47,7 +47,7 @@ import base64
 
 _MANTIS_LOGO_CANDIDATES = [
     "mantis_brand_logo.png",
-    "mantis_logo_trans.png",
+    os.path.join("NIS", "mantis_logo_trans.png"),
 ]
 
 def _mantis_logo_b64() -> str:

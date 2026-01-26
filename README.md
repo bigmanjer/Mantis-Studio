@@ -7,7 +7,7 @@ MANTIS Studio uses Groq’s free online models via an OpenAI-compatible API.
 ### 1) Install dependencies
 
 ```bash
-pip install -r requirements.txt
+pip install -r app/requirements.txt
 ```
 
 ### 2) Set your Groq API key
