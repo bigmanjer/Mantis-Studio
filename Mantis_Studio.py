@@ -3692,6 +3692,18 @@ def _run_ui():
                                     update_locked_chapters()
                                     st.toast("Applied fix.")
                                     st.rerun()
+                                elif issue.get("suggested_rewrite"):
+                                    insertion = issue.get("suggested_rewrite", "").strip()
+                                    if insertion:
+                                        spacer = "\n\n" if (target_chapter.content or "").strip() else ""
+                                        updated = f"{(target_chapter.content or '').rstrip()}{spacer}{insertion}"
+                                        target_chapter.update_content(updated, "Coherence Fix (Appended)")
+                                        p.save()
+                                        results.pop(idx)
+                                        st.session_state["coherence_results"] = results
+                                        update_locked_chapters()
+                                        st.toast("Applied fix (appended).")
+                                        st.rerun()
                                 else:
                                     st.warning("Target excerpt not found in chapter content.")
                         with a2:
