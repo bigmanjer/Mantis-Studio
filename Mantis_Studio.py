@@ -174,6 +174,15 @@ def _password_policy_error(password: str) -> Optional[str]:
     return None
 
 
+def _email_error(email: str) -> Optional[str]:
+    clean_email = (email or "").strip()
+    if not clean_email:
+        return "Email is required."
+    if not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", clean_email):
+        return "Enter a valid email address."
+    return None
+
+
 def _acquire_lock(lock_path: str, timeout: int, retry_sleep: float) -> bool:
     start = time.time()
     while True:
@@ -221,11 +230,15 @@ def verify_password(password: str, salt_hex: str, hash_hex: str) -> bool:
     return hmac.compare_digest(candidate, expected)
 
 
-def create_user(username: str, display_name: str, password: str) -> Dict[str, Any]:
+def create_user(username: str, display_name: str, email: str, password: str) -> Dict[str, Any]:
     clean_username = _normalize_username(username)
     display_name = (display_name or "").strip()
-    if not clean_username or not display_name or not password:
+    email = (email or "").strip().lower()
+    if not clean_username or not display_name or not password or not email:
         return {"ok": False, "error": "All fields are required."}
+    email_error = _email_error(email)
+    if email_error:
+        return {"ok": False, "error": email_error}
     policy_error = _password_policy_error(password)
     if policy_error:
         return {"ok": False, "error": policy_error}
@@ -233,6 +246,8 @@ def create_user(username: str, display_name: str, password: str) -> Dict[str, An
     data = load_users_db()
     if clean_username in data["users"]:
         return {"ok": False, "error": "That username is already taken."}
+    if any(user.get("email", "").lower() == email for user in data.get("users", {}).values()):
+        return {"ok": False, "error": "An account already exists for that email."}
 
     creds = hash_password(password)
     user_id = str(uuid.uuid4())
@@ -240,12 +255,42 @@ def create_user(username: str, display_name: str, password: str) -> Dict[str, An
         "id": user_id,
         "username": clean_username,
         "display_name": display_name,
+        "email": email,
         "password_hash": creds["hash"],
         "password_salt": creds["salt"],
         "created_at": time.time(),
     }
     save_users_db(data)
     return {"ok": True, "user": data["users"][clean_username]}
+
+
+def reset_password(email: str, new_password: str) -> Dict[str, Any]:
+    clean_email = (email or "").strip().lower()
+    if not clean_email or not new_password:
+        return {"ok": False, "error": "Email and new password are required."}
+    email_error = _email_error(clean_email)
+    if email_error:
+        return {"ok": False, "error": email_error}
+    policy_error = _password_policy_error(new_password)
+    if policy_error:
+        return {"ok": False, "error": policy_error}
+
+    data = load_users_db()
+    match_key = None
+    for username_key, user in data.get("users", {}).items():
+        if user.get("email", "").lower() == clean_email:
+            match_key = username_key
+            break
+
+    if not match_key:
+        return {"ok": False, "error": "No account found for that email."}
+
+    creds = hash_password(new_password)
+    data["users"][match_key]["password_hash"] = creds["hash"]
+    data["users"][match_key]["password_salt"] = creds["salt"]
+    data["users"][match_key]["updated_at"] = time.time()
+    save_users_db(data)
+    return {"ok": True}
 
 
 def authenticate_user(username: str, password: str) -> Dict[str, Any]:
@@ -1698,6 +1743,10 @@ def _run_ui():
             "openai_model",
             AppConfig.OPENAI_MODEL,
         )
+    if "openai_model_list" not in st.session_state:
+        st.session_state.openai_model_list = []
+    if "openai_model_tests" not in st.session_state:
+        st.session_state.openai_model_tests = {}
     if "ui_theme" not in st.session_state:
         st.session_state.ui_theme = config_data.get("ui_theme", "Dark")
     if "groq_base_url" not in st.session_state:
@@ -1919,6 +1968,32 @@ def _run_ui():
                         save_auth_remember(user, False, st.session_state.remember_me)
                         st.session_state._force_nav = True
                         st.rerun()
+                with st.expander("Forgot password?"):
+                    st.caption("Reset locally using the email tied to your account.")
+                    reset_email = st.text_input(
+                        "Email",
+                        key="auth_reset_email",
+                        placeholder="e.g. alex@email.com",
+                    )
+                    reset_new_password = st.text_input(
+                        "New password",
+                        type="password",
+                        key="auth_reset_password",
+                    )
+                    reset_confirm = st.text_input(
+                        "Confirm new password",
+                        type="password",
+                        key="auth_reset_confirm",
+                    )
+                    if st.button("Reset password", width="stretch"):
+                        if reset_new_password != reset_confirm:
+                            st.error("Passwords do not match.")
+                        else:
+                            reset_result = reset_password(reset_email, reset_new_password)
+                            if not reset_result.get("ok"):
+                                st.error(reset_result.get("error", "Password reset failed."))
+                            else:
+                                st.success("Password updated. You can now sign in.")
 
             with tabs[2]:
                 display_name = st.text_input(
@@ -1926,6 +2001,12 @@ def _run_ui():
                     key="auth_create_display_name",
                     placeholder="e.g. Alex Writer",
                 )
+                email = st.text_input(
+                    "Email",
+                    key="auth_create_email",
+                    placeholder="e.g. alex@email.com",
+                )
+                st.caption("We use email for account recovery. Google sign-in is coming soon.")
                 new_username = st.text_input("Username", key="auth_create_username", placeholder="e.g. alex")
                 new_password = st.text_input("Password", type="password", key="auth_create_password")
                 confirm_password = st.text_input("Confirm password", type="password", key="auth_create_confirm")
@@ -1933,11 +2014,15 @@ def _run_ui():
                     if new_password != confirm_password:
                         st.error("Passwords do not match.")
                     else:
+                        email_error = _email_error(email)
+                        if email_error:
+                            st.error(email_error)
+                            return
                         policy_error = _password_policy_error(new_password or "")
                         if policy_error:
                             st.error(policy_error)
                         else:
-                            result = create_user(new_username, display_name, new_password)
+                            result = create_user(new_username, display_name, email, new_password)
                             if not result.get("ok"):
                                 st.error(result.get("error", "Could not create account."))
                             else:
@@ -1947,9 +2032,9 @@ def _run_ui():
                                 st.session_state.auth_username = user["username"]
                                 st.session_state.auth_is_guest = False
                                 st.session_state.projects_dir = get_user_projects_dir(user["id"])
-                            save_auth_remember(user, False, st.session_state.remember_me)
-                            st.session_state._force_nav = True
-                            st.rerun()
+                                save_auth_remember(user, False, st.session_state.remember_me)
+                                st.session_state._force_nav = True
+                                st.rerun()
 
     def _today_str() -> str:
         return datetime.date.today().isoformat()
@@ -2124,6 +2209,21 @@ def _run_ui():
         except Exception:
             return False
 
+    def test_openai_connection(base_url: str, api_key: str) -> bool:
+        headers = {}
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
+        try:
+            r = requests.get(
+                f"{base_url.rstrip('/')}/models",
+                headers=headers,
+                timeout=5,
+            )
+            r.raise_for_status()
+            return True
+        except Exception:
+            return False
+
     def fetch_groq_models(base_url: str, api_key: str) -> tuple[List[str], str]:
         headers = {}
         if api_key:
@@ -2141,7 +2241,46 @@ def _run_ui():
         except Exception as exc:
             return [], str(exc)
 
+    def fetch_openai_models(base_url: str, api_key: str) -> tuple[List[str], str]:
+        headers = {}
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
+        try:
+            r = requests.get(
+                f"{base_url.rstrip('/')}/models",
+                headers=headers,
+                timeout=10,
+            )
+            r.raise_for_status()
+            data = r.json()
+            models = [m.get("id") for m in data.get("data", []) if m.get("id")]
+            return models, ""
+        except Exception as exc:
+            return [], str(exc)
+
     def test_groq_model(base_url: str, api_key: str, model: str) -> tuple[bool, str]:
+        headers = {"Content-Type": "application/json"}
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
+        payload = {
+            "model": model,
+            "messages": [{"role": "user", "content": "ping"}],
+            "max_tokens": 1,
+            "temperature": 0,
+        }
+        try:
+            r = requests.post(
+                f"{base_url.rstrip('/')}/chat/completions",
+                headers=headers,
+                json=payload,
+                timeout=15,
+            )
+            r.raise_for_status()
+            return True, ""
+        except Exception as exc:
+            return False, str(exc)
+
+    def test_openai_model(base_url: str, api_key: str, model: str) -> tuple[bool, str]:
         headers = {"Content-Type": "application/json"}
         if api_key:
             headers["Authorization"] = f"Bearer {api_key}"
@@ -2308,135 +2447,208 @@ def _run_ui():
         return
 
     def render_ai_settings():
-        st.markdown("## 🧠 AI Settings")
-        st.caption("Configure your AI providers and models.")
+        st.markdown("## 🧠 AI Tools")
+        st.caption("Connect providers, choose models, and validate access.")
 
-        st.markdown("### 🤖 Groq")
-        groq_url = st.text_input("Groq Base URL", value=st.session_state.groq_base_url)
-        if groq_url != st.session_state.groq_base_url:
-            st.session_state.groq_base_url = groq_url
-            AppConfig.GROQ_API_URL = groq_url
+        status_cols = st.columns(3)
+        with status_cols[0]:
+            st.metric("Groq", "Connected" if st.session_state.groq_api_key else "Missing key")
+        with status_cols[1]:
+            st.metric("OpenAI", "Connected" if st.session_state.openai_api_key else "Missing key")
+        with status_cols[2]:
+            st.metric("Active model", st.session_state.groq_model or "Not set")
 
-        groq_key = st.text_input(
-            "Groq API Key",
-            value=st.session_state.groq_api_key,
-            type="password",
-            help="Required for Groq cloud models.",
-        )
-        if groq_key != st.session_state.groq_api_key:
-            st.session_state.groq_api_key = groq_key
-            AppConfig.GROQ_API_KEY = groq_key
+        provider_cols = st.columns(2)
+        with provider_cols[0]:
+            with st.container(border=True):
+                st.markdown("### 🤖 Groq")
+                groq_url = st.text_input("Groq Base URL", value=st.session_state.groq_base_url)
+                if groq_url != st.session_state.groq_base_url:
+                    st.session_state.groq_base_url = groq_url
+                    AppConfig.GROQ_API_URL = groq_url
 
-        if st.button("↻ Fetch Groq Models", width="stretch"):
-            models, error_message = fetch_groq_models(
-                st.session_state.groq_base_url,
-                st.session_state.groq_api_key,
-            )
-            if models:
-                st.session_state.groq_model_list = models
-                st.session_state.groq_model_tests = {}
-                st.toast(f"Loaded {len(models)} models.")
-            else:
-                st.session_state.groq_model_list = []
-                st.session_state.groq_model_tests = {}
-                st.error(f"Model fetch failed. {error_message or 'Check the base URL and key.'}")
+                groq_key = st.text_input(
+                    "Groq API Key",
+                    value=st.session_state.groq_api_key,
+                    type="password",
+                    help="Required for Groq cloud models.",
+                )
+                if groq_key != st.session_state.groq_api_key:
+                    st.session_state.groq_api_key = groq_key
+                    AppConfig.GROQ_API_KEY = groq_key
 
-        if st.session_state.groq_model_list:
-            models = st.session_state.groq_model_list
-            idx = 0
-            if st.session_state.groq_model in models:
-                idx = models.index(st.session_state.groq_model)
-            groq_model = st.selectbox("Groq Model", models, index=idx)
-
-            if st.button("🧪 Test All Groq Models", width="stretch"):
-                results = {}
-                total = len(models)
-                progress = st.progress(0)
-                for i, model_name in enumerate(models, start=1):
-                    ok, error_message = test_groq_model(
+                if st.button("↻ Fetch Groq Models", width="stretch"):
+                    models, error_message = fetch_groq_models(
                         st.session_state.groq_base_url,
                         st.session_state.groq_api_key,
-                        model_name,
                     )
-                    results[model_name] = "" if ok else error_message
-                    progress.progress(i / total)
-                st.session_state.groq_model_tests = results
-                failures = [m for m, err in results.items() if err]
-                if failures:
-                    st.warning(f"{len(failures)} models failed. Expand results for details.")
-                else:
-                    st.success("All models responded successfully.")
+                    if models:
+                        st.session_state.groq_model_list = models
+                        st.session_state.groq_model_tests = {}
+                        st.toast(f"Loaded {len(models)} models.")
+                    else:
+                        st.session_state.groq_model_list = []
+                        st.session_state.groq_model_tests = {}
+                        st.error(f"Model fetch failed. {error_message or 'Check the base URL and key.'}")
 
-            if st.session_state.groq_model_tests:
-                with st.expander("Groq model test results", expanded=False):
-                    for model_name, error_message in sorted(
-                        st.session_state.groq_model_tests.items()
-                    ):
-                        if error_message:
-                            st.error(f"{model_name}: {error_message}")
+                if st.session_state.groq_model_list:
+                    models = st.session_state.groq_model_list
+                    idx = 0
+                    if st.session_state.groq_model in models:
+                        idx = models.index(st.session_state.groq_model)
+                    groq_model = st.selectbox("Groq Model", models, index=idx)
+
+                    if st.button("🧪 Test All Groq Models", width="stretch"):
+                        results = {}
+                        total = len(models)
+                        progress = st.progress(0)
+                        for i, model_name in enumerate(models, start=1):
+                            ok, error_message = test_groq_model(
+                                st.session_state.groq_base_url,
+                                st.session_state.groq_api_key,
+                                model_name,
+                            )
+                            results[model_name] = "" if ok else error_message
+                            progress.progress(i / total)
+                        st.session_state.groq_model_tests = results
+                        failures = [m for m, err in results.items() if err]
+                        if failures:
+                            st.warning(f"{len(failures)} models failed. Expand results for details.")
                         else:
-                            st.success(f"{model_name}: OK")
-        else:
-            groq_model = st.text_input("Groq Model", value=st.session_state.groq_model)
+                            st.success("All models responded successfully.")
 
-        if groq_model != st.session_state.groq_model:
-            st.session_state.groq_model = groq_model
-            AppConfig.DEFAULT_MODEL = groq_model
+                    if st.session_state.groq_model_tests:
+                        with st.expander("Groq model test results", expanded=False):
+                            for model_name, error_message in sorted(
+                                st.session_state.groq_model_tests.items()
+                            ):
+                                if error_message:
+                                    st.error(f"{model_name}: {error_message}")
+                                else:
+                                    st.success(f"{model_name}: OK")
+                else:
+                    groq_model = st.text_input("Groq Model", value=st.session_state.groq_model)
 
-        st.markdown(
-            "[Get a free Groq API key](https://console.groq.com/keys) to enable cloud models."
-        )
-        if not st.session_state.groq_api_key:
-            st.info("No Groq API key yet. Create one above and paste it here to unlock Groq models.")
-        if st.button("🔌 Test Groq Connection", width="stretch"):
-            ok = test_groq_connection(
-                st.session_state.groq_base_url,
-                st.session_state.groq_api_key,
-            )
-            if ok:
-                st.success("Groq connection OK.")
-            else:
-                st.error("Groq connection failed. Check your base URL and key.")
+                if groq_model != st.session_state.groq_model:
+                    st.session_state.groq_model = groq_model
+                    AppConfig.DEFAULT_MODEL = groq_model
 
-        st.divider()
-        st.markdown("### ✨ OpenAI")
-        openai_url = st.text_input("OpenAI Base URL", value=st.session_state.openai_base_url)
-        if openai_url != st.session_state.openai_base_url:
-            st.session_state.openai_base_url = openai_url
-            AppConfig.OPENAI_API_URL = openai_url
+                st.markdown(
+                    "[Get a free Groq API key](https://console.groq.com/keys) to enable cloud models."
+                )
+                if not st.session_state.groq_api_key:
+                    st.info("No Groq API key yet. Create one above and paste it here to unlock Groq models.")
+                if st.button("🔌 Test Groq Connection", width="stretch"):
+                    ok = test_groq_connection(
+                        st.session_state.groq_base_url,
+                        st.session_state.groq_api_key,
+                    )
+                    if ok:
+                        st.success("Groq connection OK.")
+                    else:
+                        st.error("Groq connection failed. Check your base URL and key.")
 
-        openai_key = st.text_input(
-            "OpenAI API Key",
-            value=st.session_state.openai_api_key,
-            type="password",
-            help="Required for OpenAI cloud models.",
-        )
-        if openai_key != st.session_state.openai_api_key:
-            st.session_state.openai_api_key = openai_key
-            AppConfig.OPENAI_API_KEY = openai_key
-        if not st.session_state.openai_api_key:
-            st.info("No OpenAI API key yet. Create one and paste it here to unlock OpenAI models.")
+        with provider_cols[1]:
+            with st.container(border=True):
+                st.markdown("### ✨ OpenAI")
+                openai_url = st.text_input("OpenAI Base URL", value=st.session_state.openai_base_url)
+                if openai_url != st.session_state.openai_base_url:
+                    st.session_state.openai_base_url = openai_url
+                    AppConfig.OPENAI_API_URL = openai_url
 
-        openai_model = st.text_input("OpenAI Model", value=st.session_state.openai_model)
-        if openai_model != st.session_state.openai_model:
-            st.session_state.openai_model = openai_model
-            AppConfig.OPENAI_MODEL = openai_model
+                openai_key = st.text_input(
+                    "OpenAI API Key",
+                    value=st.session_state.openai_api_key,
+                    type="password",
+                    help="Required for OpenAI cloud models.",
+                )
+                if openai_key != st.session_state.openai_api_key:
+                    st.session_state.openai_api_key = openai_key
+                    AppConfig.OPENAI_API_KEY = openai_key
+                if not st.session_state.openai_api_key:
+                    st.info("No OpenAI API key yet. Create one and paste it here to unlock OpenAI models.")
 
-        st.markdown(
-            "[Create an OpenAI account](https://platform.openai.com/api-keys) to get an API key."
-        )
+                if st.button("↻ Fetch OpenAI Models", width="stretch"):
+                    models, error_message = fetch_openai_models(
+                        st.session_state.openai_base_url,
+                        st.session_state.openai_api_key,
+                    )
+                    if models:
+                        st.session_state.openai_model_list = models
+                        st.session_state.openai_model_tests = {}
+                        st.toast(f"Loaded {len(models)} models.")
+                    else:
+                        st.session_state.openai_model_list = []
+                        st.session_state.openai_model_tests = {}
+                        st.error(f"Model fetch failed. {error_message or 'Check the base URL and key.'}")
 
-        colm1, colm2 = st.columns([1, 1])
-        with colm1:
-            st.checkbox("Auto-save", key="auto_save")
-        with colm2:
-            if st.button("↻ Refresh Groq Models", width="stretch"):
-                st.cache_data.clear()
-                refresh_models()
-                st.toast("Model list refreshed")
+                if st.session_state.openai_model_list:
+                    models = st.session_state.openai_model_list
+                    idx = 0
+                    if st.session_state.openai_model in models:
+                        idx = models.index(st.session_state.openai_model)
+                    openai_model = st.selectbox("OpenAI Model", models, index=idx)
 
-        if st.button("💾 Save AI Settings", width="stretch"):
-            save_app_settings()
+                    if st.button("🧪 Test All OpenAI Models", width="stretch"):
+                        results = {}
+                        total = len(models)
+                        progress = st.progress(0)
+                        for i, model_name in enumerate(models, start=1):
+                            ok, error_message = test_openai_model(
+                                st.session_state.openai_base_url,
+                                st.session_state.openai_api_key,
+                                model_name,
+                            )
+                            results[model_name] = "" if ok else error_message
+                            progress.progress(i / total)
+                        st.session_state.openai_model_tests = results
+                        failures = [m for m, err in results.items() if err]
+                        if failures:
+                            st.warning(f"{len(failures)} models failed. Expand results for details.")
+                        else:
+                            st.success("All models responded successfully.")
+
+                    if st.session_state.openai_model_tests:
+                        with st.expander("OpenAI model test results", expanded=False):
+                            for model_name, error_message in sorted(
+                                st.session_state.openai_model_tests.items()
+                            ):
+                                if error_message:
+                                    st.error(f"{model_name}: {error_message}")
+                                else:
+                                    st.success(f"{model_name}: OK")
+                else:
+                    openai_model = st.text_input("OpenAI Model", value=st.session_state.openai_model)
+                if openai_model != st.session_state.openai_model:
+                    st.session_state.openai_model = openai_model
+                    AppConfig.OPENAI_MODEL = openai_model
+
+                st.markdown(
+                    "[Create an OpenAI account](https://platform.openai.com/api-keys) to get an API key."
+                )
+                if st.button("🔌 Test OpenAI Connection", width="stretch"):
+                    ok = test_openai_connection(
+                        st.session_state.openai_base_url,
+                        st.session_state.openai_api_key,
+                    )
+                    if ok:
+                        st.success("OpenAI connection OK.")
+                    else:
+                        st.error("OpenAI connection failed. Check your base URL and key.")
+
+        with st.container(border=True):
+            st.markdown("### ✅ Actions")
+            action_cols = st.columns(3)
+            with action_cols[0]:
+                st.checkbox("Auto-save", key="auto_save")
+            with action_cols[1]:
+                if st.button("↻ Refresh Groq Models", width="stretch"):
+                    st.cache_data.clear()
+                    refresh_models()
+                    st.toast("Model list refreshed")
+            with action_cols[2]:
+                if st.button("💾 Save AI Settings", width="stretch"):
+                    save_app_settings()
 
     with st.sidebar:
         st.markdown(f"""
@@ -2567,7 +2779,6 @@ def _run_ui():
         latest_chapter_label = "You last worked on Chapter — · recently"
         latest_chapter_index = None
         latest_chapter_id = None
-        latest_chapter_index = None
         latest_ts = None
 
         if active_project and getattr(active_project, "chapters", None):
@@ -2575,35 +2786,10 @@ def _run_ui():
                 active_project.chapters.values(),
                 key=lambda c: (c.modified_at or c.created_at or 0),
             )
-
-        def _pill(label, *, key):
-            return st.button(label, key=key, width="stretch")
-
-        with st.container(border=True):
-            st.markdown("### 👋 Welcome back")
-            st.markdown(f"## {project_title}")
-            st.caption(latest_chapter_label)
-
-        st.markdown("#### Quick actions")
-        quick_cols = st.columns(3)
-        with quick_cols[0]:
-            if st.button("🌍 World Bible", key="qa_world_bible", width="stretch"):
-                if recent_projects and not st.session_state.project:
-                    st.session_state.project = Project.load(recent_projects[0]["path"])
-                st.session_state.page = "world"
-                st.rerun()
-        with quick_cols[1]:
-            if st.button("🧠 Memory", key="qa_memory", width="stretch"):
-                if recent_projects and not st.session_state.project:
-                    st.session_state.project = Project.load(recent_projects[0]["path"])
-                st.session_state.page = "world"
-                st.rerun()
-        with quick_cols[2]:
-            if st.button("📈 Insights", key="qa_insights", width="stretch"):
-                if recent_projects and not st.session_state.project:
-                    st.session_state.project = Project.load(recent_projects[0]["path"])
-                st.session_state.page = "world"
-                st.rerun()
+            latest_ts = ch.modified_at or ch.created_at
+            latest_chapter_index = ch.index
+            latest_chapter_id = ch.id
+            latest_chapter_label = f"Latest: Chapter {ch.index} — {ch.title}"
 
         primary_label = "✨ Start your story"
         primary_target = "projects"
@@ -2611,25 +2797,36 @@ def _run_ui():
             primary_label = "🛠 Fix story issues"
             primary_target = "world"
         elif has_chapter and latest_chapter_index:
-            primary_label = f"▶ Continue writing Chapter {latest_chapter_index}"
+            primary_label = f"▶ Continue Chapter {latest_chapter_index}"
             primary_target = "chapters"
         elif has_outline:
             primary_label = "📝 Build your outline"
             primary_target = "outline"
 
-        primary_cols = st.columns([1, 2, 1])
-        with primary_cols[1]:
-            if st.button(primary_label, type="primary", width="stretch"):
-                if recent_projects and not st.session_state.project:
-                    st.session_state.project = Project.load(recent_projects[0]["path"])
-                if primary_target == "chapters" and latest_chapter_id:
-                    st.session_state.curr_chap_id = latest_chapter_id
-                st.session_state.page = target
-                st.rerun()
+        header_cols = st.columns([2, 1])
+        with header_cols[0]:
+            with st.container(border=True):
+                st.markdown("### 👋 Welcome back")
+                st.markdown(f"## {project_title}")
+                st.caption(latest_chapter_label)
+                if st.button(primary_label, type="primary", width="stretch"):
+                    if recent_projects and not st.session_state.project:
+                        st.session_state.project = Project.load(recent_projects[0]["path"])
+                    if primary_target == "chapters" and latest_chapter_id:
+                        st.session_state.curr_chap_id = latest_chapter_id
+                    st.session_state.page = primary_target
+                    st.rerun()
 
-        st.markdown("#### Quick actions")
-        r1 = st.columns(4)
-        with r1[0]:
+        with header_cols[1]:
+            with st.container(border=True):
+                st.markdown("#### Workspace snapshot")
+                st.metric("Active projects", len(recent_projects))
+                st.metric("Latest genre", (recent_snapshot or {}).get("genre", "—"))
+                st.metric("Weekly sessions", f"{weekly_count}/{weekly_goal}")
+
+        st.markdown("#### Studio modules")
+        module_row = st.columns(4)
+        with module_row[0]:
             with st.container(border=True):
                 st.markdown("### 🌍 World Bible")
                 st.caption("Characters, places, factions, and lore")
@@ -2639,7 +2836,7 @@ def _run_ui():
                     st.session_state.page = "world"
                     st.rerun()
 
-        with r1[1]:
+        with module_row[1]:
             with st.container(border=True):
                 st.markdown("### 📝 Outline")
                 st.caption("Blueprint your story beats and arcs")
@@ -2649,7 +2846,7 @@ def _run_ui():
                     st.session_state.page = "outline"
                     st.rerun()
 
-        with r1[2]:
+        with module_row[2]:
             with st.container(border=True):
                 st.markdown("### 🧠 Memory")
                 st.caption("Canon rules, guidance, and style notes")
@@ -2659,7 +2856,7 @@ def _run_ui():
                     st.session_state.page = "world"
                     st.rerun()
 
-        with r1[3]:
+        with module_row[3]:
             with st.container(border=True):
                 st.markdown("### 📊 Insights")
                 st.caption("Analytics and canon health insights")
@@ -2699,58 +2896,6 @@ def _run_ui():
                         st.session_state.project = Project.load(recent_projects[0]["path"])
                         st.session_state.page = "outline"
                         st.rerun()
-
-            st.markdown("#### Workspace snapshot")
-            snapshot_cols = st.columns(3)
-            snapshot_cols[0].metric("Active projects", len(recent_projects))
-            snapshot_cols[1].metric("Latest genre", (recent_snapshot or {}).get("genre", "—"))
-            snapshot_cols[2].metric("Weekly sessions", f"{weekly_count}/{weekly_goal}")
-
-        with st.container(border=True):
-            st.markdown("### 🧭 Getting started")
-            completed_steps = sum([has_project, has_outline, has_chapter])
-            progress = completed_steps / 3
-            st.progress(progress, text=f"{completed_steps}/3 steps complete")
-
-            onboarding_text = """
-**MANTIS** mirrors a focused studio: a clean writing surface, memory tools,
-and quick start modules so you can draft fast and refine later.
-
-**Quick path**
-1) Create a project  
-2) Build a structured outline or lore entries  
-3) Draft chapters with AI assists on demand
-"""
-            if st.session_state.get("first_run", True):
-                st.markdown(onboarding_text)
-                c1, c2, c3 = st.columns([1, 1, 2])
-                with c1:
-                    if st.button("✅ Got it", type="primary", width="stretch"):
-                        st.session_state.first_run = False
-                        st.rerun()
-                with c2:
-                    if st.button("📌 Keep showing", width="stretch"):
-                        st.toast("Welcome panel will keep showing.")
-                with c3:
-                    st.caption("Tip: If the AI model shows Offline, confirm your Groq API key and model access.")
-
-            cta_label = "🧭 Start a project"
-            cta_target = "projects"
-            if has_project and not has_outline:
-                cta_label = "📝 Draft your outline"
-                cta_target = "outline"
-            elif has_outline and not has_chapter:
-                cta_label = "▶ Write your first chapter"
-                cta_target = "chapters"
-            elif canon_icon == "🔴":
-                cta_label = "🛠 Review canon issues"
-                cta_target = "world"
-
-            if st.button(cta_label, type="primary", width="stretch"):
-                if recent_projects and not st.session_state.project:
-                    st.session_state.project = Project.load(recent_projects[0]["path"])
-                st.session_state.page = cta_target
-                st.rerun()
 
         if not st.session_state.groq_api_key or not st.session_state.openai_api_key:
             with st.container(border=True):
@@ -3898,7 +4043,7 @@ def run_selftest() -> int:
         original_users_db = json.loads(json.dumps(load_users_db()))
         test_username = f"selftest_{uuid.uuid4().hex[:8]}"
         test_password = "Testpass1234"
-        user_result = create_user(test_username, "Self Test", test_password)
+        user_result = create_user(test_username, "Self Test", "selftest@example.com", test_password)
         if not user_result.get("ok"):
             raise RuntimeError(f"User create failed: {user_result.get('error', 'unknown')}")
         auth_result = authenticate_user(test_username, test_password)
