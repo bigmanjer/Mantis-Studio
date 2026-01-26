@@ -3692,25 +3692,6 @@ def _run_ui():
                                     update_locked_chapters()
                                     st.toast("Applied fix.")
                                     st.rerun()
-                                elif target_excerpt:
-                                    content = target_chapter.content or ""
-                                    cleaned_excerpt = target_excerpt.strip()
-                                    if cleaned_excerpt:
-                                        pattern = re.sub(r"\s+", r"\\s+", re.escape(cleaned_excerpt))
-                                        match = re.search(pattern, content, flags=re.DOTALL)
-                                        if match:
-                                            updated = (
-                                                content[: match.start()]
-                                                + (issue.get("suggested_rewrite", "") or "")
-                                                + content[match.end() :]
-                                            )
-                                            target_chapter.update_content(updated, "Coherence Fix")
-                                            p.save()
-                                            results.pop(idx)
-                                            st.session_state["coherence_results"] = results
-                                            update_locked_chapters()
-                                            st.toast("Applied fix.")
-                                            st.rerun()
                                 elif issue.get("suggested_rewrite"):
                                     insertion = issue.get("suggested_rewrite", "").strip()
                                     if insertion:
