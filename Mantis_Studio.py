@@ -3590,7 +3590,7 @@ def _run_ui():
             with f4:
                 show_recent = st.checkbox("Recently added", key="world_filter_recent")
 
-        tab_options = ["Characters", "Locations", "Factions", "Items", "Lore", "Memory", "Insights"]
+        tab_options = ["Characters", "Locations", "Factions", "Lore", "Memory", "Insights"]
         focus_tab = st.session_state.pop("world_focus_tab", None)
         if focus_tab not in tab_options:
             focus_tab = None
@@ -3827,8 +3827,6 @@ def _run_ui():
         elif selected_tab == "Locations":
             render_cat("Location")
         elif selected_tab == "Factions":
-            render_cat("Faction")
-        elif selected_tab == "Items":
             render_cat("Item")
         elif selected_tab == "Lore":
             render_cat("Lore")
