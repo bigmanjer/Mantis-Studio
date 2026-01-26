@@ -39,6 +39,7 @@ import requests
 # (UI-only imports are loaded inside _run_ui() so selftests can run without Streamlit installed.)
 
 import sys
+from utils.navigation import get_nav_config
 
 
 # ===== v45 BRANDING (SAFE, ORIGINAL TEMPLATE) =====
@@ -2797,29 +2798,7 @@ def _run_ui():
         st.divider()
         st.markdown("### 🧭 Navigation")
 
-        nav_labels = ["Dashboard", "Projects", "AI Tools"]
-        pmap = {
-            "Dashboard": "home",
-            "Projects": "projects",
-            "AI Tools": "ai",
-        }
-        if st.session_state.project:
-            nav_labels = [
-                "Dashboard",
-                "Projects",
-                "Editor",
-                "Outline",
-                "World Bible",
-                "AI Tools",
-            ]
-            pmap = {
-                "Dashboard": "home",
-                "Projects": "projects",
-                "Editor": "chapters",
-                "Outline": "outline",
-                "World Bible": "world",
-                "AI Tools": "ai",
-            }
+        nav_labels, pmap = get_nav_config(bool(st.session_state.project))
         current_page = st.session_state.page
         reverse_map = {v: k for k, v in pmap.items()}
         current_label = reverse_map.get(current_page, "Dashboard")
