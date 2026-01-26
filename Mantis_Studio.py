@@ -174,6 +174,15 @@ def _password_policy_error(password: str) -> Optional[str]:
     return None
 
 
+def _email_error(email: str) -> Optional[str]:
+    clean_email = (email or "").strip()
+    if not clean_email:
+        return "Email is required."
+    if not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", clean_email):
+        return "Enter a valid email address."
+    return None
+
+
 def _acquire_lock(lock_path: str, timeout: int, retry_sleep: float) -> bool:
     start = time.time()
     while True:
@@ -221,11 +230,15 @@ def verify_password(password: str, salt_hex: str, hash_hex: str) -> bool:
     return hmac.compare_digest(candidate, expected)
 
 
-def create_user(username: str, display_name: str, password: str) -> Dict[str, Any]:
+def create_user(username: str, display_name: str, email: str, password: str) -> Dict[str, Any]:
     clean_username = _normalize_username(username)
     display_name = (display_name or "").strip()
-    if not clean_username or not display_name or not password:
+    email = (email or "").strip().lower()
+    if not clean_username or not display_name or not password or not email:
         return {"ok": False, "error": "All fields are required."}
+    email_error = _email_error(email)
+    if email_error:
+        return {"ok": False, "error": email_error}
     policy_error = _password_policy_error(password)
     if policy_error:
         return {"ok": False, "error": policy_error}
@@ -233,6 +246,8 @@ def create_user(username: str, display_name: str, password: str) -> Dict[str, An
     data = load_users_db()
     if clean_username in data["users"]:
         return {"ok": False, "error": "That username is already taken."}
+    if any(user.get("email", "").lower() == email for user in data.get("users", {}).values()):
+        return {"ok": False, "error": "An account already exists for that email."}
 
     creds = hash_password(password)
     user_id = str(uuid.uuid4())
@@ -240,6 +255,7 @@ def create_user(username: str, display_name: str, password: str) -> Dict[str, An
         "id": user_id,
         "username": clean_username,
         "display_name": display_name,
+        "email": email,
         "password_hash": creds["hash"],
         "password_salt": creds["salt"],
         "created_at": time.time(),
@@ -1926,6 +1942,12 @@ def _run_ui():
                     key="auth_create_display_name",
                     placeholder="e.g. Alex Writer",
                 )
+                email = st.text_input(
+                    "Email",
+                    key="auth_create_email",
+                    placeholder="e.g. alex@email.com",
+                )
+                st.caption("We use email for account recovery. Google sign-in is coming soon.")
                 new_username = st.text_input("Username", key="auth_create_username", placeholder="e.g. alex")
                 new_password = st.text_input("Password", type="password", key="auth_create_password")
                 confirm_password = st.text_input("Confirm password", type="password", key="auth_create_confirm")
@@ -1933,11 +1955,15 @@ def _run_ui():
                     if new_password != confirm_password:
                         st.error("Passwords do not match.")
                     else:
+                        email_error = _email_error(email)
+                        if email_error:
+                            st.error(email_error)
+                            return
                         policy_error = _password_policy_error(new_password or "")
                         if policy_error:
                             st.error(policy_error)
                         else:
-                            result = create_user(new_username, display_name, new_password)
+                            result = create_user(new_username, display_name, email, new_password)
                             if not result.get("ok"):
                                 st.error(result.get("error", "Could not create account."))
                             else:
@@ -1947,9 +1973,9 @@ def _run_ui():
                                 st.session_state.auth_username = user["username"]
                                 st.session_state.auth_is_guest = False
                                 st.session_state.projects_dir = get_user_projects_dir(user["id"])
-                            save_auth_remember(user, False, st.session_state.remember_me)
-                            st.session_state._force_nav = True
-                            st.rerun()
+                                save_auth_remember(user, False, st.session_state.remember_me)
+                                st.session_state._force_nav = True
+                                st.rerun()
 
     def _today_str() -> str:
         return datetime.date.today().isoformat()
@@ -3898,7 +3924,7 @@ def run_selftest() -> int:
         original_users_db = json.loads(json.dumps(load_users_db()))
         test_username = f"selftest_{uuid.uuid4().hex[:8]}"
         test_password = "Testpass1234"
-        user_result = create_user(test_username, "Self Test", test_password)
+        user_result = create_user(test_username, "Self Test", "selftest@example.com", test_password)
         if not user_result.get("ok"):
             raise RuntimeError(f"User create failed: {user_result.get('error', 'unknown')}")
         auth_result = authenticate_user(test_username, test_password)
