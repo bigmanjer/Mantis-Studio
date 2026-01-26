@@ -1,0 +1,1 @@
+"""MANTIS Studio application package."""
