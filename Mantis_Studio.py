@@ -3009,6 +3009,18 @@ def _run_ui():
         recent_projects = _load_recent_projects(active_dir, st.session_state.projects_refresh_token)
         has_project = bool(recent_projects)
 
+        banner_bytes = load_asset_bytes("mantis_banner_dark.png")
+        st.markdown('<div class="mantis-banner">', unsafe_allow_html=True)
+        if banner_bytes:
+            st.image(banner_bytes, use_container_width=True)
+        else:
+            st.markdown("## MANTIS Studio")
+        st.markdown("</div>", unsafe_allow_html=True)
+
+        full_logo_bytes = load_asset_bytes("mantis_full_logo.png")
+        if full_logo_bytes:
+            st.image(full_logo_bytes, width=240)
+
         has_outline = any((p["meta"].get("outline") or "").strip() for p in recent_projects)
         has_chapter = any(
             (c.get("word_count") or 0) > 0
