@@ -1408,6 +1408,16 @@ def _run_ui():
         st.session_state.activity_log = list(config_data.get("activity_log", []))
     if "remember_me" not in st.session_state:
         st.session_state.remember_me = bool(config_data.get("remember_me", False))
+    if "projects_refresh_token" not in st.session_state:
+        st.session_state.projects_refresh_token = 0
+    if "delete_project_path" not in st.session_state:
+        st.session_state.delete_project_path = None
+    if "delete_project_title" not in st.session_state:
+        st.session_state.delete_project_title = None
+    if "delete_entity_id" not in st.session_state:
+        st.session_state.delete_entity_id = None
+    if "delete_entity_name" not in st.session_state:
+        st.session_state.delete_entity_name = None
     st.session_state.setdefault("canon_health_log", [])
 
     theme = st.session_state.ui_theme if st.session_state.ui_theme in ("Dark", "Light") else "Dark"
@@ -2306,7 +2316,8 @@ def _run_ui():
             counts.append(1 if day.isoformat() in log_set else 0)
         return [{"day": label, "sessions": count} for label, count in zip(labels, counts)]
 
-    def _load_recent_projects(active_dir: str) -> List[Dict[str, Any]]:
+    @st.cache_data(show_spinner=False)
+    def _load_recent_projects(active_dir: str, refresh_token: int) -> List[Dict[str, Any]]:
         if not os.path.exists(active_dir):
             return []
         files = sorted(
@@ -2324,6 +2335,9 @@ def _run_ui():
             except Exception:
                 logger.warning("Failed to load project metadata: %s", full_path, exc_info=True)
         return projects
+
+    def _bump_projects_refresh() -> None:
+        st.session_state.projects_refresh_token += 1
 
     def _project_snapshot(meta: Dict[str, Any]) -> Dict[str, Any]:
         chapters = meta.get("chapters", {}) or {}
@@ -2956,7 +2970,7 @@ def _run_ui():
 
     def render_home():
         active_dir = get_active_projects_dir()
-        recent_projects = _load_recent_projects(active_dir)
+        recent_projects = _load_recent_projects(active_dir, st.session_state.projects_refresh_token)
         has_project = bool(recent_projects)
         has_outline = any((p["meta"].get("outline") or "").strip() for p in recent_projects)
         has_chapter = any(
@@ -3143,7 +3157,7 @@ def _run_ui():
 
     def render_projects():
         active_dir = get_active_projects_dir()
-        recent_projects = _load_recent_projects(active_dir)
+        recent_projects = _load_recent_projects(active_dir, st.session_state.projects_refresh_token)
 
         st.markdown("## Projects")
         st.caption("Create, import, and manage your story worlds.")
@@ -3180,6 +3194,7 @@ def _run_ui():
                         storage_dir=get_active_projects_dir(),
                     )
                     p.save()
+                    _bump_projects_refresh()
                     st.session_state.project = p
                     st.session_state.page = "outline"
                     st.session_state.first_run = False
@@ -3216,6 +3231,7 @@ def _run_ui():
                         else:
                             st.warning("Add a Groq API key and model to auto-generate an outline.")
                         p.save()
+                        _bump_projects_refresh()
                         st.session_state.project = p
                         st.session_state.page = "outline"
                         st.session_state.first_run = False
@@ -3258,10 +3274,35 @@ def _run_ui():
                                 st.rerun()
                         with row4:
                             if st.button("🗑", key=f"del_{full}", use_container_width=True):
-                                Project.delete_file(full)
-                                st.rerun()
+                                st.session_state.delete_project_path = full
+                                st.session_state.delete_project_title = title
                     except Exception:
                         logger.warning("Failed to load project metadata: %s", full, exc_info=True)
+
+        if st.session_state.delete_project_path:
+            with st.container(border=True):
+                title = st.session_state.delete_project_title or "this project"
+                st.warning(f"Delete **{title}**? This cannot be undone.")
+                d1, d2 = st.columns(2)
+                with d1:
+                    if st.button("🗑 Confirm delete", type="primary", use_container_width=True):
+                        Project.delete_file(st.session_state.delete_project_path)
+                        if (
+                            st.session_state.project
+                            and st.session_state.project.filepath == st.session_state.delete_project_path
+                        ):
+                            st.session_state.project = None
+                            st.session_state.page = "projects"
+                        st.session_state.delete_project_path = None
+                        st.session_state.delete_project_title = None
+                        _bump_projects_refresh()
+                        st.toast("Project deleted.")
+                        st.rerun()
+                with d2:
+                    if st.button("Cancel", use_container_width=True):
+                        st.session_state.delete_project_path = None
+                        st.session_state.delete_project_title = None
+                        st.rerun()
 
         export_path = st.session_state.get("export_project_path")
         if export_path:
@@ -3752,15 +3793,31 @@ def _run_ui():
                                     st.session_state.page = "chapters"
                                     st.session_state.curr_chap_id = options[sel]
                                     st.session_state._force_nav = True
+                                    st.rerun()
                             else:
                                 st.caption("No chapter references yet.")
 
                             d1, d2 = st.columns([1, 1])
                             with d1:
-                                if st.button("🗑 Delete", key=f"del_{e.id}", use_container_width=True):
-                                    p.delete_entity(e.id)
-                                    p.save()
-                                    st.rerun()
+                                if st.session_state.delete_entity_id == e.id:
+                                    st.warning(f"Delete **{st.session_state.delete_entity_name or e.name}**?")
+                                    cdel1, cdel2 = st.columns(2)
+                                    with cdel1:
+                                        if st.button("Confirm", type="primary", use_container_width=True):
+                                            p.delete_entity(e.id)
+                                            p.save()
+                                            st.session_state.delete_entity_id = None
+                                            st.session_state.delete_entity_name = None
+                                            st.toast("Entity deleted.")
+                                            st.rerun()
+                                    with cdel2:
+                                        if st.button("Cancel", use_container_width=True):
+                                            st.session_state.delete_entity_id = None
+                                            st.session_state.delete_entity_name = None
+                                            st.rerun()
+                                elif st.button("🗑 Delete", key=f"del_{e.id}", use_container_width=True):
+                                    st.session_state.delete_entity_id = e.id
+                                    st.session_state.delete_entity_name = e.name
                             with d2:
                                 st.caption(f"Created: {time.strftime('%Y-%m-%d', time.localtime(e.created_at))}")
 
@@ -4058,6 +4115,7 @@ def _run_ui():
                     if st.button("🧩 Go to Outline", use_container_width=True):
                         st.session_state.page = "outline"
                         st.session_state._force_nav = True
+                        st.rerun()
             return
 
         if "curr_chap_id" not in st.session_state or st.session_state.curr_chap_id not in p.chapters:
