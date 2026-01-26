@@ -3,6 +3,8 @@ from pathlib import Path
 
 import streamlit as st
 
+from app.utils import auth
+
 LEGAL_DIR = Path(__file__).resolve().parents[1] / "legal"
 ASSETS_DIR = Path(__file__).resolve().parents[1] / "assets"
 
@@ -81,6 +83,7 @@ def _inject_styles() -> None:
 
 def main() -> None:
     st.set_page_config(page_title="Legal • MANTIS Studio", layout="wide")
+    auth.require_login()
     _inject_styles()
     logo_b64 = _logo_base64()
 
