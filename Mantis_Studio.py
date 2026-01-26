@@ -53,6 +53,10 @@ REPAIR_MODE = "--repair" in sys.argv
 # 1) CONFIG
 # ============================================================
 
+def get_app_version() -> str:
+    return os.getenv("MANTIS_APP_VERSION", "47 (Chronicle • One-File)")
+
+
 class AppConfig:
     APP_NAME = "MANTIS Studio"
     VERSION = get_app_version()
