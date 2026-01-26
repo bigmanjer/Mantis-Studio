@@ -1417,6 +1417,11 @@ def _run_ui():
     .block-container {{ padding-top: 2.6rem; padding-bottom: 2.6rem; max-width: 1380px; }}
     header[data-testid="stHeader"] {{ height: 2.6rem; }}
     h1, h2, h3 {{ letter-spacing: -0.02em; font-family: 'Space Grotesk', sans-serif; }}
+    .stMarkdown, .stMarkdown p, .stMarkdown span, .stMarkdown li, .stMarkdown div,
+    .stTextInput label, .stSelectbox label, .stCheckbox label, .stRadio label,
+    .stNumberInput label, .stTextArea label {{
+        color: var(--mantis-text) !important;
+    }}
     .stTextInput input,
     .stNumberInput input,
     .stSelectbox div[data-baseweb="select"] > div,
@@ -1840,6 +1845,12 @@ def _run_ui():
         st.session_state.groq_model_list = _cached_models(
             st.session_state.groq_base_url,
             st.session_state.groq_api_key,
+        ) or []
+
+    def refresh_openai_models():
+        st.session_state.openai_model_list = _cached_models(
+            st.session_state.openai_base_url,
+            st.session_state.openai_api_key,
         ) or []
 
     def save_app_settings():
@@ -2680,7 +2691,7 @@ def _run_ui():
 
         with st.container(border=True):
             st.markdown("### ✅ Actions")
-            action_cols = st.columns(3)
+            action_cols = st.columns(4)
             with action_cols[0]:
                 st.checkbox("Auto-save", key="auto_save")
             with action_cols[1]:
@@ -2689,6 +2700,11 @@ def _run_ui():
                     refresh_models()
                     st.toast("Model list refreshed")
             with action_cols[2]:
+                if st.button("↻ Refresh OpenAI Models", width="stretch"):
+                    st.cache_data.clear()
+                    refresh_openai_models()
+                    st.toast("OpenAI model list refreshed")
+            with action_cols[3]:
                 if st.button("💾 Save AI Settings", width="stretch"):
                     save_app_settings()
 
@@ -3345,6 +3361,8 @@ def _run_ui():
         with st.container(border=True):
             f1, f2, f3, f4 = st.columns([2.2, 1, 1, 1])
             with f1:
+                if st.session_state.get("world_search_pending"):
+                    st.session_state["world_search"] = st.session_state.pop("world_search_pending")
                 query = st.text_input(
                     "Search",
                     placeholder="Type a name or alias to filter...",
@@ -3793,7 +3811,7 @@ def _run_ui():
                         with r2:
                             if st.button("Jump to Entity", key=f"jump_entity_{ent.id}", width="stretch"):
                                 st.session_state["world_focus_entity"] = ent.id
-                                st.session_state["world_search"] = ent.name
+                                st.session_state["world_search_pending"] = ent.name
                                 st.toast("Entity highlighted in World Bible.")
             else:
                 st.success("No flagged entities right now.")
