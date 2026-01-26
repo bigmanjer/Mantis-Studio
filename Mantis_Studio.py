@@ -2780,6 +2780,52 @@ def _run_ui():
                         st.session_state.page = "outline"
                         st.rerun()
 
+        with st.container(border=True):
+            st.markdown("### 🧭 Getting started")
+            completed_steps = sum([has_project, has_outline, has_chapter])
+            progress = completed_steps / 3
+            st.progress(progress, text=f"{completed_steps}/3 steps complete")
+
+            onboarding_text = """
+**MANTIS** mirrors a focused studio: a clean writing surface, memory tools,
+and quick start modules so you can draft fast and refine later.
+
+**Quick path**
+1) Create a project  
+2) Build a structured outline or lore entries  
+3) Draft chapters with AI assists on demand
+"""
+            if st.session_state.get("first_run", True):
+                st.markdown(onboarding_text)
+                c1, c2, c3 = st.columns([1, 1, 2])
+                with c1:
+                    if st.button("✅ Got it", type="primary", width="stretch"):
+                        st.session_state.first_run = False
+                        st.rerun()
+                with c2:
+                    if st.button("📌 Keep showing", width="stretch"):
+                        st.toast("Welcome panel will keep showing.")
+                with c3:
+                    st.caption("Tip: If the AI model shows Offline, confirm your Groq API key and model access.")
+
+            cta_label = "🧭 Start a project"
+            cta_target = "projects"
+            if has_project and not has_outline:
+                cta_label = "📝 Draft your outline"
+                cta_target = "outline"
+            elif has_outline and not has_chapter:
+                cta_label = "▶ Write your first chapter"
+                cta_target = "chapters"
+            elif canon_icon == "🔴":
+                cta_label = "🛠 Review canon issues"
+                cta_target = "world"
+
+            if st.button(cta_label, type="primary", width="stretch"):
+                if recent_projects and not st.session_state.project:
+                    st.session_state.project = Project.load(recent_projects[0]["path"])
+                st.session_state.page = cta_target
+                st.rerun()
+
         if not st.session_state.groq_api_key or not st.session_state.openai_api_key:
             with st.container(border=True):
                 st.markdown("### 🔑 Connect your AI providers")
