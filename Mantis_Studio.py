@@ -264,6 +264,35 @@ def create_user(username: str, display_name: str, email: str, password: str) -> 
     return {"ok": True, "user": data["users"][clean_username]}
 
 
+def reset_password(email: str, new_password: str) -> Dict[str, Any]:
+    clean_email = (email or "").strip().lower()
+    if not clean_email or not new_password:
+        return {"ok": False, "error": "Email and new password are required."}
+    email_error = _email_error(clean_email)
+    if email_error:
+        return {"ok": False, "error": email_error}
+    policy_error = _password_policy_error(new_password)
+    if policy_error:
+        return {"ok": False, "error": policy_error}
+
+    data = load_users_db()
+    match_key = None
+    for username_key, user in data.get("users", {}).items():
+        if user.get("email", "").lower() == clean_email:
+            match_key = username_key
+            break
+
+    if not match_key:
+        return {"ok": False, "error": "No account found for that email."}
+
+    creds = hash_password(new_password)
+    data["users"][match_key]["password_hash"] = creds["hash"]
+    data["users"][match_key]["password_salt"] = creds["salt"]
+    data["users"][match_key]["updated_at"] = time.time()
+    save_users_db(data)
+    return {"ok": True}
+
+
 def authenticate_user(username: str, password: str) -> Dict[str, Any]:
     clean_username = _normalize_username(username)
     data = load_users_db()
@@ -1935,6 +1964,32 @@ def _run_ui():
                         save_auth_remember(user, False, st.session_state.remember_me)
                         st.session_state._force_nav = True
                         st.rerun()
+                with st.expander("Forgot password?"):
+                    st.caption("Reset locally using the email tied to your account.")
+                    reset_email = st.text_input(
+                        "Email",
+                        key="auth_reset_email",
+                        placeholder="e.g. alex@email.com",
+                    )
+                    reset_new_password = st.text_input(
+                        "New password",
+                        type="password",
+                        key="auth_reset_password",
+                    )
+                    reset_confirm = st.text_input(
+                        "Confirm new password",
+                        type="password",
+                        key="auth_reset_confirm",
+                    )
+                    if st.button("Reset password", width="stretch"):
+                        if reset_new_password != reset_confirm:
+                            st.error("Passwords do not match.")
+                        else:
+                            reset_result = reset_password(reset_email, reset_new_password)
+                            if not reset_result.get("ok"):
+                                st.error(reset_result.get("error", "Password reset failed."))
+                            else:
+                                st.success("Password updated. You can now sign in.")
 
             with tabs[2]:
                 display_name = st.text_input(
@@ -2593,7 +2648,6 @@ def _run_ui():
         latest_chapter_label = "You last worked on Chapter — · recently"
         latest_chapter_index = None
         latest_chapter_id = None
-        latest_chapter_index = None
         latest_ts = None
 
         if active_project and getattr(active_project, "chapters", None):
@@ -2601,35 +2655,10 @@ def _run_ui():
                 active_project.chapters.values(),
                 key=lambda c: (c.modified_at or c.created_at or 0),
             )
-
-        def _pill(label, *, key):
-            return st.button(label, key=key, width="stretch")
-
-        with st.container(border=True):
-            st.markdown("### 👋 Welcome back")
-            st.markdown(f"## {project_title}")
-            st.caption(latest_chapter_label)
-
-        st.markdown("#### Quick actions")
-        quick_cols = st.columns(3)
-        with quick_cols[0]:
-            if st.button("🌍 World Bible", key="qa_world_bible", width="stretch"):
-                if recent_projects and not st.session_state.project:
-                    st.session_state.project = Project.load(recent_projects[0]["path"])
-                st.session_state.page = "world"
-                st.rerun()
-        with quick_cols[1]:
-            if st.button("🧠 Memory", key="qa_memory", width="stretch"):
-                if recent_projects and not st.session_state.project:
-                    st.session_state.project = Project.load(recent_projects[0]["path"])
-                st.session_state.page = "world"
-                st.rerun()
-        with quick_cols[2]:
-            if st.button("📈 Insights", key="qa_insights", width="stretch"):
-                if recent_projects and not st.session_state.project:
-                    st.session_state.project = Project.load(recent_projects[0]["path"])
-                st.session_state.page = "world"
-                st.rerun()
+            latest_ts = ch.modified_at or ch.created_at
+            latest_chapter_index = ch.index
+            latest_chapter_id = ch.id
+            latest_chapter_label = f"Latest: Chapter {ch.index} — {ch.title}"
 
         primary_label = "✨ Start your story"
         primary_target = "projects"
@@ -2637,25 +2666,36 @@ def _run_ui():
             primary_label = "🛠 Fix story issues"
             primary_target = "world"
         elif has_chapter and latest_chapter_index:
-            primary_label = f"▶ Continue writing Chapter {latest_chapter_index}"
+            primary_label = f"▶ Continue Chapter {latest_chapter_index}"
             primary_target = "chapters"
         elif has_outline:
             primary_label = "📝 Build your outline"
             primary_target = "outline"
 
-        primary_cols = st.columns([1, 2, 1])
-        with primary_cols[1]:
-            if st.button(primary_label, type="primary", width="stretch"):
-                if recent_projects and not st.session_state.project:
-                    st.session_state.project = Project.load(recent_projects[0]["path"])
-                if primary_target == "chapters" and latest_chapter_id:
-                    st.session_state.curr_chap_id = latest_chapter_id
-                st.session_state.page = target
-                st.rerun()
+        header_cols = st.columns([2, 1])
+        with header_cols[0]:
+            with st.container(border=True):
+                st.markdown("### 👋 Welcome back")
+                st.markdown(f"## {project_title}")
+                st.caption(latest_chapter_label)
+                if st.button(primary_label, type="primary", width="stretch"):
+                    if recent_projects and not st.session_state.project:
+                        st.session_state.project = Project.load(recent_projects[0]["path"])
+                    if primary_target == "chapters" and latest_chapter_id:
+                        st.session_state.curr_chap_id = latest_chapter_id
+                    st.session_state.page = primary_target
+                    st.rerun()
 
-        st.markdown("#### Quick actions")
-        r1 = st.columns(4)
-        with r1[0]:
+        with header_cols[1]:
+            with st.container(border=True):
+                st.markdown("#### Workspace snapshot")
+                st.metric("Active projects", len(recent_projects))
+                st.metric("Latest genre", (recent_snapshot or {}).get("genre", "—"))
+                st.metric("Weekly sessions", f"{weekly_count}/{weekly_goal}")
+
+        st.markdown("#### Studio modules")
+        module_row = st.columns(4)
+        with module_row[0]:
             with st.container(border=True):
                 st.markdown("### 🌍 World Bible")
                 st.caption("Characters, places, factions, and lore")
@@ -2665,7 +2705,7 @@ def _run_ui():
                     st.session_state.page = "world"
                     st.rerun()
 
-        with r1[1]:
+        with module_row[1]:
             with st.container(border=True):
                 st.markdown("### 📝 Outline")
                 st.caption("Blueprint your story beats and arcs")
@@ -2675,7 +2715,7 @@ def _run_ui():
                     st.session_state.page = "outline"
                     st.rerun()
 
-        with r1[2]:
+        with module_row[2]:
             with st.container(border=True):
                 st.markdown("### 🧠 Memory")
                 st.caption("Canon rules, guidance, and style notes")
@@ -2685,7 +2725,7 @@ def _run_ui():
                     st.session_state.page = "world"
                     st.rerun()
 
-        with r1[3]:
+        with module_row[3]:
             with st.container(border=True):
                 st.markdown("### 📊 Insights")
                 st.caption("Analytics and canon health insights")
@@ -2725,12 +2765,6 @@ def _run_ui():
                         st.session_state.project = Project.load(recent_projects[0]["path"])
                         st.session_state.page = "outline"
                         st.rerun()
-
-            st.markdown("#### Workspace snapshot")
-            snapshot_cols = st.columns(3)
-            snapshot_cols[0].metric("Active projects", len(recent_projects))
-            snapshot_cols[1].metric("Latest genre", (recent_snapshot or {}).get("genre", "—"))
-            snapshot_cols[2].metric("Weekly sessions", f"{weekly_count}/{weekly_goal}")
 
         with st.container(border=True):
             st.markdown("### 🧭 Getting started")
