@@ -2945,14 +2945,14 @@ def _run_ui():
                     st.session_state.page = "world"
                     st.rerun()
 
-        with module_row[1]:
+        def render_quick_action(title: str, caption: str, target: str, key: str):
             with st.container(border=True):
                 st.markdown("### 📝 Outline")
                 st.caption("Blueprint your story beats and arcs")
                 if st.button("Open", key="nav_outline", use_container_width=True):
                     if recent_projects and not st.session_state.project:
                         st.session_state.project = Project.load(recent_projects[0]["path"])
-                    st.session_state.page = "outline"
+                    st.session_state.page = target
                     st.rerun()
 
         def render_quick_action(title: str, caption: str, target: str, key: str):
