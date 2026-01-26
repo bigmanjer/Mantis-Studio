@@ -46,6 +46,12 @@ management, MFA, and recovery are handled by your identity provider (Google, Mic
    - Multi-tenant: `https://login.microsoftonline.com/common/v2.0`
 4. Add the client ID and client secret to `.streamlit/secrets.toml` under `[auth.providers.microsoft]`.
 
+### Apple Sign In (placeholder + future support)
+
+Streamlit-native OIDC does not ship with an Apple preset. To enable Apple later, add a provider block
+under `[auth.providers.apple]` with Apple’s OIDC metadata and credentials. Until then, the app shows
+Apple as “Coming soon.” This keeps the login UX consistent without breaking the current deployment.
+
 ### Required secrets (template)
 
 See `.streamlit/secrets.toml` for a full template including optional allowlists and admin emails.
@@ -65,6 +71,11 @@ issuer = "https://accounts.google.com"
 client_id = "..."
 client_secret = "..."
 issuer = "https://login.microsoftonline.com/<tenant-id>/v2.0"
+
+[auth.providers.apple]
+client_id = "..."
+client_secret = "..."
+issuer = "https://appleid.apple.com"
 ```
 
 ### Optional authorization controls
