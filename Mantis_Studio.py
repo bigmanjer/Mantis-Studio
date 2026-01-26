@@ -1200,22 +1200,6 @@ def sanitize_chapter_title(title: str) -> str:
     return clean
 
 
-def update_locked_chapters() -> None:
-    try:
-        import streamlit as st
-    except Exception:
-        return
-    results = st.session_state.get("coherence_results", [])
-    locked = set()
-    for issue in results:
-        try:
-            chapter_idx = int(issue.get("chapter_index"))
-        except (TypeError, ValueError):
-            continue
-        locked.add(chapter_idx)
-    st.session_state["locked_chapters"] = locked
-
-
 # ============================================================
 # 5) STREAMLIT UI (Appearance + First-time Onboarding)
 # ============================================================
@@ -1436,15 +1420,6 @@ def _run_ui():
     .stMarkdown, .stMarkdown p, .stMarkdown span, .stMarkdown li, .stMarkdown div,
     .stTextInput label, .stSelectbox label, .stCheckbox label, .stRadio label,
     .stNumberInput label, .stTextArea label {{
-        color: var(--mantis-text) !important;
-    }}
-    div[data-testid="stMetricValue"] {{
-        color: var(--mantis-text) !important;
-    }}
-    div[data-testid="stMetricLabel"] {{
-        color: var(--mantis-muted) !important;
-    }}
-    div[data-testid="stMetricDelta"] {{
         color: var(--mantis-text) !important;
     }}
     .stTextInput input,
@@ -3735,25 +3710,6 @@ def _run_ui():
                                     update_locked_chapters()
                                     st.toast("Applied fix.")
                                     st.rerun()
-                                elif target_excerpt:
-                                    content = target_chapter.content or ""
-                                    cleaned_excerpt = target_excerpt.strip()
-                                    if cleaned_excerpt:
-                                        pattern = re.sub(r"\s+", r"\\s+", re.escape(cleaned_excerpt))
-                                        match = re.search(pattern, content, flags=re.DOTALL)
-                                        if match:
-                                            updated = (
-                                                content[: match.start()]
-                                                + (issue.get("suggested_rewrite", "") or "")
-                                                + content[match.end() :]
-                                            )
-                                            target_chapter.update_content(updated, "Coherence Fix")
-                                            p.save()
-                                            results.pop(idx)
-                                            st.session_state["coherence_results"] = results
-                                            update_locked_chapters()
-                                            st.toast("Applied fix.")
-                                            st.rerun()
                                 elif issue.get("suggested_rewrite"):
                                     insertion = issue.get("suggested_rewrite", "").strip()
                                     if insertion:
