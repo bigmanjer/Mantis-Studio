@@ -5,8 +5,9 @@
 #   python -m streamlit run Mantis_Studio.py
 #
 # Requirements:
-#   streamlit>=1.30.0
+#   streamlit>=1.42.0
 #   requests
+#   Authlib>=1.3.2
 #   python-dotenv (optional)
 #   pandas
 #   plotly
