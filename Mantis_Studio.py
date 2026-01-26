@@ -3773,12 +3773,7 @@ def _run_ui():
                                 e.aliases = [a.strip() for a in alias_text.split(",") if a.strip()]
                                 p.save()
 
-                            if c2.button("✨ Enrich", key=f"en_{e.id}", use_container_width=True):
-                                new_info = AnalysisEngine.enrich_entity(e.name, e.category, e.description, get_ai_model())
-                                if new_info:
-                                    e.merge(new_info)
-                                    p.save()
-                                    st.rerun()
+                            c2.caption("Enrichment is currently unavailable.")
 
                             refs = mention_refs.get(e.id, [])
                             if refs:
