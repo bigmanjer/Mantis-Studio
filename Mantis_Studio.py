@@ -802,8 +802,6 @@ class Project:
         if not isinstance(world_db_data, dict):
             world_db_data = {}
         for k, v in world_db_data.items():
-            if not isinstance(v, dict):
-                continue
             if "category" not in v:
                 v["category"] = "Character"
             clean = {key: val for key, val in v.items() if key in ent_fields}
@@ -827,10 +825,7 @@ class Project:
             }
         if not isinstance(chapter_data, dict):
             chapter_data = {}
-        fallback_index = 1
         for k, v in chapter_data.items():
-            if not isinstance(v, dict):
-                continue
             clean = {key: val for key, val in v.items() if key in chap_fields}
             clean["id"] = clean.get("id") or k or str(uuid.uuid4())
             try:
@@ -2934,17 +2929,15 @@ def _run_ui():
             primary_label = "📝 Build your outline"
             primary_target = "outline"
 
-        section_header(
-            "Dashboard",
-            "Your writing cockpit — jump back in, track momentum, and move between tools.",
-        )
+        st.markdown("## Dashboard")
+        st.caption("Your writing cockpit — jump back in, track momentum, and move between tools.")
 
         header_cols = st.columns([2.2, 1])
         with header_cols[0]:
             with card("👋 Welcome back"):
                 st.markdown(f"## {project_title}")
                 st.caption(latest_chapter_label)
-                if primary_button(primary_label, key="dashboard_primary_cta"):
+                if st.button(primary_label, type="primary", use_container_width=True):
                     if recent_projects and not st.session_state.project:
                         st.session_state.project = Project.load(recent_projects[0]["path"])
                     if primary_target == "chapters" and latest_chapter_id:
@@ -2973,52 +2966,54 @@ def _run_ui():
                         st.rerun()
 
         with header_cols[1]:
-            with card("Workspace snapshot"):
-                kpi_cols = st.columns(2)
-                with kpi_cols[0]:
-                    stat_tile("Active projects", str(len(recent_projects)), icon="📚")
-                with kpi_cols[1]:
-                    stat_tile("Latest genre", (recent_snapshot or {}).get("genre", "—"), icon="🎭")
-                kpi_cols = st.columns(2)
-                with kpi_cols[0]:
-                    stat_tile("Weekly sessions", f"{weekly_count}/{weekly_goal}", icon="📅")
-                with kpi_cols[1]:
-                    stat_tile("Writing streak", f"{_activity_streak()} days", icon="🔥")
+            with st.container(border=True):
+                st.markdown("#### Workspace snapshot")
+                st.metric("Active projects", len(recent_projects))
+                st.metric("Latest genre", (recent_snapshot or {}).get("genre", "—"))
+                st.metric("Weekly sessions", f"{weekly_count}/{weekly_goal}")
+                st.metric("Writing streak", f"{_activity_streak()} days")
 
-        section_header("Quick actions", "Jump straight to a key workspace.")
+        st.markdown("#### Studio modules")
+        module_row = st.columns(4)
+        with module_row[0]:
+            with st.container(border=True):
+                st.markdown("### 🌍 World Bible")
+                st.caption("Characters, places, factions, and lore")
+                if st.button("Open", key="nav_world", use_container_width=True):
+                    if recent_projects and not st.session_state.project:
+                        st.session_state.project = Project.load(recent_projects[0]["path"])
+                    st.session_state.page = "world"
+                    st.rerun()
 
-        def render_quick_action(title: str, caption: str, target: str, key_prefix: str):
-            with card(title, caption):
-                title_slug = re.sub(r"[^a-z0-9]+", "_", title.lower()).strip("_")
-                button_key = f"{key_prefix}_{target}_{title_slug}_open"
-                if st.button("Open", use_container_width=True, key=button_key):
+        def render_quick_action(title: str, caption: str, target: str, key: str):
+            with st.container(border=True):
+                st.markdown("### 📝 Outline")
+                st.caption("Blueprint your story beats and arcs")
+                if st.button("Open", key="nav_outline", use_container_width=True):
                     if recent_projects and not st.session_state.project:
                         st.session_state.project = Project.load(recent_projects[0]["path"])
                     st.session_state.page = target
                     st.rerun()
 
-        action_rows = st.columns(3)
-        with action_rows[0]:
-            render_quick_action(
-                "🌍 World Bible",
-                "Characters, places, factions, and lore",
-                "world",
-                "dashboard_quick_world",
-            )
-        with action_rows[1]:
-            render_quick_action(
-                "🧠 Memory",
-                "Canon rules, guardrails, and style notes",
-                "world",
-                "dashboard_quick_memory",
-            )
-        with action_rows[2]:
-            render_quick_action(
-                "📊 Insights",
-                "Canon health, timeline, and utilization",
-                "world",
-                "dashboard_quick_insights",
-            )
+        def render_quick_action(title: str, caption: str, target: str, key: str):
+            with st.container(border=True):
+                st.markdown("### 🧠 Memory")
+                st.caption("Canon rules, guidance, and style notes")
+                if st.button("Open", key="nav_memory", use_container_width=True):
+                    if recent_projects and not st.session_state.project:
+                        st.session_state.project = Project.load(recent_projects[0]["path"])
+                    st.session_state.page = target
+                    st.rerun()
+
+        with module_row[3]:
+            with st.container(border=True):
+                st.markdown("### 📊 Insights")
+                st.caption("Analytics and canon health insights")
+                if st.button("Open", key="nav_analytics", use_container_width=True):
+                    if recent_projects and not st.session_state.project:
+                        st.session_state.project = Project.load(recent_projects[0]["path"])
+                    st.session_state.page = "world"
+                    st.rerun()
 
         secondary_actions = st.columns(2)
         with secondary_actions[0]:
@@ -3036,31 +3031,44 @@ def _run_ui():
                 "dashboard_quick_editor",
             )
 
-        with card("Project center", "Manage projects, exports, and imports in one place."):
-            if st.button(
-                "🗂 Go to Projects",
-                use_container_width=True,
-                key="dashboard_projects_hub",
-            ):
-                st.session_state.page = "projects"
-                st.rerun()
+        with st.container(border=True):
+            st.markdown("#### Project actions")
+            action_cols = st.columns(3)
+            with action_cols[0]:
+                if st.button(
+                    "📂 Resume",
+                    use_container_width=True,
+                    disabled=not recent_projects,
+                ):
+                    if recent_projects:
+                        st.session_state.project = Project.load(recent_projects[0]["path"])
+                        st.session_state.page = "chapters"
+                        st.rerun()
+            with action_cols[1]:
+                if st.button("🧭 New project", use_container_width=True):
+                    st.session_state.page = "projects"
+                    st.rerun()
+            with action_cols[2]:
+                if st.button(
+                    "🧩 Open outline",
+                    use_container_width=True,
+                    disabled=not recent_projects,
+                ):
+                    if recent_projects:
+                        st.session_state.project = Project.load(recent_projects[0]["path"])
+                        st.session_state.page = "outline"
+                        st.rerun()
 
         if not st.session_state.groq_api_key or not st.session_state.openai_api_key:
             with card("🔑 Connect your AI providers", "Unlock generation, summaries, and entity tools with API access."):
                 cta_left, cta_right = st.columns(2)
                 with cta_left:
-                    st.link_button(
-                        "Create Groq Account",
-                        "https://console.groq.com/keys",
-                        use_container_width=True,
-                        key="dashboard_groq_signup",
-                    )
+                    st.link_button("Create Groq Account", "https://console.groq.com/keys", use_container_width=True)
                 with cta_right:
                     st.link_button(
                         "Create OpenAI Account",
                         "https://platform.openai.com/api-keys",
                         use_container_width=True,
-                        key="dashboard_openai_signup",
                     )
 
 
@@ -3642,6 +3650,13 @@ def _run_ui():
                             if alias_text != ", ".join(e.aliases or []):
                                 e.aliases = [a.strip() for a in alias_text.split(",") if a.strip()]
                                 p.save()
+
+                            if c2.button("✨ Enrich", key=f"en_{e.id}", use_container_width=True):
+                                new_info = AnalysisEngine.enrich_entity(e.name, e.category, e.description, get_ai_model())
+                                if new_info:
+                                    e.merge(new_info)
+                                    p.save()
+                                    st.rerun()
 
                             refs = mention_refs.get(e.id, [])
                             if refs:
