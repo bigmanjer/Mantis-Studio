@@ -2389,135 +2389,149 @@ def _run_ui():
         return
 
     def render_ai_settings():
-        st.markdown("## 🧠 AI Settings")
-        st.caption("Configure your AI providers and models.")
+        st.markdown("## 🧠 AI Tools")
+        st.caption("Connect providers, choose models, and validate access.")
 
-        st.markdown("### 🤖 Groq")
-        groq_url = st.text_input("Groq Base URL", value=st.session_state.groq_base_url)
-        if groq_url != st.session_state.groq_base_url:
-            st.session_state.groq_base_url = groq_url
-            AppConfig.GROQ_API_URL = groq_url
+        status_cols = st.columns(3)
+        with status_cols[0]:
+            st.metric("Groq", "Connected" if st.session_state.groq_api_key else "Missing key")
+        with status_cols[1]:
+            st.metric("OpenAI", "Connected" if st.session_state.openai_api_key else "Missing key")
+        with status_cols[2]:
+            st.metric("Active model", st.session_state.groq_model or "Not set")
 
-        groq_key = st.text_input(
-            "Groq API Key",
-            value=st.session_state.groq_api_key,
-            type="password",
-            help="Required for Groq cloud models.",
-        )
-        if groq_key != st.session_state.groq_api_key:
-            st.session_state.groq_api_key = groq_key
-            AppConfig.GROQ_API_KEY = groq_key
+        provider_cols = st.columns(2)
+        with provider_cols[0]:
+            with st.container(border=True):
+                st.markdown("### 🤖 Groq")
+                groq_url = st.text_input("Groq Base URL", value=st.session_state.groq_base_url)
+                if groq_url != st.session_state.groq_base_url:
+                    st.session_state.groq_base_url = groq_url
+                    AppConfig.GROQ_API_URL = groq_url
 
-        if st.button("↻ Fetch Groq Models", width="stretch"):
-            models, error_message = fetch_groq_models(
-                st.session_state.groq_base_url,
-                st.session_state.groq_api_key,
-            )
-            if models:
-                st.session_state.groq_model_list = models
-                st.session_state.groq_model_tests = {}
-                st.toast(f"Loaded {len(models)} models.")
-            else:
-                st.session_state.groq_model_list = []
-                st.session_state.groq_model_tests = {}
-                st.error(f"Model fetch failed. {error_message or 'Check the base URL and key.'}")
+                groq_key = st.text_input(
+                    "Groq API Key",
+                    value=st.session_state.groq_api_key,
+                    type="password",
+                    help="Required for Groq cloud models.",
+                )
+                if groq_key != st.session_state.groq_api_key:
+                    st.session_state.groq_api_key = groq_key
+                    AppConfig.GROQ_API_KEY = groq_key
 
-        if st.session_state.groq_model_list:
-            models = st.session_state.groq_model_list
-            idx = 0
-            if st.session_state.groq_model in models:
-                idx = models.index(st.session_state.groq_model)
-            groq_model = st.selectbox("Groq Model", models, index=idx)
-
-            if st.button("🧪 Test All Groq Models", width="stretch"):
-                results = {}
-                total = len(models)
-                progress = st.progress(0)
-                for i, model_name in enumerate(models, start=1):
-                    ok, error_message = test_groq_model(
+                if st.button("↻ Fetch Groq Models", width="stretch"):
+                    models, error_message = fetch_groq_models(
                         st.session_state.groq_base_url,
                         st.session_state.groq_api_key,
-                        model_name,
                     )
-                    results[model_name] = "" if ok else error_message
-                    progress.progress(i / total)
-                st.session_state.groq_model_tests = results
-                failures = [m for m, err in results.items() if err]
-                if failures:
-                    st.warning(f"{len(failures)} models failed. Expand results for details.")
-                else:
-                    st.success("All models responded successfully.")
+                    if models:
+                        st.session_state.groq_model_list = models
+                        st.session_state.groq_model_tests = {}
+                        st.toast(f"Loaded {len(models)} models.")
+                    else:
+                        st.session_state.groq_model_list = []
+                        st.session_state.groq_model_tests = {}
+                        st.error(f"Model fetch failed. {error_message or 'Check the base URL and key.'}")
 
-            if st.session_state.groq_model_tests:
-                with st.expander("Groq model test results", expanded=False):
-                    for model_name, error_message in sorted(
-                        st.session_state.groq_model_tests.items()
-                    ):
-                        if error_message:
-                            st.error(f"{model_name}: {error_message}")
+                if st.session_state.groq_model_list:
+                    models = st.session_state.groq_model_list
+                    idx = 0
+                    if st.session_state.groq_model in models:
+                        idx = models.index(st.session_state.groq_model)
+                    groq_model = st.selectbox("Groq Model", models, index=idx)
+
+                    if st.button("🧪 Test All Groq Models", width="stretch"):
+                        results = {}
+                        total = len(models)
+                        progress = st.progress(0)
+                        for i, model_name in enumerate(models, start=1):
+                            ok, error_message = test_groq_model(
+                                st.session_state.groq_base_url,
+                                st.session_state.groq_api_key,
+                                model_name,
+                            )
+                            results[model_name] = "" if ok else error_message
+                            progress.progress(i / total)
+                        st.session_state.groq_model_tests = results
+                        failures = [m for m, err in results.items() if err]
+                        if failures:
+                            st.warning(f"{len(failures)} models failed. Expand results for details.")
                         else:
-                            st.success(f"{model_name}: OK")
-        else:
-            groq_model = st.text_input("Groq Model", value=st.session_state.groq_model)
+                            st.success("All models responded successfully.")
 
-        if groq_model != st.session_state.groq_model:
-            st.session_state.groq_model = groq_model
-            AppConfig.DEFAULT_MODEL = groq_model
+                    if st.session_state.groq_model_tests:
+                        with st.expander("Groq model test results", expanded=False):
+                            for model_name, error_message in sorted(
+                                st.session_state.groq_model_tests.items()
+                            ):
+                                if error_message:
+                                    st.error(f"{model_name}: {error_message}")
+                                else:
+                                    st.success(f"{model_name}: OK")
+                else:
+                    groq_model = st.text_input("Groq Model", value=st.session_state.groq_model)
 
-        st.markdown(
-            "[Get a free Groq API key](https://console.groq.com/keys) to enable cloud models."
-        )
-        if not st.session_state.groq_api_key:
-            st.info("No Groq API key yet. Create one above and paste it here to unlock Groq models.")
-        if st.button("🔌 Test Groq Connection", width="stretch"):
-            ok = test_groq_connection(
-                st.session_state.groq_base_url,
-                st.session_state.groq_api_key,
-            )
-            if ok:
-                st.success("Groq connection OK.")
-            else:
-                st.error("Groq connection failed. Check your base URL and key.")
+                if groq_model != st.session_state.groq_model:
+                    st.session_state.groq_model = groq_model
+                    AppConfig.DEFAULT_MODEL = groq_model
 
-        st.divider()
-        st.markdown("### ✨ OpenAI")
-        openai_url = st.text_input("OpenAI Base URL", value=st.session_state.openai_base_url)
-        if openai_url != st.session_state.openai_base_url:
-            st.session_state.openai_base_url = openai_url
-            AppConfig.OPENAI_API_URL = openai_url
+                st.markdown(
+                    "[Get a free Groq API key](https://console.groq.com/keys) to enable cloud models."
+                )
+                if not st.session_state.groq_api_key:
+                    st.info("No Groq API key yet. Create one above and paste it here to unlock Groq models.")
+                if st.button("🔌 Test Groq Connection", width="stretch"):
+                    ok = test_groq_connection(
+                        st.session_state.groq_base_url,
+                        st.session_state.groq_api_key,
+                    )
+                    if ok:
+                        st.success("Groq connection OK.")
+                    else:
+                        st.error("Groq connection failed. Check your base URL and key.")
 
-        openai_key = st.text_input(
-            "OpenAI API Key",
-            value=st.session_state.openai_api_key,
-            type="password",
-            help="Required for OpenAI cloud models.",
-        )
-        if openai_key != st.session_state.openai_api_key:
-            st.session_state.openai_api_key = openai_key
-            AppConfig.OPENAI_API_KEY = openai_key
-        if not st.session_state.openai_api_key:
-            st.info("No OpenAI API key yet. Create one and paste it here to unlock OpenAI models.")
+        with provider_cols[1]:
+            with st.container(border=True):
+                st.markdown("### ✨ OpenAI")
+                openai_url = st.text_input("OpenAI Base URL", value=st.session_state.openai_base_url)
+                if openai_url != st.session_state.openai_base_url:
+                    st.session_state.openai_base_url = openai_url
+                    AppConfig.OPENAI_API_URL = openai_url
 
-        openai_model = st.text_input("OpenAI Model", value=st.session_state.openai_model)
-        if openai_model != st.session_state.openai_model:
-            st.session_state.openai_model = openai_model
-            AppConfig.OPENAI_MODEL = openai_model
+                openai_key = st.text_input(
+                    "OpenAI API Key",
+                    value=st.session_state.openai_api_key,
+                    type="password",
+                    help="Required for OpenAI cloud models.",
+                )
+                if openai_key != st.session_state.openai_api_key:
+                    st.session_state.openai_api_key = openai_key
+                    AppConfig.OPENAI_API_KEY = openai_key
+                if not st.session_state.openai_api_key:
+                    st.info("No OpenAI API key yet. Create one and paste it here to unlock OpenAI models.")
 
-        st.markdown(
-            "[Create an OpenAI account](https://platform.openai.com/api-keys) to get an API key."
-        )
+                openai_model = st.text_input("OpenAI Model", value=st.session_state.openai_model)
+                if openai_model != st.session_state.openai_model:
+                    st.session_state.openai_model = openai_model
+                    AppConfig.OPENAI_MODEL = openai_model
 
-        colm1, colm2 = st.columns([1, 1])
-        with colm1:
-            st.checkbox("Auto-save", key="auto_save")
-        with colm2:
-            if st.button("↻ Refresh Groq Models", width="stretch"):
-                st.cache_data.clear()
-                refresh_models()
-                st.toast("Model list refreshed")
+                st.markdown(
+                    "[Create an OpenAI account](https://platform.openai.com/api-keys) to get an API key."
+                )
 
-        if st.button("💾 Save AI Settings", width="stretch"):
-            save_app_settings()
+        with st.container(border=True):
+            st.markdown("### ✅ Actions")
+            action_cols = st.columns(3)
+            with action_cols[0]:
+                st.checkbox("Auto-save", key="auto_save")
+            with action_cols[1]:
+                if st.button("↻ Refresh Groq Models", width="stretch"):
+                    st.cache_data.clear()
+                    refresh_models()
+                    st.toast("Model list refreshed")
+            with action_cols[2]:
+                if st.button("💾 Save AI Settings", width="stretch"):
+                    save_app_settings()
 
     with st.sidebar:
         st.markdown(f"""
