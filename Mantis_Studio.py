@@ -663,14 +663,14 @@ class Project:
             if match:
                 raw_text = match.group(1).strip()
                 split_text = re.split(r" [-–:] ", raw_text, 1)
-                final_title = split_text[0].strip()
+                final_title = sanitize_chapter_title(split_text[0].strip())
                 if len(final_title) > 2:
                     title = final_title
 
         c = Chapter(
             id=str(uuid.uuid4()),
             index=index,
-            title=(title or "").strip(),
+            title=sanitize_chapter_title(title),
             content=content or "",
             target_words=self.default_word_count,
         )
@@ -701,6 +701,7 @@ class Project:
             if not content.strip():
                 continue
             title = headers[i].strip() if i < len(headers) else f"Chapter {i+1}"
+            title = sanitize_chapter_title(title)
             self.add_chapter(title, content.strip())
             count += 1
         return count
@@ -1188,6 +1189,17 @@ def project_to_markdown(project: Project) -> str:
     return "\n".join(md)
 
 
+def sanitize_chapter_title(title: str) -> str:
+    raw = (title or "").strip()
+    if not raw:
+        return ""
+    clean = raw.replace("“", "").replace("”", "").replace("’", "")
+    clean = clean.replace('"', "").replace("'", "")
+    clean = re.sub(r"^\*+|\*+$", "", clean).strip()
+    clean = re.sub(r"\s{2,}", " ", clean).strip()
+    return clean
+
+
 # ============================================================
 # 5) STREAMLIT UI (Appearance + First-time Onboarding)
 # ============================================================
@@ -1205,6 +1217,34 @@ def _run_ui():
         if issue_count <= 2:
             return "🟡", "Minor Canon Drift"
         return "🔴", "High Canon Risk"
+
+    def detect_hard_canon_violation(project: Project, chapter_index: int, new_text: str) -> List[Dict[str, Any]]:
+        hard_rules = (project.memory_hard or project.memory or "").strip()
+        if not hard_rules or not (new_text or "").strip():
+            return []
+        if not AppConfig.GROQ_API_KEY or not get_ai_model():
+            return []
+        compiled_world_bible = "\n".join(
+            f"{e.name} ({e.category}): {e.description}"
+            for e in project.world_db.values()
+        )
+        chapters_payload = [
+            {
+                "chapter_index": chapter_index,
+                "summary": "",
+                "excerpt": (new_text or "")[:800],
+            }
+        ]
+        results = AnalysisEngine.coherence_check(
+            memory=hard_rules,
+            author_note="",
+            style_guide="",
+            outline=project.outline or "",
+            world_bible=compiled_world_bible,
+            chapters=chapters_payload,
+            model=get_ai_model(),
+        )
+        return results or []
 
     def render_privacy():
         st.markdown("## Privacy Policy\n\nLocal-only storage. No analytics.")
@@ -1431,8 +1471,8 @@ def _run_ui():
         align-items:center;
     }}
     .mantis-header-logo {{
-        width:72px;
-        height:72px;
+        width:88px;
+        height:88px;
         border-radius:18px;
         background: rgba(0,0,0,0.35);
         display:flex;
@@ -1444,7 +1484,7 @@ def _run_ui():
             0 0 18px rgba(34,197,94,0.45);
     }}
     .mantis-header-logo img {{
-        height:48px;
+        height:60px;
         width:auto;
         padding:0;
         border-radius:0;
@@ -1634,8 +1674,8 @@ def _run_ui():
         box-shadow: var(--mantis-shadow-button);
     }}
     .mantis-sidebar-logo{{
-        width:56px;
-        height:56px;
+        width:70px;
+        height:70px;
         border-radius: 14px;
         background: var(--mantis-sidebar-logo-bg);
         display:flex;
@@ -1646,7 +1686,7 @@ def _run_ui():
         flex: 0 0 auto;
     }}
     .mantis-sidebar-logo img{{
-        height:38px;
+        height:48px;
         width:auto;
         display:block;
     }}
@@ -1954,6 +1994,7 @@ def _run_ui():
                     placeholder="e.g. alex",
                 )
                 password = st.text_input("Password", type="password", key="auth_login_password")
+                st.checkbox("Stay logged in", value=st.session_state.remember_me, key="remember_me")
                 if st.button("Sign In", width="stretch"):
                     result = authenticate_user(username, password)
                     if not result.get("ok"):
@@ -2568,7 +2609,58 @@ def _run_ui():
                 if not st.session_state.openai_api_key:
                     st.info("No OpenAI API key yet. Create one and paste it here to unlock OpenAI models.")
 
-                openai_model = st.text_input("OpenAI Model", value=st.session_state.openai_model)
+                if st.button("↻ Fetch OpenAI Models", width="stretch"):
+                    models, error_message = fetch_openai_models(
+                        st.session_state.openai_base_url,
+                        st.session_state.openai_api_key,
+                    )
+                    if models:
+                        st.session_state.openai_model_list = models
+                        st.session_state.openai_model_tests = {}
+                        st.toast(f"Loaded {len(models)} models.")
+                    else:
+                        st.session_state.openai_model_list = []
+                        st.session_state.openai_model_tests = {}
+                        st.error(f"Model fetch failed. {error_message or 'Check the base URL and key.'}")
+
+                if st.session_state.openai_model_list:
+                    models = st.session_state.openai_model_list
+                    idx = 0
+                    if st.session_state.openai_model in models:
+                        idx = models.index(st.session_state.openai_model)
+                    openai_model = st.selectbox("OpenAI Model", models, index=idx)
+
+                    if st.button("🧪 Test All OpenAI Models", width="stretch"):
+                        results = {}
+                        total = len(models)
+                        progress = st.progress(0)
+                        for i, model_name in enumerate(models, start=1):
+                            ok, error_message = test_openai_model(
+                                st.session_state.openai_base_url,
+                                st.session_state.openai_api_key,
+                                model_name,
+                            )
+                            results[model_name] = "" if ok else error_message
+                            progress.progress(i / total)
+                        st.session_state.openai_model_tests = results
+                        failures = [m for m, err in results.items() if err]
+                        if failures:
+                            st.warning(f"{len(failures)} models failed. Expand results for details.")
+                        else:
+                            st.success("All models responded successfully.")
+
+                    if st.session_state.openai_model_tests:
+                        with st.expander("OpenAI model test results", expanded=False):
+                            for model_name, error_message in sorted(
+                                st.session_state.openai_model_tests.items()
+                            ):
+                                if error_message:
+                                    st.error(f"{model_name}: {error_message}")
+                                else:
+                                    st.success(f"{model_name}: OK")
+                else:
+                    openai_model = st.text_input("OpenAI Model", value=st.session_state.openai_model)
+
                 if openai_model != st.session_state.openai_model:
                     st.session_state.openai_model = openai_model
                     AppConfig.OPENAI_MODEL = openai_model
@@ -2576,6 +2668,15 @@ def _run_ui():
                 st.markdown(
                     "[Create an OpenAI account](https://platform.openai.com/api-keys) to get an API key."
                 )
+                if st.button("🔌 Test OpenAI Connection", width="stretch"):
+                    ok = test_openai_connection(
+                        st.session_state.openai_base_url,
+                        st.session_state.openai_api_key,
+                    )
+                    if ok:
+                        st.success("OpenAI connection OK.")
+                    else:
+                        st.error("OpenAI connection failed. Check your base URL and key.")
 
         with st.container(border=True):
             st.markdown("### ✅ Actions")
@@ -2838,52 +2939,6 @@ def _run_ui():
                         st.session_state.page = "outline"
                         st.rerun()
 
-        with st.container(border=True):
-            st.markdown("### 🧭 Getting started")
-            completed_steps = sum([has_project, has_outline, has_chapter])
-            progress = completed_steps / 3
-            st.progress(progress, text=f"{completed_steps}/3 steps complete")
-
-            onboarding_text = """
-**MANTIS** mirrors a focused studio: a clean writing surface, memory tools,
-and quick start modules so you can draft fast and refine later.
-
-**Quick path**
-1) Create a project  
-2) Build a structured outline or lore entries  
-3) Draft chapters with AI assists on demand
-"""
-            if st.session_state.get("first_run", True):
-                st.markdown(onboarding_text)
-                c1, c2, c3 = st.columns([1, 1, 2])
-                with c1:
-                    if st.button("✅ Got it", type="primary", width="stretch"):
-                        st.session_state.first_run = False
-                        st.rerun()
-                with c2:
-                    if st.button("📌 Keep showing", width="stretch"):
-                        st.toast("Welcome panel will keep showing.")
-                with c3:
-                    st.caption("Tip: If the AI model shows Offline, confirm your Groq API key and model access.")
-
-            cta_label = "🧭 Start a project"
-            cta_target = "projects"
-            if has_project and not has_outline:
-                cta_label = "📝 Draft your outline"
-                cta_target = "outline"
-            elif has_outline and not has_chapter:
-                cta_label = "▶ Write your first chapter"
-                cta_target = "chapters"
-            elif canon_icon == "🔴":
-                cta_label = "🛠 Review canon issues"
-                cta_target = "world"
-
-            if st.button(cta_label, type="primary", width="stretch"):
-                if recent_projects and not st.session_state.project:
-                    st.session_state.project = Project.load(recent_projects[0]["path"])
-                st.session_state.page = cta_target
-                st.rerun()
-
         if not st.session_state.groq_api_key or not st.session_state.openai_api_key:
             with st.container(border=True):
                 st.markdown("### 🔑 Connect your AI providers")
@@ -2968,9 +3023,14 @@ and quick start modules so you can draft fast and refine later.
                     if st.button("Import & Analyze", width="stretch"):
                         p = Project.create("Imported Project", storage_dir=get_active_projects_dir())
                         p.import_text_file(txt)
+                        if AppConfig.GROQ_API_KEY and get_ai_model():
+                            with st.spinner("Reviewing document and generating outline..."):
+                                p.outline = StoryEngine.reverse_engineer_outline(p, get_ai_model())
+                        else:
+                            st.warning("Add a Groq API key and model to auto-generate an outline.")
                         p.save()
                         st.session_state.project = p
-                        st.session_state.page = "chapters"
+                        st.session_state.page = "outline"
                         st.session_state.first_run = False
                         st.rerun()
 
@@ -3082,19 +3142,11 @@ and quick start modules so you can draft fast and refine later.
                     p.outline = val
                     save_p()
 
-                b1, b2 = st.columns([1, 1])
-                with b1:
-                    if st.button("💾 Save Outline", width="stretch"):
-                        p.save()
-                        # Automatically scan entities on save so World Bible stays in sync.
-                        extract_entities_ui(p.outline or "", "Outline")
-                        st.toast("Outline Saved & Entities Scanned")
-                with b2:
-                    if st.button("🔄 Reverse Outline", width="stretch"):
-                        p.outline = StoryEngine.reverse_engineer_outline(p, get_ai_model())
-                        st.session_state["_outline_sync"] = p.outline or ""  # apply on next rerun before widget renders
-                        save_p()
-                        st.rerun()
+                if st.button("💾 Save Outline", width="stretch"):
+                    p.save()
+                    # Automatically scan entities on save so World Bible stays in sync.
+                    extract_entities_ui(p.outline or "", "Outline")
+                    st.toast("Outline Saved & Entities Scanned")
 
         with right:
             with st.container(border=True):
@@ -3640,6 +3692,37 @@ and quick start modules so you can draft fast and refine later.
                                     update_locked_chapters()
                                     st.toast("Applied fix.")
                                     st.rerun()
+                                elif target_excerpt:
+                                    content = target_chapter.content or ""
+                                    cleaned_excerpt = target_excerpt.strip()
+                                    if cleaned_excerpt:
+                                        pattern = re.sub(r"\s+", r"\\s+", re.escape(cleaned_excerpt))
+                                        match = re.search(pattern, content, flags=re.DOTALL)
+                                        if match:
+                                            updated = (
+                                                content[: match.start()]
+                                                + (issue.get("suggested_rewrite", "") or "")
+                                                + content[match.end() :]
+                                            )
+                                            target_chapter.update_content(updated, "Coherence Fix")
+                                            p.save()
+                                            results.pop(idx)
+                                            st.session_state["coherence_results"] = results
+                                            update_locked_chapters()
+                                            st.toast("Applied fix.")
+                                            st.rerun()
+                                elif issue.get("suggested_rewrite"):
+                                    insertion = issue.get("suggested_rewrite", "").strip()
+                                    if insertion:
+                                        spacer = "\n\n" if (target_chapter.content or "").strip() else ""
+                                        updated = f"{(target_chapter.content or '').rstrip()}{spacer}{insertion}"
+                                        target_chapter.update_content(updated, "Coherence Fix (Appended)")
+                                        p.save()
+                                        results.pop(idx)
+                                        st.session_state["coherence_results"] = results
+                                        update_locked_chapters()
+                                        st.toast("Applied fix (appended).")
+                                        st.rerun()
                                 else:
                                     st.warning("Target excerpt not found in chapter content.")
                         with a2:
@@ -3817,7 +3900,7 @@ and quick start modules so you can draft fast and refine later.
                 raw = match.group(1).strip()
                 clean = re.split(r" [-–:] ", raw, 1)[0].strip()
                 if len(clean) > 2:
-                    curr.title = clean
+                    curr.title = sanitize_chapter_title(clean)
                     p.save()
 
         st.markdown("## Chapters")
@@ -3841,10 +3924,10 @@ and quick start modules so you can draft fast and refine later.
                     match = pat.search(p.outline or "")
                     if match:
                         raw = match.group(1).strip()
-                        title = re.split(r" [-–:] ", raw, 1)[0].strip()
+                        title = sanitize_chapter_title(re.split(r" [-–:] ", raw, 1)[0].strip())
                     else:
                         title = f"Chapter {next_idx}"
-                    p.add_chapter(title)
+                    p.add_chapter(sanitize_chapter_title(title))
                     p.save()
                     st.rerun()
 
