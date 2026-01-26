@@ -66,6 +66,17 @@ def _inject_styles() -> None:
             color: rgba(230, 240, 245, 0.72);
             margin: 4px 0 0 0;
         }
+        .mantis-page-title {
+            font-size: 26px;
+            font-weight: 700;
+            margin: 0;
+            color: #f8fafc;
+        }
+        .mantis-page-sub {
+            color: rgba(230, 240, 245, 0.72);
+            margin-top: 4px;
+            font-size: 14px;
+        }
         .mantis-legal-card {
             padding: 18px 20px;
             border-radius: 16px;
@@ -109,18 +120,26 @@ def main() -> None:
         if logo_b64
         else '<div class="mantis-legal-logo">🪲</div>'
     )
-    st.markdown(
-        f"""
-        <div class="mantis-legal-header">
-            {header_logo}
-            <div>
-                <div class="mantis-legal-title">Legal</div>
-                <div class="mantis-legal-subtitle">Policies and documentation for MANTIS Studio.</div>
+    header_cols = st.columns([3, 1])
+    with header_cols[0]:
+        st.markdown(
+            f"""
+            <div class="mantis-legal-header">
+                {header_logo}
+                <div>
+                    <div class="mantis-page-title">Legal</div>
+                    <div class="mantis-page-sub">Policies and documentation for MANTIS Studio.</div>
+                </div>
             </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+            """,
+            unsafe_allow_html=True,
+        )
+    with header_cols[1]:
+        if st.button("⬅ Back to Studio", use_container_width=True, key="legal_back"):
+            if hasattr(st, "switch_page"):
+                st.switch_page("Mantis_Studio.py")
+            else:
+                st.info("Use the sidebar to return to the studio.")
     st.markdown("")
     with st.container(border=True):
         st.markdown('<div class="mantis-legal-card">', unsafe_allow_html=True)

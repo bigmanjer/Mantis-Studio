@@ -31,7 +31,7 @@ import difflib
 import logging
 import shutil
 from dataclasses import dataclass, field, asdict, fields
-from typing import Dict, List, Optional, Any, Generator
+from typing import Dict, List, Optional, Any, Generator, Callable
 
 import requests
 # (UI-only imports are loaded inside _run_ui() so selftests can run without Streamlit installed.)
@@ -1268,6 +1268,34 @@ def _run_ui():
         st.session_state.delete_entity_id = None
     if "delete_entity_name" not in st.session_state:
         st.session_state.delete_entity_name = None
+    if "export_project_path" not in st.session_state:
+        st.session_state.export_project_path = None
+    if "world_search" not in st.session_state:
+        st.session_state.world_search = ""
+    if "world_search_pending" not in st.session_state:
+        st.session_state.world_search_pending = None
+    if "world_focus_entity" not in st.session_state:
+        st.session_state.world_focus_entity = None
+    if "world_focus_tab" not in st.session_state:
+        st.session_state.world_focus_tab = None
+    if "world_tabs" not in st.session_state:
+        st.session_state.world_tabs = "Characters"
+    if "world_bible_review" not in st.session_state:
+        st.session_state.world_bible_review = []
+    if "last_entity_scan" not in st.session_state:
+        st.session_state.last_entity_scan = None
+    if "locked_chapters" not in st.session_state:
+        st.session_state.locked_chapters = set()
+    if "_chapter_sync_id" not in st.session_state:
+        st.session_state._chapter_sync_id = None
+    if "_chapter_sync_text" not in st.session_state:
+        st.session_state._chapter_sync_text = None
+    if "curr_chap_id" not in st.session_state:
+        st.session_state.curr_chap_id = None
+    if "out_txt_project_id" not in st.session_state:
+        st.session_state.out_txt_project_id = None
+    if "_outline_sync" not in st.session_state:
+        st.session_state._outline_sync = None
     st.session_state.setdefault("canon_health_log", [])
 
     theme = st.session_state.ui_theme if st.session_state.ui_theme in ("Dark", "Light") else "Dark"
@@ -1577,6 +1605,23 @@ def _run_ui():
     }}
     .mantis-hero-sub {{
         color: var(--mantis-muted);
+        font-size: 14px;
+    }}
+    .mantis-page-header {{
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 12px;
+    }}
+    .mantis-page-title {{
+        font-size: 26px;
+        font-weight: 700;
+        margin: 0;
+        color: var(--mantis-text);
+    }}
+    .mantis-page-sub {{
+        color: var(--mantis-muted);
+        margin-top: 4px;
         font-size: 14px;
     }}
     .mantis-tag {{
@@ -1901,6 +1946,47 @@ def _run_ui():
 
     def get_active_projects_dir() -> str:
         return st.session_state.get("projects_dir") or AppConfig.PROJECTS_DIR
+
+    def load_project_safe(path: str, context: str = "project") -> Optional["Project"]:
+        try:
+            return Project.load(path)
+        except Exception:
+            logger.warning("Failed to load %s: %s", context, path, exc_info=True)
+            st.error("We couldn't open that project file. It may be missing or corrupted.")
+            return None
+
+    def render_page_header(
+        title: str,
+        subtitle: str,
+        primary_label: Optional[str] = None,
+        primary_action: Optional[Callable[[], None]] = None,
+        secondary_label: Optional[str] = None,
+        secondary_action: Optional[Callable[[], None]] = None,
+        tag: Optional[str] = None,
+        key_prefix: str = "page_header",
+    ) -> None:
+        with st.container(border=True):
+            left, right = st.columns([2.4, 1])
+            with left:
+                tag_html = f"<span class='mantis-tag'>{tag}</span>" if tag else ""
+                st.markdown(
+                    f"""
+                    <div class="mantis-page-header">
+                        <div>
+                            <div class="mantis-page-title">{title} {tag_html}</div>
+                            <div class="mantis-page-sub">{subtitle}</div>
+                        </div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+            with right:
+                if primary_label and primary_action:
+                    if st.button(primary_label, type="primary", use_container_width=True, key=f"{key_prefix}__primary"):
+                        primary_action()
+                if secondary_label and secondary_action:
+                    if st.button(secondary_label, use_container_width=True, key=f"{key_prefix}__secondary"):
+                        secondary_action()
 
     @st.cache_data(show_spinner=False)
     def _cached_models(base_url: str, api_key: str) -> List[str]:
@@ -2230,7 +2316,12 @@ def _run_ui():
         raw_text = text or ""
         p = st.session_state.project
 
-        ents = AnalysisEngine.extract_entities(raw_text, model)
+        try:
+            ents = AnalysisEngine.extract_entities(raw_text, model)
+        except Exception:
+            logger.warning("Entity extraction failed for %s", label, exc_info=True)
+            st.error("Entity scan failed. Please check your AI settings and try again.")
+            return
         total_detected = len(ents)
         added = 0
         matched = 0
@@ -2343,7 +2434,22 @@ def _run_ui():
         return
 
     def render_ai_settings():
-        section_header("AI Tools", "Connect providers, choose models, and validate access.")
+        def refresh_all_models() -> None:
+            st.cache_data.clear()
+            refresh_models()
+            refresh_openai_models()
+            st.toast("Model list refreshed")
+
+        render_page_header(
+            "AI Tools",
+            "Connect providers, choose models, and validate access.",
+            primary_label="💾 Save settings",
+            primary_action=save_app_settings,
+            secondary_label="↻ Refresh models",
+            secondary_action=refresh_all_models,
+            tag="Settings",
+            key_prefix="ai_header",
+        )
         if st.session_state.pop("ai_settings__flash", False):
             st.success("AI Settings opened. Update providers and models below.")
 
@@ -2719,7 +2825,10 @@ def _run_ui():
                 st.toast("Create or import a project to unlock this module.")
                 st.rerun()
             if recent_projects and not st.session_state.project:
-                st.session_state.project = Project.load(recent_projects[0]["path"])
+                loaded = load_project_safe(recent_projects[0]["path"], context="recent project")
+                if not loaded:
+                    return
+                st.session_state.project = loaded
             if focus_tab:
                 st.session_state.world_focus_tab = focus_tab
             st.session_state.page = target
@@ -2750,6 +2859,26 @@ def _run_ui():
                 st.switch_page("pages/legal.py")
                 return
             st.toast("Open the Legal page from the sidebar menu if it did not open.")
+
+        def open_primary_cta() -> None:
+            if primary_target == "chapters" and latest_chapter_id:
+                st.session_state.curr_chap_id = latest_chapter_id
+            open_recent_project(primary_target)
+
+        def open_new_project() -> None:
+            st.session_state.page = "projects"
+            st.rerun()
+
+        render_page_header(
+            "Dashboard",
+            "Your studio cockpit for progress, projects, and next steps.",
+            primary_label=primary_label,
+            primary_action=open_primary_cta,
+            secondary_label="➕ New project",
+            secondary_action=open_new_project,
+            tag="Workspace",
+            key_prefix="dashboard_header",
+        )
 
         hero_logo_bytes = load_asset_bytes("mantis_logo_trans.png")
         with st.container(border=True):
@@ -2856,16 +2985,20 @@ def _run_ui():
                     row = st.columns([2.2, 1, 1])
                     with row[0]:
                         if st.button(f"📂 {title}", use_container_width=True):
-                            st.session_state.project = Project.load(project_entry["path"])
-                            st.session_state.page = "chapters"
-                            st.rerun()
+                            loaded = load_project_safe(project_entry["path"], context="project")
+                            if loaded:
+                                st.session_state.project = loaded
+                                st.session_state.page = "chapters"
+                                st.rerun()
                     with row[1]:
                         st.caption(genre)
                     with row[2]:
                         if st.button("Open", use_container_width=True):
-                            st.session_state.project = Project.load(project_entry["path"])
-                            st.session_state.page = "chapters"
-                            st.rerun()
+                            loaded = load_project_safe(project_entry["path"], context="project")
+                            if loaded:
+                                st.session_state.project = loaded
+                                st.session_state.page = "chapters"
+                                st.rerun()
 
         with st.container(border=True):
             st.markdown("#### Utilities")
@@ -2918,19 +3051,33 @@ def _run_ui():
         active_dir = get_active_projects_dir()
         recent_projects = _load_recent_projects(active_dir, st.session_state.projects_refresh_token)
 
-        st.markdown("## Projects")
-        st.caption("Create, import, and manage your story worlds.")
+        def open_latest_project() -> None:
+            if not recent_projects:
+                st.toast("Complete the form below to create your first project.")
+                return
+            loaded = load_project_safe(recent_projects[0]["path"], context="recent project")
+            if not loaded:
+                return
+            st.session_state.project = loaded
+            st.session_state.page = "chapters"
+            st.session_state.first_run = False
+            st.rerun()
 
-        st.markdown(
-            """
-            <div class="mantis-section-header">
-                <div>
-                    <div class="mantis-section-title">Start a new project</div>
-                    <div class="mantis-hero-caption">Set a title, genre, and author details to build your base.</div>
-                </div>
-            </div>
-            """,
-            unsafe_allow_html=True,
+        primary_label = "Open latest project" if recent_projects else "Create your first project"
+        render_page_header(
+            "Projects",
+            "Create, import, and manage your story worlds.",
+            primary_label=primary_label,
+            primary_action=open_latest_project,
+            secondary_label="⬇️ Import draft",
+            secondary_action=lambda: st.toast("Use the importer below to bring in .txt or .md files."),
+            tag="Workspace",
+            key_prefix="projects_header",
+        )
+
+        section_header(
+            "Start a new project",
+            "Set a title, genre, and author details to build your base.",
         )
         with st.container(border=True):
             with st.form("new_project_form", clear_on_submit=False):
@@ -2959,16 +3106,9 @@ def _run_ui():
                     st.session_state.first_run = False
                     st.rerun()
 
-        st.markdown(
-            """
-            <div class="mantis-section-header">
-                <div>
-                    <div class="mantis-section-title">Import an existing draft</div>
-                    <div class="mantis-hero-caption">Upload a .txt or .md file to split into chapters.</div>
-                </div>
-            </div>
-            """,
-            unsafe_allow_html=True,
+        section_header(
+            "Import an existing draft",
+            "Upload a .txt or .md file to split into chapters.",
         )
         with st.container(border=True):
             uf = st.file_uploader("Upload file", type=["txt", "md"])
@@ -2982,30 +3122,28 @@ def _run_ui():
                 else:
                     txt = uf.read().decode("utf-8", errors="replace")
                     if st.button("Import & Analyze", use_container_width=True):
-                        p = Project.create("Imported Project", storage_dir=get_active_projects_dir())
-                        p.import_text_file(txt)
-                        if AppConfig.GROQ_API_KEY and get_ai_model():
-                            with st.spinner("Reviewing document and generating outline..."):
-                                p.outline = StoryEngine.reverse_engineer_outline(p, get_ai_model())
-                        else:
-                            st.warning("Add a Groq API key and model to auto-generate an outline.")
-                        p.save()
+                        try:
+                            p = Project.create("Imported Project", storage_dir=get_active_projects_dir())
+                            p.import_text_file(txt)
+                            if AppConfig.GROQ_API_KEY and get_ai_model():
+                                with st.spinner("Reviewing document and generating outline..."):
+                                    p.outline = StoryEngine.reverse_engineer_outline(p, get_ai_model())
+                            else:
+                                st.warning("Add a Groq API key and model to auto-generate an outline.")
+                            p.save()
+                        except Exception:
+                            logger.warning("Import failed for uploaded draft", exc_info=True)
+                            st.error("Import failed. Please check the file and try again.")
+                            return
                         _bump_projects_refresh()
                         st.session_state.project = p
                         st.session_state.page = "outline"
                         st.session_state.first_run = False
                         st.rerun()
 
-        st.markdown(
-            """
-            <div class="mantis-section-header">
-                <div>
-                    <div class="mantis-section-title">Your projects</div>
-                    <div class="mantis-hero-caption">Open, export, or clean up older drafts.</div>
-                </div>
-            </div>
-            """,
-            unsafe_allow_html=True,
+        section_header(
+            "Your projects",
+            "Open, export, or clean up older drafts.",
         )
         with st.container(border=True):
             if not recent_projects:
@@ -3021,10 +3159,12 @@ def _run_ui():
                         row1, row2, row3, row4 = st.columns([5, 2, 1.5, 1])
                         with row1:
                             if st.button(f"📂 {title}", key=f"open_{full}", use_container_width=True):
-                                st.session_state.project = Project.load(full)
-                                st.session_state.page = "chapters"
-                                st.session_state.first_run = False
-                                st.rerun()
+                                loaded = load_project_safe(full, context="project")
+                                if loaded:
+                                    st.session_state.project = loaded
+                                    st.session_state.page = "chapters"
+                                    st.session_state.first_run = False
+                                    st.rerun()
                         with row2:
                             st.caption(genre)
                         with row3:
@@ -3087,8 +3227,23 @@ def _run_ui():
 
     def render_outline():
         p = st.session_state.project
-        st.markdown("## Outline")
-        st.caption("Your blueprint. Generate structure, scan entities, and keep the story plan here.")
+        def save_outline_action() -> None:
+            p.save()
+            st.toast("Outline saved.")
+
+        def scan_outline_action() -> None:
+            extract_entities_ui(p.outline or "", "Outline")
+
+        render_page_header(
+            "Outline",
+            "Your blueprint. Generate structure, scan entities, and keep the story plan here.",
+            primary_label="💾 Save outline",
+            primary_action=save_outline_action,
+            secondary_label="🔍 Scan entities",
+            secondary_action=scan_outline_action,
+            tag="Project",
+            key_prefix="outline_header",
+        )
 
         # Keep the outline editor widget in sync when switching projects/pages
         if st.session_state.get("out_txt_project_id") != p.id:
@@ -3166,7 +3321,28 @@ def _run_ui():
 
     def render_world():
         p = st.session_state.project
-        section_header("World Bible", "Track canonical characters, locations, factions, and lore.")
+        def open_add_entity() -> None:
+            tab_label = st.session_state.get("world_tabs") or "Characters"
+            category_map = {
+                "Characters": "Character",
+                "Locations": "Location",
+                "Factions": "Faction",
+                "Lore": "Lore",
+            }
+            category = category_map.get(tab_label, "Character")
+            st.session_state[f"add_open_{category}"] = True
+            st.rerun()
+
+        render_page_header(
+            "World Bible",
+            "Track canonical characters, locations, factions, and lore.",
+            primary_label="➕ Add entity",
+            primary_action=open_add_entity,
+            secondary_label="🔍 Run scan",
+            secondary_action=lambda: extract_entities_ui(p.outline or "", "Outline"),
+            tag="Canon",
+            key_prefix="world_header",
+        )
 
         st.markdown(
             """
@@ -3579,7 +3755,7 @@ def _run_ui():
         elif selected_tab == "Locations":
             render_cat("Location")
         elif selected_tab == "Factions":
-            render_cat("Item")
+            render_cat("Faction")
         elif selected_tab == "Lore":
             render_cat("Lore")
         elif selected_tab == "Memory":
@@ -3854,9 +4030,37 @@ def _run_ui():
         p = st.session_state.project
         chaps = p.get_ordered_chapters()
 
+        def create_next_chapter() -> None:
+            next_idx = len(chaps) + 1 if chaps else 1
+            title = f"Chapter {next_idx}"
+            if p.outline:
+                pat = re.compile(rf"Chapter {next_idx}[:\\s]+(.*?)(?=\\n|$)", re.IGNORECASE)
+                match = pat.search(p.outline or "")
+                if match:
+                    raw = match.group(1).strip()
+                    title = sanitize_chapter_title(re.split(r" [-–:] ", raw, 1)[0].strip()) or title
+            p.add_chapter(title)
+            p.save()
+            st.rerun()
+
+        def go_to_outline() -> None:
+            st.session_state.page = "outline"
+            st.session_state._force_nav = True
+            st.rerun()
+
+        render_page_header(
+            "Editor",
+            "Write chapters, update summaries, and apply AI improvements.",
+            primary_label="➕ New chapter",
+            primary_action=create_next_chapter,
+            secondary_label="🧩 Go to outline",
+            secondary_action=go_to_outline,
+            tag="Drafting",
+            key_prefix="editor_header",
+        )
+
         if not chaps:
             with st.container(border=True):
-                section_header("Editor", "Draft chapters with AI assist and keep your draft organized.")
                 st.info("📭 No chapters yet.\n\nCreate your first chapter — or let MANTIS write one from your outline.")
                 c1, c2 = st.columns([1, 1])
                 with c1:
@@ -3895,8 +4099,6 @@ def _run_ui():
                 if len(clean) > 2:
                     curr.title = sanitize_chapter_title(clean)
                     p.save()
-
-        section_header("Editor", "Navigate on the left, write in the center, and use AI tools on the right.")
 
         col_nav, col_editor, col_ai = st.columns([1.05, 3.2, 1.25])
 
