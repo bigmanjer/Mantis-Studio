@@ -1945,6 +1945,16 @@ def _run_ui():
         st.session_state.auto_save = True
     if "ghost_text" not in st.session_state:
         st.session_state.ghost_text = ""
+    if "pending_improvement_text" not in st.session_state:
+        st.session_state.pending_improvement_text = ""
+    if "pending_improvement_meta" not in st.session_state:
+        st.session_state.pending_improvement_meta = {}
+    if "chapter_text_prev" not in st.session_state:
+        st.session_state.chapter_text_prev = {}
+    if "chapter_drafts" not in st.session_state:
+        st.session_state.chapter_drafts = []
+    if "editor_improve__copy_buffer" not in st.session_state:
+        st.session_state.editor_improve__copy_buffer = ""
     if "first_run" not in st.session_state:
         st.session_state.first_run = True
     if "is_premium" not in st.session_state:
@@ -4207,37 +4217,108 @@ def _run_ui():
                             p.save()
                             st.rerun()
 
+                def generate_improvement(style_choice, custom_instructions):
+                    prompt = rewrite_prompt(curr.content or "", style_choice, custom_instructions)
+                    full = ""
+                    for chunk in AIEngine().generate_stream(prompt, get_ai_model()):
+                        full += chunk
+                        stream_ph.markdown(f"**IMPROVING:**\n\n{full}")
+                    if full.strip().startswith("ERROR: Canon violation detected."):
+                        st.error("Canon violation detected. Resolve issues before generating AI content.")
+                        return ""
+                    violations = detect_hard_canon_violation(p, curr.index, full)
+                    if violations:
+                        results = st.session_state.get("coherence_results", [])
+                        results.extend(violations)
+                        st.session_state["coherence_results"] = results
+                        update_locked_chapters()
+                        st.warning("Hard Canon conflict detected. AI output was not applied.")
+                        return ""
+                    return full
+
                 with st.expander("✨ Modify / Improve Text"):
                     rewrite_locked = curr.index in locked_chapters
                     style = st.selectbox(
                         "How to improve?",
                         list(REWRITE_PRESETS.keys()),
                         disabled=rewrite_locked,
+                        key=f"editor_improve__style_{curr.id}",
                     )
                     cust = ""
                     if style == "Custom":
-                        cust = st.text_input("Instructions", disabled=rewrite_locked)
+                        cust = st.text_input(
+                            "Instructions",
+                            disabled=rewrite_locked,
+                            key=f"editor_improve__instructions_{curr.id}",
+                        )
                     if rewrite_locked:
                         st.caption("🔒 Rewrite tools are disabled for locked chapters.")
-                    if st.button("Apply Changes", use_container_width=True, disabled=rewrite_locked):
-                        prompt = rewrite_prompt(curr.content or "", style, cust)
-                        st.session_state.ghost_text = ""
-                        full = ""
-                        for chunk in AIEngine().generate_stream(prompt, get_ai_model()):
-                            full += chunk
-                            stream_ph.markdown(f"**IMPROVING:**\n\n{full}")
-                        if full.strip().startswith("ERROR: Canon violation detected."):
-                            st.error("Canon violation detected. Resolve issues before generating AI content.")
-                            return
-                        violations = detect_hard_canon_violation(p, curr.index, full)
-                        if violations:
-                            results = st.session_state.get("coherence_results", [])
-                            results.extend(violations)
-                            st.session_state["coherence_results"] = results
-                            update_locked_chapters()
-                            st.warning("Hard Canon conflict detected. AI output was not applied.")
-                            return
-                        st.session_state.ghost_text = full
+                    if st.button(
+                        "Generate Improvement",
+                        use_container_width=True,
+                        disabled=rewrite_locked,
+                        key=f"editor_improve__generate_{curr.id}",
+                    ):
+                        full = generate_improvement(style, cust)
+                        if full:
+                            st.session_state.pending_improvement_text = full
+                            st.session_state.pending_improvement_meta = {
+                                "mode": style,
+                                "custom": cust,
+                                "timestamp": time.time(),
+                                "chapter_id": curr.id,
+                            }
+                            st.rerun()
+
+                if st.button(
+                    "↩️ Undo last apply",
+                    use_container_width=True,
+                    key=f"editor_improve__undo_{curr.id}",
+                    help="Restore the previous chapter text, if available.",
+                ):
+                    prev = st.session_state.get("chapter_text_prev", {})
+                    if prev.get("chapter_id") == curr.id and prev.get("text") is not None:
+                        curr.update_content(prev.get("text") or "", "Undo Apply")
+                        p.save()
+                        st.session_state._chapter_sync_id = curr.id
+                        st.session_state._chapter_sync_text = prev.get("text") or ""
+                        st.toast("Previous chapter text restored.")
+                        st.rerun()
+                    else:
+                        st.info("No previous chapter text available to restore.")
+
+                chapter_drafts = [
+                    draft for draft in st.session_state.get("chapter_drafts", [])
+                    if draft.get("chapter_id") == curr.id
+                ]
+                if chapter_drafts:
+                    st.markdown("#### Draft Versions")
+                    for idx, draft in enumerate(chapter_drafts, start=1):
+                        label = f"Draft {idx} • {draft.get('mode', 'Improved')} • {time.strftime('%Y-%m-%d %H:%M', time.localtime(draft.get('timestamp', 0)))}"
+                        with st.expander(label):
+                            st.text_area(
+                                "Draft Text",
+                                draft.get("text", ""),
+                                height=200,
+                                disabled=True,
+                                key=f"editor_improve__draft_text_{curr.id}_{idx}",
+                            )
+                            if st.button(
+                                "Set as active",
+                                type="primary",
+                                use_container_width=True,
+                                key=f"editor_improve__set_active_{curr.id}_{idx}",
+                            ):
+                                st.session_state.chapter_text_prev = {
+                                    "chapter_id": curr.id,
+                                    "text": curr.content or "",
+                                }
+                                curr.update_content(draft.get("text", ""), "Draft Applied")
+                                p.save()
+                                st.session_state._chapter_sync_id = curr.id
+                                st.session_state._chapter_sync_text = draft.get("text", "")
+                                st.toast("Draft set as active.")
+                                st.rerun()
 
         with col_ai:
             with st.container(border=True):
@@ -4291,24 +4372,145 @@ def _run_ui():
                 else:
                     st.info("No summary yet. Click **Update Summary** to generate one.")
 
-        if st.session_state.ghost_text:
+        pending_text = st.session_state.get("pending_improvement_text") or ""
+        pending_meta = st.session_state.get("pending_improvement_meta") or {}
+        pending_for_chapter = pending_text and pending_meta.get("chapter_id") == curr.id
+        if pending_for_chapter:
             with st.container(border=True):
-                st.warning("⚠️ Pending AI Text generated (not inserted yet).")
-                g1, g2 = st.columns([1, 1])
-                with g1:
-                    if st.button("✅ Insert into Editor", type="primary", use_container_width=True):
-                        new_text = ((curr.content or "") + "\n" + (st.session_state.ghost_text or "")).strip()
-                        curr.update_content(new_text, "AI Insert")
-                        st.session_state.ghost_text = ""
-                        p.save()
+                st.markdown("### ✨ Review Changes")
+                diff_toggle = st.toggle(
+                    "Diff view",
+                    value=False,
+                    key=f"editor_improve__diff_toggle_{curr.id}",
+                    help="Show a unified diff instead of the full texts.",
+                )
+                col_left, col_right = st.columns(2)
+                if diff_toggle:
+                    diff_lines = difflib.unified_diff(
+                        (curr.content or "").splitlines(),
+                        (pending_text or "").splitlines(),
+                        fromfile="Original",
+                        tofile="Improved",
+                        lineterm="",
+                    )
+                    diff_text = "\n".join(diff_lines).strip() or "No differences found."
+                    with col_left:
+                        st.text_area(
+                            "Original",
+                            curr.content or "",
+                            height=260,
+                            disabled=True,
+                            key=f"editor_improve__original_{curr.id}",
+                        )
+                    with col_right:
+                        st.code(diff_text, language="diff")
+                else:
+                    with col_left:
+                        st.text_area(
+                            "Original",
+                            curr.content or "",
+                            height=260,
+                            disabled=True,
+                            key=f"editor_improve__original_{curr.id}",
+                        )
+                    with col_right:
+                        st.text_area(
+                            "Improved",
+                            pending_text or "",
+                            height=260,
+                            disabled=True,
+                            key=f"editor_improve__improved_{curr.id}",
+                        )
 
-                        st.session_state._chapter_sync_id = curr.id
-                        st.session_state._chapter_sync_text = new_text
+                apply_mode = st.selectbox(
+                    "Apply result as",
+                    [
+                        "Replace chapter",
+                        "Save as new draft/version",
+                        "Append to end (advanced)",
+                    ],
+                    key=f"editor_improve__apply_mode_{curr.id}",
+                )
 
+                b1, b2, b3, b4 = st.columns([1, 1, 1, 1])
+                with b1:
+                    if st.button(
+                        "Apply Changes",
+                        type="primary",
+                        use_container_width=True,
+                        key=f"editor_improve__apply_{curr.id}",
+                    ):
+                        if apply_mode == "Replace chapter":
+                            st.session_state.chapter_text_prev = {
+                                "chapter_id": curr.id,
+                                "text": curr.content or "",
+                            }
+                            new_text = pending_text or ""
+                            curr.update_content(new_text, "AI Improve")
+                            p.save()
+                            st.session_state._chapter_sync_id = curr.id
+                            st.session_state._chapter_sync_text = new_text
+                            st.toast("Chapter replaced with improved text.")
+                        elif apply_mode == "Save as new draft/version":
+                            draft_entry = {
+                                "chapter_id": curr.id,
+                                "text": pending_text or "",
+                                "mode": pending_meta.get("mode", "Improve"),
+                                "timestamp": time.time(),
+                            }
+                            st.session_state.chapter_drafts = (
+                                st.session_state.get("chapter_drafts", []) + [draft_entry]
+                            )
+                            st.toast("Saved as a new draft version.")
+                        else:
+                            st.session_state.chapter_text_prev = {
+                                "chapter_id": curr.id,
+                                "text": curr.content or "",
+                            }
+                            new_text = ((curr.content or "") + "\n" + (pending_text or "")).strip()
+                            curr.update_content(new_text, "AI Improve Append")
+                            p.save()
+                            st.session_state._chapter_sync_id = curr.id
+                            st.session_state._chapter_sync_text = new_text
+                            st.toast("Improved text appended to chapter.")
+
+                        st.session_state.pending_improvement_text = ""
+                        st.session_state.pending_improvement_meta = {}
                         st.rerun()
-                with g2:
-                    if st.button("🗑 Discard", use_container_width=True):
-                        st.session_state.ghost_text = ""
+                with b2:
+                    if st.button(
+                        "Copy Improved",
+                        use_container_width=True,
+                        key=f"editor_improve__copy_{curr.id}",
+                    ):
+                        st.session_state.editor_improve__copy_buffer = pending_text or ""
+                        st.toast("Improved text ready to copy (Ctrl/Cmd+C).")
+                with b3:
+                    if st.button(
+                        "Regenerate",
+                        use_container_width=True,
+                        key=f"editor_improve__regenerate_{curr.id}",
+                    ):
+                        regen_style = pending_meta.get("mode", "Improve Flow")
+                        regen_custom = pending_meta.get("custom", "")
+                        full = generate_improvement(regen_style, regen_custom)
+                        if full:
+                            st.session_state.pending_improvement_text = full
+                            st.session_state.pending_improvement_meta = {
+                                "mode": regen_style,
+                                "custom": regen_custom,
+                                "timestamp": time.time(),
+                                "chapter_id": curr.id,
+                            }
+                            st.rerun()
+                with b4:
+                    if st.button(
+                        "Discard",
+                        use_container_width=True,
+                        key=f"editor_improve__discard_{curr.id}",
+                    ):
+                        st.session_state.pending_improvement_text = ""
+                        st.session_state.pending_improvement_meta = {}
                         st.rerun()
 
     rendered_page = False
