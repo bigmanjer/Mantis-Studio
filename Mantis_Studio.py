@@ -3170,7 +3170,8 @@ def _run_ui():
                 st.caption(f"Canon health: {canon_icon} {canon_label}.")
 
         with st.container(border=True):
-            st.markdown("#### Recent projects")
+            st.markdown("#### My projects")
+            st.caption("Select a project to open and pick up where you left off.")
             if not recent_projects:
                 st.info("📭 No projects yet. Create one to get started.")
             else:
@@ -3187,7 +3188,7 @@ def _run_ui():
                     with row[1]:
                         st.caption(genre)
                     with row[2]:
-                        if st.button("Resume", use_container_width=True):
+                        if st.button("Open", use_container_width=True):
                             st.session_state.project = Project.load(project_entry["path"])
                             st.session_state.page = "chapters"
                             st.rerun()
