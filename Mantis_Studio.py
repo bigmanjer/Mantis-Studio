@@ -3009,7 +3009,7 @@ def _run_ui():
         recent_projects = _load_recent_projects(active_dir, st.session_state.projects_refresh_token)
         has_project = bool(recent_projects)
 
-        banner_bytes = load_asset_bytes("mantis_wordmark.png")
+        banner_bytes = load_asset_bytes("mantis_banner_dark.png")
         st.markdown('<div class="mantis-banner">', unsafe_allow_html=True)
         if banner_bytes:
             st.image(banner_bytes, use_container_width=True)
