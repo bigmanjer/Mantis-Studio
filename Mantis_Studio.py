@@ -44,19 +44,28 @@ import sys
 # ===== v45 BRANDING (SAFE, ORIGINAL TEMPLATE) =====
 import base64
 
-_MANTIS_LOGO_PATH = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)),
+_MANTIS_LOGO_CANDIDATES = [
+    "mantis_brand_logo.png",
     "mantis_logo_trans.png",
-)
+]
 
 def _mantis_logo_b64() -> str:
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    logo_path = ""
+    for candidate in _MANTIS_LOGO_CANDIDATES:
+        path = os.path.join(base_dir, candidate)
+        if os.path.exists(path):
+            logo_path = path
+            break
+    if not logo_path:
+        return ""
     try:
-        with open(_MANTIS_LOGO_PATH, "rb") as f:
+        with open(logo_path, "rb") as f:
             return base64.b64encode(f.read()).decode("utf-8")
     except Exception:
         logging.getLogger("MANTIS").warning(
             "Failed to load logo asset from %s",
-            _MANTIS_LOGO_PATH,
+            logo_path or "unknown",
             exc_info=True,
         )
         return ""
@@ -2726,8 +2735,6 @@ def _run_ui():
         st.caption(f"Signed in as **{st.session_state.auth_user}**")
         if st.session_state.auth_username and not st.session_state.auth_is_guest:
             st.caption(f"@{st.session_state.auth_username}")
-        if st.button("💾 Save Account", width="stretch"):
-            save_app_settings()
         if st.button("Sign out", width="stretch"):
             st.session_state.auth_user = None
             st.session_state.auth_user_id = None
