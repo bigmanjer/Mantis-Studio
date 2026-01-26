@@ -3782,7 +3782,7 @@ def _run_ui():
                                 e.aliases = [a.strip() for a in alias_text.split(",") if a.strip()]
                                 p.save()
 
-                            c2.caption("Enrichment is currently unavailable.")
+                            st.caption("Enrichment is currently unavailable.")
 
                             refs = mention_refs.get(e.id, [])
                             if refs:
