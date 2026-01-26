@@ -1254,6 +1254,7 @@ def sanitize_chapter_title(title: str) -> str:
 
 def _run_ui():
     import streamlit as st
+    from components.ui import card, section_header, primary_button, stat_tile
 
     def get_canon_health() -> tuple[str, str]:
         results = st.session_state.get("coherence_results", [])
@@ -1686,11 +1687,57 @@ def _run_ui():
         font-weight:700;
         margin-bottom: 6px;
     }}
+    .mantis-section-header {{
+        display:flex;
+        align-items:flex-end;
+        justify-content:space-between;
+        gap:16px;
+        margin: 6px 0 14px;
+    }}
+    .mantis-section-caption {{
+        color: var(--mantis-muted);
+        font-size: 13px;
+    }}
     .mantis-soft {{
         background: var(--mantis-surface-alt);
         border-radius: 16px;
         padding: 14px;
         border: 1px solid var(--mantis-card-border);
+    }}
+    .mantis-stat-tile {{
+        display:flex;
+        flex-direction:column;
+        gap:6px;
+        padding: 12px 14px;
+        border-radius: 16px;
+        background: var(--mantis-surface-alt);
+        border: 1px solid var(--mantis-card-border);
+    }}
+    .mantis-stat-icon {{
+        width: 30px;
+        height: 30px;
+        border-radius: 10px;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        background: var(--mantis-accent-soft);
+        border: 1px solid var(--mantis-accent-glow);
+        font-size: 14px;
+    }}
+    .mantis-stat-label {{
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--mantis-muted);
+    }}
+    .mantis-stat-value {{
+        font-size: 20px;
+        font-weight: 700;
+        color: var(--mantis-text);
+    }}
+    .mantis-stat-help {{
+        font-size: 12px;
+        color: var(--mantis-muted);
     }}
 
     /* --- SIDEBAR POLISH --- */
@@ -2887,8 +2934,7 @@ def _run_ui():
 
         header_cols = st.columns([2.2, 1])
         with header_cols[0]:
-            with st.container(border=True):
-                st.markdown("### 👋 Welcome back")
+            with card("👋 Welcome back"):
                 st.markdown(f"## {project_title}")
                 st.caption(latest_chapter_label)
                 if st.button(primary_label, type="primary", use_container_width=True):
@@ -3014,9 +3060,7 @@ def _run_ui():
                         st.rerun()
 
         if not st.session_state.groq_api_key or not st.session_state.openai_api_key:
-            with st.container(border=True):
-                st.markdown("### 🔑 Connect your AI providers")
-                st.caption("Unlock generation, summaries, and entity tools with API access.")
+            with card("🔑 Connect your AI providers", "Unlock generation, summaries, and entity tools with API access."):
                 cta_left, cta_right = st.columns(2)
                 with cta_left:
                     st.link_button("Create Groq Account", "https://console.groq.com/keys", use_container_width=True)
@@ -3253,8 +3297,7 @@ def _run_ui():
 
     def render_world():
         p = st.session_state.project
-        st.markdown("## World Bible")
-        st.caption("Track canonical characters, locations, factions, and lore.")
+        section_header("World Bible", "Track canonical characters, locations, factions, and lore.")
 
         st.markdown(
             """
@@ -3402,21 +3445,24 @@ def _run_ui():
         elif canon_icon == "🔴":
             canon_class = "risk"
 
-        with st.container(border=True):
+        with card("World overview", "Live status of your canon database."):
             top_cols = st.columns([1, 1, 1, 1, 1.2])
-            top_cols[0].metric("Total Entities", len(entries))
-            top_cols[1].metric("Orphaned", len(orphaned_ids))
-            top_cols[2].metric("Locked", len(locked_entities))
-            top_cols[3].metric(
-                "Last Scan",
-                time.strftime("%Y-%m-%d %H:%M", time.localtime(last_scan_ts)),
-            )
-            top_cols[4].markdown(
-                f"<div class='world-pill {canon_class}'>{canon_icon} {canon_label}</div>",
-                unsafe_allow_html=True,
-            )
+            with top_cols[0]:
+                stat_tile("Total entities", str(len(entries)), icon="📘")
+            with top_cols[1]:
+                stat_tile("Orphaned", str(len(orphaned_ids)), icon="🛰️")
+            with top_cols[2]:
+                stat_tile("Locked", str(len(locked_entities)), icon="🔒")
+            with top_cols[3]:
+                stat_tile(
+                    "Last scan",
+                    time.strftime("%Y-%m-%d %H:%M", time.localtime(last_scan_ts)),
+                    icon="🕒",
+                )
+            with top_cols[4]:
+                stat_tile("Canon health", f"{canon_icon} {canon_label}", icon="✅")
 
-        with st.container(border=True):
+        with card("Search & filters", "Refine by status, recency, or canon risk."):
             f1, f2, f3, f4 = st.columns([2.2, 1, 1, 1])
             with f1:
                 if st.session_state.get("world_search_pending"):
@@ -3439,9 +3485,7 @@ def _run_ui():
 
         review_queue = st.session_state.get("world_bible_review", [])
         if review_queue:
-            with st.container(border=True):
-                st.markdown("### 🔍 Review AI Suggestions")
-                st.caption("AI suggestions are queued for review. Apply to update canon.")
+            with card("🔍 Review AI Suggestions", "AI suggestions are queued for review. Apply to update canon."):
                 for idx, item in enumerate(list(review_queue)):
                     label = f"{item.get('name', 'Unnamed')} • {item.get('category', 'Lore')}"
                     expander_label = build_expander_label(label, str(idx))
@@ -3491,7 +3535,7 @@ def _run_ui():
         recent_cutoff = time.time() - (7 * 86400)
 
         def render_cat(category: str):
-            with st.container(border=True):
+            with card():
                 top = st.columns([1, 1.2, 1])
                 with top[0]:
                     st.markdown(f"### {category}")
