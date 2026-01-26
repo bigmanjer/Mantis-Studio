@@ -1743,6 +1743,10 @@ def _run_ui():
             "openai_model",
             AppConfig.OPENAI_MODEL,
         )
+    if "openai_model_list" not in st.session_state:
+        st.session_state.openai_model_list = []
+    if "openai_model_tests" not in st.session_state:
+        st.session_state.openai_model_tests = {}
     if "ui_theme" not in st.session_state:
         st.session_state.ui_theme = config_data.get("ui_theme", "Dark")
     if "groq_base_url" not in st.session_state:
@@ -2205,6 +2209,21 @@ def _run_ui():
         except Exception:
             return False
 
+    def test_openai_connection(base_url: str, api_key: str) -> bool:
+        headers = {}
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
+        try:
+            r = requests.get(
+                f"{base_url.rstrip('/')}/models",
+                headers=headers,
+                timeout=5,
+            )
+            r.raise_for_status()
+            return True
+        except Exception:
+            return False
+
     def fetch_groq_models(base_url: str, api_key: str) -> tuple[List[str], str]:
         headers = {}
         if api_key:
@@ -2222,7 +2241,46 @@ def _run_ui():
         except Exception as exc:
             return [], str(exc)
 
+    def fetch_openai_models(base_url: str, api_key: str) -> tuple[List[str], str]:
+        headers = {}
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
+        try:
+            r = requests.get(
+                f"{base_url.rstrip('/')}/models",
+                headers=headers,
+                timeout=10,
+            )
+            r.raise_for_status()
+            data = r.json()
+            models = [m.get("id") for m in data.get("data", []) if m.get("id")]
+            return models, ""
+        except Exception as exc:
+            return [], str(exc)
+
     def test_groq_model(base_url: str, api_key: str, model: str) -> tuple[bool, str]:
+        headers = {"Content-Type": "application/json"}
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
+        payload = {
+            "model": model,
+            "messages": [{"role": "user", "content": "ping"}],
+            "max_tokens": 1,
+            "temperature": 0,
+        }
+        try:
+            r = requests.post(
+                f"{base_url.rstrip('/')}/chat/completions",
+                headers=headers,
+                json=payload,
+                timeout=15,
+            )
+            r.raise_for_status()
+            return True, ""
+        except Exception as exc:
+            return False, str(exc)
+
+    def test_openai_model(base_url: str, api_key: str, model: str) -> tuple[bool, str]:
         headers = {"Content-Type": "application/json"}
         if api_key:
             headers["Authorization"] = f"Bearer {api_key}"
