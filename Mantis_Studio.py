@@ -39,7 +39,7 @@ import requests
 # (UI-only imports are loaded inside _run_ui() so selftests can run without Streamlit installed.)
 
 import sys
-from utils.navigation import get_nav_config
+from app.utils.navigation import get_nav_config
 
 
 # ===== v45 BRANDING (SAFE, ORIGINAL TEMPLATE) =====
@@ -1254,7 +1254,7 @@ def sanitize_chapter_title(title: str) -> str:
 
 def _run_ui():
     import streamlit as st
-    from components.ui import card, section_header, primary_button, stat_tile
+    from app.components.ui import card, section_header, primary_button, stat_tile
 
     def get_canon_health() -> tuple[str, str]:
         results = st.session_state.get("coherence_results", [])

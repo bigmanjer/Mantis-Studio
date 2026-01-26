@@ -42,3 +42,12 @@ Need help choosing a Groq model or tuning prompts? Tell me what you’re buildin
 - [Brand / IP clarity](legal/Brand_ip_Clarity.md)
 - [License](LICENSE.md)
 - [Trademark path](legal/Trademark_Path.md)
+
+## Assets
+
+- `mantis_logo_trans.png` is the active logo asset used by the app; unused full-size variants have been removed.
+
+## Repository layout (product-oriented)
+
+- `app/` houses reusable application code (components, services, UI, and utilities).
+- `pages/` remains at the repo root to support Streamlit multipage routing.
