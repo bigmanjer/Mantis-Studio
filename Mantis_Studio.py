@@ -29,8 +29,6 @@ import datetime
 import uuid
 import difflib
 import logging
-import hashlib
-import hmac
 import shutil
 from dataclasses import dataclass, field, asdict, fields
 from typing import Dict, List, Optional, Any, Generator
@@ -40,7 +38,7 @@ import requests
 
 import sys
 from app.utils.navigation import get_nav_config
-from app.utils.versioning import get_app_version
+from app.utils import auth
 
 
 # ===== v45 BRANDING (SAFE, ORIGINAL TEMPLATE) =====
@@ -60,12 +58,7 @@ class AppConfig:
     VERSION = get_app_version()
     PROJECTS_DIR = os.getenv("MANTIS_PROJECTS_DIR", "projects")
     BACKUPS_DIR = os.path.join(PROJECTS_DIR, ".backups")
-    USERS_DB_PATH = os.getenv(
-        "MANTIS_USERS_DB_PATH",
-        os.path.join(PROJECTS_DIR, ".mantis_users.json"),
-    )
     USERS_DIR = os.getenv("MANTIS_USERS_DIR", os.path.join(PROJECTS_DIR, "users"))
-    GUESTS_DIR = os.getenv("MANTIS_GUESTS_DIR", os.path.join(PROJECTS_DIR, "guests"))
     GROQ_API_URL = os.getenv("GROQ_API_URL", "https://api.groq.com/openai/v1")
     GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
     GROQ_TIMEOUT = int(os.getenv("GROQ_TIMEOUT", "300"))
@@ -88,7 +81,6 @@ class AppConfig:
 os.makedirs(AppConfig.PROJECTS_DIR, exist_ok=True)
 os.makedirs(AppConfig.BACKUPS_DIR, exist_ok=True)
 os.makedirs(AppConfig.USERS_DIR, exist_ok=True)
-os.makedirs(AppConfig.GUESTS_DIR, exist_ok=True)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("MANTIS")
@@ -115,31 +107,6 @@ def save_app_config(data: Dict[str, str]) -> None:
         logger.warning("Failed to save app config", exc_info=True)
 
 
-def _normalize_username(username: str) -> str:
-    return re.sub(r"\s+", "", (username or "").strip()).lower()
-
-
-def load_users_db() -> Dict[str, Dict[str, Any]]:
-    try:
-        with open(AppConfig.USERS_DB_PATH, "r", encoding="utf-8") as fh:
-            data = json.load(fh)
-            if isinstance(data, dict) and isinstance(data.get("users"), dict):
-                return data
-    except FileNotFoundError:
-        return {"users": {}}
-    except Exception:
-        logger.warning("Failed to load users database", exc_info=True)
-    return {"users": {}}
-
-
-def save_users_db(data: Dict[str, Dict[str, Any]]) -> None:
-    try:
-        with open(AppConfig.USERS_DB_PATH, "w", encoding="utf-8") as fh:
-            json.dump(data, fh, indent=2)
-    except Exception:
-        logger.warning("Failed to save users database", exc_info=True)
-
-
 def _truncate_prompt(prompt: str, limit: int) -> str:
     if not prompt:
         return prompt
@@ -147,23 +114,6 @@ def _truncate_prompt(prompt: str, limit: int) -> str:
         return prompt
     logger.warning("Prompt length %s exceeded limit %s; truncating", len(prompt), limit)
     return prompt[:limit]
-
-
-def _password_policy_error(password: str) -> Optional[str]:
-    if len(password or "") < 10:
-        return "Password must be at least 10 characters."
-    if not re.search(r"[A-Za-z]", password or "") or not re.search(r"\d", password or ""):
-        return "Password must include at least one letter and one number."
-    return None
-
-
-def _email_error(email: str) -> Optional[str]:
-    clean_email = (email or "").strip()
-    if not clean_email:
-        return "Email is required."
-    if not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", clean_email):
-        return "Enter a valid email address."
-    return None
 
 
 def _acquire_lock(lock_path: str, timeout: int, retry_sleep: float) -> bool:
@@ -196,109 +146,10 @@ def _release_lock(lock_path: str) -> None:
         pass
 
 
-def hash_password(password: str, salt: Optional[bytes] = None) -> Dict[str, str]:
-    if salt is None:
-        salt = os.urandom(16)
-    pw_hash = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, 120_000)
-    return {"salt": salt.hex(), "hash": pw_hash.hex()}
-
-
-def verify_password(password: str, salt_hex: str, hash_hex: str) -> bool:
-    try:
-        salt = bytes.fromhex(salt_hex)
-        expected = bytes.fromhex(hash_hex)
-    except ValueError:
-        return False
-    candidate = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, 120_000)
-    return hmac.compare_digest(candidate, expected)
-
-
-def create_user(username: str, display_name: str, email: str, password: str) -> Dict[str, Any]:
-    clean_username = _normalize_username(username)
-    display_name = (display_name or "").strip()
-    email = (email or "").strip().lower()
-    if not clean_username or not display_name or not password or not email:
-        return {"ok": False, "error": "All fields are required."}
-    email_error = _email_error(email)
-    if email_error:
-        return {"ok": False, "error": email_error}
-    policy_error = _password_policy_error(password)
-    if policy_error:
-        return {"ok": False, "error": policy_error}
-
-    data = load_users_db()
-    if clean_username in data["users"]:
-        return {"ok": False, "error": "That username is already taken."}
-    if any(user.get("email", "").lower() == email for user in data.get("users", {}).values()):
-        return {"ok": False, "error": "An account already exists for that email."}
-
-    creds = hash_password(password)
-    user_id = str(uuid.uuid4())
-    data["users"][clean_username] = {
-        "id": user_id,
-        "username": clean_username,
-        "display_name": display_name,
-        "email": email,
-        "password_hash": creds["hash"],
-        "password_salt": creds["salt"],
-        "created_at": time.time(),
-    }
-    save_users_db(data)
-    return {"ok": True, "user": data["users"][clean_username]}
-
-
-def reset_password(email: str, new_password: str) -> Dict[str, Any]:
-    clean_email = (email or "").strip().lower()
-    if not clean_email or not new_password:
-        return {"ok": False, "error": "Email and new password are required."}
-    email_error = _email_error(clean_email)
-    if email_error:
-        return {"ok": False, "error": email_error}
-    policy_error = _password_policy_error(new_password)
-    if policy_error:
-        return {"ok": False, "error": policy_error}
-
-    data = load_users_db()
-    match_key = None
-    for username_key, user in data.get("users", {}).items():
-        if user.get("email", "").lower() == clean_email:
-            match_key = username_key
-            break
-
-    if not match_key:
-        return {"ok": False, "error": "No account found for that email."}
-
-    creds = hash_password(new_password)
-    data["users"][match_key]["password_hash"] = creds["hash"]
-    data["users"][match_key]["password_salt"] = creds["salt"]
-    data["users"][match_key]["updated_at"] = time.time()
-    save_users_db(data)
-    return {"ok": True}
-
-
-def authenticate_user(username: str, password: str) -> Dict[str, Any]:
-    clean_username = _normalize_username(username)
-    data = load_users_db()
-    user = data.get("users", {}).get(clean_username)
-    if not user:
-        return {"ok": False, "error": "Username or password is incorrect."}
-
-    if not verify_password(password, user.get("password_salt", ""), user.get("password_hash", "")):
-        return {"ok": False, "error": "Username or password is incorrect."}
-
-    return {"ok": True, "user": user}
-
-
 def get_user_projects_dir(user_id: str) -> str:
     user_dir = os.path.join(AppConfig.USERS_DIR, user_id)
     os.makedirs(user_dir, exist_ok=True)
     return user_dir
-
-
-def get_guest_projects_dir(guest_id: str) -> str:
-    guest_dir = os.path.join(AppConfig.GUESTS_DIR, guest_id)
-    os.makedirs(guest_dir, exist_ok=True)
-    return guest_dir
 
 
 # ============================================================
@@ -1394,6 +1245,7 @@ def _run_ui():
     page_icon = str(icon_path) if icon_path.exists() else "🪲"
     st.set_page_config(page_title=AppConfig.APP_NAME, page_icon=page_icon, layout="wide")
 
+    user = auth.require_login()
     config_data = load_app_config()
 
     if "ui_theme" not in st.session_state:
@@ -1406,8 +1258,6 @@ def _run_ui():
         st.session_state.focus_minutes = int(config_data.get("focus_minutes", 25))
     if "activity_log" not in st.session_state:
         st.session_state.activity_log = list(config_data.get("activity_log", []))
-    if "remember_me" not in st.session_state:
-        st.session_state.remember_me = bool(config_data.get("remember_me", False))
     if "projects_refresh_token" not in st.session_state:
         st.session_state.projects_refresh_token = 0
     if "delete_project_path" not in st.session_state:
@@ -1870,6 +1720,19 @@ def _run_ui():
         width:auto;
         display:block;
     }}
+    .mantis-avatar {{
+        height:44px;
+        width:44px;
+        border-radius:50%;
+        background: var(--mantis-surface-alt);
+        color: var(--mantis-text);
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        font-weight:700;
+        font-size:0.9rem;
+        border: 1px solid var(--mantis-card-border);
+    }}
     .mantis-logo-fallback {{
         font-size: 0.95rem;
         font-weight: 700;
@@ -1943,14 +1806,8 @@ def _run_ui():
         unsafe_allow_html=True,
     )
 
-    if "auth_user" not in st.session_state:
-        st.session_state.auth_user = None
-    if "auth_user_id" not in st.session_state:
-        st.session_state.auth_user_id = None
-    if "auth_username" not in st.session_state:
-        st.session_state.auth_username = None
-    if "auth_is_guest" not in st.session_state:
-        st.session_state.auth_is_guest = False
+    if "user_id" not in st.session_state:
+        st.session_state.user_id = None
     if "projects_dir" not in st.session_state:
         st.session_state.projects_dir = None
     if "project" not in st.session_state:
@@ -2016,13 +1873,19 @@ def _run_ui():
     AppConfig.OPENAI_API_KEY = st.session_state.openai_api_key
     AppConfig.OPENAI_MODEL = st.session_state.openai_model
 
-    if st.session_state.auth_user and not st.session_state.projects_dir:
-        if st.session_state.auth_is_guest:
-            guest_id = st.session_state.get("guest_id") or st.session_state.auth_user_id or str(uuid.uuid4())
-            st.session_state.guest_id = guest_id
-            st.session_state.projects_dir = get_guest_projects_dir(guest_id)
-        elif st.session_state.auth_user_id:
-            st.session_state.projects_dir = get_user_projects_dir(st.session_state.auth_user_id)
+    user_id = auth.get_user_id(user)
+    if not user_id:
+        st.error("We could not determine a user identifier from your login. Please try again.")
+        auth.logout_button(key="auth_missing_user_id_logout")
+        st.stop()
+
+    if st.session_state.user_id != user_id:
+        st.session_state.user_id = user_id
+        st.session_state.projects_dir = get_user_projects_dir(user_id)
+        st.session_state.project = None
+        st.session_state.page = "home"
+    elif not st.session_state.projects_dir:
+        st.session_state.projects_dir = get_user_projects_dir(user_id)
 
     # Reliable navigation rerun (avoids Streamlit edge cases when returning early)
     if st.session_state.get("_force_nav"):
@@ -2068,227 +1931,9 @@ def _run_ui():
             "weekly_sessions_goal": int(st.session_state.weekly_sessions_goal),
             "focus_minutes": int(st.session_state.focus_minutes),
             "activity_log": list(st.session_state.activity_log),
-            "remember_me": bool(st.session_state.remember_me),
         }
         save_app_config(data)
         st.toast("Settings saved.")
-
-    def save_auth_remember(user: Optional[Dict[str, Any]], is_guest: bool, remember: bool, guest_id: str = ""):
-        data = dict(config_data)
-        if remember and user:
-            data.update(
-                {
-                    "remember_me": True,
-                    "remembered_username": user.get("username", ""),
-                    "remembered_user_id": user.get("id", ""),
-                    "remembered_display_name": user.get("display_name", ""),
-                    "remembered_is_guest": bool(is_guest),
-                    "remembered_guest_id": guest_id or "",
-                }
-            )
-        else:
-            data.update(
-                {
-                    "remember_me": False,
-                    "remembered_username": "",
-                    "remembered_user_id": "",
-                    "remembered_display_name": "",
-                    "remembered_is_guest": False,
-                    "remembered_guest_id": "",
-                }
-            )
-        config_data.clear()
-        config_data.update(data)
-        if "remember_me" not in st.session_state:
-            st.session_state.remember_me = bool(data.get("remember_me", False))
-        save_app_config(data)
-
-    def _restore_remembered_session() -> None:
-        if st.session_state.auth_user or not config_data.get("remember_me"):
-            return
-        if config_data.get("remembered_is_guest"):
-            guest_id = config_data.get("remembered_guest_id") or str(uuid.uuid4())
-            st.session_state.guest_id = guest_id
-            st.session_state.auth_user = config_data.get("remembered_display_name") or "Guest"
-            st.session_state.auth_user_id = guest_id
-            st.session_state.auth_username = "guest"
-            st.session_state.auth_is_guest = True
-            st.session_state.projects_dir = get_guest_projects_dir(guest_id)
-            return
-
-        username = config_data.get("remembered_username", "")
-        user_id = config_data.get("remembered_user_id", "")
-        if not username or not user_id:
-            save_auth_remember(None, False, False)
-            return
-
-        data = load_users_db()
-        user = data.get("users", {}).get(username)
-        if not user or user.get("id") != user_id:
-            save_auth_remember(None, False, False)
-            return
-
-        st.session_state.auth_user = user.get("display_name") or username
-        st.session_state.auth_user_id = user.get("id")
-        st.session_state.auth_username = user.get("username")
-        st.session_state.auth_is_guest = False
-        st.session_state.projects_dir = get_user_projects_dir(user.get("id", ""))
-
-    def render_auth():
-        saved_username = config_data.get("last_username", "")
-        hero_left, hero_right = st.columns([1.1, 1.3])
-        with hero_left:
-            st.markdown(
-                """
-                <div class="mantis-hero">
-                    <div class="mantis-tag">Welcome</div>
-                    <div class="mantis-hero-title">Enter your story studio</div>
-                    <div class="mantis-hero-sub">
-                        Start writing instantly. Sign in later to save and sync.
-                    </div>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
-            st.markdown(
-                """
-                <div class="mantis-soft">
-                    <div class="mantis-section-title">What you can do</div>
-                    <ul style="margin:0; padding-left:18px;">
-                        <li>Draft chapters with AI assist</li>
-                        <li>Build and maintain your World Bible</li>
-                        <li>Track goals and writing momentum</li>
-                    </ul>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
-
-        with hero_right:
-            st.markdown(
-                """
-                <div class="mantis-section-title">Account access</div>
-                <p class="mantis-muted" style="margin-top:0;">
-                    Choose how you want to start writing.
-                </p>
-                """,
-                unsafe_allow_html=True,
-            )
-            tabs = st.tabs(["Start Writing (Guest)", "Sign In", "Create Account"])
-
-            with tabs[0]:
-                st.caption("Guest mode lets you write immediately. Projects are not saved.")
-                if st.button("✍️ Start Writing (Guest)", type="primary", use_container_width=True):
-                    guest_id = st.session_state.get("guest_id") or str(uuid.uuid4())
-                    st.session_state.guest_id = guest_id
-                    st.session_state.auth_user = "Guest"
-                    st.session_state.auth_user_id = guest_id
-                    st.session_state.auth_username = "guest"
-                    st.session_state.auth_is_guest = True
-                    st.session_state.projects_dir = get_guest_projects_dir(guest_id)
-                    save_auth_remember(
-                        {
-                            "id": guest_id,
-                            "username": "guest",
-                            "display_name": "Guest",
-                        },
-                        True,
-                        st.session_state.remember_me,
-                        guest_id=guest_id,
-                    )
-                    st.session_state._force_nav = True
-                    st.rerun()
-
-            with tabs[1]:
-                username = st.text_input(
-                    "Username",
-                    value=saved_username,
-                    key="auth_login_username",
-                    placeholder="e.g. alex",
-                )
-                password = st.text_input("Password", type="password", key="auth_login_password")
-                st.checkbox("Stay logged in", value=st.session_state.remember_me, key="remember_me")
-                if st.button("Sign In", use_container_width=True):
-                    result = authenticate_user(username, password)
-                    if not result.get("ok"):
-                        st.error(result.get("error", "Sign in failed."))
-                    else:
-                        user = result["user"]
-                        st.session_state.auth_user = user["display_name"]
-                        st.session_state.auth_user_id = user["id"]
-                        st.session_state.auth_username = user["username"]
-                        st.session_state.auth_is_guest = False
-                        st.session_state.projects_dir = get_user_projects_dir(user["id"])
-                        save_auth_remember(user, False, st.session_state.remember_me)
-                        st.session_state._force_nav = True
-                        st.rerun()
-                with st.expander("Forgot password?"):
-                    st.caption("Reset locally using the email tied to your account.")
-                    reset_email = st.text_input(
-                        "Email",
-                        key="auth_reset_email",
-                        placeholder="e.g. alex@email.com",
-                    )
-                    reset_new_password = st.text_input(
-                        "New password",
-                        type="password",
-                        key="auth_reset_password",
-                    )
-                    reset_confirm = st.text_input(
-                        "Confirm new password",
-                        type="password",
-                        key="auth_reset_confirm",
-                    )
-                    if st.button("Reset password", use_container_width=True):
-                        if reset_new_password != reset_confirm:
-                            st.error("Passwords do not match.")
-                        else:
-                            reset_result = reset_password(reset_email, reset_new_password)
-                            if not reset_result.get("ok"):
-                                st.error(reset_result.get("error", "Password reset failed."))
-                            else:
-                                st.success("Password updated. You can now sign in.")
-
-            with tabs[2]:
-                display_name = st.text_input(
-                    "Display name",
-                    key="auth_create_display_name",
-                    placeholder="e.g. Alex Writer",
-                )
-                email = st.text_input(
-                    "Email",
-                    key="auth_create_email",
-                    placeholder="e.g. alex@email.com",
-                )
-                st.caption("We use email for account recovery. Google sign-in is coming soon.")
-                new_username = st.text_input("Username", key="auth_create_username", placeholder="e.g. alex")
-                new_password = st.text_input("Password", type="password", key="auth_create_password")
-                confirm_password = st.text_input("Confirm password", type="password", key="auth_create_confirm")
-                if st.button("Create Account", type="primary", use_container_width=True):
-                    if new_password != confirm_password:
-                        st.error("Passwords do not match.")
-                    else:
-                        email_error = _email_error(email)
-                        if email_error:
-                            st.error(email_error)
-                            return
-                        policy_error = _password_policy_error(new_password or "")
-                        if policy_error:
-                            st.error(policy_error)
-                        else:
-                            result = create_user(new_username, display_name, email, new_password)
-                            if not result.get("ok"):
-                                st.error(result.get("error", "Could not create account."))
-                            else:
-                                user = result["user"]
-                                st.session_state.auth_user = user["display_name"]
-                                st.session_state.auth_user_id = user["id"]
-                                st.session_state.auth_username = user["username"]
-                                st.session_state.auth_is_guest = False
-                                st.session_state.projects_dir = get_user_projects_dir(user["id"])
-                                save_auth_remember(user, False, st.session_state.remember_me)
-                                st.session_state._force_nav = True
-                                st.rerun()
 
     def _today_str() -> str:
         return datetime.date.today().isoformat()
@@ -2697,14 +2342,6 @@ def _run_ui():
         render_footer()
         return
 
-    if not st.session_state.auth_user:
-        _restore_remembered_session()
-    if not st.session_state.auth_user:
-        with key_scope("auth"):
-            render_auth()
-        render_footer()
-        return
-
     def render_ai_settings():
         section_header("AI Tools", "Connect providers, choose models, and validate access.")
         if st.session_state.pop("ai_settings__flash", False):
@@ -2941,20 +2578,32 @@ def _run_ui():
 
             st.markdown("---")
             st.markdown("### 👤 Account")
-            st.caption(f"Signed in as **{st.session_state.auth_user}**")
-            if st.session_state.auth_username and not st.session_state.auth_is_guest:
-                st.caption(f"@{st.session_state.auth_username}")
-            if st.button("Sign out", use_container_width=True):
-                st.session_state.auth_user = None
-                st.session_state.auth_user_id = None
-                st.session_state.auth_username = None
-                st.session_state.auth_is_guest = False
-                st.session_state.projects_dir = None
-                st.session_state.project = None
-                st.session_state.page = "home"
-                save_auth_remember(None, False, False)
-                st.session_state._force_nav = True
-                st.rerun()
+            account_cols = st.columns([1, 2.6])
+            display_name = auth.get_user_display_name(user)
+            email = auth.get_user_email(user)
+            avatar_url = auth.get_user_avatar_url(user)
+            with account_cols[0]:
+                if avatar_url:
+                    st.image(avatar_url, width=44)
+                else:
+                    st.markdown(
+                        f"<div class='mantis-avatar'>{auth.get_user_initials(user)}</div>",
+                        unsafe_allow_html=True,
+                    )
+            with account_cols[1]:
+                st.markdown(f"**{display_name}**")
+                if email:
+                    st.caption(email)
+                if auth.user_is_admin(user):
+                    st.caption("Admin")
+
+            manage_url = auth.get_manage_account_url(user)
+            if manage_url:
+                st.link_button("Manage account", manage_url, use_container_width=True)
+            auth.logout_button(
+                key="sidebar_logout",
+                extra_state_keys=["projects_dir", "project", "page", "_force_nav"],
+            )
 
             st.markdown("### 🎨 Appearance")
             st.selectbox("Theme", ["Dark", "Light"], key="ui_theme")
@@ -4658,17 +4307,7 @@ def run_selftest() -> int:
     print("[MANTIS SELFTEST]")
     try:
         os.makedirs(AppConfig.PROJECTS_DIR, exist_ok=True)
-        original_users_db = json.loads(json.dumps(load_users_db()))
-        test_username = f"selftest_{uuid.uuid4().hex[:8]}"
-        test_password = "Testpass1234"
-        user_result = create_user(test_username, "Self Test", "selftest@example.com", test_password)
-        if not user_result.get("ok"):
-            raise RuntimeError(f"User create failed: {user_result.get('error', 'unknown')}")
-        auth_result = authenticate_user(test_username, test_password)
-        if not auth_result.get("ok"):
-            raise RuntimeError(f"User auth failed: {auth_result.get('error', 'unknown')}")
-        user_id = auth_result["user"]["id"]
-        user_projects_dir = get_user_projects_dir(user_id)
+        user_projects_dir = get_user_projects_dir(f"selftest_{uuid.uuid4().hex[:8]}")
 
         p = Project.create("SELFTEST_PROJECT", author="MANTIS", genre="Test", storage_dir=user_projects_dir)
         p.outline = "Chapter 1: Test - This is a test outline."
@@ -4702,11 +4341,6 @@ def run_selftest() -> int:
                 shutil.rmtree(user_projects_dir)
         except OSError:
             logger.warning("Selftest cleanup failed for %s", user_projects_dir, exc_info=True)
-        try:
-            save_users_db(original_users_db)
-        except Exception:
-            logger.warning("Selftest cleanup failed for users DB", exc_info=True)
-
         print("SELFTEST RESULT: PASS")
         return 0
     except Exception as e:
