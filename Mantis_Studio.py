@@ -2707,6 +2707,8 @@ def _run_ui():
 
     def render_ai_settings():
         section_header("AI Tools", "Connect providers, choose models, and validate access.")
+        if st.session_state.pop("ai_settings__flash", False):
+            st.success("AI Settings opened. Update providers and models below.")
 
         status_cols = st.columns(3)
         with status_cols[0]:
@@ -3089,6 +3091,17 @@ def _run_ui():
                 st.toast("Select a project to export.")
                 st.rerun()
 
+        def open_ai_settings() -> None:
+            st.session_state.ai_settings__flash = True
+            st.session_state.page = "ai"
+            st.rerun()
+
+        def open_legal_page() -> None:
+            if hasattr(st, "switch_page"):
+                st.switch_page("pages/legal.py")
+                return
+            st.toast("Open the Legal page from the sidebar menu if it did not open.")
+
         hero_logo_bytes = load_asset_bytes("mantis_logo_trans.png")
         with st.container(border=True):
             hero_cols = st.columns([2.4, 1])
@@ -3101,7 +3114,19 @@ def _run_ui():
                         st.markdown("### M")
                 with text_col:
                     st.markdown("### MANTIS Studio")
-                    st.caption("Your writing cockpit — jump back in, track momentum, and move between tools.")
+                    st.markdown("#### About MANTIS")
+                    st.markdown("**A premium command deck for storytellers.**")
+                    st.markdown(
+                        """
+                        - AI-assisted drafting, summaries, and rewrite presets
+                        - World Bible to keep canon, characters, and lore aligned
+                        - Memory + insights to track momentum and continuity
+                        - Clean markdown exports for editors and collaborators
+                        """
+                    )
+                    st.caption("Built for writers who want clarity, speed, and control.")
+                    if st.button("Learn more", key="dashboard__about_learn_more"):
+                        open_legal_page()
             with hero_cols[1]:
                 st.markdown(
                     f"""
@@ -3112,29 +3137,6 @@ def _run_ui():
                     """,
                     unsafe_allow_html=True,
                 )
-
-        section_header("Quick actions", "Jump straight into your most-used tools.")
-        quick_row_one = st.columns(3)
-        with quick_row_one[0]:
-            if action_card("✍️ Editor", "Draft chapters and summaries.", help_text="Open the chapter editor."):
-                open_recent_project("chapters")
-        with quick_row_one[1]:
-            if action_card("📝 Outline", "Plan beats, arcs, and chapter flow."):
-                open_recent_project("outline")
-        with quick_row_one[2]:
-            if action_card("🌍 World Bible", "Characters, places, factions, lore."):
-                open_recent_project("world")
-
-        quick_row_two = st.columns(3)
-        with quick_row_two[0]:
-            if action_card("🧠 Memory", "Hard canon rules and guidelines."):
-                open_recent_project("world", focus_tab="Memory")
-        with quick_row_two[1]:
-            if action_card("📊 Insights", "Canon health and analytics."):
-                open_recent_project("world", focus_tab="Insights")
-        with quick_row_two[2]:
-            if action_card("⬇️ Export", "Download your project as markdown.", button_label="Export"):
-                open_export()
 
         header_cols = st.columns([2.2, 1])
         with header_cols[0]:
@@ -3169,6 +3171,29 @@ def _run_ui():
                     stat_tile("Writing streak", f"{_activity_streak()} days", icon="🔥")
                 st.caption(f"Canon health: {canon_icon} {canon_label}.")
 
+        section_header("Quick actions", "Jump straight into your most-used tools.")
+        quick_row_one = st.columns(3)
+        with quick_row_one[0]:
+            if action_card("✍️ Editor", "Draft chapters and summaries.", help_text="Open the chapter editor."):
+                open_recent_project("chapters")
+        with quick_row_one[1]:
+            if action_card("📝 Outline", "Plan beats, arcs, and chapter flow."):
+                open_recent_project("outline")
+        with quick_row_one[2]:
+            if action_card("🌍 World Bible", "Characters, places, factions, lore."):
+                open_recent_project("world")
+
+        quick_row_two = st.columns(3)
+        with quick_row_two[0]:
+            if action_card("🧠 Memory", "Hard canon rules and guidelines."):
+                open_recent_project("world", focus_tab="Memory")
+        with quick_row_two[1]:
+            if action_card("📊 Insights", "Canon health and analytics."):
+                open_recent_project("world", focus_tab="Insights")
+        with quick_row_two[2]:
+            if action_card("⬇️ Export", "Download your project as markdown.", button_label="Export"):
+                open_export()
+
         with st.container(border=True):
             st.markdown("#### My projects")
             st.caption("Select a project to open and pick up where you left off.")
@@ -3194,21 +3219,38 @@ def _run_ui():
                             st.rerun()
 
         with st.container(border=True):
-            st.markdown("#### Secondary actions")
-            st.caption("Need to update settings or review policies? Jump to the essentials.")
+            st.markdown("#### Utilities")
+            st.caption("Compact shortcuts to settings, docs, and policies.")
             s1, s2, s3 = st.columns(3)
             with s1:
-                if st.button("⚙️ AI Settings", use_container_width=True):
-                    st.session_state.page = "ai"
-                    st.rerun()
-            with s2:
-                st.link_button("📖 Help Docs", "https://github.com/bigmanjer/Mantis-Studio", use_container_width=True)
-            with s3:
-                st.link_button(
-                    "⚖️ Legal",
-                    "https://github.com/bigmanjer/Mantis-Studio/tree/main/legal",
+                st.markdown("**AI Settings**")
+                st.caption("Manage providers, models, and API access.")
+                if st.button(
+                    "⚙️ AI Settings",
+                    key="dashboard__utilities_ai_settings",
                     use_container_width=True,
+                    help="Jump to AI Tools to configure Groq/OpenAI.",
+                ):
+                    open_ai_settings()
+            with s2:
+                st.markdown("**Help Docs**")
+                st.caption("Guides, README notes, and updates.")
+                st.link_button(
+                    "📖 Help Docs",
+                    "https://github.com/bigmanjer/Mantis-Studio",
+                    use_container_width=True,
+                    help="Open the project documentation in a new tab.",
                 )
+            with s3:
+                st.markdown("**Legal**")
+                st.caption("Terms, privacy, and IP clarity.")
+                if st.button(
+                    "⚖️ Legal",
+                    key="dashboard__utilities_legal",
+                    use_container_width=True,
+                    help="Review policies and legal details.",
+                ):
+                    open_legal_page()
 
         if not st.session_state.groq_api_key or not st.session_state.openai_api_key:
             with card("🔑 Connect your AI providers", "Unlock generation, summaries, and entity tools with API access."):
