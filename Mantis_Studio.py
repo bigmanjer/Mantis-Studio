@@ -3758,13 +3758,12 @@ def _run_ui():
                         detail_suffix = f"{e.name} ({e.id})" if e.id else e.name
                         detail_label = build_expander_label("Details", detail_suffix)
                         with st.expander(detail_label, expanded=e.id == focus_entity):
-                            c1, c2 = st.columns([4, 1])
-                            new_desc = c1.text_area("Notes", e.description, key=f"desc_{e.id}", height=140)
+                            new_desc = st.text_area("Notes", e.description, key=f"desc_{e.id}", height=140)
                             if new_desc != e.description:
                                 e.description = new_desc
                                 p.save()
 
-                            alias_text = c1.text_input(
+                            alias_text = st.text_input(
                                 "Aliases (comma-separated)",
                                 value=", ".join(e.aliases or []),
                                 key=f"aliases_{e.id}",
