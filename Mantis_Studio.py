@@ -825,6 +825,7 @@ class Project:
             }
         if not isinstance(chapter_data, dict):
             chapter_data = {}
+        fallback_index = 1
         for k, v in chapter_data.items():
             clean = {key: val for key, val in v.items() if key in chap_fields}
             clean["id"] = clean.get("id") or k or str(uuid.uuid4())
