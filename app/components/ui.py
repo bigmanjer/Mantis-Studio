@@ -51,3 +51,16 @@ def stat_tile(label: str, value: str, helper: Optional[str] = None, icon: Option
         """,
         unsafe_allow_html=True,
     )
+
+
+def action_card(
+    title: str,
+    caption: str,
+    button_label: str = "Open",
+    key: Optional[str] = None,
+    help_text: Optional[str] = None,
+) -> bool:
+    with st.container(border=True):
+        st.markdown(f"### {title}")
+        st.caption(caption)
+        return st.button(button_label, key=key, use_container_width=True, help=help_text)
