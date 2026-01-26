@@ -3093,7 +3093,52 @@ def _run_ui():
                 st.toast("Select a project to export.")
                 st.rerun()
 
-        section_header("Dashboard", "Your writing cockpit — jump back in, track momentum, and move between tools.", tag="Home")
+        hero_logo_bytes = load_asset_bytes("mantis_logo_trans.png")
+        with st.container(border=True):
+            hero_cols = st.columns([2.4, 1])
+            with hero_cols[0]:
+                logo_col, text_col = st.columns([0.18, 0.82])
+                with logo_col:
+                    if hero_logo_bytes:
+                        st.image(hero_logo_bytes, width=64)
+                    else:
+                        st.markdown("### M")
+                with text_col:
+                    st.markdown("### MANTIS Studio")
+                    st.caption("Your writing cockpit — jump back in, track momentum, and move between tools.")
+            with hero_cols[1]:
+                st.markdown(
+                    f"""
+                    <div style="display:flex; gap:8px; justify-content:flex-end; flex-wrap:wrap;">
+                        <span class="mantis-pill">Workspace</span>
+                        <span class="mantis-pill">v{AppConfig.VERSION}</span>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+
+        section_header("Quick actions", "Jump straight into your most-used tools.")
+        quick_row_one = st.columns(3)
+        with quick_row_one[0]:
+            if action_card("✍️ Editor", "Draft chapters and summaries.", help_text="Open the chapter editor."):
+                open_recent_project("chapters")
+        with quick_row_one[1]:
+            if action_card("📝 Outline", "Plan beats, arcs, and chapter flow."):
+                open_recent_project("outline")
+        with quick_row_one[2]:
+            if action_card("🌍 World Bible", "Characters, places, factions, lore."):
+                open_recent_project("world")
+
+        quick_row_two = st.columns(3)
+        with quick_row_two[0]:
+            if action_card("🧠 Memory", "Hard canon rules and guidelines."):
+                open_recent_project("world", focus_tab="Memory")
+        with quick_row_two[1]:
+            if action_card("📊 Insights", "Canon health and analytics."):
+                open_recent_project("world", focus_tab="Insights")
+        with quick_row_two[2]:
+            if action_card("⬇️ Export", "Download your project as markdown.", button_label="Export"):
+                open_export()
 
         header_cols = st.columns([2.2, 1])
         with header_cols[0]:
@@ -3127,29 +3172,6 @@ def _run_ui():
                 with k4:
                     stat_tile("Writing streak", f"{_activity_streak()} days", icon="🔥")
                 st.caption(f"Canon health: {canon_icon} {canon_label}.")
-
-        section_header("Quick actions", "Jump straight into your most-used tools.")
-        quick_row_one = st.columns(3)
-        with quick_row_one[0]:
-            if action_card("✍️ Editor", "Draft chapters and summaries.", help_text="Open the chapter editor."):
-                open_recent_project("chapters")
-        with quick_row_one[1]:
-            if action_card("📝 Outline", "Plan beats, arcs, and chapter flow."):
-                open_recent_project("outline")
-        with quick_row_one[2]:
-            if action_card("🌍 World Bible", "Characters, places, factions, lore."):
-                open_recent_project("world")
-
-        quick_row_two = st.columns(3)
-        with quick_row_two[0]:
-            if action_card("🧠 Memory", "Hard canon rules and guidelines."):
-                open_recent_project("world", focus_tab="Memory")
-        with quick_row_two[1]:
-            if action_card("📊 Insights", "Canon health and analytics."):
-                open_recent_project("world", focus_tab="Insights")
-        with quick_row_two[2]:
-            if action_card("⬇️ Export", "Download your project as markdown.", button_label="Export"):
-                open_export()
 
         with st.container(border=True):
             st.markdown("#### Recent projects")
