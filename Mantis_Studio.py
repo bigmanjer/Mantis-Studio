@@ -804,11 +804,15 @@ class Project:
             if "category" not in v:
                 v["category"] = "Character"
             clean = {key: val for key, val in v.items() if key in ent_fields}
-            if "category" in clean:
-                clean["category"] = Project._normalize_category(clean["category"])
+            clean["id"] = clean.get("id") or k or str(uuid.uuid4())
+            clean["name"] = clean.get("name") or "Unknown"
+            clean["category"] = Project._normalize_category(clean.get("category", "Lore"))
             if "aliases" in clean and not isinstance(clean["aliases"], list):
                 clean["aliases"] = [str(clean["aliases"])]
-            proj.world_db[k] = Entity(**clean)
+            try:
+                proj.world_db[clean["id"]] = Entity(**clean)
+            except TypeError:
+                logger.warning("Skipping malformed entity entry: %s", k, exc_info=True)
 
         chap_fields = {f.name for f in fields(Chapter)}
         chapter_data = data.get("chapters") or {}
@@ -822,7 +826,18 @@ class Project:
             chapter_data = {}
         for k, v in chapter_data.items():
             clean = {key: val for key, val in v.items() if key in chap_fields}
-            proj.chapters[k] = Chapter(**clean)
+            clean["id"] = clean.get("id") or k or str(uuid.uuid4())
+            try:
+                clean_index = int(clean.get("index") or fallback_index)
+            except (TypeError, ValueError):
+                clean_index = fallback_index
+            clean["index"] = clean_index
+            clean["title"] = clean.get("title") or f"Chapter {clean_index}"
+            fallback_index = max(fallback_index, clean_index + 1)
+            try:
+                proj.chapters[clean["id"]] = Chapter(**clean)
+            except TypeError:
+                logger.warning("Skipping malformed chapter entry: %s", k, exc_info=True)
 
         proj.storage_dir = os.path.dirname(path)
         proj.filepath = path
@@ -3507,9 +3522,10 @@ def _run_ui():
 
                 if st.session_state.get(f"add_open_{category}", False):
                     with st.form(f"add_{category}"):
-                        n = st.text_input("Name")
-                        d = st.text_area("Description")
-                        a = st.text_input("Aliases (comma-separated)")
+                        cat_slug = re.sub(r"[^a-z0-9]+", "_", category.lower()).strip("_")
+                        n = st.text_input("Name", key=f"add_{cat_slug}_name")
+                        d = st.text_area("Description", key=f"add_{cat_slug}_desc")
+                        a = st.text_input("Aliases (comma-separated)", key=f"add_{cat_slug}_aliases")
                         s1, s2 = st.columns(2)
                         with s1:
                             ok = st.form_submit_button("Save", type="primary", use_container_width=True)
