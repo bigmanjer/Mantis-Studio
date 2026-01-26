@@ -7,7 +7,7 @@ MANTIS Studio uses Groq’s free online models via an OpenAI-compatible API.
 ### 1) Install dependencies
 
 ```bash
-pip install -r requirements.txt
+pip install -r app/requirements.txt
 ```
 
 ### 2) Set your Groq API key
@@ -42,3 +42,12 @@ Need help choosing a Groq model or tuning prompts? Tell me what you’re buildin
 - [Brand / IP clarity](legal/Brand_ip_Clarity.md)
 - [License](LICENSE.md)
 - [Trademark path](legal/Trademark_Path.md)
+
+## Assets
+
+- `NIS/mantis_logo_trans.png` is the active logo asset used by the app; unused full-size variants have been removed.
+
+## Repository layout (product-oriented)
+
+- `app/` houses reusable application code (components, services, UI, and utilities).
+- `pages/` remains at the repo root to support Streamlit multipage routing.
