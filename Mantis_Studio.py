@@ -1218,17 +1218,6 @@ def _run_ui():
             return "🟡", "Minor Canon Drift"
         return "🔴", "High Canon Risk"
 
-    def update_locked_chapters() -> None:
-        results = st.session_state.get("coherence_results", [])
-        locked = set()
-        for issue in results:
-            try:
-                chapter_idx = int(issue.get("chapter_index"))
-            except (TypeError, ValueError):
-                continue
-            locked.add(chapter_idx)
-        st.session_state["locked_chapters"] = locked
-
     def detect_hard_canon_violation(project: Project, chapter_index: int, new_text: str) -> List[Dict[str, Any]]:
         hard_rules = (project.memory_hard or project.memory or "").strip()
         if not hard_rules or not (new_text or "").strip():
@@ -3721,25 +3710,6 @@ def _run_ui():
                                     update_locked_chapters()
                                     st.toast("Applied fix.")
                                     st.rerun()
-                                elif target_excerpt:
-                                    content = target_chapter.content or ""
-                                    cleaned_excerpt = target_excerpt.strip()
-                                    if cleaned_excerpt:
-                                        pattern = re.sub(r"\s+", r"\\s+", re.escape(cleaned_excerpt))
-                                        match = re.search(pattern, content, flags=re.DOTALL)
-                                        if match:
-                                            updated = (
-                                                content[: match.start()]
-                                                + (issue.get("suggested_rewrite", "") or "")
-                                                + content[match.end() :]
-                                            )
-                                            target_chapter.update_content(updated, "Coherence Fix")
-                                            p.save()
-                                            results.pop(idx)
-                                            st.session_state["coherence_results"] = results
-                                            update_locked_chapters()
-                                            st.toast("Applied fix.")
-                                            st.rerun()
                                 elif issue.get("suggested_rewrite"):
                                     insertion = issue.get("suggested_rewrite", "").strip()
                                     if insertion:
