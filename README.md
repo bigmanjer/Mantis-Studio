@@ -45,7 +45,7 @@ Need help choosing a Groq model or tuning prompts? Tell me what you’re buildin
 
 ## Assets
 
-- `mantis_logo_trans.png` is the active logo asset used by the app; unused full-size variants have been removed.
+- Brand assets live in `assets/` and are used for the Streamlit icon, sidebar branding, and dashboard banner.
 
 ## Repository layout (product-oriented)
 

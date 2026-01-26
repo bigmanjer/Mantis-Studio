@@ -44,34 +44,6 @@ from app.utils.navigation import get_nav_config
 
 # ===== v45 BRANDING (SAFE, ORIGINAL TEMPLATE) =====
 import base64
-
-_MANTIS_LOGO_CANDIDATES = [
-    "mantis_brand_logo.png",
-    os.path.join("NIS", "mantis_logo_trans.png"),
-]
-
-def _mantis_logo_b64() -> str:
-    base_dir = os.path.dirname(os.path.abspath(__file__))
-    logo_path = ""
-    for candidate in _MANTIS_LOGO_CANDIDATES:
-        path = os.path.join(base_dir, candidate)
-        if os.path.exists(path):
-            logo_path = path
-            break
-    if not logo_path:
-        return ""
-    try:
-        with open(logo_path, "rb") as f:
-            return base64.b64encode(f.read()).decode("utf-8")
-    except Exception:
-        logging.getLogger("MANTIS").warning(
-            "Failed to load logo asset from %s",
-            logo_path or "unknown",
-            exc_info=True,
-        )
-        return ""
-
-_MANTIS_LOGO_B64 = _mantis_logo_b64()
 # ==================================================
 
 SELFTEST_MODE = "--selftest" in sys.argv
@@ -1256,10 +1228,34 @@ def sanitize_chapter_title(title: str) -> str:
 def _run_ui():
     import streamlit as st
     from contextlib import contextmanager
+    from pathlib import Path
     from app.components.ui import action_card, card, primary_button, section_header, stat_tile
 
     widget_counters: Dict[tuple, int] = {}
     key_prefix_stack: List[str] = []
+
+    ASSETS_DIR = Path(__file__).parent / "assets"
+
+    @st.cache_data(show_spinner=False)
+    def load_asset_bytes(filename: str) -> Optional[bytes]:
+        path = ASSETS_DIR / filename
+        if not path.exists():
+            return None
+        try:
+            return path.read_bytes()
+        except Exception:
+            logging.getLogger("MANTIS").warning(
+                "Failed to load asset %s",
+                path,
+                exc_info=True,
+            )
+            return None
+
+    def asset_base64(filename: str) -> str:
+        payload = load_asset_bytes(filename)
+        if not payload:
+            return ""
+        return base64.b64encode(payload).decode("utf-8")
 
     def _current_prefix() -> str:
         return "__".join(key_prefix_stack) or "global"
@@ -1393,7 +1389,9 @@ def _run_ui():
         st.markdown("---")
         st.caption("© MANTIS Studio")
 
-    st.set_page_config(page_title=AppConfig.APP_NAME, layout="wide")
+    icon_path = ASSETS_DIR / "mantis_logo_trans.png"
+    page_icon = str(icon_path) if icon_path.exists() else "🪲"
+    st.set_page_config(page_title=AppConfig.APP_NAME, page_icon=page_icon, layout="wide")
 
     config_data = load_app_config()
 
@@ -1871,6 +1869,11 @@ def _run_ui():
         width:auto;
         display:block;
     }}
+    .mantis-logo-fallback {{
+        font-size: 0.95rem;
+        font-weight: 700;
+        color: var(--mantis-sidebar-title);
+    }}
     .mantis-sidebar-title{{
         font-weight:800;
         font-size:14px;
@@ -1882,6 +1885,10 @@ def _run_ui():
         color: var(--mantis-muted);
         margin-top:2px;
         line-height:1.1;
+    }}
+    .mantis-banner img {{
+        max-height: 180px;
+        object-fit: contain;
     }}
 
     /* --- NAV RADIO STYLE --- */
@@ -1905,11 +1912,18 @@ def _run_ui():
     )
 
     # --- BRAND HEADER (UI only) ---
-    st.markdown(f"""
+    header_logo_b64 = asset_base64("mantis_logo_trans.png")
+    header_logo_html = (
+        f'<img src="data:image/png;base64,{header_logo_b64}" alt="MANTIS logo" />'
+        if header_logo_b64
+        else '<span class="mantis-logo-fallback">M</span>'
+    )
+    st.markdown(
+        f"""
         <div class="mantis-header">
             <div class="mantis-header-left">
                 <div class="mantis-header-logo">
-                    <img src="data:image/png;base64,{_MANTIS_LOGO_B64}" />
+                    {header_logo_html}
                 </div>
                 <div style="line-height:1.15;">
                     <div class="mantis-header-title">
@@ -1925,7 +1939,9 @@ def _run_ui():
                 <span class="mantis-pill">v{AppConfig.VERSION}</span>
             </div>
         </div>
-        """, unsafe_allow_html=True)
+        """,
+        unsafe_allow_html=True,
+    )
 
     if "auth_user" not in st.session_state:
         st.session_state.auth_user = None
@@ -2900,17 +2916,26 @@ def _run_ui():
 
     with st.sidebar:
         with key_scope("sidebar"):
-            st.markdown(f"""
+            sidebar_logo_b64 = asset_base64("mantis_logo_trans.png")
+            sidebar_logo_html = (
+                f'<img src="data:image/png;base64,{sidebar_logo_b64}" alt="MANTIS logo" />'
+                if sidebar_logo_b64
+                else '<span class="mantis-logo-fallback">MANTIS</span>'
+            )
+            st.markdown(
+                f"""
             <div class="mantis-sidebar-brand">
                 <div class="mantis-sidebar-logo">
-                    <img src="data:image/png;base64,{_MANTIS_LOGO_B64}" />
+                    {sidebar_logo_html}
                 </div>
                 <div>
-                    <div class="mantis-sidebar-title">MANTIS Studio</div>
-                    <div class="mantis-sidebar-sub">v{AppConfig.VERSION}</div>
+                    <div class="mantis-sidebar-title">MANTIS</div>
+                    <div class="mantis-sidebar-sub">Studio • v{AppConfig.VERSION}</div>
                 </div>
             </div>
-            """, unsafe_allow_html=True)
+            """,
+                unsafe_allow_html=True,
+            )
 
             st.markdown("---")
             st.markdown("### 👤 Account")
@@ -2983,6 +3008,7 @@ def _run_ui():
         active_dir = get_active_projects_dir()
         recent_projects = _load_recent_projects(active_dir, st.session_state.projects_refresh_token)
         has_project = bool(recent_projects)
+
         has_outline = any((p["meta"].get("outline") or "").strip() for p in recent_projects)
         has_chapter = any(
             (c.get("word_count") or 0) > 0
@@ -3055,7 +3081,52 @@ def _run_ui():
                 st.toast("Select a project to export.")
                 st.rerun()
 
-        section_header("Dashboard", "Your writing cockpit — jump back in, track momentum, and move between tools.", tag="Home")
+        hero_logo_bytes = load_asset_bytes("mantis_logo_trans.png")
+        with st.container(border=True):
+            hero_cols = st.columns([2.4, 1])
+            with hero_cols[0]:
+                logo_col, text_col = st.columns([0.18, 0.82])
+                with logo_col:
+                    if hero_logo_bytes:
+                        st.image(hero_logo_bytes, width=64)
+                    else:
+                        st.markdown("### M")
+                with text_col:
+                    st.markdown("### MANTIS Studio")
+                    st.caption("Your writing cockpit — jump back in, track momentum, and move between tools.")
+            with hero_cols[1]:
+                st.markdown(
+                    f"""
+                    <div style="display:flex; gap:8px; justify-content:flex-end; flex-wrap:wrap;">
+                        <span class="mantis-pill">Workspace</span>
+                        <span class="mantis-pill">v{AppConfig.VERSION}</span>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+
+        section_header("Quick actions", "Jump straight into your most-used tools.")
+        quick_row_one = st.columns(3)
+        with quick_row_one[0]:
+            if action_card("✍️ Editor", "Draft chapters and summaries.", help_text="Open the chapter editor."):
+                open_recent_project("chapters")
+        with quick_row_one[1]:
+            if action_card("📝 Outline", "Plan beats, arcs, and chapter flow."):
+                open_recent_project("outline")
+        with quick_row_one[2]:
+            if action_card("🌍 World Bible", "Characters, places, factions, lore."):
+                open_recent_project("world")
+
+        quick_row_two = st.columns(3)
+        with quick_row_two[0]:
+            if action_card("🧠 Memory", "Hard canon rules and guidelines."):
+                open_recent_project("world", focus_tab="Memory")
+        with quick_row_two[1]:
+            if action_card("📊 Insights", "Canon health and analytics."):
+                open_recent_project("world", focus_tab="Insights")
+        with quick_row_two[2]:
+            if action_card("⬇️ Export", "Download your project as markdown.", button_label="Export"):
+                open_export()
 
         header_cols = st.columns([2.2, 1])
         with header_cols[0]:
@@ -3089,29 +3160,6 @@ def _run_ui():
                 with k4:
                     stat_tile("Writing streak", f"{_activity_streak()} days", icon="🔥")
                 st.caption(f"Canon health: {canon_icon} {canon_label}.")
-
-        section_header("Quick actions", "Jump straight into your most-used tools.")
-        quick_row_one = st.columns(3)
-        with quick_row_one[0]:
-            if action_card("✍️ Editor", "Draft chapters and summaries.", help_text="Open the chapter editor."):
-                open_recent_project("chapters")
-        with quick_row_one[1]:
-            if action_card("📝 Outline", "Plan beats, arcs, and chapter flow."):
-                open_recent_project("outline")
-        with quick_row_one[2]:
-            if action_card("🌍 World Bible", "Characters, places, factions, lore."):
-                open_recent_project("world")
-
-        quick_row_two = st.columns(3)
-        with quick_row_two[0]:
-            if action_card("🧠 Memory", "Hard canon rules and guidelines."):
-                open_recent_project("world", focus_tab="Memory")
-        with quick_row_two[1]:
-            if action_card("📊 Insights", "Canon health and analytics."):
-                open_recent_project("world", focus_tab="Insights")
-        with quick_row_two[2]:
-            if action_card("⬇️ Export", "Download your project as markdown.", button_label="Export"):
-                open_export()
 
         with st.container(border=True):
             st.markdown("#### Recent projects")
