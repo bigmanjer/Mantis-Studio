@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 import streamlit as st
 
 from app.utils import auth
@@ -85,6 +86,24 @@ def _account_key(name: str) -> str:
     return f"account_{name}"
 
 
+# ---- Password reset cooldown (local, so it never crashes) ----
+_RESET_COOLDOWN_SECONDS = 60
+_RESET_TS_KEY = "pw_reset_last_sent_ts"
+
+
+def _reset_cooldown_remaining() -> int:
+    last = st.session_state.get(_RESET_TS_KEY)
+    if not last:
+        return 0
+    elapsed = time.time() - float(last)
+    remaining = int(max(0, _RESET_COOLDOWN_SECONDS - elapsed))
+    return remaining
+
+
+def _mark_reset_sent() -> None:
+    st.session_state[_RESET_TS_KEY] = time.time()
+
+
 def _return_to_studio(return_page: str) -> None:
     st.session_state["page"] = return_page or "home"
     if hasattr(st, "switch_page"):
@@ -120,6 +139,7 @@ def _render_login_tabs() -> None:
                 key=_account_key("login_password"),
             )
             submit = st.form_submit_button("Log in", use_container_width=True)
+
         if submit:
             if "@" not in email:
                 st.session_state["account_error"] = "Enter a valid email address."
@@ -134,7 +154,7 @@ def _render_login_tabs() -> None:
                     st.session_state["account_error"] = msg
 
         with st.expander("Forgot password?"):
-            remaining = auth.reset_cooldown_remaining()
+            remaining = _reset_cooldown_remaining()
             with st.form(_account_key("reset_form")):
                 reset_email = st.text_input(
                     "Email for reset link",
@@ -147,16 +167,22 @@ def _render_login_tabs() -> None:
                     use_container_width=True,
                     disabled=remaining > 0,
                 )
+
             if reset_submit:
                 if "@" not in reset_email:
                     st.session_state["account_error"] = "Enter a valid email address."
                 else:
                     ok, msg = auth.auth_request_password_reset(reset_email.strip().lower())
                     if ok:
+                        # Mark cooldown only after a successful request
+                        _mark_reset_sent()
                         st.session_state["account_notice"] = msg
                         st.session_state["auth_email"] = reset_email.strip().lower()
                     else:
                         st.session_state["account_error"] = msg
+                st.rerun()
+
+            remaining = _reset_cooldown_remaining()
             if remaining > 0:
                 st.caption(f"Resend available in {remaining}s.")
 
@@ -179,6 +205,7 @@ def _render_login_tabs() -> None:
                 key=_account_key("signup_password_confirm"),
             )
             submit = st.form_submit_button("Create account", use_container_width=True)
+
         if submit:
             if "@" not in email:
                 st.session_state["account_error"] = "Enter a valid email address."
@@ -190,6 +217,7 @@ def _render_login_tabs() -> None:
                 ok, msg = auth.auth_signup(email.strip().lower(), password)
                 if ok:
                     st.session_state["account_notice"] = msg
+                    st.session_state["auth_email"] = email.strip().lower()
                     st.rerun()
                 else:
                     st.session_state["account_error"] = msg
