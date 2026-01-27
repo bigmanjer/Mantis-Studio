@@ -13,7 +13,7 @@ import time
 import uuid
 from dataclasses import dataclass, field, fields
 from pathlib import Path
-from typing import Any, Callable, Dict, Generator, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 import requests
 
