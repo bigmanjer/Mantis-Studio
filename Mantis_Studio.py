@@ -3665,7 +3665,7 @@ def _run_ui():
         with st.container(border=True):
             st.markdown("#### Utilities")
             st.caption("Compact shortcuts to settings, docs, and policies.")
-            s1, s2, s3 = st.columns(3)
+            s1, s2 = st.columns(2)
             with s1:
                 st.markdown("**AI Settings**")
                 st.caption("Manage providers, models, and API access.")
@@ -3685,16 +3685,6 @@ def _run_ui():
                     use_container_width=True,
                     help="Open the project documentation in a new tab.",
                 )
-            with s3:
-                st.markdown("**Legal**")
-                st.caption("Terms, privacy, and IP clarity.")
-                if st.button(
-                    "⚖️ Legal",
-                    key="dashboard__utilities_legal",
-                    use_container_width=True,
-                    help="Review policies and legal details.",
-                ):
-                    open_legal_page()
 
         groq_key, _ = get_effective_key("groq", st.session_state.get("user_id"))
         openai_key, _ = get_effective_key("openai", st.session_state.get("user_id"))
