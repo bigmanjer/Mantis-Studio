@@ -7,10 +7,6 @@ from typing import List
 
 import streamlit as st
 
-LEGAL_DIR = Path(__file__).resolve().parents[1] / "legal"
-ASSETS_DIR = Path(__file__).resolve().parents[1] / "assets"
-LAST_UPDATED = date(2026, 1, 12)
-
 SECTIONS = [
     {"title": "Terms of Service", "filename": "terms.md", "updated": "2024-06-01"},
     {"title": "Privacy Policy", "filename": "privacy.md", "updated": "2024-06-01"},
@@ -20,6 +16,10 @@ SECTIONS = [
     {"title": "Brand IP Clarity", "filename": "Brand_ip_Clarity.md", "updated": "2024-06-01"},
     {"title": "Trademark Path", "filename": "Trademark_Path.md", "updated": "2024-06-01"},
 ]
+
+LEGAL_DIR = Path(__file__).resolve().parents[1] / "legal"
+ASSETS_DIR = Path(__file__).resolve().parents[1] / "assets"
+LAST_UPDATED = max(date.fromisoformat(section["updated"]) for section in SECTIONS)
 
 
 def _logo_base64() -> str:
@@ -238,5 +238,4 @@ def main() -> None:
     _render_footer()
 
 
-if __name__ == "__main__":
-    main()
+main()

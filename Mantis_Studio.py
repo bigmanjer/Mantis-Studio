@@ -1236,8 +1236,8 @@ def _run_ui():
     user = st.user
     config_data = load_app_config()
 
-    is_guest = not bool(user)
-    logged_in = bool(user)
+    logged_in = auth.is_authenticated()
+    is_guest = not logged_in
     st.session_state["guest_mode"] = is_guest
     if is_guest:
         st.session_state.setdefault("guest_session_id", uuid.uuid4().hex[:8])
@@ -1925,7 +1925,7 @@ def _run_ui():
         st.toast("Open the Legal page from the sidebar menu if it did not open.")
 
     GUEST_BANNER_TEXT = (
-        "Guest mode: creations are not saved. Create an account to save projects across devices."
+        "Guest mode: your creations won’t be saved unless you create an account."
     )
 
     def request_account_access(
@@ -1978,7 +1978,7 @@ def _run_ui():
             banner_cols = st.columns([1, 1])
             with banner_cols[0]:
                 if st.button(
-                    "Create account to save",
+                    "Create account",
                     type="primary",
                     use_container_width=True,
                     key=f"guest_banner_create_{context}",
@@ -1986,11 +1986,11 @@ def _run_ui():
                     request_account_access("signup", GUEST_BANNER_TEXT)
             with banner_cols[1]:
                 if st.button(
-                    "Enable cloud save",
+                    "Sign in",
                     use_container_width=True,
-                    key=f"guest_banner_cloud_{context}",
+                    key=f"guest_banner_signin_{context}",
                 ):
-                    request_account_access("enable_cloud_save", GUEST_BANNER_TEXT)
+                    request_account_access("signin", GUEST_BANNER_TEXT)
 
     def render_app_footer() -> None:
         render_footer(AppConfig.VERSION)
@@ -1998,9 +1998,9 @@ def _run_ui():
     if is_guest:
         user_id = f"guest_{st.session_state['guest_session_id']}"
     else:
-        user_id = auth.get_user_id(user)
+        user_id = auth.get_user_id_with_fallback(user)
         if not user_id:
-            st.error("We could not determine a user identifier from your login. Please try again.")
+            st.warning("We couldn't read a user identifier. Please sign in again.")
             auth.logout_button(key="auth_missing_user_id_logout")
             st.stop()
 
@@ -2861,6 +2861,17 @@ def _run_ui():
                 intent=st.session_state.get("auth_redirect_reason") or GUEST_BANNER_TEXT,
                 allow_guest=True,
             )
+            if auth.debug_auth_enabled():
+                st.markdown("### Debug auth")
+                st.code(
+                    {
+                        "user_keys": list(getattr(st.user, "keys", lambda: [])()),
+                        "user_id": auth.get_user_id_with_fallback(st.user),
+                        "user_display_name": auth.get_user_display_name(st.user),
+                        "user_email": auth.get_user_email(st.user),
+                    },
+                    language="json",
+                )
             return
 
         st.success("You're signed in.")
@@ -2887,6 +2898,18 @@ def _run_ui():
             key="account_logout",
             extra_state_keys=["projects_dir", "project", "page", "_force_nav"],
         )
+
+        if auth.debug_auth_enabled():
+            st.markdown("### Debug auth")
+            st.code(
+                {
+                    "user_keys": list(getattr(st.user, "keys", lambda: [])()),
+                    "user_id": auth.get_user_id_with_fallback(st.user),
+                    "user_display_name": auth.get_user_display_name(st.user),
+                    "user_email": auth.get_user_email(st.user),
+                },
+                language="json",
+            )
 
     def render_legal_redirect():
         render_page_header(
@@ -2931,18 +2954,18 @@ def _run_ui():
                 st.markdown("**Guest mode**")
                 st.caption("Projects and edits are not saved across devices.")
                 if st.button(
-                    "Create account to save",
+                    "Create account",
                     type="primary",
                     use_container_width=True,
                     key="sidebar_guest_create_account",
                 ):
                     request_account_access("signup", GUEST_BANNER_TEXT)
                 if st.button(
-                    "Enable cloud save",
+                    "Sign in",
                     use_container_width=True,
                     key="sidebar_guest_cloud_save",
                 ):
-                    request_account_access("enable_cloud_save", GUEST_BANNER_TEXT)
+                    request_account_access("signin", GUEST_BANNER_TEXT)
             else:
                 account_cols = st.columns([1, 2.6])
                 display_name = auth.get_user_display_name(user)

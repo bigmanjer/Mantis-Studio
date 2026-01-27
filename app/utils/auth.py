@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any, Dict, Iterable, Optional
 
+import hashlib
+
 import streamlit as st
 
 GOOGLE_ACCOUNT_URL = "https://myaccount.google.com/"
@@ -17,6 +19,12 @@ DEFAULT_SESSION_CLEAR_KEYS = (
     "page",
     "user_id",
     "auth_provider_hint",
+    "auth_redirect_reason",
+    "auth_redirect_action",
+    "auth_redirect_return_page",
+    "pending_action",
+    "guest_continue_action",
+    "guest_project",
 )
 
 
@@ -34,7 +42,9 @@ def get_current_user() -> Optional[Any]:
 
 def is_logged_in(user: Optional[Any] = None) -> bool:
     user = user or get_current_user()
-    return bool(user)
+    if not auth_is_configured():
+        return False
+    return bool(get_user_id(user))
 
 
 def auth_is_configured() -> bool:
@@ -213,8 +223,28 @@ def _render_recovery_links() -> None:
     )
 
 
+def _render_provider_cta(
+    label: str,
+    provider_key: str,
+    ready: bool,
+    *,
+    disabled_label: Optional[str] = None,
+    help_text: Optional[str] = None,
+    key: str,
+) -> None:
+    if ready:
+        _render_login_button(label, provider_key, disabled=False, key=key)
+        return
+    st.button(disabled_label or label, use_container_width=True, disabled=True, key=key)
+    if help_text:
+        st.caption(help_text)
+
+
 def is_authenticated() -> bool:
-    return bool(getattr(st, "user", None))
+    user = get_current_user()
+    if not auth_is_configured():
+        return False
+    return bool(get_user_id(user))
 
 
 def render_login_screen(intent: Optional[str] = None, allow_guest: bool = False) -> bool:
@@ -243,6 +273,17 @@ def render_login_screen(intent: Optional[str] = None, allow_guest: bool = False)
             border: 1px solid rgba(148, 163, 184, 0.2);
             background: rgba(15, 23, 42, 0.5);
         }
+        .mantis-auth-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            border-radius: 999px;
+            border: 1px solid rgba(120, 199, 190, 0.3);
+            background: rgba(15, 23, 42, 0.6);
+            font-size: 12px;
+            color: rgba(226, 232, 240, 0.85);
+        }
         </style>
         """,
         unsafe_allow_html=True,
@@ -252,7 +293,8 @@ def render_login_screen(intent: Optional[str] = None, allow_guest: bool = False)
         """
         <div class="mantis-auth-hero">
             <div class="mantis-auth-title">Create your MANTIS account</div>
-            <div class="mantis-auth-sub">Sync projects across devices, unlock cloud saves, and keep your drafts safe.</div>
+            <div class="mantis-auth-sub">Sign in to sync projects across devices, unlock cloud saves, and keep drafts safe.</div>
+            <div class="mantis-auth-pill">Guest mode stays open while you decide</div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -260,7 +302,7 @@ def render_login_screen(intent: Optional[str] = None, allow_guest: bool = False)
     if intent:
         st.info(intent)
     if allow_guest:
-        st.warning("Your creations will NOT be saved unless you create an account.")
+        st.warning("Guest mode is active. Your creations won’t be saved unless you create an account.")
     _render_login_error()
 
     providers = _get_providers()
@@ -293,39 +335,38 @@ def render_login_screen(intent: Optional[str] = None, allow_guest: bool = False)
         st.markdown('<div class="mantis-auth-card">', unsafe_allow_html=True)
         if not any([google_ready, microsoft_ready, apple_ready, other_provider]):
             st.caption("No sign-in providers are configured yet. You can continue in Guest mode.")
-        if google_ready:
-            _render_login_button(
-                "Continue with Google",
-                "google",
-                disabled=False,
-                key="login_google",
-            )
-        else:
-            st.caption("Admin hasn’t configured Google sign-in yet.")
-        if microsoft_ready:
-            _render_login_button(
-                "Continue with Microsoft",
-                "microsoft",
-                disabled=False,
-                key="login_microsoft",
-            )
-        else:
-            st.caption("Admin hasn’t configured Microsoft sign-in yet.")
-        if apple_ready:
-            _render_login_button(
-                "Continue with Apple",
-                "apple",
-                disabled=False,
-                key="login_apple",
-            )
-        else:
-            st.caption("Admin hasn’t configured Apple sign-in yet.")
+        _render_provider_cta(
+            "Continue with Google",
+            "google",
+            google_ready,
+            disabled_label="Continue with Google (admin setup required)",
+            help_text="Google sign-in isn’t configured yet.",
+            key="login_google",
+        )
+        _render_provider_cta(
+            "Continue with Microsoft",
+            "microsoft",
+            microsoft_ready,
+            disabled_label="Continue with Microsoft (admin setup required)",
+            help_text="Microsoft sign-in isn’t configured yet.",
+            key="login_microsoft",
+        )
+        _render_provider_cta(
+            "Continue with Apple",
+            "apple",
+            apple_ready,
+            disabled_label="Continue with Apple (coming soon)",
+            help_text="Apple sign-in can be enabled once credentials are added.",
+            key="login_apple",
+        )
         if other_provider:
             st.divider()
-            _render_login_button(
+            _render_provider_cta(
                 "Continue with other OIDC provider",
                 other_provider,
-                disabled=not _provider_is_configured(other_provider),
+                _provider_is_configured(other_provider),
+                disabled_label="Continue with other OIDC provider (admin setup required)",
+                help_text="This provider needs client credentials in secrets.",
                 key="login_other_oidc",
             )
         st.markdown("</div>", unsafe_allow_html=True)
@@ -365,8 +406,8 @@ def user_is_admin(user: Optional[Any] = None) -> bool:
 
 
 def require_login() -> Any:
-    user = st.user
-    if not user:
+    user = get_current_user()
+    if not is_authenticated():
         render_login_screen()
         st.stop()
     if not _user_is_allowed(user):
