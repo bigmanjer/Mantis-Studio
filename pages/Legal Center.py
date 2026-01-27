@@ -150,6 +150,7 @@ def _render_footer() -> None:
 
 def main() -> None:
     st.set_page_config(page_title="Legal • MANTIS Studio", layout="wide")
+    inject_theme()
     _inject_styles()
     logo_b64 = _logo_base64()
 
