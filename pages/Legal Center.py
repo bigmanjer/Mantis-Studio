@@ -7,6 +7,9 @@ from typing import List
 
 import streamlit as st
 
+from app.ui.theme import inject_theme
+from app.utils import ui_key
+
 SECTIONS = [
     {"title": "Terms of Service", "filename": "terms.md", "updated": "2024-06-01"},
     {"title": "Privacy Policy", "filename": "privacy.md", "updated": "2024-06-01"},
@@ -20,6 +23,10 @@ SECTIONS = [
 LEGAL_DIR = Path(__file__).resolve().parents[1] / "legal"
 ASSETS_DIR = Path(__file__).resolve().parents[1] / "assets"
 LAST_UPDATED = max(date.fromisoformat(section["updated"]) for section in SECTIONS)
+
+
+def _key(name: str) -> str:
+    return ui_key("legal", name)
 
 
 def _logo_base64() -> str:
@@ -133,7 +140,7 @@ def _render_footer() -> None:
     st.markdown("---")
     f1, f2 = st.columns([1, 1])
     with f1:
-        if st.button("⬅ Back to Studio", use_container_width=True, key="legal_footer_back"):
+        if st.button("⬅ Back to Studio", use_container_width=True, key=_key("footer_back")):
             if hasattr(st, "switch_page"):
                 st.switch_page("Mantis_Studio.py")
             else:
@@ -144,6 +151,7 @@ def _render_footer() -> None:
 
 def main() -> None:
     st.set_page_config(page_title="Legal • MANTIS Studio", layout="wide")
+    inject_theme()
     _inject_styles()
     logo_b64 = _logo_base64()
 
@@ -155,7 +163,7 @@ def main() -> None:
             "Legal sections",
             titles,
             label_visibility="collapsed",
-            key="legal__section_nav",
+            key=_key("section_nav"),
         )
 
     section = next((entry for entry in SECTIONS if entry["title"] == selected_title), SECTIONS[0])
@@ -202,7 +210,7 @@ def main() -> None:
             unsafe_allow_html=True,
         )
     with header_cols[1]:
-        if st.button("⬅ Back to Studio", use_container_width=True, key="legal_back"):
+        if st.button("⬅ Back to Studio", use_container_width=True, key=_key("back")):
             if hasattr(st, "switch_page"):
                 st.switch_page("Mantis_Studio.py")
             else:

@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import streamlit as st
 
-from app.utils import auth
+from app.ui.components import card_end, card_start, header_bar
+from app.ui.theme import inject_theme
+from app.utils import auth, ui_key
 
 
 def _inject_styles() -> None:
@@ -67,7 +69,7 @@ def _go_back_to_studio() -> None:
 
 
 def _key(name: str) -> str:
-    return f"account_{name}"
+    return ui_key("account", name)
 
 
 def _render_debug_panel() -> None:
@@ -97,8 +99,7 @@ def _render_login_ui() -> None:
     colA, colB = st.columns([1.2, 1], vertical_alignment="top")
 
     with colA:
-        st.markdown("<div class='mantis-card'>", unsafe_allow_html=True)
-        st.markdown("### Guest mode vs Account")
+        card_start("Guest mode vs Account")
         st.markdown(
             """
             <div class="mantis-grid">
@@ -118,10 +119,10 @@ def _render_login_ui() -> None:
             """,
             unsafe_allow_html=True,
         )
-        st.markdown("</div>", unsafe_allow_html=True)
+        card_end()
 
     with colB:
-        st.markdown("<div class='mantis-card'>", unsafe_allow_html=True)
+        card_start("Sign in or create an account")
         login_tab, signup_tab = st.tabs(["Log in", "Create account"])
 
         with login_tab:
@@ -199,7 +200,7 @@ def _render_login_ui() -> None:
                     st.session_state["account_error"] = msg
                 st.rerun()
 
-        st.markdown("</div>", unsafe_allow_html=True)
+        card_end()
 
 
 def _render_settings_ui(user: dict) -> None:
@@ -207,8 +208,7 @@ def _render_settings_ui(user: dict) -> None:
     email = auth.get_user_email(user)
     profile = auth.get_profile(user_id) or auth.ensure_profile(user) or {}
 
-    st.markdown("<div class='mantis-card'>", unsafe_allow_html=True)
-    st.markdown("### Profile & settings")
+    card_start("Profile & settings")
 
     notice = st.session_state.pop("account_notice", None)
     error = st.session_state.pop("account_error", None)
@@ -232,33 +232,21 @@ def _render_settings_ui(user: dict) -> None:
         st.rerun()
 
     auth.render_email_account_controls(email)
-    st.markdown("</div>", unsafe_allow_html=True)
+    card_end()
 
 
 def main() -> None:
     st.set_page_config(page_title="Account Access • MANTIS Studio", layout="wide")
+    inject_theme()
     _inject_styles()
 
-    st.markdown('<div class="mantis-wrap">', unsafe_allow_html=True)
-
-    top_l, top_r = st.columns([1, 1])
-    with top_l:
-        st.markdown('<div class="mantis-pill">🛡️ Secure account access · Supabase email/password</div>', unsafe_allow_html=True)
-    with top_r:
-        if st.button("← Back to Studio", use_container_width=True, key=_key("back_to_studio")):
-            _go_back_to_studio()
-
-    st.markdown(
-        """
-        <div class="mantis-hero">
-            <div class="mantis-title">Account Access</div>
-            <div class="mantis-sub">
-                Create a MANTIS account to unlock exports + cloud sync. Guest mode stays available for writing and drafting.
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
+    header_bar(
+        "Account Access",
+        "Create a MANTIS account to unlock exports + cloud sync. Guest mode stays available.",
+        pill="Secure access",
     )
+    if st.button("← Back to Studio", use_container_width=True, key=_key("back_to_studio")):
+        _go_back_to_studio()
 
     _render_debug_panel()
 
@@ -273,12 +261,9 @@ def main() -> None:
                 _go_back_to_studio()
         with cols[1]:
             auth.logout_button(label="Log out", key=_key("logout"), extra_state_keys=["page", "_force_nav"])
-        st.markdown("</div>", unsafe_allow_html=True)
         return
 
     _render_login_ui()
-
-    st.markdown("</div>", unsafe_allow_html=True)
 
 
 main()
