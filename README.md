@@ -47,6 +47,30 @@ your configured email/passwordless provider.
    - Multi-tenant: `https://login.microsoftonline.com/common/v2.0/.well-known/openid-configuration`
 4. Add the client ID and client secret to `.streamlit/secrets.toml` under `[auth.microsoft]`.
 
+### How to set up Keycloak OIDC (self-registration)
+1. In Keycloak Admin Console (Realm Settings → Login), enable:
+   - **User registration** (Register link on login screen).
+   - **Forgot password** (optional but recommended).
+   - **Verify email** (recommended).
+   - **Login with email** (optional).
+2. If you enable **Verify email** or **Forgot password**, configure SMTP under **Realm Settings → Email**.
+3. Create/verify a **confidential** Keycloak OIDC client:
+   - **Standard flow**: ON
+   - **Client authentication**: ON (so you have a `client_secret`)
+   - **Valid Redirect URIs**:
+     - `http://localhost:8501/oauth2callback`
+     - `https://mantis-studio.streamlit.app/oauth2callback`
+   - **Web Origins**:
+     - `http://localhost:8501`
+     - `https://mantis-studio.streamlit.app`
+4. Add a Keycloak provider block in `.streamlit/secrets.toml`:
+   ```toml
+   [auth.keycloak]
+   client_id = "mantis"
+   client_secret = "YOUR_CLIENT_SECRET"
+   server_metadata_url = "https://KEYCLOAK_HOST/realms/YOUR_REALM/.well-known/openid-configuration"
+   ```
+
 ### Apple Sign In (placeholder + future support)
 
 Streamlit-native OIDC does not ship with an Apple preset. To enable Apple, add a provider block
