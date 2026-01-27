@@ -1237,6 +1237,7 @@ def _run_ui():
     config_data = load_app_config()
 
     is_guest = not bool(user)
+    logged_in = bool(user)
     st.session_state["guest_mode"] = is_guest
     if is_guest:
         st.session_state.setdefault("guest_session_id", uuid.uuid4().hex[:8])
@@ -1927,14 +1928,26 @@ def _run_ui():
         "Guest mode: creations are not saved. Create an account to save projects across devices."
     )
 
-    def open_account_access(action: str, reason: str) -> None:
+    def request_account_access(
+        action: str,
+        reason: str,
+        *,
+        payload: Optional[Dict[str, Any]] = None,
+        return_to: Optional[str] = None,
+    ) -> None:
         st.session_state["auth_redirect_action"] = action
         st.session_state["auth_redirect_reason"] = reason
-        st.session_state["auth_redirect_return_page"] = st.session_state.get("page", "home")
+        st.session_state["auth_redirect_return_page"] = return_to or st.session_state.get("page", "home")
+        st.session_state.pending_action = {
+            "action": action,
+            "payload": payload or {},
+            "return_to": return_to or st.session_state.get("page", "home"),
+        }
         if hasattr(st, "switch_page"):
             st.switch_page("pages/account.py")
         else:
-            st.info("Account access is available from the sidebar.")
+            st.session_state.page = "account"
+            st.rerun()
 
     def persist_project(
         project: "Project",
@@ -1946,7 +1959,12 @@ def _run_ui():
             project.save()
             return True
         if prompt_on_guest:
-            open_account_access(action, GUEST_BANNER_TEXT)
+            normalized_action = "save_project" if action == "save" else action
+            request_account_access(
+                normalized_action,
+                GUEST_BANNER_TEXT,
+                return_to=st.session_state.get("page", "home"),
+            )
         else:
             project.last_modified = time.time()
         return False
@@ -1965,25 +1983,17 @@ def _run_ui():
                     use_container_width=True,
                     key=f"guest_banner_create_{context}",
                 ):
-                    open_account_access("signup", GUEST_BANNER_TEXT)
+                    request_account_access("signup", GUEST_BANNER_TEXT)
             with banner_cols[1]:
                 if st.button(
                     "Enable cloud save",
                     use_container_width=True,
                     key=f"guest_banner_cloud_{context}",
                 ):
-                    open_account_access("enable_cloud_save", GUEST_BANNER_TEXT)
+                    request_account_access("enable_cloud_save", GUEST_BANNER_TEXT)
 
-    def render_footer() -> None:
-        st.markdown("---")
-        f1, f2, f3 = st.columns([1.2, 1, 1])
-        with f1:
-            if st.button("Legal & Privacy", use_container_width=True, key="footer_legal"):
-                open_legal_page()
-        with f2:
-            st.caption(f"Version {AppConfig.VERSION}")
-        with f3:
-            st.caption("Built with Streamlit • MANTIS Studio")
+    def render_app_footer() -> None:
+        render_footer(AppConfig.VERSION)
 
     if is_guest:
         user_id = f"guest_{st.session_state['guest_session_id']}"
@@ -2022,31 +2032,34 @@ def _run_ui():
         if st.session_state.project and st.session_state.auto_save:
             persist_project(st.session_state.project)
 
-    def persist_project() -> bool:
-        if st.session_state.get("guest_mode"):
-            return False
-        if st.session_state.project:
-            st.session_state.project.save()
-            return True
-        return False
-
     def get_active_projects_dir() -> Optional[str]:
         if st.session_state.get("guest_mode"):
             return None
         return st.session_state.get("projects_dir") or AppConfig.PROJECTS_DIR
 
-    def queue_pending_action(action: str, payload: Optional[Dict[str, Any]] = None, return_to: str = "home") -> None:
+    def queue_pending_action(
+        action: str,
+        payload: Optional[Dict[str, Any]] = None,
+        return_to: str = "home",
+        reason: Optional[str] = None,
+    ) -> None:
         st.session_state.pending_action = {
             "action": action,
             "payload": payload or {},
             "return_to": return_to,
         }
-        st.session_state.page = "account"
-        st.rerun()
+        st.session_state["auth_redirect_action"] = action
+        st.session_state["auth_redirect_reason"] = reason or GUEST_BANNER_TEXT
+        st.session_state["auth_redirect_return_page"] = return_to
+        if hasattr(st, "switch_page"):
+            st.switch_page("pages/account.py")
+        else:
+            st.session_state.page = "account"
+            st.rerun()
 
     def require_account(action: str, payload: Optional[Dict[str, Any]] = None, return_to: str = "home") -> bool:
         if st.session_state.get("guest_mode"):
-            queue_pending_action(action, payload, return_to)
+            queue_pending_action(action, payload, return_to, reason=GUEST_BANNER_TEXT)
             return False
         return True
 
@@ -2113,22 +2126,6 @@ def _run_ui():
     if logged_in and st.session_state.get("pending_action"):
         resume_pending_action()
 
-    def render_guest_banner(current_page: str) -> None:
-        if not st.session_state.get("guest_mode"):
-            return
-        st.info(
-            "Guest mode: creations are not saved. Create an account to save projects across devices.",
-            icon="🧭",
-        )
-        cols = st.columns(2)
-        with cols[0]:
-            if st.button("Create free account", use_container_width=True, key=f"guest_signup_{current_page}"):
-                queue_pending_action("none", return_to=current_page)
-        with cols[1]:
-            if st.button("Continue as guest", use_container_width=True, key=f"guest_continue_{current_page}"):
-                if not st.session_state.project:
-                    st.session_state.project = st.session_state.guest_project or create_guest_project()
-                st.toast("Guest session active. Your work will not be saved.")
 
     def load_project_safe(path: str, context: str = "project") -> Optional["Project"]:
         try:
@@ -2834,7 +2831,7 @@ def _run_ui():
                 if is_guest:
                     st.checkbox("Auto-save (cloud)", key="auto_save", disabled=True)
                     if st.button("Enable cloud save", use_container_width=True, key="guest_enable_cloud_save"):
-                        open_account_access("enable_cloud_save", GUEST_BANNER_TEXT)
+                        request_account_access("enable_cloud_save", GUEST_BANNER_TEXT)
                 else:
                     st.checkbox("Auto-save", key="auto_save")
             with action_cols[1]:
@@ -2860,7 +2857,10 @@ def _run_ui():
             key_prefix="account_header",
         )
         if st.session_state.get("guest_mode"):
-            auth.render_login_screen()
+            auth.render_login_screen(
+                intent=st.session_state.get("auth_redirect_reason") or GUEST_BANNER_TEXT,
+                allow_guest=True,
+            )
             return
 
         st.success("You're signed in.")
@@ -2936,13 +2936,13 @@ def _run_ui():
                     use_container_width=True,
                     key="sidebar_guest_create_account",
                 ):
-                    open_account_access("signup", GUEST_BANNER_TEXT)
+                    request_account_access("signup", GUEST_BANNER_TEXT)
                 if st.button(
                     "Enable cloud save",
                     use_container_width=True,
                     key="sidebar_guest_cloud_save",
                 ):
-                    open_account_access("enable_cloud_save", GUEST_BANNER_TEXT)
+                    request_account_access("enable_cloud_save", GUEST_BANNER_TEXT)
             else:
                 account_cols = st.columns([1, 2.6])
                 display_name = auth.get_user_display_name(user)
@@ -3409,7 +3409,7 @@ def _run_ui():
                 if submitted:
                     if is_guest:
                         st.session_state["guest_pending_project"] = {"title": t, "genre": g, "author": a}
-                        open_account_access("create_project", GUEST_BANNER_TEXT)
+                        request_account_access("create_project", GUEST_BANNER_TEXT)
                         return
                     if not t:
                         t = _random_project_title()
@@ -3452,7 +3452,7 @@ def _run_ui():
                     if st.button("Import & Analyze", use_container_width=True):
                         if is_guest:
                             st.session_state["guest_pending_import"] = txt
-                            open_account_access("create_project", GUEST_BANNER_TEXT)
+                            request_account_access("create_project", GUEST_BANNER_TEXT)
                             return
                         try:
                             p = Project.create("Imported Project", storage_dir=get_active_projects_dir())
@@ -4929,10 +4929,6 @@ def _run_ui():
         else:
             st.session_state.page = "home"
             st.rerun()
-    else:
-        st.session_state.page = "home"
-        st.rerun()
-
     if rendered_page:
         render_app_footer()
 

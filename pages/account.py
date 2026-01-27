@@ -21,13 +21,11 @@ def main() -> None:
     return_page = st.session_state.get("auth_redirect_return_page", "home")
 
     if auth.is_authenticated():
-        st.markdown("### Welcome back")
-        st.caption("Your account is already connected.")
-        st.markdown(f"**{auth.get_user_display_name()}**")
-        email = auth.get_user_email()
-        if email:
-            st.caption(email)
-        if st.button("Back to Studio", type="primary", use_container_width=True):
+        st.success("Login complete. We’re finishing your request.")
+        st.caption("You can safely return to the studio while we complete your action.")
+        if st.button("Continue to Studio", type="primary", use_container_width=True):
+            _return_to_studio(return_page)
+        else:
             _return_to_studio(return_page)
         return
 
@@ -37,6 +35,7 @@ def main() -> None:
     )
     if continue_guest:
         st.session_state["guest_continue_action"] = redirect_action
+        st.session_state["pending_action"] = None
         st.session_state.pop("auth_redirect_reason", None)
         st.session_state.pop("auth_redirect_action", None)
         st.session_state.pop("auth_redirect_return_page", None)
