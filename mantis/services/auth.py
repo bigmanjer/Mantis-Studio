@@ -2,16 +2,18 @@ from __future__ import annotations
 
 from typing import Any, Dict, Iterable, Optional
 
-import hashlib
+import os
+import time
 
 import streamlit as st
+from supabase import Client, create_client
 
 GOOGLE_ACCOUNT_URL = "https://myaccount.google.com/"
 MICROSOFT_ACCOUNT_URL = "https://myaccount.microsoft.com/"
 APPLE_ACCOUNT_URL = "https://appleid.apple.com/"
-GOOGLE_RECOVERY_URL = "https://accounts.google.com/signin/recovery"
-MICROSOFT_RECOVERY_URL = "https://account.live.com/password/reset"
-APPLE_RECOVERY_URL = "https://iforgot.apple.com/password/verify/appleid"
+EMAIL_SIGNIN_COOLDOWN_SECONDS = 45
+SESSION_USER_KEY = "mantis_auth_user"
+SESSION_PROVIDER_KEY = "mantis_auth_provider"
 
 DEFAULT_SESSION_CLEAR_KEYS = (
     "projects_dir",
@@ -36,7 +38,73 @@ def _get_authz_config() -> Dict[str, Any]:
     return st.secrets.get("authz", {}) if hasattr(st, "secrets") else {}
 
 
+def _auth_key(name: str) -> str:
+    return f"auth_{name}"
+
+
+def _get_supabase_config() -> Dict[str, str]:
+    config = st.secrets.get("supabase", {}) if hasattr(st, "secrets") else {}
+    return {
+        "url": config.get("url") or os.getenv("SUPABASE_URL", ""),
+        "anon_key": config.get("anon_key") or os.getenv("SUPABASE_ANON_KEY", ""),
+    }
+
+
+def _supabase_enabled() -> bool:
+    config = _get_supabase_config()
+    return bool(config.get("url") and config.get("anon_key"))
+
+
+@st.cache_resource(show_spinner=False)
+def _supabase_client(url: str, anon_key: str) -> Client:
+    return create_client(url, anon_key)
+
+
+def _get_supabase_client() -> Optional[Client]:
+    if not _supabase_enabled():
+        return None
+    config = _get_supabase_config()
+    return _supabase_client(config["url"], config["anon_key"])
+
+
+def _normalize_supabase_user(user: Any) -> Optional[Dict[str, Any]]:
+    if not user:
+        return None
+    if isinstance(user, dict):
+        user_dict = user
+    else:
+        user_dict = getattr(user, "__dict__", {}) or {}
+    metadata = user_dict.get("user_metadata") or {}
+    app_metadata = user_dict.get("app_metadata") or {}
+    return {
+        "id": user_dict.get("id") or user_dict.get("user_id") or user_dict.get("sub"),
+        "email": user_dict.get("email") or metadata.get("email"),
+        "name": metadata.get("full_name") or metadata.get("name") or user_dict.get("email"),
+        "picture": metadata.get("avatar_url") or metadata.get("picture"),
+        "provider": (app_metadata.get("provider") or "email"),
+    }
+
+
+def _set_supabase_session(user: Dict[str, Any]) -> None:
+    st.session_state[SESSION_USER_KEY] = user
+    st.session_state[SESSION_PROVIDER_KEY] = user.get("provider", "email")
+    st.session_state["auth_provider_hint"] = user.get("provider", "email")
+
+
+def _clear_supabase_session() -> None:
+    st.session_state.pop(SESSION_USER_KEY, None)
+    st.session_state.pop(SESSION_PROVIDER_KEY, None)
+
+
+def _email_cooldown_remaining(state_key: str) -> int:
+    last_sent = st.session_state.get(state_key, 0.0)
+    elapsed = time.time() - float(last_sent or 0.0)
+    return max(0, int(EMAIL_SIGNIN_COOLDOWN_SECONDS - elapsed))
+
 def get_current_user() -> Optional[Any]:
+    session_user = st.session_state.get(SESSION_USER_KEY)
+    if session_user:
+        return session_user
     if not hasattr(st, "user"):
         return None
     try:
@@ -47,8 +115,6 @@ def get_current_user() -> Optional[Any]:
 
 def is_logged_in(user: Optional[Any] = None) -> bool:
     user = user or get_current_user()
-    if not auth_is_configured():
-        return False
     return bool(get_user_id(user))
 
 
@@ -58,6 +124,10 @@ def auth_is_configured() -> bool:
         provider.get("client_id") and provider.get("client_secret")
         for provider in providers.values()
     )
+
+
+def debug_auth_enabled() -> bool:
+    return bool(_get_auth_config().get("debug_auth", False))
 
 
 def _normalize_list(values: Optional[Iterable[str]]) -> list[str]:
@@ -91,7 +161,7 @@ def _get_user_attr(user: Any, attr: str) -> Optional[str]:
 
 
 def get_user_email(user: Optional[Any] = None) -> str:
-    user = user or st.user
+    user = user or get_current_user()
     return (
         _get_user_attr(user, "email")
         or _get_user_attr(user, "preferred_username")
@@ -101,7 +171,7 @@ def get_user_email(user: Optional[Any] = None) -> str:
 
 
 def get_user_display_name(user: Optional[Any] = None) -> str:
-    user = user or st.user
+    user = user or get_current_user()
     name = (
         _get_user_attr(user, "name")
         or _get_user_attr(user, "display_name")
@@ -126,12 +196,12 @@ def get_user_initials(user: Optional[Any] = None) -> str:
 
 
 def get_user_avatar_url(user: Optional[Any] = None) -> str:
-    user = user or st.user
+    user = user or get_current_user()
     return _get_user_attr(user, "picture") or _get_user_attr(user, "avatar") or ""
 
 
 def get_user_id(user: Optional[Any] = None) -> str:
-    user = user or st.user
+    user = user or get_current_user()
     return (
         _get_user_attr(user, "sub")
         or _get_user_attr(user, "id")
@@ -143,8 +213,16 @@ def get_user_id(user: Optional[Any] = None) -> str:
     )
 
 
+def get_user_id_with_fallback(user: Optional[Any] = None) -> str:
+    user_id = get_user_id(user)
+    if user_id:
+        return user_id
+    fallback = st.session_state.get("user_id", "")
+    return str(fallback) if fallback else ""
+
+
 def _get_provider_key(user: Optional[Any] = None) -> str:
-    user = user or st.user
+    user = user or get_current_user()
     provider = (
         _get_user_attr(user, "auth_provider")
         or _get_user_attr(user, "identity_provider")
@@ -190,6 +268,26 @@ def get_provider_keys() -> list[str]:
     return list(_get_providers().keys())
 
 
+def get_provider_label(user: Optional[Any] = None) -> str:
+    provider_key = _get_provider_key(user)
+    if "google" in provider_key:
+        return "Google"
+    if "microsoft" in provider_key or "entra" in provider_key:
+        return "Microsoft"
+    if "apple" in provider_key:
+        return "Apple"
+    if "email" in provider_key or "magic" in provider_key:
+        return "Email"
+    if provider_key:
+        return provider_key.replace("_", " ").replace("-", " ").title()
+    return ""
+
+
+def is_email_provider(user: Optional[Any] = None) -> bool:
+    provider_key = _get_provider_key(user)
+    return "email" in provider_key or "magic" in provider_key
+
+
 def _provider_is_configured(provider_key: str) -> bool:
     providers = _get_providers()
     provider = providers.get(provider_key, {})
@@ -215,17 +313,209 @@ def _render_login_error() -> None:
             st.session_state.pop("auth_error", None)
 
 
-def _render_recovery_links() -> None:
-    st.markdown("#### Account recovery")
-    st.markdown(
-        f"- [Google account recovery]({GOOGLE_RECOVERY_URL})"
-    )
-    st.markdown(
-        f"- [Microsoft account recovery]({MICROSOFT_RECOVERY_URL})"
-    )
-    st.markdown(
-        f"- [Apple ID recovery]({APPLE_RECOVERY_URL})"
-    )
+def _render_auth_notice() -> None:
+    notice = st.session_state.pop("auth_notice", None)
+    if notice:
+        st.success(notice)
+
+
+def _extract_supabase_user(response: Any) -> tuple[Optional[Dict[str, Any]], bool]:
+    if response is None:
+        return None, False
+    user = None
+    session = None
+    if isinstance(response, dict):
+        user = response.get("user") or (response.get("data") or {}).get("user")
+        session = response.get("session") or (response.get("data") or {}).get("session")
+    else:
+        user = getattr(response, "user", None)
+        session = getattr(response, "session", None)
+        if user is None and hasattr(response, "data"):
+            data = response.data
+            if isinstance(data, dict):
+                user = data.get("user")
+                session = data.get("session")
+            else:
+                user = getattr(data, "user", None)
+                session = getattr(data, "session", None)
+    normalized = _normalize_supabase_user(user)
+    return normalized, bool(session)
+
+
+def render_email_signin_area() -> None:
+    st.markdown("#### Continue with email")
+    _render_auth_notice()
+    client = _get_supabase_client()
+    if not client:
+        st.caption("Email sign-in requires Supabase configuration.")
+        return
+
+    signin_tab, signup_tab, reset_tab = st.tabs(["Sign in", "Create account", "Forgot password"])
+
+    with signin_tab:
+        with st.form(_auth_key("email_signin_form")):
+            email = st.text_input(
+                "Email address",
+                value=st.session_state.get("auth_email", ""),
+                placeholder="you@example.com",
+                key=_auth_key("signin_email"),
+            )
+            password = st.text_input(
+                "Password",
+                type="password",
+                key=_auth_key("signin_password"),
+            )
+            submit = st.form_submit_button("Sign in", use_container_width=True)
+        if submit:
+            if "@" not in email:
+                st.session_state["auth_error"] = "Enter a valid email address."
+            elif not password:
+                st.session_state["auth_error"] = "Enter your password to continue."
+            else:
+                try:
+                    response = client.auth.sign_in_with_password(
+                        {"email": email.strip().lower(), "password": password}
+                    )
+                    user, _ = _extract_supabase_user(response)
+                    if user:
+                        _set_supabase_session(user)
+                        st.session_state["auth_notice"] = "Signed in successfully."
+                        st.rerun()
+                    else:
+                        st.session_state["auth_error"] = "Sign-in failed. Check your credentials."
+                except Exception:
+                    st.session_state["auth_error"] = "Sign-in failed. Please try again."
+
+        st.divider()
+        magic_remaining = _email_cooldown_remaining("magic_link_sent_at")
+        with st.form(_auth_key("magic_link_form")):
+            magic_email = st.text_input(
+                "Send a magic link",
+                value=st.session_state.get("auth_email", ""),
+                placeholder="you@example.com",
+                key=_auth_key("magic_email"),
+            )
+            magic_submit = st.form_submit_button(
+                "Email me a sign-in link",
+                use_container_width=True,
+                disabled=magic_remaining > 0,
+            )
+        if magic_submit:
+            if "@" not in magic_email:
+                st.session_state["auth_error"] = "Enter a valid email address to receive a link."
+            else:
+                try:
+                    client.auth.sign_in_with_otp({"email": magic_email.strip().lower()})
+                    st.session_state["magic_link_sent_at"] = time.time()
+                    st.session_state["auth_notice"] = "Magic link sent. Check your inbox to finish sign-in."
+                    st.session_state["auth_email"] = magic_email.strip().lower()
+                except Exception:
+                    st.session_state["auth_error"] = "We couldn't send the sign-in link. Try again."
+        if magic_remaining > 0:
+            st.caption(f"Resend available in {magic_remaining}s.")
+
+    with signup_tab:
+        with st.form(_auth_key("email_signup_form")):
+            email = st.text_input(
+                "Email address",
+                value=st.session_state.get("auth_email", ""),
+                placeholder="you@example.com",
+                key=_auth_key("signup_email"),
+            )
+            password = st.text_input(
+                "Create password",
+                type="password",
+                key=_auth_key("signup_password"),
+            )
+            confirm = st.text_input(
+                "Confirm password",
+                type="password",
+                key=_auth_key("signup_password_confirm"),
+            )
+            submit = st.form_submit_button("Create account", use_container_width=True)
+        if submit:
+            if "@" not in email:
+                st.session_state["auth_error"] = "Enter a valid email address."
+            elif not password or len(password) < 8:
+                st.session_state["auth_error"] = "Create a password with at least 8 characters."
+            elif password != confirm:
+                st.session_state["auth_error"] = "Passwords do not match."
+            else:
+                try:
+                    response = client.auth.sign_up(
+                        {"email": email.strip().lower(), "password": password}
+                    )
+                    user, has_session = _extract_supabase_user(response)
+                    if user and has_session:
+                        _set_supabase_session(user)
+                        st.session_state["auth_notice"] = "Account created and signed in."
+                        st.rerun()
+                    elif user:
+                        st.session_state["auth_notice"] = (
+                            "Account created. Check your email to confirm and sign in."
+                        )
+                        st.session_state["auth_email"] = email.strip().lower()
+                    else:
+                        st.session_state["auth_error"] = "Signup failed. Please try again."
+                except Exception:
+                    st.session_state["auth_error"] = "Signup failed. Please try again."
+
+    with reset_tab:
+        remaining = _email_cooldown_remaining("password_reset_sent_at")
+        with st.form(_auth_key("email_reset_form")):
+            email = st.text_input(
+                "Email address",
+                value=st.session_state.get("auth_email", ""),
+                placeholder="you@example.com",
+                key=_auth_key("reset_email"),
+            )
+            submit = st.form_submit_button(
+                "Send reset link",
+                use_container_width=True,
+                disabled=remaining > 0,
+            )
+        if submit:
+            if "@" not in email:
+                st.session_state["auth_error"] = "Enter a valid email address."
+            else:
+                try:
+                    client.auth.reset_password_email(email.strip().lower())
+                    st.session_state["password_reset_sent_at"] = time.time()
+                    st.session_state["auth_notice"] = "Password reset email sent."
+                    st.session_state["auth_email"] = email.strip().lower()
+                except Exception:
+                    st.session_state["auth_error"] = "Reset failed. Please try again."
+        if remaining > 0:
+            st.caption(f"Resend available in {remaining}s.")
+
+
+def render_email_account_controls(user_email: str) -> None:
+    st.markdown("#### Email account")
+    st.caption("Send a password reset link or update your email sign-in.")
+    _render_auth_notice()
+    _render_login_error()
+    client = _get_supabase_client()
+    if not client:
+        st.info("Email account management requires Supabase configuration.")
+        return
+    remaining = _email_cooldown_remaining("password_reset_sent_at")
+    if st.button(
+        "Send password reset email",
+        use_container_width=True,
+        disabled=remaining > 0,
+        key=_auth_key("account_reset_password"),
+    ):
+        if "@" not in (user_email or ""):
+            st.session_state["auth_error"] = "Add a valid email to receive a reset link."
+        else:
+            try:
+                client.auth.reset_password_email(user_email.strip().lower())
+                st.session_state["password_reset_sent_at"] = time.time()
+                st.session_state["auth_notice"] = "Password reset email sent."
+            except Exception:
+                st.session_state["auth_error"] = "Reset failed. Please try again."
+    if remaining > 0:
+        st.caption(f"Resend available in {remaining}s.")
 
 
 def _render_provider_cta(
@@ -247,9 +537,9 @@ def _render_provider_cta(
 
 def is_authenticated() -> bool:
     user = get_current_user()
-    if not auth_is_configured():
-        return False
-    return bool(get_user_id(user))
+    if user and get_user_id(user):
+        return True
+    return False
 
 
 def render_login_screen(intent: Optional[str] = None, allow_guest: bool = False) -> bool:
@@ -307,7 +597,7 @@ def render_login_screen(intent: Optional[str] = None, allow_guest: bool = False)
     if intent:
         st.info(intent)
     if allow_guest:
-        st.warning("Guest mode is active. Your creations won’t be saved unless you create an account.")
+        st.warning("Guest mode is active. Local saves are temporary until you create an account.")
     _render_login_error()
 
     providers = _get_providers()
@@ -374,6 +664,9 @@ def render_login_screen(intent: Optional[str] = None, allow_guest: bool = False)
                 help_text="This provider needs client credentials in secrets.",
                 key="login_other_oidc",
             )
+        st.divider()
+        st.markdown('<div style="text-align:center; font-weight:600;">or</div>', unsafe_allow_html=True)
+        render_email_signin_area()
         st.markdown("</div>", unsafe_allow_html=True)
 
     st.markdown("#### Why we ask you to sign in")
@@ -384,12 +677,12 @@ def render_login_screen(intent: Optional[str] = None, allow_guest: bool = False)
         "- [Privacy](/?page=privacy)\n- [Terms](/?page=terms)\n- [Legal hub](/pages/legal.py)"
     )
     st.divider()
-    _render_recovery_links()
+    st.caption("Need help? Check your inbox for confirmation or reset links, or contact support.")
     return False
 
 
 def _user_is_allowed(user: Optional[Any] = None) -> bool:
-    user = user or st.user
+    user = user or get_current_user()
     authz = _get_authz_config()
     allowed_domains = _normalize_list(authz.get("allowed_domains"))
     allowed_emails = _normalize_list(authz.get("allowed_emails"))
@@ -403,7 +696,7 @@ def _user_is_allowed(user: Optional[Any] = None) -> bool:
 
 
 def user_is_admin(user: Optional[Any] = None) -> bool:
-    user = user or st.user
+    user = user or get_current_user()
     authz = _get_authz_config()
     admin_emails = _normalize_list(authz.get("admin_emails"))
     email = get_user_email(user).lower()
@@ -430,6 +723,14 @@ def _clear_session(keys: Iterable[str]) -> None:
 
 def _logout(extra_state_keys: Iterable[str]) -> None:
     _clear_session(tuple(DEFAULT_SESSION_CLEAR_KEYS) + tuple(extra_state_keys))
+    if st.session_state.get(SESSION_USER_KEY):
+        client = _get_supabase_client()
+        if client:
+            try:
+                client.auth.sign_out()
+            except Exception:
+                st.session_state["auth_error"] = "Sign out failed. Please try again."
+        _clear_supabase_session()
     try:
         st.logout()
     except Exception:

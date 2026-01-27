@@ -11,9 +11,10 @@ import shutil
 import sys
 import time
 import uuid
+from collections.abc import Generator
 from dataclasses import dataclass, field, fields
 from pathlib import Path
-from typing import Any, Callable, Dict, Generator, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 import requests
 
@@ -2089,6 +2090,17 @@ def _run_ui():
         st.session_state.pending_action = None
     if "guest_project" not in st.session_state:
         st.session_state.guest_project = None
+    st.session_state.setdefault("ai_keys", {})
+
+    def _resolve_api_key(provider: str, default_value: str) -> str:
+        session_key = (st.session_state.get("ai_keys") or {}).get(provider, "")
+        if session_key:
+            return session_key
+        if not guest_mode:
+            config_key = config_data.get(f"{provider}_api_key", "")
+            if config_key:
+                return config_key
+        return default_value or ""
     if "openai_base_url" not in st.session_state:
         st.session_state.openai_base_url = config_data.get(
             "openai_base_url",
@@ -2141,7 +2153,7 @@ def _run_ui():
         st.rerun()
 
     GUEST_BANNER_TEXT = (
-        "Guest mode: your creations won’t be saved unless you create an account."
+        "Guest mode: your work saves locally in this session. Create an account to sync and export."
     )
 
     def request_account_access(
@@ -2190,19 +2202,10 @@ def _run_ui():
         prompt_on_guest: bool = False,
         action: str = "save",
     ) -> bool:
-        if not is_guest:
-            project.save()
-            return True
-        if prompt_on_guest:
-            normalized_action = "save_project" if action == "save" else action
-            request_account_access(
-                normalized_action,
-                GUEST_BANNER_TEXT,
-                return_to=st.session_state.get("page", "home"),
-            )
-        else:
-            project.last_modified = time.time()
-        return False
+        project.save()
+        if is_guest and prompt_on_guest:
+            st.toast("Saved locally. Create an account to sync and export.")
+        return True
 
     def render_guest_banner(context: str) -> None:
         if not is_guest:
@@ -2253,7 +2256,7 @@ def _run_ui():
     guest_continue_action = st.session_state.get("guest_continue_action")
     if guest_continue_action and guest_continue_action != "create_project":
         st.session_state["guest_continue_action"] = None
-        st.toast("You're still in Guest mode. Saving stays disabled until you create an account.")
+        st.toast("You're still in Guest mode. Saves stay local until you create an account.")
 
     # Reliable navigation rerun (avoids Streamlit edge cases when returning early)
     if st.session_state.get("_force_nav"):
@@ -2277,7 +2280,7 @@ def _run_ui():
 
     def get_active_projects_dir() -> Optional[str]:
         if st.session_state.get("guest_mode"):
-            return None
+            return st.session_state.get("projects_dir") or AppConfig.PROJECTS_DIR
         return st.session_state.get("projects_dir") or AppConfig.PROJECTS_DIR
 
     def queue_pending_action(
@@ -2326,8 +2329,8 @@ def _run_ui():
         return True
 
     def create_guest_project(title: str = "Guest Sandbox") -> Project:
-        p = Project.create(title, storage_dir=AppConfig.PROJECTS_DIR)
-        p.storage_dir = None
+        storage_dir = st.session_state.get("projects_dir") or AppConfig.PROJECTS_DIR
+        p = Project.create(title, storage_dir=storage_dir)
         p.filepath = None
         st.session_state.guest_project = p
         return p
@@ -3282,9 +3285,7 @@ def _run_ui():
                 st.caption(email)
             provider_label = auth.get_provider_label(user)
             if provider_label and not auth.is_email_provider(user):
-                st.caption(
-                    f"Signed in with {provider_label}. Password and recovery are managed by your provider."
-                )
+                st.caption(f"Signed in with {provider_label}.")
             if auth.is_email_provider(user):
                 auth.render_email_account_controls(email)
             manage_url = auth.get_manage_account_url(user)
@@ -3734,7 +3735,7 @@ def _run_ui():
                 st.session_state.project = p
                 st.session_state.page = "outline"
                 st.session_state.first_run = False
-                st.toast("Guest project ready. Remember: it won't be saved.")
+                st.toast("Guest project ready. Saved locally for this session.")
                 st.rerun()
 
         def open_latest_project() -> None:
@@ -3764,7 +3765,7 @@ def _run_ui():
         if st.session_state.get("guest_mode"):
             with st.container(border=True):
                 st.markdown("### Guest sandbox")
-                st.caption("Explore MANTIS Studio without saving. Create an account to persist work.")
+                st.caption("Explore MANTIS Studio with local saves. Create an account to sync and export.")
                 if st.button("Start guest sandbox", use_container_width=True):
                     st.session_state.project = st.session_state.guest_project or create_guest_project()
                     st.session_state.page = "outline"
@@ -3784,15 +3785,11 @@ def _run_ui():
                 a = st.text_input("Author (optional)", placeholder="Your name")
                 submitted = st.form_submit_button("🚀 Initialize Project", type="primary", use_container_width=True)
                 if submitted:
-                    if is_guest:
-                        st.session_state["guest_pending_project"] = {"title": t, "genre": g, "author": a}
-                        request_account_access("create_project", GUEST_BANNER_TEXT)
-                        return
                     if not t:
                         t = _random_project_title()
                     if not g:
                         g = _random_project_genres()
-                    if not require_account(
+                    if not is_guest and not require_account(
                         "create_project",
                         payload={"title": t, "author": a, "genre": g},
                         return_to="projects",
@@ -3827,10 +3824,6 @@ def _run_ui():
                 else:
                     txt = uf.read().decode("utf-8", errors="replace")
                     if st.button("Import & Analyze", use_container_width=True):
-                        if is_guest:
-                            st.session_state["guest_pending_import"] = txt
-                            request_account_access("create_project", GUEST_BANNER_TEXT)
-                            return
                         try:
                             p = Project.create("Imported Project", storage_dir=get_active_projects_dir())
                             p.import_text_file(txt)

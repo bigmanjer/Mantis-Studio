@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 import uuid
-from typing import Dict, Generator, List, Optional, Tuple
+from collections.abc import Generator
+from typing import Dict, List, Optional, Tuple
 
 from mantis.config.settings import AppConfig
 
@@ -99,6 +100,18 @@ def initialize_session_state(st, auth, config_data: Dict[str, str]) -> Dict[str,
     st.session_state["guest_mode"] = is_guest
     if is_guest:
         st.session_state.setdefault("guest_session_id", uuid.uuid4().hex[:8])
+    st.session_state.setdefault("ai_keys", {})
+
+    def _resolve_api_key(provider: str, default_value: str) -> str:
+        session_key = (st.session_state.get("ai_keys") or {}).get(provider, "")
+        if session_key:
+            return session_key
+        if logged_in:
+            config_key = config_data.get(f"{provider}_api_key", "")
+            if config_key:
+                return config_key
+        return default_value or ""
+
 
     if "ui_theme" not in st.session_state:
         st.session_state.ui_theme = config_data.get("ui_theme", "Dark")
@@ -187,11 +200,7 @@ def initialize_session_state(st, auth, config_data: Dict[str, str]) -> Dict[str,
             "openai_base_url",
             AppConfig.OPENAI_API_URL,
         )
-    if "openai_api_key" not in st.session_state:
-        st.session_state.openai_api_key = config_data.get(
-            "openai_api_key",
-            AppConfig.OPENAI_API_KEY,
-        )
+    st.session_state.openai_api_key = _resolve_api_key("openai", AppConfig.OPENAI_API_KEY)
     if "openai_model" not in st.session_state:
         st.session_state.openai_model = config_data.get(
             "openai_model",
@@ -205,8 +214,7 @@ def initialize_session_state(st, auth, config_data: Dict[str, str]) -> Dict[str,
         st.session_state.ui_theme = config_data.get("ui_theme", "Dark")
     if "groq_base_url" not in st.session_state:
         st.session_state.groq_base_url = config_data.get("groq_base_url", AppConfig.GROQ_API_URL)
-    if "groq_api_key" not in st.session_state:
-        st.session_state.groq_api_key = config_data.get("groq_api_key", AppConfig.GROQ_API_KEY)
+    st.session_state.groq_api_key = _resolve_api_key("groq", AppConfig.GROQ_API_KEY)
     if "groq_model" not in st.session_state:
         st.session_state.groq_model = config_data.get("groq_model", AppConfig.DEFAULT_MODEL)
     if "groq_model_list" not in st.session_state:
@@ -217,10 +225,10 @@ def initialize_session_state(st, auth, config_data: Dict[str, str]) -> Dict[str,
         st.session_state._force_nav = False
 
     AppConfig.GROQ_API_URL = st.session_state.groq_base_url
-    AppConfig.GROQ_API_KEY = st.session_state.groq_api_key
+    AppConfig.GROQ_API_KEY = _resolve_api_key("groq", AppConfig.GROQ_API_KEY)
     AppConfig.DEFAULT_MODEL = st.session_state.groq_model
     AppConfig.OPENAI_API_URL = st.session_state.openai_base_url
-    AppConfig.OPENAI_API_KEY = st.session_state.openai_api_key
+    AppConfig.OPENAI_API_KEY = _resolve_api_key("openai", AppConfig.OPENAI_API_KEY)
     AppConfig.OPENAI_MODEL = st.session_state.openai_model
 
     return {
