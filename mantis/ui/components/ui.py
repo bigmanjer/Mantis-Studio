@@ -1,5 +1,6 @@
 from contextlib import contextmanager
-from typing import Generator, Optional
+from collections.abc import Generator
+from typing import Optional
 
 import streamlit as st
 

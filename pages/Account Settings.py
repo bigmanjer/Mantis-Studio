@@ -112,9 +112,7 @@ def main() -> None:
                 st.caption(email)
             provider_label = auth.get_provider_label(user)
             if provider_label and not auth.is_email_provider(user):
-                st.caption(
-                    f"Signed in with {provider_label}. Password and recovery are managed by your provider."
-                )
+                st.caption(f"Signed in with {provider_label}.")
             if auth.is_email_provider(user):
                 auth.render_email_account_controls(email)
             manage_url = auth.get_manage_account_url(user)
@@ -140,7 +138,7 @@ def main() -> None:
         return
 
     continue_guest = auth.render_login_screen(
-        intent=redirect_reason or "Guest mode: creations are not saved. Create an account to save projects.",
+        intent=redirect_reason or "Guest mode: local saves are temporary. Create an account to sync and export.",
         allow_guest=True,
     )
     if continue_guest:

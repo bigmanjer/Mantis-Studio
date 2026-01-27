@@ -3,7 +3,8 @@ from __future__ import annotations
 import json
 import re
 import sys
-from typing import Any, Dict, Generator, List, Optional
+from collections.abc import Generator
+from typing import Any, Dict, List, Optional
 
 import requests
 
