@@ -52,6 +52,11 @@ Streamlit-native OIDC does not ship with an Apple preset. To enable Apple, add a
 under `[auth.apple]` with Apple’s OIDC metadata and credentials. The app hides the button if Apple
 is not configured.
 
+### Runbook + troubleshooting
+
+For a full Streamlit Cloud runbook (secrets, redirect URIs, and common failure modes), see:
+`docs/streamlit-auth-runbook.md`.
+
 ### Required secrets (template)
 
 See `.streamlit/secrets.toml` (or the copyable `.streamlit/secrets.toml.example`) for a full template including optional allowlists and admin emails.
@@ -61,6 +66,7 @@ At minimum, provide:
 [auth]
 redirect_uri = "https://<your-app>.streamlit.app/oauth2callback"
 cookie_secret = "replace-with-a-long-random-string"
+debug_auth = false
 
 [auth.google]
 client_id = "..."
