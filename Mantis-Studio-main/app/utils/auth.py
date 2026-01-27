@@ -3,15 +3,14 @@ from __future__ import annotations
 from typing import Any, Dict, Iterable, Optional
 
 import hashlib
+import time
 
 import streamlit as st
 
 GOOGLE_ACCOUNT_URL = "https://myaccount.google.com/"
 MICROSOFT_ACCOUNT_URL = "https://myaccount.microsoft.com/"
 APPLE_ACCOUNT_URL = "https://appleid.apple.com/"
-GOOGLE_RECOVERY_URL = "https://accounts.google.com/signin/recovery"
-MICROSOFT_RECOVERY_URL = "https://account.live.com/password/reset"
-APPLE_RECOVERY_URL = "https://iforgot.apple.com/password/verify/appleid"
+EMAIL_SIGNIN_COOLDOWN_SECONDS = 45
 
 DEFAULT_SESSION_CLEAR_KEYS = (
     "projects_dir",
@@ -34,6 +33,10 @@ def _get_auth_config() -> Dict[str, Any]:
 
 def _get_authz_config() -> Dict[str, Any]:
     return st.secrets.get("authz", {}) if hasattr(st, "secrets") else {}
+
+
+def debug_auth_enabled() -> bool:
+    return bool(_get_auth_config().get("debug_auth", False))
 
 
 def get_current_user() -> Optional[Any]:
@@ -91,7 +94,7 @@ def _get_user_attr(user: Any, attr: str) -> Optional[str]:
 
 
 def get_user_email(user: Optional[Any] = None) -> str:
-    user = user or st.user
+    user = user or get_current_user()
     return (
         _get_user_attr(user, "email")
         or _get_user_attr(user, "preferred_username")
@@ -101,7 +104,7 @@ def get_user_email(user: Optional[Any] = None) -> str:
 
 
 def get_user_display_name(user: Optional[Any] = None) -> str:
-    user = user or st.user
+    user = user or get_current_user()
     name = (
         _get_user_attr(user, "name")
         or _get_user_attr(user, "display_name")
@@ -126,12 +129,12 @@ def get_user_initials(user: Optional[Any] = None) -> str:
 
 
 def get_user_avatar_url(user: Optional[Any] = None) -> str:
-    user = user or st.user
+    user = user or get_current_user()
     return _get_user_attr(user, "picture") or _get_user_attr(user, "avatar") or ""
 
 
 def get_user_id(user: Optional[Any] = None) -> str:
-    user = user or st.user
+    user = user or get_current_user()
     return (
         _get_user_attr(user, "sub")
         or _get_user_attr(user, "id")
@@ -143,8 +146,16 @@ def get_user_id(user: Optional[Any] = None) -> str:
     )
 
 
+def get_user_id_with_fallback(user: Optional[Any] = None) -> str:
+    user_id = get_user_id(user)
+    if user_id:
+        return user_id
+    fallback = st.session_state.get("user_id", "")
+    return str(fallback) if fallback else ""
+
+
 def _get_provider_key(user: Optional[Any] = None) -> str:
-    user = user or st.user
+    user = user or get_current_user()
     provider = (
         _get_user_attr(user, "auth_provider")
         or _get_user_attr(user, "identity_provider")
@@ -190,6 +201,26 @@ def get_provider_keys() -> list[str]:
     return list(_get_providers().keys())
 
 
+def get_provider_label(user: Optional[Any] = None) -> str:
+    provider_key = _get_provider_key(user)
+    if "google" in provider_key:
+        return "Google"
+    if "microsoft" in provider_key or "entra" in provider_key:
+        return "Microsoft"
+    if "apple" in provider_key:
+        return "Apple"
+    if "email" in provider_key or "magic" in provider_key:
+        return "Email"
+    if provider_key:
+        return provider_key.replace("_", " ").replace("-", " ").title()
+    return ""
+
+
+def is_email_provider(user: Optional[Any] = None) -> bool:
+    provider_key = _get_provider_key(user)
+    return "email" in provider_key or "magic" in provider_key
+
+
 def _provider_is_configured(provider_key: str) -> bool:
     providers = _get_providers()
     provider = providers.get(provider_key, {})
@@ -215,17 +246,101 @@ def _render_login_error() -> None:
             st.session_state.pop("auth_error", None)
 
 
-def _render_recovery_links() -> None:
-    st.markdown("#### Account recovery")
-    st.markdown(
-        f"- [Google account recovery]({GOOGLE_RECOVERY_URL})"
+def _get_email_provider_key() -> str:
+    providers = _get_providers()
+    for key in ("email", "passwordless", "magic_link", "magic"):
+        if key in providers:
+            return key
+    return ""
+
+
+def _email_cooldown_remaining() -> int:
+    last_sent = st.session_state.get("email_signin_sent_at", 0.0)
+    elapsed = time.time() - float(last_sent or 0.0)
+    remaining = max(0, int(EMAIL_SIGNIN_COOLDOWN_SECONDS - elapsed))
+    return remaining
+
+
+def _start_email_signin(email: str, provider_key: str) -> None:
+    st.session_state["email_signin_target"] = email
+    st.session_state["email_signin_sent_at"] = time.time()
+    st.session_state["email_signin_status"] = "sent"
+    st.session_state["auth_provider_hint"] = provider_key
+    try:
+        st.login(provider_key)
+    except Exception:
+        st.session_state["auth_error"] = (
+            "We couldn't start email sign-in. Please try again."
+        )
+
+
+def render_email_signin_area() -> None:
+    email_provider_key = _get_email_provider_key()
+    email_provider_ready = (
+        bool(email_provider_key) and _provider_is_configured(email_provider_key)
     )
-    st.markdown(
-        f"- [Microsoft account recovery]({MICROSOFT_RECOVERY_URL})"
+    st.markdown("#### Continue with email")
+    email_input = st.text_input(
+        "Email address",
+        value=st.session_state.get("email_signin_target", ""),
+        placeholder="you@example.com",
+        key="auth_email_signin_input",
     )
-    st.markdown(
-        f"- [Apple ID recovery]({APPLE_RECOVERY_URL})"
+    cooldown_remaining = _email_cooldown_remaining()
+    disabled = not email_provider_ready or not email_input or cooldown_remaining > 0
+    button_label = "Send sign-in link"
+    if not email_provider_ready:
+        button_label = "Send sign-in link (admin setup required)"
+    if st.button(
+        button_label,
+        use_container_width=True,
+        disabled=disabled,
+        key="auth_email_signin_send",
+    ):
+        if "@" not in email_input:
+            st.error("Enter a valid email address to continue.")
+        else:
+            _start_email_signin(email_input.strip().lower(), email_provider_key)
+    if cooldown_remaining > 0:
+        st.caption(f"Resend available in {cooldown_remaining}s.")
+    status = st.session_state.get("email_signin_status")
+    if status == "sent" and email_input:
+        st.success(
+            f"We started email sign-in for {email_input}. Complete it in the provider window."
+        )
+    if not email_provider_ready:
+        st.caption("Email sign-in needs an OIDC provider configured in secrets.")
+
+
+def render_email_account_controls(user_email: str) -> None:
+    st.markdown("#### Email sign-in")
+    st.caption("Passwordless sign-in for MANTIS accounts.")
+    email_value = st.text_input(
+        "Update email",
+        value=user_email or st.session_state.get("email_signin_target", ""),
+        placeholder="you@example.com",
+        key="auth_email_update_input",
     )
+    cooldown_remaining = _email_cooldown_remaining()
+    resend_disabled = cooldown_remaining > 0 or not email_value
+    resend_label = "Resend sign-in link"
+    if st.button(
+        resend_label,
+        use_container_width=True,
+        disabled=resend_disabled,
+        key="auth_email_resend",
+    ):
+        if "@" not in email_value:
+            st.error("Enter a valid email address to resend the link.")
+        else:
+            provider_key = _get_email_provider_key()
+            if provider_key and _provider_is_configured(provider_key):
+                _start_email_signin(email_value.strip().lower(), provider_key)
+                st.success("Sign-in link sent.")
+            else:
+                st.warning("Email sign-in provider is not configured yet.")
+    if cooldown_remaining > 0:
+        st.caption(f"Resend available in {cooldown_remaining}s.")
 
 
 def _render_provider_cta(
@@ -360,8 +475,8 @@ def render_login_screen(intent: Optional[str] = None, allow_guest: bool = False)
             "Continue with Apple",
             "apple",
             apple_ready,
-            disabled_label="Continue with Apple (coming soon)",
-            help_text="Apple sign-in can be enabled once credentials are added.",
+            disabled_label="Continue with Apple (admin setup required)",
+            help_text="Apple sign-in isn’t configured yet.",
             key="login_apple",
         )
         if other_provider:
@@ -374,6 +489,9 @@ def render_login_screen(intent: Optional[str] = None, allow_guest: bool = False)
                 help_text="This provider needs client credentials in secrets.",
                 key="login_other_oidc",
             )
+        st.divider()
+        st.markdown('<div style="text-align:center; font-weight:600;">or</div>', unsafe_allow_html=True)
+        render_email_signin_area()
         st.markdown("</div>", unsafe_allow_html=True)
 
     st.markdown("#### Why we ask you to sign in")
@@ -381,10 +499,17 @@ def render_login_screen(intent: Optional[str] = None, allow_guest: bool = False)
         "Accounts keep your projects private, enable cloud sync, and protect access to your workspace."
     )
     st.markdown(
-        "- [Privacy](/?page=privacy)\n- [Terms](/?page=terms)\n- [Legal hub](/pages/legal.py)"
+        "- [Privacy](/?page=privacy)\n- [Terms](/?page=terms)\n- [Legal hub](/?page=legal)"
     )
     st.divider()
-    _render_recovery_links()
+    st.markdown("#### Need help signing in?")
+    st.markdown(
+        """
+        - If you used Google/Microsoft/Apple: manage recovery with your provider.
+        - If you used Email sign-in: use “Resend sign-in link” above.
+        - Still stuck? Contact support.
+        """
+    )
     return False
 
 

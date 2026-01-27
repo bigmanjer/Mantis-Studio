@@ -48,6 +48,9 @@ def _inject_styles() -> None:
     st.markdown(
         """
         <style>
+        div[data-testid="stSidebarNav"] {
+            display: none;
+        }
         .mantis-legal-header {
             display: flex;
             align-items: center;
