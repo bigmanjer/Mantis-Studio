@@ -1295,6 +1295,7 @@ def _run_ui():
     from app.components.ui import action_card, card, primary_button, section_header, stat_tile
     from app.ui.layout import render_footer
     from app.utils import auth
+    from app.utils.keys import ui_key
 
     widget_counters: Dict[tuple, int] = {}
     key_prefix_stack: List[str] = []
@@ -1337,7 +1338,26 @@ def _run_ui():
         counter_key = (prefix, widget_type, slug)
         widget_counters[counter_key] = widget_counters.get(counter_key, 0) + 1
         index = widget_counters[counter_key]
-        return f"{prefix}__{slug}__{index}"
+        return ui_key(prefix, widget_type, slug, str(index))
+
+    def init_state(key: str, default: Any) -> None:
+        if key not in st.session_state:
+            st.session_state[key] = default
+
+    def queue_widget_update(key: str, value: Any) -> None:
+        pending = st.session_state.setdefault("_pending_widget_updates", {})
+        pending[key] = value
+
+    def apply_pending_widget_updates() -> None:
+        pending = st.session_state.pop("_pending_widget_updates", None)
+        if pending:
+            for pending_key, pending_value in pending.items():
+                st.session_state[pending_key] = pending_value
+
+    def _record_action(action_label: Optional[str], action_key: Optional[str]) -> None:
+        label = (action_label or action_key or "action").strip()
+        st.session_state["last_action"] = label
+        st.session_state["last_action_ts"] = time.time()
 
     @contextmanager
     def key_scope(prefix: str) -> Generator[None, None, None]:
@@ -1349,15 +1369,23 @@ def _run_ui():
 
     def _wrap_widget(widget_fn, widget_type: str):
         def _wrapped(label=None, *args, **kwargs):
-            kwargs["key"] = _auto_key(widget_type, label, kwargs.get("key"))
-            return widget_fn(label, *args, **kwargs)
+            resolved_key = _auto_key(widget_type, label, kwargs.get("key"))
+            kwargs["key"] = resolved_key
+            result = widget_fn(label, *args, **kwargs)
+            if widget_type in {"button", "form_submit_button"} and result:
+                _record_action(label, resolved_key)
+            return result
 
         return _wrapped
 
     def _wrap_widget_no_label(widget_fn, widget_type: str):
         def _wrapped(*args, **kwargs):
-            kwargs["key"] = _auto_key(widget_type, None, kwargs.get("key"))
-            return widget_fn(*args, **kwargs)
+            resolved_key = _auto_key(widget_type, None, kwargs.get("key"))
+            kwargs["key"] = resolved_key
+            result = widget_fn(*args, **kwargs)
+            if widget_type in {"button", "form_submit_button"} and result:
+                _record_action(None, resolved_key)
+            return result
 
         return _wrapped
 
@@ -1454,55 +1482,37 @@ def _run_ui():
     if is_guest:
         st.session_state.setdefault("guest_session_id", uuid.uuid4().hex[:8])
 
-    if "ui_theme" not in st.session_state:
-        st.session_state.ui_theme = config_data.get("ui_theme", "Dark")
-    if "daily_word_goal" not in st.session_state:
-        st.session_state.daily_word_goal = int(config_data.get("daily_word_goal", 500))
-    if "weekly_sessions_goal" not in st.session_state:
-        st.session_state.weekly_sessions_goal = int(config_data.get("weekly_sessions_goal", 4))
-    if "focus_minutes" not in st.session_state:
-        st.session_state.focus_minutes = int(config_data.get("focus_minutes", 25))
-    if "activity_log" not in st.session_state:
-        st.session_state.activity_log = list(config_data.get("activity_log", []))
-    if "projects_refresh_token" not in st.session_state:
-        st.session_state.projects_refresh_token = 0
-    if "delete_project_path" not in st.session_state:
-        st.session_state.delete_project_path = None
-    if "delete_project_title" not in st.session_state:
-        st.session_state.delete_project_title = None
-    if "delete_entity_id" not in st.session_state:
-        st.session_state.delete_entity_id = None
-    if "delete_entity_name" not in st.session_state:
-        st.session_state.delete_entity_name = None
-    if "export_project_path" not in st.session_state:
-        st.session_state.export_project_path = None
-    if "world_search" not in st.session_state:
-        st.session_state.world_search = ""
-    if "world_search_pending" not in st.session_state:
-        st.session_state.world_search_pending = None
-    if "world_focus_entity" not in st.session_state:
-        st.session_state.world_focus_entity = None
-    if "world_focus_tab" not in st.session_state:
-        st.session_state.world_focus_tab = None
-    if "world_tabs" not in st.session_state:
-        st.session_state.world_tabs = "Characters"
-    if "world_bible_review" not in st.session_state:
-        st.session_state.world_bible_review = []
-    if "last_entity_scan" not in st.session_state:
-        st.session_state.last_entity_scan = None
-    if "locked_chapters" not in st.session_state:
-        st.session_state.locked_chapters = set()
-    if "_chapter_sync_id" not in st.session_state:
-        st.session_state._chapter_sync_id = None
-    if "_chapter_sync_text" not in st.session_state:
-        st.session_state._chapter_sync_text = None
-    if "curr_chap_id" not in st.session_state:
-        st.session_state.curr_chap_id = None
-    if "out_txt_project_id" not in st.session_state:
-        st.session_state.out_txt_project_id = None
-    if "_outline_sync" not in st.session_state:
-        st.session_state._outline_sync = None
+    init_state("ui_theme", config_data.get("ui_theme", "Dark"))
+    init_state("daily_word_goal", int(config_data.get("daily_word_goal", 500)))
+    init_state("weekly_sessions_goal", int(config_data.get("weekly_sessions_goal", 4)))
+    init_state("focus_minutes", int(config_data.get("focus_minutes", 25)))
+    init_state("activity_log", list(config_data.get("activity_log", [])))
+    init_state("projects_refresh_token", 0)
+    init_state("delete_project_path", None)
+    init_state("delete_project_title", None)
+    init_state("delete_entity_id", None)
+    init_state("delete_entity_name", None)
+    init_state("export_project_path", None)
+    init_state("world_search", "")
+    init_state("world_search_pending", None)
+    init_state("world_focus_entity", None)
+    init_state("world_focus_tab", None)
+    init_state("world_tabs", "Characters")
+    init_state("world_bible_review", [])
+    init_state("last_entity_scan", None)
+    init_state("locked_chapters", set())
+    init_state("_chapter_sync_id", None)
+    init_state("_chapter_sync_text", None)
+    init_state("curr_chap_id", None)
+    init_state("out_txt_project_id", None)
+    init_state("_outline_sync", None)
     st.session_state.setdefault("canon_health_log", [])
+    init_state("debug", False)
+    init_state("last_action", "")
+    init_state("last_action_ts", None)
+    init_state("last_exception", "")
+
+    apply_pending_widget_updates()
 
     theme = st.session_state.ui_theme if st.session_state.ui_theme in ("Dark", "Light") else "Dark"
     theme_tokens = {
@@ -2058,38 +2068,24 @@ def _run_ui():
         unsafe_allow_html=True,
     )
 
-    if "user_id" not in st.session_state:
-        st.session_state.user_id = None
-    if "projects_dir" not in st.session_state:
-        st.session_state.projects_dir = None
-    if "project" not in st.session_state:
-        st.session_state.project = None
-    if "page" not in st.session_state:
-        st.session_state.page = "home"
-    if "auto_save" not in st.session_state:
-        st.session_state.auto_save = not is_guest
-    if "ghost_text" not in st.session_state:
-        st.session_state.ghost_text = ""
-    if "pending_improvement_text" not in st.session_state:
-        st.session_state.pending_improvement_text = ""
-    if "pending_improvement_meta" not in st.session_state:
-        st.session_state.pending_improvement_meta = {}
-    if "chapter_text_prev" not in st.session_state:
-        st.session_state.chapter_text_prev = {}
-    if "chapter_drafts" not in st.session_state:
-        st.session_state.chapter_drafts = []
-    if "editor_improve__copy_buffer" not in st.session_state:
-        st.session_state.editor_improve__copy_buffer = ""
-    if "first_run" not in st.session_state:
-        st.session_state.first_run = True
-    if "is_premium" not in st.session_state:
-        st.session_state.is_premium = True
-    if "guest_mode" not in st.session_state:
-        st.session_state.guest_mode = guest_mode
-    if "pending_action" not in st.session_state:
-        st.session_state.pending_action = None
-    if "guest_project" not in st.session_state:
-        st.session_state.guest_project = None
+    guest_mode = st.session_state.get("guest_mode", is_guest)
+
+    init_state("user_id", None)
+    init_state("projects_dir", None)
+    init_state("project", None)
+    init_state("page", "home")
+    init_state("auto_save", not is_guest)
+    init_state("ghost_text", "")
+    init_state("pending_improvement_text", "")
+    init_state("pending_improvement_meta", {})
+    init_state("chapter_text_prev", {})
+    init_state("chapter_drafts", [])
+    init_state("editor_improve__copy_buffer", "")
+    init_state("first_run", True)
+    init_state("is_premium", True)
+    init_state("guest_mode", is_guest)
+    init_state("pending_action", None)
+    init_state("guest_project", None)
     st.session_state.setdefault("ai_keys", {})
 
     def _resolve_api_key(provider: str, default_value: str) -> str:
@@ -2101,49 +2097,42 @@ def _run_ui():
             if config_key:
                 return config_key
         return default_value or ""
-    if "openai_base_url" not in st.session_state:
-        st.session_state.openai_base_url = config_data.get(
-            "openai_base_url",
-            AppConfig.OPENAI_API_URL,
-        )
-    if "ai_provider" not in st.session_state:
-        st.session_state.ai_provider = config_data.get("ai_provider", "groq")
-    if "ai_session_keys" not in st.session_state:
-        st.session_state.ai_session_keys = {"openai": "", "groq": ""}
-    if "ai_saved_keys_cache" not in st.session_state:
-        st.session_state.ai_saved_keys_cache = {}
-    if "ai_saved_keys_user_id" not in st.session_state:
-        st.session_state.ai_saved_keys_user_id = ""
-    if "openai_key_input" not in st.session_state:
-        st.session_state.openai_key_input = ""
-    if "openai_model" not in st.session_state:
-        st.session_state.openai_model = config_data.get(
-            "openai_model",
-            AppConfig.OPENAI_MODEL,
-        )
-    if "openai_model_list" not in st.session_state:
-        st.session_state.openai_model_list = []
-    if "openai_model_tests" not in st.session_state:
-        st.session_state.openai_model_tests = {}
-    if "ui_theme" not in st.session_state:
-        st.session_state.ui_theme = config_data.get("ui_theme", "Dark")
-    if "groq_base_url" not in st.session_state:
-        st.session_state.groq_base_url = config_data.get("groq_base_url", AppConfig.GROQ_API_URL)
-    if "groq_key_input" not in st.session_state:
-        st.session_state.groq_key_input = ""
-    if "groq_model" not in st.session_state:
-        st.session_state.groq_model = config_data.get("groq_model", AppConfig.DEFAULT_MODEL)
-    if "groq_model_list" not in st.session_state:
-        st.session_state.groq_model_list = []
-    if "groq_model_tests" not in st.session_state:
-        st.session_state.groq_model_tests = {}
-    if "_force_nav" not in st.session_state:
-        st.session_state._force_nav = False
+    init_state(
+        "openai_base_url",
+        config_data.get("openai_base_url", AppConfig.OPENAI_API_URL),
+    )
+    init_state("ai_provider", config_data.get("ai_provider", "groq"))
+    init_state("ai_session_keys", {"openai": "", "groq": ""})
+    init_state("ai_saved_keys_cache", {})
+    init_state("ai_saved_keys_user_id", "")
+    init_state("openai_key_input", "")
+    init_state("openai_model", config_data.get("openai_model", AppConfig.OPENAI_MODEL))
+    init_state("openai_model_list", [])
+    init_state("openai_model_tests", {})
+    init_state("ui_theme", config_data.get("ui_theme", "Dark"))
+    init_state("groq_base_url", config_data.get("groq_base_url", AppConfig.GROQ_API_URL))
+    init_state("groq_key_input", "")
+    init_state("groq_model", config_data.get("groq_model", AppConfig.DEFAULT_MODEL))
+    init_state("groq_model_list", [])
+    init_state("groq_model_tests", {})
+    init_state("_force_nav", False)
 
     AppConfig.GROQ_API_URL = st.session_state.groq_base_url
     AppConfig.DEFAULT_MODEL = st.session_state.groq_model
     AppConfig.OPENAI_API_URL = st.session_state.openai_base_url
     AppConfig.OPENAI_MODEL = st.session_state.openai_model
+
+    def debug_enabled() -> bool:
+        try:
+            secrets = st.secrets
+        except Exception:
+            secrets = {}
+        if isinstance(secrets, dict):
+            return bool(secrets.get("DEBUG")) or bool(st.session_state.get("debug"))
+        try:
+            return bool(secrets["DEBUG"]) or bool(st.session_state.get("debug"))
+        except Exception:
+            return bool(st.session_state.get("debug"))
 
     def open_legal_page() -> None:
         if hasattr(st, "switch_page"):
@@ -2984,6 +2973,7 @@ def _run_ui():
         def _render_key_controls(provider: str) -> None:
             provider_label = _provider_label(provider)
             key_input_state = f"{provider}_key_input"
+            init_state(key_input_state, "")
             key_value = st.text_input(
                 f"{provider_label} API Key",
                 value=st.session_state.get(key_input_state, ""),
@@ -2997,8 +2987,9 @@ def _run_ui():
                 if st.button(f"Use for this session", use_container_width=True, key=f"{provider}_session_key"):
                     if key_value.strip():
                         set_session_key(provider, key_value)
-                        st.session_state[key_input_state] = ""
+                        queue_widget_update(key_input_state, "")
                         st.toast(f"{provider_label} session key set.")
+                        st.rerun()
                     else:
                         st.warning("Paste a key first.")
             with key_cols[1]:
@@ -3014,8 +3005,9 @@ def _run_ui():
                     ):
                         if key_value.strip():
                             if save_user_key(provider, key_value, st.session_state.get("user_id")):
-                                st.session_state[key_input_state] = ""
+                                queue_widget_update(key_input_state, "")
                                 st.toast(f"{provider_label} key saved to your account.")
+                                st.rerun()
                         else:
                             st.warning("Paste a key first.")
                 else:
@@ -3417,6 +3409,19 @@ def _run_ui():
                         st.rerun()
             else:
                 st.info("No project loaded.")
+
+            if debug_enabled():
+                st.divider()
+                st.markdown("### 🛠 Debug")
+                st.caption(f"Page: {st.session_state.get('page', 'unknown')}")
+                last_action = st.session_state.get("last_action") or "—"
+                last_action_ts = st.session_state.get("last_action_ts")
+                if last_action_ts:
+                    st.caption(f"Last action: {last_action} ({time.strftime('%H:%M:%S', time.localtime(last_action_ts))})")
+                else:
+                    st.caption(f"Last action: {last_action}")
+                last_exception = st.session_state.get("last_exception") or "—"
+                st.caption(f"Last exception: {last_exception}")
 
     def render_home():
         render_guest_banner("home")
@@ -5342,50 +5347,60 @@ def _run_ui():
                         st.session_state.pending_improvement_meta = {}
                         st.rerun()
 
-    rendered_page = False
-    if st.session_state.page == "home":
-        with key_scope("dashboard"):
-            render_home()
-        rendered_page = True
-    elif st.session_state.page == "projects":
-        with key_scope("projects"):
-            render_projects()
-        rendered_page = True
-    elif st.session_state.page == "ai":
-        with key_scope("settings"):
-            render_ai_settings()
-        rendered_page = True
-    elif st.session_state.page == "account":
-        with key_scope("account"):
-            render_account()
-        rendered_page = True
-    elif st.session_state.page == "legal":
-        with key_scope("legal"):
-            render_legal_redirect()
-        rendered_page = True
-    elif st.session_state.page == "export":
-        with key_scope("export"):
-            render_export()
-        rendered_page = True
-    else:
-        pg = st.session_state.page
-        if pg == "outline":
-            with key_scope("outline"):
-                render_outline()
+    def _render_current_page() -> None:
+        rendered_page = False
+        if st.session_state.page == "home":
+            with key_scope("dashboard"):
+                render_home()
             rendered_page = True
-        elif pg == "world":
-            with key_scope("world"):
-                render_world()
+        elif st.session_state.page == "projects":
+            with key_scope("projects"):
+                render_projects()
             rendered_page = True
-        elif pg == "chapters":
-            with key_scope("editor"):
-                render_chapters()
+        elif st.session_state.page == "ai":
+            with key_scope("settings"):
+                render_ai_settings()
+            rendered_page = True
+        elif st.session_state.page == "account":
+            with key_scope("account"):
+                render_account()
+            rendered_page = True
+        elif st.session_state.page == "legal":
+            with key_scope("legal"):
+                render_legal_redirect()
+            rendered_page = True
+        elif st.session_state.page == "export":
+            with key_scope("export"):
+                render_export()
             rendered_page = True
         else:
-            st.session_state.page = "home"
-            st.rerun()
-    if rendered_page:
-        render_app_footer()
+            pg = st.session_state.page
+            if pg == "outline":
+                with key_scope("outline"):
+                    render_outline()
+                rendered_page = True
+            elif pg == "world":
+                with key_scope("world"):
+                    render_world()
+                rendered_page = True
+            elif pg == "chapters":
+                with key_scope("editor"):
+                    render_chapters()
+                rendered_page = True
+            else:
+                st.session_state.page = "home"
+                st.rerun()
+        if rendered_page:
+            render_app_footer()
+
+    try:
+        _render_current_page()
+    except Exception as exc:
+        st.session_state["last_exception"] = f"{type(exc).__name__}: {exc}"
+        logger.exception("Unhandled UI exception", exc_info=True)
+        st.error("Something went wrong while rendering this page. Try reloading the app or returning to the dashboard.")
+        if debug_enabled():
+            st.exception(exc)
 
 
 def run_selftest() -> int:
