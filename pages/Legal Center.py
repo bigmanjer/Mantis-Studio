@@ -7,7 +7,6 @@ from typing import List
 
 import streamlit as st
 
-from app.ui.theme import inject_theme
 from app.utils import ui_key
 
 SECTIONS = [

@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import streamlit as st
 
-from app.ui.components import card_end, card_start, header_bar
-from app.ui.theme import inject_theme
 from app.utils import auth, ui_key
 
 
