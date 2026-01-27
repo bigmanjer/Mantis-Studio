@@ -12,7 +12,7 @@ import sys
 import time
 import uuid
 from collections.abc import Generator
-from dataclasses import dataclass, field, fields
+from dataclasses import asdict, dataclass, field, fields
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
