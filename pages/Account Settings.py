@@ -3,6 +3,12 @@ from __future__ import annotations
 import streamlit as st
 from app.utils import auth
 
+with st.expander("Debug (admin)", expanded=False):
+    st.write("auth_is_configured():", auth.auth_is_configured())
+    st.write("SUPABASE_URL set:", bool(st.secrets.get("SUPABASE_URL", "")))
+    st.write("SUPABASE_ANON_KEY set:", bool(st.secrets.get("SUPABASE_ANON_KEY", "")))
+    st.write("redirect:", st.secrets.get("SUPABASE_REDIRECT_URL", ""))
+
 
 def _inject_styles() -> None:
     st.markdown(
