@@ -162,6 +162,189 @@ def get_user_projects_dir(user_id: str) -> str:
     return user_dir
 
 
+def _get_streamlit():
+    if "streamlit" not in sys.modules:
+        return None
+    try:
+        import streamlit as st
+
+        return st
+    except Exception:
+        return None
+
+
+def _normalize_provider(provider: str) -> str:
+    return (provider or "groq").strip().lower()
+
+
+def _provider_label(provider: str) -> str:
+    return "OpenAI" if _normalize_provider(provider) == "openai" else "Groq"
+
+
+def _get_user_keys_path(user_id: str) -> Optional[str]:
+    if not user_id:
+        return None
+    user_dir = get_user_projects_dir(user_id)
+    return os.path.join(user_dir, ".mantis_ai_keys.json")
+
+
+def _load_user_keys(user_id: str) -> Dict[str, str]:
+    path = _get_user_keys_path(user_id)
+    if not path or not os.path.exists(path):
+        return {}
+    try:
+        with open(path, "r", encoding="utf-8") as fh:
+            data = json.load(fh)
+        if isinstance(data, dict):
+            return {
+                key: str(value)
+                for key, value in data.items()
+                if key in {"openai", "groq"} and value
+            }
+    except Exception:
+        logger.warning("Failed to load user AI keys", exc_info=True)
+    return {}
+
+
+def _save_user_keys(user_id: str, keys: Dict[str, str]) -> bool:
+    path = _get_user_keys_path(user_id)
+    if not path:
+        return False
+    try:
+        with open(path, "w", encoding="utf-8") as fh:
+            json.dump(keys, fh, indent=2)
+        return True
+    except Exception:
+        logger.warning("Failed to save user AI keys", exc_info=True)
+        return False
+
+
+def _ensure_session_keys(st) -> Dict[str, str]:
+    keys = st.session_state.setdefault("ai_session_keys", {})
+    for provider in ("openai", "groq"):
+        keys.setdefault(provider, "")
+    st.session_state["ai_session_keys"] = keys
+    return keys
+
+
+def _get_saved_keys(st, user_id: str) -> Dict[str, str]:
+    cached_user = st.session_state.get("ai_saved_keys_user_id")
+    if user_id and cached_user != user_id:
+        st.session_state["ai_saved_keys_user_id"] = user_id
+        st.session_state["ai_saved_keys_cache"] = _load_user_keys(user_id)
+    return st.session_state.get("ai_saved_keys_cache", {})
+
+
+def set_session_key(provider: str, key: str) -> None:
+    st = _get_streamlit()
+    if not st:
+        return
+    provider = _normalize_provider(provider)
+    keys = _ensure_session_keys(st)
+    keys[provider] = (key or "").strip()
+    st.session_state["ai_session_keys"] = keys
+
+
+def clear_session_key(provider: str) -> None:
+    st = _get_streamlit()
+    if not st:
+        return
+    provider = _normalize_provider(provider)
+    keys = _ensure_session_keys(st)
+    keys[provider] = ""
+    st.session_state["ai_session_keys"] = keys
+
+
+def save_user_key(provider: str, key: str, user_id: Optional[str]) -> bool:
+    st = _get_streamlit()
+    if not st or not user_id:
+        return False
+    provider = _normalize_provider(provider)
+    normalized = (key or "").strip()
+    if not normalized:
+        return False
+    saved = dict(_get_saved_keys(st, user_id))
+    saved[provider] = normalized
+    if not _save_user_keys(user_id, saved):
+        return False
+    st.session_state["ai_saved_keys_cache"] = saved
+    return True
+
+
+def _get_secret_key(st, provider: str) -> str:
+    if not st or not hasattr(st, "secrets"):
+        return ""
+    secrets = st.secrets
+    provider = _normalize_provider(provider)
+    if provider == "openai":
+        return str(
+            secrets.get("openai_api_key")
+            or secrets.get("OPENAI_API_KEY")
+            or (secrets.get("openai") or {}).get("api_key")
+            or ""
+        ).strip()
+    return str(
+        secrets.get("groq_api_key")
+        or secrets.get("GROQ_API_KEY")
+        or (secrets.get("groq") or {}).get("api_key")
+        or ""
+    ).strip()
+
+
+def _get_server_default_key(provider: str) -> str:
+    st = _get_streamlit()
+    key = _get_secret_key(st, provider)
+    if key:
+        return key
+    provider = _normalize_provider(provider)
+    if provider == "openai":
+        return (AppConfig.OPENAI_API_KEY or "").strip()
+    return (AppConfig.GROQ_API_KEY or "").strip()
+
+
+def get_effective_key(provider: str, user_id: Optional[str] = None) -> tuple[str, str]:
+    provider = _normalize_provider(provider)
+    st = _get_streamlit()
+    if st:
+        session_key = _ensure_session_keys(st).get(provider, "")
+        if session_key:
+            return session_key, "session"
+        try:
+            from app.utils import auth
+
+            if auth.is_authenticated():
+                user_id = user_id or st.session_state.get("user_id")
+                if user_id:
+                    saved_key = _get_saved_keys(st, user_id).get(provider, "")
+                    if saved_key:
+                        return saved_key, "saved"
+        except Exception:
+            pass
+    default_key = _get_server_default_key(provider)
+    if default_key:
+        return default_key, "default"
+    return "", "none"
+
+
+def get_active_provider() -> str:
+    st = _get_streamlit()
+    if st:
+        return _normalize_provider(st.session_state.get("ai_provider", "groq"))
+    return "groq"
+
+
+def _get_provider_base_url(provider: str) -> str:
+    provider = _normalize_provider(provider)
+    st = _get_streamlit()
+    if provider == "openai":
+        if st:
+            return st.session_state.get("openai_base_url", AppConfig.OPENAI_API_URL)
+        return AppConfig.OPENAI_API_URL
+    if st:
+        return st.session_state.get("groq_base_url", AppConfig.GROQ_API_URL)
+    return AppConfig.GROQ_API_URL
+
+
 # ============================================================
 # 2) MODELS
 # ============================================================
@@ -692,10 +875,24 @@ class Project:
 # ============================================================
 
 class AIEngine:
-    def __init__(self, timeout: int = AppConfig.GROQ_TIMEOUT, base_url: Optional[str] = None):
-        self.base_url = (base_url or AppConfig.GROQ_API_URL).rstrip("/")
+    def __init__(
+        self,
+        timeout: int = AppConfig.GROQ_TIMEOUT,
+        base_url: Optional[str] = None,
+        provider: Optional[str] = None,
+        api_key: Optional[str] = None,
+    ):
+        self.provider = _normalize_provider(provider or get_active_provider())
+        self.base_url = (base_url or _get_provider_base_url(self.provider)).rstrip("/")
         self.timeout = timeout
         self.session = requests.Session()
+        self.api_key = (api_key or "").strip()
+
+    def _resolve_api_key(self) -> str:
+        if self.api_key:
+            return self.api_key
+        key, _ = get_effective_key(self.provider)
+        return key
 
     def probe_models(self, api_key: str) -> List[str]:
         headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
@@ -730,12 +927,12 @@ class AIEngine:
                     f"{prompt}"
                 )
         if not model:
-            yield "Groq model not configured."
+            yield f"{_provider_label(self.provider)} model not configured."
             return
 
-        api_key = (AppConfig.GROQ_API_KEY or "").strip()
+        api_key = self._resolve_api_key()
         if not api_key:
-            yield "Groq API key not configured."
+            yield f"{_provider_label(self.provider)} API key not configured."
             return
 
         prompt = _truncate_prompt(prompt, AppConfig.MAX_PROMPT_CHARS)
@@ -762,10 +959,10 @@ class AIEngine:
                 if content:
                     yield content
                 else:
-                    yield "Groq response empty."
+                    yield f"{_provider_label(self.provider)} response empty."
             except Exception:
-                logger.warning("Groq non-stream generation failed", exc_info=True)
-                yield "Groq generation failed."
+                logger.warning("%s non-stream generation failed", _provider_label(self.provider), exc_info=True)
+                yield f"{_provider_label(self.provider)} generation failed."
 
         payload = {
             "model": model,
@@ -803,7 +1000,11 @@ class AIEngine:
                 if not yielded:
                     yield from _groq_non_stream()
         except Exception:
-            logger.warning("Groq streaming generation failed, retrying non-stream", exc_info=True)
+            logger.warning(
+                "%s streaming generation failed, retrying non-stream",
+                _provider_label(self.provider),
+                exc_info=True,
+            )
             yield from _groq_non_stream()
 
     def generate(self, prompt: str, model: str) -> Dict[str, str]:
@@ -1205,7 +1406,9 @@ def _run_ui():
         hard_rules = (project.memory_hard or project.memory or "").strip()
         if not hard_rules or not (new_text or "").strip():
             return []
-        if not AppConfig.GROQ_API_KEY or not get_ai_model():
+        active_provider = _normalize_provider(st.session_state.get("ai_provider", "groq"))
+        active_key, _ = get_effective_key(active_provider, st.session_state.get("user_id"))
+        if not active_key or not get_ai_model():
             return []
         compiled_world_bible = "\n".join(
             f"{e.name} ({e.category}): {e.description}"
@@ -1903,7 +2106,16 @@ def _run_ui():
             "openai_base_url",
             AppConfig.OPENAI_API_URL,
         )
-    st.session_state.openai_api_key = _resolve_api_key("openai", AppConfig.OPENAI_API_KEY)
+    if "ai_provider" not in st.session_state:
+        st.session_state.ai_provider = config_data.get("ai_provider", "groq")
+    if "ai_session_keys" not in st.session_state:
+        st.session_state.ai_session_keys = {"openai": "", "groq": ""}
+    if "ai_saved_keys_cache" not in st.session_state:
+        st.session_state.ai_saved_keys_cache = {}
+    if "ai_saved_keys_user_id" not in st.session_state:
+        st.session_state.ai_saved_keys_user_id = ""
+    if "openai_key_input" not in st.session_state:
+        st.session_state.openai_key_input = ""
     if "openai_model" not in st.session_state:
         st.session_state.openai_model = config_data.get(
             "openai_model",
@@ -1917,7 +2129,8 @@ def _run_ui():
         st.session_state.ui_theme = config_data.get("ui_theme", "Dark")
     if "groq_base_url" not in st.session_state:
         st.session_state.groq_base_url = config_data.get("groq_base_url", AppConfig.GROQ_API_URL)
-    st.session_state.groq_api_key = _resolve_api_key("groq", AppConfig.GROQ_API_KEY)
+    if "groq_key_input" not in st.session_state:
+        st.session_state.groq_key_input = ""
     if "groq_model" not in st.session_state:
         st.session_state.groq_model = config_data.get("groq_model", AppConfig.DEFAULT_MODEL)
     if "groq_model_list" not in st.session_state:
@@ -1928,10 +2141,8 @@ def _run_ui():
         st.session_state._force_nav = False
 
     AppConfig.GROQ_API_URL = st.session_state.groq_base_url
-    AppConfig.GROQ_API_KEY = _resolve_api_key("groq", AppConfig.GROQ_API_KEY)
     AppConfig.DEFAULT_MODEL = st.session_state.groq_model
     AppConfig.OPENAI_API_URL = st.session_state.openai_base_url
-    AppConfig.OPENAI_API_KEY = _resolve_api_key("openai", AppConfig.OPENAI_API_KEY)
     AppConfig.OPENAI_MODEL = st.session_state.openai_model
 
     def open_legal_page() -> None:
@@ -2053,39 +2264,15 @@ def _run_ui():
         st.rerun()
 
     def get_ai_model() -> str:
+        provider = _normalize_provider(st.session_state.get("ai_provider", "groq"))
+        if provider == "openai":
+            return st.session_state.get("openai_model", AppConfig.OPENAI_MODEL)
         return st.session_state.get("groq_model", AppConfig.DEFAULT_MODEL)
 
-    def _resolve_ai_key(provider: str) -> str:
-        session_key = (st.session_state.get("ai_keys") or {}).get(provider, "")
-        if session_key:
-            return session_key
-        if not guest_mode:
-            return config_data.get(f"{provider}_api_key", "") or ""
-        return AppConfig.GROQ_API_KEY if provider == "groq" else AppConfig.OPENAI_API_KEY
-
-    def _display_ai_key(provider: str) -> str:
-        session_key = (st.session_state.get("ai_keys") or {}).get(provider, "")
-        if session_key:
-            return session_key
-        if not guest_mode:
-            return config_data.get(f"{provider}_api_key", "") or ""
-        return ""
-
-    def _set_ai_key(provider: str, value: str) -> None:
-        cleaned = (value or "").strip()
-        ai_keys = st.session_state.get("ai_keys") or {}
-        if cleaned:
-            ai_keys[provider] = cleaned
-        else:
-            ai_keys.pop(provider, None)
-        st.session_state.ai_keys = ai_keys
-        resolved = _resolve_ai_key(provider)
-        if provider == "groq":
-            st.session_state.groq_api_key = resolved
-            AppConfig.GROQ_API_KEY = resolved
-        elif provider == "openai":
-            st.session_state.openai_api_key = resolved
-            AppConfig.OPENAI_API_KEY = resolved
+    def get_active_key_status() -> tuple[str, str, str]:
+        provider = _normalize_provider(st.session_state.get("ai_provider", "groq"))
+        key, source = get_effective_key(provider, st.session_state.get("user_id"))
+        return provider, key, source
 
     def save_p():
         if st.session_state.project and st.session_state.auto_save:
@@ -2116,9 +2303,28 @@ def _run_ui():
         st.session_state.page = "account"
         st.rerun()
 
-    def require_account(action: str, payload: Optional[Dict[str, Any]] = None, return_to: str = "home") -> bool:
+    def is_authenticated() -> bool:
+        return auth.is_authenticated()
+
+    def require_account(
+        action: Optional[str] = None,
+        payload: Optional[Dict[str, Any]] = None,
+        return_to: str = "home",
+        *,
+        feature: Optional[str] = None,
+    ) -> bool:
+        if feature:
+            if is_authenticated():
+                return True
+            action_key = "export_project" if feature == "export" else feature
+            with st.container(border=True):
+                st.markdown("#### Create an account to export")
+                st.caption("Sign in to unlock exports and keep your drafts in sync.")
+                if st.button("Sign in / Create account", type="primary", use_container_width=True):
+                    request_account_access(action_key, GUEST_BANNER_TEXT, return_to=return_to)
+            return False
         if st.session_state.get("guest_mode"):
-            queue_pending_action(action, payload, return_to, reason=GUEST_BANNER_TEXT)
+            queue_pending_action(action or "signup", payload, return_to, reason=GUEST_BANNER_TEXT)
             return False
         return True
 
@@ -2151,7 +2357,9 @@ def _run_ui():
             text = payload.get("text") or ""
             p = Project.create("Imported Project", storage_dir=get_active_projects_dir() or AppConfig.PROJECTS_DIR)
             p.import_text_file(text)
-            if AppConfig.GROQ_API_KEY and get_ai_model():
+            active_provider = _normalize_provider(st.session_state.get("ai_provider", "groq"))
+            active_key, _ = get_effective_key(active_provider, st.session_state.get("user_id"))
+            if active_key and get_ai_model():
                 p.outline = StoryEngine.reverse_engineer_outline(p, get_ai_model())
             p.save()
             st.session_state.project = p
@@ -2199,8 +2407,10 @@ def _run_ui():
         subtitle: str,
         primary_label: Optional[str] = None,
         primary_action: Optional[Callable[[], None]] = None,
+        primary_disabled: bool = False,
         secondary_label: Optional[str] = None,
         secondary_action: Optional[Callable[[], None]] = None,
+        secondary_disabled: bool = False,
         tag: Optional[str] = None,
         key_prefix: str = "page_header",
     ) -> None:
@@ -2223,10 +2433,21 @@ def _run_ui():
                 if st.button("👤 Profile & settings", use_container_width=True):
                     open_account_settings(return_to=st.session_state.get("page", "home"))
                 if primary_label and primary_action:
-                    if st.button(primary_label, type="primary", use_container_width=True, key=f"{key_prefix}__primary"):
+                    if st.button(
+                        primary_label,
+                        type="primary",
+                        use_container_width=True,
+                        key=f"{key_prefix}__primary",
+                        disabled=primary_disabled,
+                    ):
                         primary_action()
                 if secondary_label and secondary_action:
-                    if st.button(secondary_label, use_container_width=True, key=f"{key_prefix}__secondary"):
+                    if st.button(
+                        secondary_label,
+                        use_container_width=True,
+                        key=f"{key_prefix}__secondary",
+                        disabled=secondary_disabled,
+                    ):
                         secondary_action()
 
     @st.cache_data(show_spinner=False)
@@ -2234,24 +2455,25 @@ def _run_ui():
         return AIEngine(base_url=base_url).probe_models(api_key)
 
     def refresh_models():
+        groq_key, _ = get_effective_key("groq", st.session_state.get("user_id"))
         st.session_state.groq_model_list = _cached_models(
             st.session_state.groq_base_url,
-            st.session_state.groq_api_key,
+            groq_key,
         ) or []
 
     def refresh_openai_models():
+        openai_key, _ = get_effective_key("openai", st.session_state.get("user_id"))
         st.session_state.openai_model_list = _cached_models(
             st.session_state.openai_base_url,
-            st.session_state.openai_api_key,
+            openai_key,
         ) or []
 
     def save_app_settings():
         data = {
+            "ai_provider": st.session_state.ai_provider,
             "groq_base_url": st.session_state.groq_base_url,
-            "groq_api_key": st.session_state.groq_api_key,
             "groq_model": st.session_state.groq_model,
             "openai_base_url": st.session_state.openai_base_url,
-            "openai_api_key": st.session_state.openai_api_key,
             "openai_model": st.session_state.openai_model,
             "ui_theme": st.session_state.ui_theme,
             "daily_word_goal": int(st.session_state.daily_word_goal),
@@ -2314,6 +2536,16 @@ def _run_ui():
             labels.append(day.strftime("%a"))
             counts.append(1 if day.isoformat() in log_set else 0)
         return [{"day": label, "sessions": count} for label, count in zip(labels, counts)]
+
+    def _cooldown_remaining(action_key: str, cooldown_s: int = 8) -> int:
+        cooldowns = st.session_state.setdefault("action_cooldowns", {})
+        last_ts = cooldowns.get(action_key, 0)
+        remaining = max(0, cooldown_s - (time.time() - last_ts))
+        return int(round(remaining))
+
+    def _mark_action(action_key: str) -> None:
+        cooldowns = st.session_state.setdefault("action_cooldowns", {})
+        cooldowns[action_key] = time.time()
 
     @st.cache_data(show_spinner=False)
     def _load_recent_projects(active_dir: Optional[str], refresh_token: int) -> List[Dict[str, Any]]:
@@ -2553,6 +2785,14 @@ def _run_ui():
         or slightly different spellings merge into existing entries instead of
         creating duplicates.
         """
+        provider, active_key, _ = get_active_key_status()
+        if not active_key:
+            st.info(f"Add a {_provider_label(provider)} API key in AI Settings to scan entities.")
+            return
+        last_scan = st.session_state.get("last_entity_scan")
+        if last_scan and (time.time() - last_scan) < 15:
+            st.warning("Please wait a few seconds before running another entity scan.")
+            return
         model = get_ai_model()
         raw_text = text or ""
         p = st.session_state.project
@@ -2701,126 +2941,119 @@ def _run_ui():
         if st.session_state.pop("ai_settings__flash", False):
             st.success("AI Settings opened. Update providers and models below.")
 
+        groq_key, groq_source = get_effective_key("groq", st.session_state.get("user_id"))
+        openai_key, openai_source = get_effective_key("openai", st.session_state.get("user_id"))
         status_cols = st.columns(3)
         with status_cols[0]:
-            st.metric("Groq", "Connected" if st.session_state.groq_api_key else "Missing key")
+            st.metric("Groq", "Connected" if groq_key else "Missing key")
         with status_cols[1]:
-            st.metric("OpenAI", "Connected" if st.session_state.openai_api_key else "Missing key")
+            st.metric("OpenAI", "Connected" if openai_key else "Missing key")
         with status_cols[2]:
-            st.metric("Active model", st.session_state.groq_model or "Not set")
+            st.metric("Active model", get_ai_model() or "Not set")
 
-        provider_cols = st.columns(2)
-        with provider_cols[0]:
-            with st.container(border=True):
-                st.markdown("### 🤖 Groq")
-                groq_url = st.text_input("Groq Base URL", value=st.session_state.groq_base_url)
-                if groq_url != st.session_state.groq_base_url:
-                    st.session_state.groq_base_url = groq_url
-                    AppConfig.GROQ_API_URL = groq_url
+        provider_choice = st.radio(
+            "Active provider",
+            ["Groq", "OpenAI"],
+            horizontal=True,
+            index=0 if st.session_state.ai_provider == "groq" else 1,
+            key="ai_provider_choice",
+        )
+        provider_value = "groq" if provider_choice == "Groq" else "openai"
+        if provider_value != st.session_state.ai_provider:
+            st.session_state.ai_provider = provider_value
 
-                groq_key = st.text_input(
-                    "Groq API Key",
-                    value=_display_ai_key("groq"),
-                    type="password",
-                    help="Required for Groq cloud models.",
-                )
-                if groq_key != _display_ai_key("groq"):
-                    _set_ai_key("groq", groq_key)
+        tabs = st.tabs(["OpenAI", "Groq"])
 
-                if st.button("↻ Fetch Groq Models", use_container_width=True):
-                    models, error_message = fetch_groq_models(
-                        st.session_state.groq_base_url,
-                        st.session_state.groq_api_key,
-                    )
-                    if models:
-                        st.session_state.groq_model_list = models
-                        st.session_state.groq_model_tests = {}
-                        st.toast(f"Loaded {len(models)} models.")
+        def _status_label(source: str) -> str:
+            return {
+                "session": "Using session key",
+                "saved": "Using saved key",
+                "default": "Using server default",
+                "none": "No key set",
+            }.get(source, "No key set")
+
+        def _render_key_controls(provider: str) -> None:
+            provider_label = _provider_label(provider)
+            key_input_state = f"{provider}_key_input"
+            key_value = st.text_input(
+                f"{provider_label} API Key",
+                value=st.session_state.get(key_input_state, ""),
+                type="password",
+                placeholder="Paste API key",
+                help=f"Required for {provider_label} cloud models.",
+                key=key_input_state,
+            )
+            key_cols = st.columns(3)
+            with key_cols[0]:
+                if st.button(f"Use for this session", use_container_width=True, key=f"{provider}_session_key"):
+                    if key_value.strip():
+                        set_session_key(provider, key_value)
+                        st.session_state[key_input_state] = ""
+                        st.toast(f"{provider_label} session key set.")
                     else:
-                        st.session_state.groq_model_list = []
-                        st.session_state.groq_model_tests = {}
-                        st.error(f"Model fetch failed. {error_message or 'Check the base URL and key.'}")
-
-                if st.session_state.groq_model_list:
-                    models = st.session_state.groq_model_list
-                    idx = 0
-                    if st.session_state.groq_model in models:
-                        idx = models.index(st.session_state.groq_model)
-                    groq_model = st.selectbox("Groq Model", models, index=idx)
-
-                    if st.button("🧪 Test All Groq Models", use_container_width=True):
-                        results = {}
-                        total = len(models)
-                        progress = st.progress(0)
-                        for i, model_name in enumerate(models, start=1):
-                            ok, error_message = test_groq_model(
-                                st.session_state.groq_base_url,
-                                st.session_state.groq_api_key,
-                                model_name,
-                            )
-                            results[model_name] = "" if ok else error_message
-                            progress.progress(i / total)
-                        st.session_state.groq_model_tests = results
-                        failures = [m for m, err in results.items() if err]
-                        if failures:
-                            st.warning(f"{len(failures)} models failed. Expand results for details.")
+                        st.warning("Paste a key first.")
+            with key_cols[1]:
+                if st.button(f"Clear session key", use_container_width=True, key=f"{provider}_clear_session"):
+                    clear_session_key(provider)
+                    st.toast(f"{provider_label} session key cleared.")
+            with key_cols[2]:
+                if is_authenticated():
+                    if st.button(
+                        "Save to my account",
+                        use_container_width=True,
+                        key=f"{provider}_save_account",
+                    ):
+                        if key_value.strip():
+                            if save_user_key(provider, key_value, st.session_state.get("user_id")):
+                                st.session_state[key_input_state] = ""
+                                st.toast(f"{provider_label} key saved to your account.")
                         else:
-                            st.success("All models responded successfully.")
-
-                    if st.session_state.groq_model_tests:
-                        with st.expander("Groq model test results", expanded=False):
-                            for model_name, error_message in sorted(
-                                st.session_state.groq_model_tests.items()
-                            ):
-                                if error_message:
-                                    st.error(f"{model_name}: {error_message}")
-                                else:
-                                    st.success(f"{model_name}: OK")
+                            st.warning("Paste a key first.")
                 else:
-                    groq_model = st.text_input("Groq Model", value=st.session_state.groq_model)
+                    st.caption("Sign in to save keys.")
 
-                if groq_model != st.session_state.groq_model:
-                    st.session_state.groq_model = groq_model
-                    AppConfig.DEFAULT_MODEL = groq_model
+            _, source = get_effective_key(provider, st.session_state.get("user_id"))
+            st.caption(f"Status: {_status_label(source)}")
 
-                st.markdown(
-                    "[Get a free Groq API key](https://console.groq.com/keys) to enable cloud models."
-                )
-                if not st.session_state.groq_api_key:
-                    st.info("No Groq API key yet. Create one above and paste it here to unlock Groq models.")
-                if st.button("🔌 Test Groq Connection", use_container_width=True):
-                    ok = test_groq_connection(
-                        st.session_state.groq_base_url,
-                        st.session_state.groq_api_key,
-                    )
-                    if ok:
-                        st.success("Groq connection OK.")
-                    else:
-                        st.error("Groq connection failed. Check your base URL and key.")
-
-        with provider_cols[1]:
+        with tabs[0]:
             with st.container(border=True):
                 st.markdown("### ✨ OpenAI")
+                _render_key_controls("openai")
                 openai_url = st.text_input("OpenAI Base URL", value=st.session_state.openai_base_url)
                 if openai_url != st.session_state.openai_base_url:
                     st.session_state.openai_base_url = openai_url
                     AppConfig.OPENAI_API_URL = openai_url
 
-                openai_key = st.text_input(
-                    "OpenAI API Key",
-                    value=_display_ai_key("openai"),
-                    type="password",
-                    help="Required for OpenAI cloud models.",
-                )
-                if openai_key != _display_ai_key("openai"):
-                    _set_ai_key("openai", openai_key)
-                if not st.session_state.openai_api_key:
-                    st.info("No OpenAI API key yet. Create one and paste it here to unlock OpenAI models.")
+                if st.session_state.openai_model_list:
+                    models = st.session_state.openai_model_list
+                    idx = 0
+                    if st.session_state.openai_model in models:
+                        idx = models.index(st.session_state.openai_model)
+                    openai_model = st.selectbox("OpenAI Model", models, index=idx)
+                else:
+                    openai_model = st.text_input("OpenAI Model", value=st.session_state.openai_model)
 
-                if st.button("↻ Fetch OpenAI Models", use_container_width=True):
+                if openai_model != st.session_state.openai_model:
+                    st.session_state.openai_model = openai_model
+                    AppConfig.OPENAI_MODEL = openai_model
+
+                st.markdown(
+                    "[Create an OpenAI account](https://platform.openai.com/api-keys) to get an API key."
+                )
+                openai_key, _ = get_effective_key("openai", st.session_state.get("user_id"))
+                if not openai_key:
+                    st.info("No OpenAI API key yet. Add one above to unlock OpenAI models.")
+
+                openai_fetch_cooldown = _cooldown_remaining("openai_fetch_models", 10)
+                if st.button(
+                    "↻ Fetch OpenAI Models",
+                    use_container_width=True,
+                    disabled=bool(openai_fetch_cooldown) or not openai_key,
+                ):
+                    _mark_action("openai_fetch_models")
                     models, error_message = fetch_openai_models(
                         st.session_state.openai_base_url,
-                        st.session_state.openai_api_key,
+                        openai_key,
                     )
                     if models:
                         st.session_state.openai_model_list = models
@@ -2831,21 +3064,37 @@ def _run_ui():
                         st.session_state.openai_model_tests = {}
                         st.error(f"Model fetch failed. {error_message or 'Check the base URL and key.'}")
 
-                if st.session_state.openai_model_list:
-                    models = st.session_state.openai_model_list
-                    idx = 0
-                    if st.session_state.openai_model in models:
-                        idx = models.index(st.session_state.openai_model)
-                    openai_model = st.selectbox("OpenAI Model", models, index=idx)
+                openai_test_cooldown = _cooldown_remaining("openai_test_connection", 10)
+                if st.button(
+                    "🔌 Test OpenAI Connection",
+                    use_container_width=True,
+                    disabled=bool(openai_test_cooldown) or not openai_key,
+                ):
+                    _mark_action("openai_test_connection")
+                    ok = test_openai_connection(
+                        st.session_state.openai_base_url,
+                        openai_key,
+                    )
+                    if ok:
+                        st.success("OpenAI connection OK.")
+                    else:
+                        st.error("OpenAI connection failed. Check your base URL and key.")
 
-                    if st.button("🧪 Test All OpenAI Models", use_container_width=True):
+                if st.session_state.openai_model_list:
+                    openai_test_all_cooldown = _cooldown_remaining("openai_test_models", 20)
+                    if st.button(
+                        "🧪 Test All OpenAI Models",
+                        use_container_width=True,
+                        disabled=bool(openai_test_all_cooldown) or not openai_key,
+                    ):
+                        _mark_action("openai_test_models")
                         results = {}
-                        total = len(models)
+                        total = len(st.session_state.openai_model_list)
                         progress = st.progress(0)
-                        for i, model_name in enumerate(models, start=1):
+                        for i, model_name in enumerate(st.session_state.openai_model_list, start=1):
                             ok, error_message = test_openai_model(
                                 st.session_state.openai_base_url,
-                                st.session_state.openai_api_key,
+                                openai_key,
                                 model_name,
                             )
                             results[model_name] = "" if ok else error_message
@@ -2866,25 +3115,107 @@ def _run_ui():
                                     st.error(f"{model_name}: {error_message}")
                                 else:
                                     st.success(f"{model_name}: OK")
-                else:
-                    openai_model = st.text_input("OpenAI Model", value=st.session_state.openai_model)
 
-                if openai_model != st.session_state.openai_model:
-                    st.session_state.openai_model = openai_model
-                    AppConfig.OPENAI_MODEL = openai_model
+        with tabs[1]:
+            with st.container(border=True):
+                st.markdown("### 🤖 Groq")
+                _render_key_controls("groq")
+                groq_url = st.text_input("Groq Base URL", value=st.session_state.groq_base_url)
+                if groq_url != st.session_state.groq_base_url:
+                    st.session_state.groq_base_url = groq_url
+                    AppConfig.GROQ_API_URL = groq_url
+
+                if st.session_state.groq_model_list:
+                    models = st.session_state.groq_model_list
+                    idx = 0
+                    if st.session_state.groq_model in models:
+                        idx = models.index(st.session_state.groq_model)
+                    groq_model = st.selectbox("Groq Model", models, index=idx)
+                else:
+                    groq_model = st.text_input("Groq Model", value=st.session_state.groq_model)
+
+                if groq_model != st.session_state.groq_model:
+                    st.session_state.groq_model = groq_model
+                    AppConfig.DEFAULT_MODEL = groq_model
 
                 st.markdown(
-                    "[Create an OpenAI account](https://platform.openai.com/api-keys) to get an API key."
+                    "[Get a free Groq API key](https://console.groq.com/keys) to enable cloud models."
                 )
-                if st.button("🔌 Test OpenAI Connection", use_container_width=True):
-                    ok = test_openai_connection(
-                        st.session_state.openai_base_url,
-                        st.session_state.openai_api_key,
+                groq_key, _ = get_effective_key("groq", st.session_state.get("user_id"))
+                if not groq_key:
+                    st.info("No Groq API key yet. Add one above to unlock Groq models.")
+
+                groq_fetch_cooldown = _cooldown_remaining("groq_fetch_models", 10)
+                if st.button(
+                    "↻ Fetch Groq Models",
+                    use_container_width=True,
+                    disabled=bool(groq_fetch_cooldown) or not groq_key,
+                ):
+                    _mark_action("groq_fetch_models")
+                    models, error_message = fetch_groq_models(
+                        st.session_state.groq_base_url,
+                        groq_key,
+                    )
+                    if models:
+                        st.session_state.groq_model_list = models
+                        st.session_state.groq_model_tests = {}
+                        st.toast(f"Loaded {len(models)} models.")
+                    else:
+                        st.session_state.groq_model_list = []
+                        st.session_state.groq_model_tests = {}
+                        st.error(f"Model fetch failed. {error_message or 'Check the base URL and key.'}")
+
+                groq_test_cooldown = _cooldown_remaining("groq_test_connection", 10)
+                if st.button(
+                    "🔌 Test Groq Connection",
+                    use_container_width=True,
+                    disabled=bool(groq_test_cooldown) or not groq_key,
+                ):
+                    _mark_action("groq_test_connection")
+                    ok = test_groq_connection(
+                        st.session_state.groq_base_url,
+                        groq_key,
                     )
                     if ok:
-                        st.success("OpenAI connection OK.")
+                        st.success("Groq connection OK.")
                     else:
-                        st.error("OpenAI connection failed. Check your base URL and key.")
+                        st.error("Groq connection failed. Check your base URL and key.")
+
+                if st.session_state.groq_model_list:
+                    groq_test_all_cooldown = _cooldown_remaining("groq_test_models", 20)
+                    if st.button(
+                        "🧪 Test All Groq Models",
+                        use_container_width=True,
+                        disabled=bool(groq_test_all_cooldown) or not groq_key,
+                    ):
+                        _mark_action("groq_test_models")
+                        results = {}
+                        total = len(st.session_state.groq_model_list)
+                        progress = st.progress(0)
+                        for i, model_name in enumerate(st.session_state.groq_model_list, start=1):
+                            ok, error_message = test_groq_model(
+                                st.session_state.groq_base_url,
+                                groq_key,
+                                model_name,
+                            )
+                            results[model_name] = "" if ok else error_message
+                            progress.progress(i / total)
+                        st.session_state.groq_model_tests = results
+                        failures = [m for m, err in results.items() if err]
+                        if failures:
+                            st.warning(f"{len(failures)} models failed. Expand results for details.")
+                        else:
+                            st.success("All models responded successfully.")
+
+                    if st.session_state.groq_model_tests:
+                        with st.expander("Groq model test results", expanded=False):
+                            for model_name, error_message in sorted(
+                                st.session_state.groq_model_tests.items()
+                            ):
+                                if error_message:
+                                    st.error(f"{model_name}: {error_message}")
+                                else:
+                                    st.success(f"{model_name}: OK")
 
         with st.container(border=True):
             st.markdown("### ✅ Actions")
@@ -3361,7 +3692,9 @@ def _run_ui():
                 ):
                     open_legal_page()
 
-        if not st.session_state.groq_api_key or not st.session_state.openai_api_key:
+        groq_key, _ = get_effective_key("groq", st.session_state.get("user_id"))
+        openai_key, _ = get_effective_key("openai", st.session_state.get("user_id"))
+        if not groq_key or not openai_key:
             with card("🔑 Connect your AI providers", "Unlock generation, summaries, and entity tools with API access."):
                 cta_left, cta_right = st.columns(2)
                 with cta_left:
@@ -3390,11 +3723,15 @@ def _run_ui():
                 p = Project.create(title, author=author, genre=genre, storage_dir=get_active_projects_dir())
                 if pending_import:
                     p.import_text_file(pending_import)
-                    if AppConfig.GROQ_API_KEY and get_ai_model():
+                    active_provider = _normalize_provider(st.session_state.get("ai_provider", "groq"))
+                    active_key, _ = get_effective_key(active_provider, st.session_state.get("user_id"))
+                    if active_key and get_ai_model():
                         with st.spinner("Reviewing document and generating outline..."):
                             p.outline = StoryEngine.reverse_engineer_outline(p, get_ai_model())
                     else:
-                        st.warning("Add a Groq API key and model to auto-generate an outline.")
+                        st.warning(
+                            f"Add a {_provider_label(active_provider)} API key and model to auto-generate an outline."
+                        )
                 st.session_state.project = p
                 st.session_state.page = "outline"
                 st.session_state.first_run = False
@@ -3490,11 +3827,15 @@ def _run_ui():
                         try:
                             p = Project.create("Imported Project", storage_dir=get_active_projects_dir())
                             p.import_text_file(txt)
-                            if AppConfig.GROQ_API_KEY and get_ai_model():
+                            active_provider = _normalize_provider(st.session_state.get("ai_provider", "groq"))
+                            active_key, _ = get_effective_key(active_provider, st.session_state.get("user_id"))
+                            if active_key and get_ai_model():
                                 with st.spinner("Reviewing document and generating outline..."):
                                     p.outline = StoryEngine.reverse_engineer_outline(p, get_ai_model())
                             else:
-                                st.warning("Add a Groq API key and model to auto-generate an outline.")
+                                st.warning(
+                                    f"Add a {_provider_label(active_provider)} API key and model to auto-generate an outline."
+                                )
                             persist_project(p, prompt_on_guest=True, action="create_project")
                         except Exception:
                             logger.warning("Import failed for uploaded draft", exc_info=True)
@@ -3603,12 +3944,7 @@ def _run_ui():
             tag="Export",
             key_prefix="export_header",
         )
-        if st.session_state.get("guest_mode"):
-            with st.container(border=True):
-                st.markdown("### 🔒 Export is for members")
-                st.caption("Exporting downloads is available after you sign in or create a MANTIS account.")
-                if st.button("Sign in / Create account", type="primary", use_container_width=True):
-                    request_account_access("export_project", GUEST_BANNER_TEXT, return_to="export")
+        if not require_account(feature="export", return_to="export"):
             return
 
         export_project = None
@@ -3662,6 +3998,7 @@ def _run_ui():
         def scan_outline_action() -> None:
             extract_entities_ui(p.outline or "", "Outline")
 
+        provider, active_key, _ = get_active_key_status()
         render_page_header(
             "Outline",
             "Your blueprint. Generate structure, scan entities, and keep the story plan here.",
@@ -3669,9 +4006,14 @@ def _run_ui():
             primary_action=save_outline_action,
             secondary_label="🔍 Scan entities",
             secondary_action=scan_outline_action,
+            secondary_disabled=not active_key,
             tag="Project",
             key_prefix="outline_header",
         )
+        if not active_key:
+            st.info(
+                f"Add a {_provider_label(provider)} API key in AI Settings to scan entities or generate outlines."
+            )
 
         # Keep the outline editor widget in sync when switching projects/pages
         if st.session_state.get("out_txt_project_id") != p.id:
@@ -3724,7 +4066,22 @@ def _run_ui():
                 st.caption("Generate a chapter-by-chapter outline and append it to your blueprint.")
 
                 chaps = st.number_input("Chapters", 1, 50, 12)
-                if st.button("✨ Generate Structure", type="primary", use_container_width=True):
+                provider, active_key, _ = get_active_key_status()
+                outline_cooldown = _cooldown_remaining("outline_generate", 12)
+                outline_label = (
+                    f"✨ Generate Structure ({outline_cooldown}s)" if outline_cooldown else "✨ Generate Structure"
+                )
+                if not active_key:
+                    st.info(
+                        f"Add a {_provider_label(provider)} API key in AI Settings to generate outlines."
+                    )
+                if st.button(
+                    outline_label,
+                    type="primary",
+                    use_container_width=True,
+                    disabled=bool(outline_cooldown) or not active_key,
+                ):
+                    _mark_action("outline_generate")
                     # use outline_stream_ph defined above
                     full = ""
                     prompt = (
@@ -3782,9 +4139,13 @@ def _run_ui():
             primary_action=open_add_entity,
             secondary_label="🔍 Run scan",
             secondary_action=lambda: extract_entities_ui(p.outline or "", "Outline"),
+            secondary_disabled=not get_active_key_status()[1],
             tag="Canon",
             key_prefix="world_header",
         )
+        if not get_active_key_status()[1]:
+            provider, _, _ = get_active_key_status()
+            st.info(f"Add a {_provider_label(provider)} API key in AI Settings to run scans.")
 
         st.markdown(
             """
@@ -4238,7 +4599,23 @@ def _run_ui():
             with scope_cols[2]:
                 scope_chapters = st.checkbox("Chapters", value=True, key=f"coh_chapters_{p.id}")
 
-            if st.button("🔍 Run Coherence Check", use_container_width=True):
+            provider, active_key, _ = get_active_key_status()
+            coherence_cooldown = _cooldown_remaining(f"coherence_{p.id}", 15)
+            coherence_label = (
+                f"🔍 Run Coherence Check ({coherence_cooldown}s)"
+                if coherence_cooldown
+                else "🔍 Run Coherence Check"
+            )
+            if not active_key:
+                st.info(
+                    f"Add a {_provider_label(provider)} API key in AI Settings to run coherence checks."
+                )
+            if st.button(
+                coherence_label,
+                use_container_width=True,
+                disabled=bool(coherence_cooldown) or not active_key,
+            ):
+                _mark_action(f"coherence_{p.id}")
                 compiled_world_bible = "\n".join(
                     f"{e.name} ({e.category}): {e.description}"
                     for e in p.world_db.values()
@@ -4584,6 +4961,7 @@ def _run_ui():
                     st.rerun()
 
         stream_ph = st.empty()
+        provider, active_key, _ = get_active_key_status()
 
         with col_editor:
             with st.container(border=True):
@@ -4616,7 +4994,22 @@ def _run_ui():
                             extract_entities_ui(curr.content or "", f"Ch {curr.index}")
                             st.toast("Chapter Saved & Entities Scanned")
                 with c2:
-                    if st.button("📝 Update Summary", use_container_width=True):
+                    summary_cooldown = _cooldown_remaining(f"summary_{curr.id}", 10)
+                    summary_label = (
+                        f"📝 Update Summary ({summary_cooldown}s)"
+                        if summary_cooldown
+                        else "📝 Update Summary"
+                    )
+                    if not active_key:
+                        st.info(
+                            f"Add a {_provider_label(provider)} API key in AI Settings to update summaries."
+                        )
+                    if st.button(
+                        summary_label,
+                        use_container_width=True,
+                        disabled=bool(summary_cooldown) or not active_key,
+                    ):
+                        _mark_action(f"summary_{curr.id}")
                         summary = StoryEngine.summarize(curr.content or "", get_ai_model())
                         if summary.strip().startswith("ERROR: Canon violation detected."):
                             st.error("Canon violation detected. Resolve issues before generating AI content.")
@@ -4661,12 +5054,23 @@ def _run_ui():
                         )
                     if rewrite_locked:
                         st.caption("🔒 Rewrite tools are disabled for locked chapters.")
+                    if not active_key:
+                        st.info(
+                            f"Add a {_provider_label(provider)} API key in AI Settings to generate improvements."
+                        )
+                    improve_cooldown = _cooldown_remaining(f"improve_{curr.id}", 12)
+                    improve_label = (
+                        f"Generate Improvement ({improve_cooldown}s)"
+                        if improve_cooldown
+                        else "Generate Improvement"
+                    )
                     if st.button(
-                        "Generate Improvement",
+                        improve_label,
                         use_container_width=True,
-                        disabled=rewrite_locked,
+                        disabled=rewrite_locked or bool(improve_cooldown) or not active_key,
                         key=f"editor_improve__generate_{curr.id}",
                     ):
+                        _mark_action(f"improve_{curr.id}")
                         full = generate_improvement(style, cust)
                         if full:
                             st.session_state.pending_improvement_text = full
@@ -4742,12 +5146,29 @@ def _run_ui():
                         use_container_width=True,
                         help="Resolve canon issues in World Bible → Memory before generating.",
                     )
-                elif st.button("✨ Auto-Write Chapter", type="primary", use_container_width=True):
-                    prompt = StoryEngine.generate_chapter_prompt(p, curr.index, int(curr.target_words))
-                    full = ""
-                    for chunk in AIEngine().generate_stream(prompt, get_ai_model()):
-                        full += chunk
-                        stream_ph.markdown(f"**GENERATING:**\n\n{full}")
+                else:
+                    if not active_key:
+                        st.info(
+                            f"Add a {_provider_label(provider)} API key in AI Settings to auto-write chapters."
+                        )
+                    auto_cooldown = _cooldown_remaining(f"auto_write_{curr.id}", 12)
+                    auto_label = (
+                        f"✨ Auto-Write Chapter ({auto_cooldown}s)"
+                        if auto_cooldown
+                        else "✨ Auto-Write Chapter"
+                    )
+                    if st.button(
+                        auto_label,
+                        type="primary",
+                        use_container_width=True,
+                        disabled=bool(auto_cooldown) or not active_key,
+                    ):
+                        _mark_action(f"auto_write_{curr.id}")
+                        prompt = StoryEngine.generate_chapter_prompt(p, curr.index, int(curr.target_words))
+                        full = ""
+                        for chunk in AIEngine().generate_stream(prompt, get_ai_model()):
+                            full += chunk
+                            stream_ph.markdown(f"**GENERATING:**\n\n{full}")
 
                     if full.strip():
                         if full.strip().startswith("ERROR: Canon violation detected."):
@@ -4894,11 +5315,17 @@ def _run_ui():
                         st.session_state.editor_improve__copy_buffer = pending_text or ""
                         st.toast("Improved text ready to copy (Ctrl/Cmd+C).")
                 with b3:
+                    regen_cooldown = _cooldown_remaining(f"improve_regen_{curr.id}", 12)
+                    regen_label = (
+                        f"Regenerate ({regen_cooldown}s)" if regen_cooldown else "Regenerate"
+                    )
                     if st.button(
-                        "Regenerate",
+                        regen_label,
                         use_container_width=True,
+                        disabled=bool(regen_cooldown) or not active_key,
                         key=f"editor_improve__regenerate_{curr.id}",
                     ):
+                        _mark_action(f"improve_regen_{curr.id}")
                         regen_style = pending_meta.get("mode", "Improve Flow")
                         regen_custom = pending_meta.get("custom", "")
                         full = generate_improvement(regen_style, regen_custom)
