@@ -25,7 +25,8 @@ python -m streamlit run Mantis_Studio.py
 ## Authentication (Streamlit native OIDC)
 
 MANTIS Studio uses Streamlit’s built-in authentication (st.login/st.user/st.logout). Password
-management, MFA, and recovery are handled by your identity provider (Google, Microsoft Entra, etc.).
+management and recovery are handled by your identity provider (Google, Microsoft Entra, etc.), or by
+your configured email/passwordless provider.
 
 ### How to set up Google OIDC
 
@@ -82,6 +83,11 @@ server_metadata_url = "https://login.microsoftonline.com/<tenant-id>/v2.0/.well-
 client_id = "..."
 client_secret = "..."
 server_metadata_url = "https://appleid.apple.com/.well-known/openid-configuration"
+
+[auth.email]
+client_id = "..."
+client_secret = "..."
+server_metadata_url = "https://your-email-idp.example.com/.well-known/openid-configuration"
 ```
 
 ### Optional authorization controls

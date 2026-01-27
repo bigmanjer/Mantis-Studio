@@ -1580,6 +1580,7 @@ def _run_ui():
     hr {{ border-color: var(--mantis-divider) !important; }}
     section[data-testid="stSidebar"] {{ background: var(--mantis-sidebar-bg); border-right: 1px solid var(--mantis-sidebar-border); }}
     section[data-testid="stSidebar"] h1, section[data-testid="stSidebar"] h2, section[data-testid="stSidebar"] h3 {{ color: var(--mantis-text); }}
+    div[data-testid="stSidebarNav"] {{ display: none; }}
     div[data-testid="stToast"] {{ border-radius: 14px !important; }}
 
     /* --- CARD POLISH --- */
@@ -1948,9 +1949,10 @@ def _run_ui():
 
     def open_legal_page() -> None:
         if hasattr(st, "switch_page"):
-            st.switch_page("pages/legal.py")
+            st.switch_page("pages/Legal Center.py")
             return
-        st.toast("Open the Legal page from the sidebar menu if it did not open.")
+        st.session_state.page = "legal"
+        st.rerun()
 
     GUEST_BANNER_TEXT = (
         "Guest mode: your creations won’t be saved unless you create an account."
@@ -1972,10 +1974,29 @@ def _run_ui():
             "return_to": return_to or st.session_state.get("page", "home"),
         }
         if hasattr(st, "switch_page"):
-            st.switch_page("pages/account.py")
-        else:
-            st.session_state.page = "account"
-            st.rerun()
+            st.switch_page("pages/Account Settings.py")
+            return
+        st.session_state.page = "account"
+        st.rerun()
+
+    def open_account_settings(
+        *,
+        action: str = "profile",
+        reason: Optional[str] = None,
+        return_to: Optional[str] = None,
+    ) -> None:
+        if st.session_state.get("guest_mode"):
+            request_account_access(
+                action,
+                reason or GUEST_BANNER_TEXT,
+                return_to=return_to or st.session_state.get("page", "home"),
+            )
+            return
+        if hasattr(st, "switch_page"):
+            st.switch_page("pages/Account Settings.py")
+            return
+        st.session_state.page = "account"
+        st.rerun()
 
     def persist_project(
         project: "Project",
@@ -2080,10 +2101,10 @@ def _run_ui():
         st.session_state["auth_redirect_reason"] = reason or GUEST_BANNER_TEXT
         st.session_state["auth_redirect_return_page"] = return_to
         if hasattr(st, "switch_page"):
-            st.switch_page("pages/account.py")
-        else:
-            st.session_state.page = "account"
-            st.rerun()
+            st.switch_page("pages/Account Settings.py")
+            return
+        st.session_state.page = "account"
+        st.rerun()
 
     def require_account(action: str, payload: Optional[Dict[str, Any]] = None, return_to: str = "home") -> bool:
         if st.session_state.get("guest_mode"):
@@ -2189,6 +2210,8 @@ def _run_ui():
                     unsafe_allow_html=True,
                 )
             with right:
+                if st.button("👤 Profile & settings", use_container_width=True):
+                    open_account_settings(return_to=st.session_state.get("page", "home"))
                 if primary_label and primary_action:
                     if st.button(primary_label, type="primary", use_container_width=True, key=f"{key_prefix}__primary"):
                         primary_action()
@@ -2640,6 +2663,9 @@ def _run_ui():
         render_copyright()
         render_app_footer()
         return
+    if query == "legal":
+        open_legal_page()
+        return
 
     def render_ai_settings():
         def refresh_all_models() -> None:
@@ -2918,6 +2944,13 @@ def _run_ui():
             email = auth.get_user_email(user)
             if email:
                 st.caption(email)
+            provider_label = auth.get_provider_label(user)
+            if provider_label and not auth.is_email_provider(user):
+                st.caption(
+                    f"Signed in with {provider_label}. Password and recovery are managed by your provider."
+                )
+            if auth.is_email_provider(user):
+                auth.render_email_account_controls(email)
             manage_url = auth.get_manage_account_url(user)
             if manage_url:
                 st.link_button("Manage account", manage_url, use_container_width=True)
@@ -2949,9 +2982,9 @@ def _run_ui():
         st.info("Open the Legal Hub for full policies and documentation.")
         if st.button("Open Legal Hub", use_container_width=True):
             if hasattr(st, "switch_page"):
-                st.switch_page("pages/legal.py")
+                st.switch_page("pages/Legal Center.py")
             else:
-                st.info("Use the sidebar to open Legal from the page menu.")
+                st.info("Use the studio footer to open Legal.")
 
     with st.sidebar:
         with key_scope("sidebar"):
@@ -2975,52 +3008,6 @@ def _run_ui():
             """,
                 unsafe_allow_html=True,
             )
-
-            st.markdown("---")
-            st.markdown("### 👤 Account")
-            if is_guest:
-                st.markdown("**Guest mode**")
-                st.caption("Projects and edits are not saved across devices.")
-                if st.button(
-                    "Create account",
-                    type="primary",
-                    use_container_width=True,
-                    key="sidebar_guest_create_account",
-                ):
-                    request_account_access("signup", GUEST_BANNER_TEXT)
-                if st.button(
-                    "Sign in",
-                    use_container_width=True,
-                    key="sidebar_guest_cloud_save",
-                ):
-                    request_account_access("signin", GUEST_BANNER_TEXT)
-            else:
-                account_cols = st.columns([1, 2.6])
-                display_name = auth.get_user_display_name(user)
-                email = auth.get_user_email(user)
-                avatar_url = auth.get_user_avatar_url(user)
-                with account_cols[0]:
-                    if avatar_url:
-                        st.image(avatar_url, width=44)
-                    else:
-                        st.markdown(
-                            f"<div class='mantis-avatar'>{auth.get_user_initials(user)}</div>",
-                            unsafe_allow_html=True,
-                        )
-                with account_cols[1]:
-                    st.markdown(f"**{display_name}**")
-                    if email:
-                        st.caption(email)
-                    if auth.user_is_admin(user):
-                        st.caption("Admin")
-
-                manage_url = auth.get_manage_account_url(user)
-                if manage_url:
-                    st.link_button("Manage account", manage_url, use_container_width=True)
-                auth.logout_button(
-                    key="sidebar_logout",
-                    extra_state_keys=["projects_dir", "project", "page", "_force_nav"],
-                )
 
             st.markdown("### 🎨 Appearance")
             st.selectbox("Theme", ["Dark", "Light"], key="ui_theme")
