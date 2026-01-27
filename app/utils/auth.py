@@ -127,31 +127,15 @@ def get_user_avatar_url(user: Optional[Any] = None) -> str:
 
 def get_user_id(user: Optional[Any] = None) -> str:
     user = user or st.user
-    email = _get_user_attr(user, "email")
-    if email:
-        return email
-    preferred = _get_user_attr(user, "preferred_username") or _get_user_attr(user, "upn")
-    if preferred:
-        return preferred
-    name = _get_user_attr(user, "name") or _get_user_attr(user, "display_name")
-    if name:
-        return name
-    return _get_user_attr(user, "sub") or ""
-
-
-def get_user_id_with_fallback(user: Optional[Any] = None) -> str:
-    user = user or st.user
-    user_id = get_user_id(user)
-    if user_id:
-        return user_id
-    raw_value = _normalize_user_value(user) or repr(user)
-    hashed = hashlib.sha256(str(raw_value).encode("utf-8")).hexdigest()[:12]
-    return f"user_{hashed}"
-
-
-def debug_auth_enabled() -> bool:
-    auth_config = _get_auth_config()
-    return bool(st.secrets.get("debug_auth", False) or auth_config.get("debug_auth", False))
+    return (
+        _get_user_attr(user, "sub")
+        or _get_user_attr(user, "id")
+        or _get_user_attr(user, "user_id")
+        or _get_user_attr(user, "oid")
+        or _get_user_attr(user, "uid")
+        or _get_user_attr(user, "username")
+        or get_user_email(user)
+    )
 
 
 def _get_provider_key(user: Optional[Any] = None) -> str:
