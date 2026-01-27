@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import streamlit as st
 
-from app.utils import auth
+from app.utils import auth, ui_key
 
 
 def _inject_styles() -> None:
@@ -67,7 +67,7 @@ def _go_back_to_studio() -> None:
 
 
 def _key(name: str) -> str:
-    return f"account_{name}"
+    return ui_key("account", name)
 
 
 def _render_debug_panel() -> None:
