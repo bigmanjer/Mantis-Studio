@@ -5,6 +5,45 @@ import streamlit as st
 from app.utils import auth
 
 
+def _inject_styles() -> None:
+    st.markdown(
+        """
+        <style>
+        .mantis-account-wrap {
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+        .mantis-account-header {
+            padding: 26px 30px;
+            border-radius: 22px;
+            border: 1px solid rgba(120, 199, 190, 0.3);
+            background: linear-gradient(135deg, rgba(16, 24, 36, 0.95), rgba(10, 16, 24, 0.95));
+            box-shadow: 0 18px 36px rgba(0,0,0,0.35);
+            margin-bottom: 24px;
+        }
+        .mantis-account-title {
+            font-size: 28px;
+            font-weight: 700;
+        }
+        .mantis-account-sub {
+            color: rgba(226, 232, 240, 0.75);
+            margin-top: 6px;
+        }
+        .mantis-account-card {
+            padding: 18px 20px;
+            border-radius: 18px;
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            background: rgba(15, 23, 42, 0.5);
+        }
+        div[data-testid="stSidebarNav"] {
+            display: none;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 def _render_debug_auth(user: object | None) -> None:
     if not auth.debug_auth_enabled():
         return
@@ -36,33 +75,7 @@ def _return_to_studio(return_page: str) -> None:
 
 def main() -> None:
     st.set_page_config(page_title="Account Access • MANTIS Studio", layout="wide")
-    st.markdown(
-        """
-        <style>
-        .mantis-account-wrap {
-            max-width: 1100px;
-            margin: 0 auto;
-        }
-        .mantis-account-header {
-            padding: 24px 28px;
-            border-radius: 20px;
-            border: 1px solid rgba(120, 199, 190, 0.3);
-            background: linear-gradient(135deg, rgba(16, 24, 36, 0.95), rgba(10, 16, 24, 0.95));
-            box-shadow: 0 16px 32px rgba(0,0,0,0.3);
-            margin-bottom: 24px;
-        }
-        .mantis-account-title {
-            font-size: 28px;
-            font-weight: 700;
-        }
-        .mantis-account-sub {
-            color: rgba(226, 232, 240, 0.75);
-            margin-top: 4px;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
+    _inject_styles()
 
     st.markdown('<div class="mantis-account-wrap">', unsafe_allow_html=True)
     st.markdown(
@@ -80,11 +93,49 @@ def main() -> None:
     return_page = st.session_state.get("auth_redirect_return_page", "home")
 
     if auth.is_authenticated():
-        st.success("Login complete. We’re finishing your request.")
-        st.caption("You can safely return to the studio while we complete your action.")
-        if st.button("Continue to Studio", type="primary", use_container_width=True):
-            _return_to_studio(return_page)
-        _render_debug_auth(st.user if hasattr(st, "user") else None)
+        st.success("You're signed in.")
+        profile_cols = st.columns([1, 2.2])
+        user = auth.get_current_user()
+        with profile_cols[0]:
+            avatar_url = auth.get_user_avatar_url(user)
+            if avatar_url:
+                st.image(avatar_url, width=72)
+            else:
+                st.markdown(
+                    f"<div class='mantis-avatar'>{auth.get_user_initials(user)}</div>",
+                    unsafe_allow_html=True,
+                )
+        with profile_cols[1]:
+            st.markdown(f"**{auth.get_user_display_name(user)}**")
+            email = auth.get_user_email(user)
+            if email:
+                st.caption(email)
+            provider_label = auth.get_provider_label(user)
+            if provider_label and not auth.is_email_provider(user):
+                st.caption(
+                    f"Signed in with {provider_label}. Password and recovery are managed by your provider."
+                )
+            if auth.is_email_provider(user):
+                auth.render_email_account_controls(email)
+            manage_url = auth.get_manage_account_url(user)
+            if manage_url:
+                st.link_button("Manage account", manage_url, use_container_width=True)
+        action_cols = st.columns(2)
+        with action_cols[0]:
+            if st.button(
+                "Return to Studio",
+                type="primary",
+                use_container_width=True,
+                key="account_return_to_studio",
+            ):
+                _return_to_studio(return_page)
+        with action_cols[1]:
+            auth.logout_button(
+                label="Sign out",
+                key="account_page_logout",
+                extra_state_keys=["projects_dir", "project", "page", "_force_nav"],
+            )
+        _render_debug_auth(user)
         st.markdown("</div>", unsafe_allow_html=True)
         return
 
