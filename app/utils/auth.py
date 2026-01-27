@@ -49,6 +49,22 @@ def _normalize_list(values: Optional[Iterable[str]]) -> list[str]:
     return [value.strip().lower() for value in values or [] if value and value.strip()]
 
 
+def _normalize_user_value(value: Any) -> Optional[str]:
+    if value is None:
+        return None
+    if isinstance(value, (list, tuple, set)):
+        for item in value:
+            if item:
+                return str(item)
+        return None
+    if isinstance(value, dict):
+        for key in ("value", "email", "id"):
+            if value.get(key):
+                return str(value[key])
+        return None
+    return str(value)
+
+
 def _get_user_attr(user: Any, attr: str) -> Optional[str]:
     if user is None:
         return None
@@ -56,7 +72,7 @@ def _get_user_attr(user: Any, attr: str) -> Optional[str]:
         value = user.get(attr)
     else:
         value = getattr(user, attr, None)
-    return value if value is not None else None
+    return _normalize_user_value(value)
 
 
 def get_user_email(user: Optional[Any] = None) -> str:
@@ -64,6 +80,7 @@ def get_user_email(user: Optional[Any] = None) -> str:
     return (
         _get_user_attr(user, "email")
         or _get_user_attr(user, "preferred_username")
+        or _get_user_attr(user, "upn")
         or ""
     )
 
@@ -104,6 +121,9 @@ def get_user_id(user: Optional[Any] = None) -> str:
         _get_user_attr(user, "sub")
         or _get_user_attr(user, "id")
         or _get_user_attr(user, "user_id")
+        or _get_user_attr(user, "oid")
+        or _get_user_attr(user, "uid")
+        or _get_user_attr(user, "username")
         or get_user_email(user)
     )
 
