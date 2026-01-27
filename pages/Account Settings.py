@@ -55,6 +55,10 @@ def _inject_styles() -> None:
     )
 
 
+def inject_theme() -> None:
+    _inject_styles()
+
+
 def _go_back_to_studio() -> None:
     st.session_state["page"] = "home"
     if hasattr(st, "switch_page"):
@@ -236,7 +240,6 @@ def _render_settings_ui(user: dict) -> None:
 def main() -> None:
     st.set_page_config(page_title="Account Access • MANTIS Studio", layout="wide")
     inject_theme()
-    _inject_styles()
 
     header_bar(
         "Account Access",

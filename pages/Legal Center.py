@@ -135,6 +135,10 @@ def _inject_styles() -> None:
     )
 
 
+def inject_theme() -> None:
+    _inject_styles()
+
+
 def _render_footer() -> None:
     st.markdown("---")
     f1, f2 = st.columns([1, 1])
@@ -151,7 +155,6 @@ def _render_footer() -> None:
 def main() -> None:
     st.set_page_config(page_title="Legal • MANTIS Studio", layout="wide")
     inject_theme()
-    _inject_styles()
     logo_b64 = _logo_base64()
 
     titles = [section["title"] for section in SECTIONS]
