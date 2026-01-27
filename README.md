@@ -33,7 +33,7 @@ management, MFA, and recovery are handled by your identity provider (Google, Mic
 2. Add your redirect URI:
    - Local: `http://localhost:8501/oauth2callback`
    - Streamlit Cloud: `https://<your-app>.streamlit.app/oauth2callback`
-3. Add the client ID and client secret to `.streamlit/secrets.toml` under `[auth.providers.google]`.
+3. Add the client ID and client secret to `.streamlit/secrets.toml` under `[auth.google]`.
 
 ### How to set up Microsoft Entra OIDC
 
@@ -41,20 +41,20 @@ management, MFA, and recovery are handled by your identity provider (Google, Mic
 2. Add your redirect URI:
    - Local: `http://localhost:8501/oauth2callback`
    - Streamlit Cloud: `https://<your-app>.streamlit.app/oauth2callback`
-3. Use the tenant issuer URL in secrets:
-   - Single tenant: `https://login.microsoftonline.com/<tenant-id>/v2.0`
-   - Multi-tenant: `https://login.microsoftonline.com/common/v2.0`
-4. Add the client ID and client secret to `.streamlit/secrets.toml` under `[auth.providers.microsoft]`.
+3. Use the tenant metadata URL in secrets:
+   - Single tenant: `https://login.microsoftonline.com/<tenant-id>/v2.0/.well-known/openid-configuration`
+   - Multi-tenant: `https://login.microsoftonline.com/common/v2.0/.well-known/openid-configuration`
+4. Add the client ID and client secret to `.streamlit/secrets.toml` under `[auth.microsoft]`.
 
 ### Apple Sign In (placeholder + future support)
 
-Streamlit-native OIDC does not ship with an Apple preset. To enable Apple later, add a provider block
-under `[auth.providers.apple]` with Apple’s OIDC metadata and credentials. Until then, the app shows
-Apple as “Coming soon.” This keeps the login UX consistent without breaking the current deployment.
+Streamlit-native OIDC does not ship with an Apple preset. To enable Apple, add a provider block
+under `[auth.apple]` with Apple’s OIDC metadata and credentials. The app hides the button if Apple
+is not configured.
 
 ### Required secrets (template)
 
-See `.streamlit/secrets.toml` for a full template including optional allowlists and admin emails.
+See `.streamlit/secrets.toml` (or the copyable `.streamlit/secrets.toml.example`) for a full template including optional allowlists and admin emails.
 At minimum, provide:
 
 ```toml
@@ -62,20 +62,20 @@ At minimum, provide:
 redirect_uri = "https://<your-app>.streamlit.app/oauth2callback"
 cookie_secret = "replace-with-a-long-random-string"
 
-[auth.providers.google]
+[auth.google]
 client_id = "..."
 client_secret = "..."
-issuer = "https://accounts.google.com"
+server_metadata_url = "https://accounts.google.com/.well-known/openid-configuration"
 
-[auth.providers.microsoft]
+[auth.microsoft]
 client_id = "..."
 client_secret = "..."
-issuer = "https://login.microsoftonline.com/<tenant-id>/v2.0"
+server_metadata_url = "https://login.microsoftonline.com/<tenant-id>/v2.0/.well-known/openid-configuration"
 
-[auth.providers.apple]
+[auth.apple]
 client_id = "..."
 client_secret = "..."
-issuer = "https://appleid.apple.com"
+server_metadata_url = "https://appleid.apple.com/.well-known/openid-configuration"
 ```
 
 ### Optional authorization controls

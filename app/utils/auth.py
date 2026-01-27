@@ -38,7 +38,7 @@ def is_logged_in(user: Optional[Any] = None) -> bool:
 
 
 def auth_is_configured() -> bool:
-    providers = _get_auth_config().get("providers", {})
+    providers = _get_providers()
     return any(
         provider.get("client_id") and provider.get("client_secret")
         for provider in providers.values()
@@ -141,7 +141,14 @@ def get_manage_account_url(user: Optional[Any] = None) -> str:
 
 
 def _get_providers() -> Dict[str, Any]:
-    return _get_auth_config().get("providers", {})
+    auth_config = _get_auth_config()
+    providers: Dict[str, Any] = dict(auth_config.get("providers", {}))
+    for key, value in auth_config.items():
+        if key in {"redirect_uri", "cookie_secret", "provider_account_url"}:
+            continue
+        if isinstance(value, dict):
+            providers.setdefault(key, value)
+    return providers
 
 
 def get_provider_keys() -> list[str]:
@@ -232,6 +239,8 @@ def render_login_screen(intent: Optional[str] = None, allow_guest: bool = False)
     )
     if intent:
         st.info(intent)
+    if allow_guest:
+        st.warning("Your creations will NOT be saved unless you create an account.")
     _render_login_error()
 
     providers = _get_providers()
@@ -262,30 +271,35 @@ def render_login_screen(intent: Optional[str] = None, allow_guest: bool = False)
                 return True
     with right:
         st.markdown('<div class="mantis-auth-card">', unsafe_allow_html=True)
-        _render_login_button(
-            "Continue with Google",
-            "google",
-            disabled=not google_ready,
-            key="login_google",
-        )
-        if not google_ready:
-            st.caption("Configure Google OIDC in secrets.toml to enable.")
-        _render_login_button(
-            "Continue with Microsoft",
-            "microsoft",
-            disabled=not microsoft_ready,
-            key="login_microsoft",
-        )
-        if not microsoft_ready:
-            st.caption("Configure Microsoft Entra OIDC in secrets.toml to enable.")
-        _render_login_button(
-            "Continue with Apple",
-            "apple",
-            disabled=not apple_ready,
-            key="login_apple",
-        )
-        if not apple_ready:
-            st.caption("Apple Sign In needs custom OIDC metadata. Coming soon—see README for setup notes.")
+        if not any([google_ready, microsoft_ready, apple_ready, other_provider]):
+            st.caption("No sign-in providers are configured yet. You can continue in Guest mode.")
+        if google_ready:
+            _render_login_button(
+                "Continue with Google",
+                "google",
+                disabled=False,
+                key="login_google",
+            )
+        else:
+            st.caption("Admin hasn’t configured Google sign-in yet.")
+        if microsoft_ready:
+            _render_login_button(
+                "Continue with Microsoft",
+                "microsoft",
+                disabled=False,
+                key="login_microsoft",
+            )
+        else:
+            st.caption("Admin hasn’t configured Microsoft sign-in yet.")
+        if apple_ready:
+            _render_login_button(
+                "Continue with Apple",
+                "apple",
+                disabled=False,
+                key="login_apple",
+            )
+        else:
+            st.caption("Admin hasn’t configured Apple sign-in yet.")
         if other_provider:
             st.divider()
             _render_login_button(
@@ -354,6 +368,13 @@ def _logout(extra_state_keys: Iterable[str]) -> None:
         st.logout()
     except Exception:
         st.session_state["auth_error"] = "Sign out failed. Please try again."
+    st.session_state["page"] = "home"
+    st.session_state["guest_mode"] = True
+    st.session_state["_force_nav"] = True
+    try:
+        st.rerun()
+    except Exception:
+        return
 
 
 def logout_button(
