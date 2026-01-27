@@ -22,6 +22,7 @@
 #   First-run welcome, clearer home, cleaner sidebar, better empty states, safer buttons/layout.
 
 import os
+from pathlib import Path
 import re
 import json
 import random
@@ -38,9 +39,10 @@ import requests
 # (UI-only imports are loaded inside _run_ui() so selftests can run without Streamlit installed.)
 
 import sys
-from app.ui.layout import render_footer
 from app.utils.navigation import get_nav_config
-from app.utils import auth
+
+# NOTE: Streamlit-dependent utilities are imported inside _run_ui() so
+# `python Mantis_Studio.py --selftest` can run without Streamlit installed.
 
 
 # ===== v45 BRANDING (SAFE, ORIGINAL TEMPLATE) =====
@@ -56,7 +58,28 @@ REPAIR_MODE = "--repair" in sys.argv
 # ============================================================
 
 def get_app_version() -> str:
-    return os.getenv("MANTIS_APP_VERSION", "47 (Chronicle • One-File)")
+    """Return the user-visible app version.
+
+    Priority:
+      1) Explicit env var (useful for CI/CD overrides)
+      2) VERSION.txt next to this file (repo-controlled)
+      3) A safe fallback string
+    """
+    env_version = os.getenv("MANTIS_APP_VERSION")
+    if env_version:
+        return env_version
+
+    try:
+        version_path = Path(__file__).with_name("VERSION.txt")
+        if version_path.exists():
+            raw = version_path.read_text(encoding="utf-8").strip()
+            if raw:
+                return raw
+    except Exception:
+        # Never block app start on version metadata.
+        pass
+
+    return "47.0"
 
 
 class AppConfig:
@@ -1088,6 +1111,8 @@ def _run_ui():
     from contextlib import contextmanager
     from pathlib import Path
     from app.components.ui import action_card, card, primary_button, section_header, stat_tile
+    from app.ui.layout import render_footer
+    from app.utils import auth
 
     widget_counters: Dict[tuple, int] = {}
     key_prefix_stack: List[str] = []
@@ -1181,7 +1206,10 @@ def _run_ui():
     _maybe_wrap("camera_input", "camera_input")
     _maybe_wrap("audio_input", "audio_input")
     _maybe_wrap("chat_input", "chat_input", has_label=False)
-    _maybe_wrap("page_link", "page_link")
+    # NOTE: st.page_link does not take a "label" as its first positional argument.
+    # Wrapping it with the generic label-first wrapper can break routing.
+    # If we need auto-keys for page_link later, add a signature-aware wrapper.
+    # _maybe_wrap("page_link", "page_link")
 
     def get_canon_health() -> tuple[str, str]:
         results = st.session_state.get("coherence_results", [])
@@ -3068,7 +3096,6 @@ def _run_ui():
         recent_projects = _load_recent_projects(active_dir, st.session_state.projects_refresh_token)
         has_project = bool(recent_projects)
 
-        render_guest_banner("dashboard")
 
         banner_bytes = load_asset_bytes("mantis_banner_dark.png")
         st.markdown('<div class="mantis-banner">', unsafe_allow_html=True)
@@ -3358,8 +3385,6 @@ def _run_ui():
         render_guest_banner("projects")
         active_dir = get_active_projects_dir()
         recent_projects = _load_recent_projects(active_dir, st.session_state.projects_refresh_token)
-
-        render_guest_banner("projects")
 
         if is_guest and st.session_state.get("guest_continue_action") == "create_project":
             pending_project = st.session_state.pop("guest_pending_project", None)
@@ -4457,7 +4482,8 @@ def _run_ui():
             st.metric("AI Readiness", f"{readiness}%")
 
     def render_chapters():
-        render_guest_banner("chapters")
+        # Single guest banner for the editor page (avoid duplicate widgets / duplicate keys).
+        render_guest_banner("editor")
         p = st.session_state.project
         if not p:
             with st.container(border=True):
@@ -4492,8 +4518,6 @@ def _run_ui():
             st.session_state.page = "outline"
             st.session_state._force_nav = True
             st.rerun()
-
-        render_guest_banner("editor")
 
         render_page_header(
             "Editor",
