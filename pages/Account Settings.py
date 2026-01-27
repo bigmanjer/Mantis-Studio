@@ -1,13 +1,8 @@
 from __future__ import annotations
 
 import streamlit as st
-from app.utils import auth
 
-with st.expander("Debug (admin)", expanded=False):
-    st.write("auth_is_configured():", auth.auth_is_configured())
-    st.write("SUPABASE_URL set:", bool(st.secrets.get("SUPABASE_URL", "")))
-    st.write("SUPABASE_ANON_KEY set:", bool(st.secrets.get("SUPABASE_ANON_KEY", "")))
-    st.write("redirect:", st.secrets.get("SUPABASE_REDIRECT_URL", ""))
+from app.utils import auth
 
 
 def _inject_styles() -> None:
@@ -62,7 +57,6 @@ def _inject_styles() -> None:
 
 def _go_back_to_studio() -> None:
     st.session_state["page"] = "home"
-    # Prefer switch_page if available
     if hasattr(st, "switch_page"):
         try:
             st.switch_page("Mantis_Studio.py")
@@ -76,8 +70,21 @@ def _key(name: str) -> str:
     return f"account_{name}"
 
 
+def _render_debug_panel() -> None:
+    with st.expander("Debug (admin)", expanded=False):
+        st.write("auth_is_configured():", auth.auth_is_configured())
+        st.write("SUPABASE_URL set:", bool(st.secrets.get("SUPABASE_URL", "")))
+        st.write("SUPABASE_ANON_KEY set:", bool(st.secrets.get("SUPABASE_ANON_KEY", "")))
+        st.write("redirect_url:", auth.get_redirect_url() or "")
+        ok, msg, meta = auth.auth_self_test()
+        st.write("self_test_ok:", ok)
+        st.write("self_test_message:", msg)
+        st.write("self_test_meta:", meta)
+
+
 def _render_login_ui() -> None:
-    if not auth.auth_is_configured():
+    configured = auth.auth_is_configured()
+    if not configured:
         st.warning("Supabase is not configured. Add SUPABASE_URL and SUPABASE_ANON_KEY to Streamlit secrets.")
 
     notice = st.session_state.pop("account_notice", None)
@@ -121,7 +128,7 @@ def _render_login_ui() -> None:
             with st.form(_key("login_form")):
                 email = st.text_input("Email", placeholder="you@example.com", key=_key("login_email"))
                 password = st.text_input("Password", type="password", key=_key("login_password"))
-                submit = st.form_submit_button("Log in", use_container_width=True)
+                submit = st.form_submit_button("Log in", use_container_width=True, disabled=not configured)
             if submit:
                 email = (email or "").strip().lower()
                 if "@" not in email:
@@ -140,11 +147,15 @@ def _render_login_ui() -> None:
             with st.expander("Forgot password?"):
                 remaining = auth.reset_cooldown_remaining()
                 with st.form(_key("reset_form")):
-                    reset_email = st.text_input("Email for reset link", placeholder="you@example.com", key=_key("reset_email"))
+                    reset_email = st.text_input(
+                        "Email for reset link",
+                        placeholder="you@example.com",
+                        key=_key("reset_email"),
+                    )
                     reset_submit = st.form_submit_button(
                         "Send reset link",
                         use_container_width=True,
-                        disabled=remaining > 0,
+                        disabled=(remaining > 0 or not configured),
                     )
                 if reset_submit:
                     reset_email = (reset_email or "").strip().lower()
@@ -160,13 +171,14 @@ def _render_login_ui() -> None:
 
                 if remaining > 0:
                     st.caption(f"Resend available in {remaining}s.")
+                st.caption("Password resets are handled by MANTIS (Supabase email/password).")
 
         with signup_tab:
             with st.form(_key("signup_form")):
                 email = st.text_input("Email", placeholder="you@example.com", key=_key("signup_email"))
                 password = st.text_input("Create password (8+ chars)", type="password", key=_key("signup_password"))
                 confirm = st.text_input("Confirm password", type="password", key=_key("signup_confirm"))
-                submit = st.form_submit_button("Create account", use_container_width=True)
+                submit = st.form_submit_button("Create account", use_container_width=True, disabled=not configured)
 
             if submit:
                 email = (email or "").strip().lower()
@@ -247,6 +259,8 @@ def main() -> None:
         """,
         unsafe_allow_html=True,
     )
+
+    _render_debug_panel()
 
     if auth.is_authenticated():
         user = auth.get_current_user() or {}

@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import importlib
+import importlib.util
 import pathlib
 import py_compile
 import sys
+from types import ModuleType
+from typing import Optional
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
@@ -30,6 +33,17 @@ def compile_sources() -> int:
     return failures
 
 
+def _import_page_module(label: str, path: pathlib.Path) -> Optional[ModuleType]:
+    if not path.exists():
+        raise FileNotFoundError(f"Page not found: {path}")
+    spec = importlib.util.spec_from_file_location(label, path)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"Unable to load module for {path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 def import_modules() -> int:
     failures = 0
     modules = [
@@ -37,8 +51,6 @@ def import_modules() -> int:
         "app.utils.auth",
         "app.utils.navigation",
         "app.ui.layout",
-        "pages.legal",
-        "pages.account",
     ]
     for module in modules:
         try:
@@ -46,6 +58,16 @@ def import_modules() -> int:
         except Exception as exc:  # noqa: BLE001 - healthcheck should capture all failures
             failures += 1
             print(f"[import] {module}: {exc}")
+    page_checks = {
+        "pages.account_settings": ROOT / "pages" / "Account Settings.py",
+        "pages.legal_center": ROOT / "pages" / "Legal Center.py",
+    }
+    for label, path in page_checks.items():
+        try:
+            _import_page_module(label, path)
+        except Exception as exc:  # noqa: BLE001 - healthcheck should capture all failures
+            failures += 1
+            print(f"[import] {label}: {exc}")
     return failures
 
 
