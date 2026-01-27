@@ -2865,10 +2865,10 @@ def _run_ui():
                 st.markdown("### Debug auth")
                 st.code(
                     {
-                        "user_keys": list(getattr(auth.get_current_user(), "keys", lambda: [])()),
-                        "user_id": auth.get_user_id_with_fallback(auth.get_current_user()),
-                        "user_display_name": auth.get_user_display_name(auth.get_current_user()),
-                        "user_email": auth.get_user_email(auth.get_current_user()),
+                        "user_keys": list(getattr(st.user, "keys", lambda: [])()),
+                        "user_id": auth.get_user_id_with_fallback(st.user),
+                        "user_display_name": auth.get_user_display_name(st.user),
+                        "user_email": auth.get_user_email(st.user),
                     },
                     language="json",
                 )
@@ -2903,10 +2903,10 @@ def _run_ui():
             st.markdown("### Debug auth")
             st.code(
                 {
-                    "user_keys": list(getattr(auth.get_current_user(), "keys", lambda: [])()),
-                    "user_id": auth.get_user_id_with_fallback(auth.get_current_user()),
-                    "user_display_name": auth.get_user_display_name(auth.get_current_user()),
-                    "user_email": auth.get_user_email(auth.get_current_user()),
+                    "user_keys": list(getattr(st.user, "keys", lambda: [])()),
+                    "user_id": auth.get_user_id_with_fallback(st.user),
+                    "user_display_name": auth.get_user_display_name(st.user),
+                    "user_email": auth.get_user_email(st.user),
                 },
                 language="json",
             )

@@ -84,7 +84,7 @@ def main() -> None:
         st.caption("You can safely return to the studio while we complete your action.")
         if st.button("Continue to Studio", type="primary", use_container_width=True):
             _return_to_studio(return_page)
-        _render_debug_auth(auth.get_current_user())
+        _render_debug_auth(st.user if hasattr(st, "user") else None)
         st.markdown("</div>", unsafe_allow_html=True)
         return
 
@@ -100,7 +100,7 @@ def main() -> None:
         st.session_state.pop("auth_redirect_return_page", None)
         _return_to_studio(return_page)
 
-    _render_debug_auth(auth.get_current_user())
+    _render_debug_auth(st.user if hasattr(st, "user") else None)
     st.markdown("</div>", unsafe_allow_html=True)
 
 
