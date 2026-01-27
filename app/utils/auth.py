@@ -7,6 +7,8 @@ from typing import Any, Dict, Optional, Tuple
 
 import streamlit as st
 
+from app.utils.keys import ui_key
+
 try:
     from supabase import create_client
 except Exception:  # pragma: no cover
@@ -472,7 +474,7 @@ def render_login_screen(intent: Optional[str] = None, allow_guest: bool = False)
         st.warning("Guest mode is active. Exports require a MANTIS account.")
     if not auth_is_configured():
         st.warning("Supabase is not configured. Add SUPABASE_URL and SUPABASE_ANON_KEY to Streamlit secrets.")
-    if st.button("Open Account Access", use_container_width=True, key="auth_open_account"):
+    if st.button("Open Account Access", use_container_width=True, key=ui_key("auth", "open_account")):
         try:
             if hasattr(st, "switch_page"):
                 st.switch_page("pages/Account Settings.py")
