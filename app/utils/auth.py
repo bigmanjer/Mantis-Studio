@@ -26,6 +26,23 @@ def _get_authz_config() -> Dict[str, Any]:
     return st.secrets.get("authz", {}) if hasattr(st, "secrets") else {}
 
 
+def get_current_user() -> Optional[Any]:
+    return st.user if hasattr(st, "user") else None
+
+
+def is_logged_in(user: Optional[Any] = None) -> bool:
+    user = user or get_current_user()
+    return bool(user)
+
+
+def auth_is_configured() -> bool:
+    providers = _get_auth_config().get("providers", {})
+    return any(
+        provider.get("client_id") and provider.get("client_secret")
+        for provider in providers.values()
+    )
+
+
 def _normalize_list(values: Optional[Iterable[str]]) -> list[str]:
     return [value.strip().lower() for value in values or [] if value and value.strip()]
 
@@ -123,6 +140,10 @@ def _get_providers() -> Dict[str, Any]:
     return _get_auth_config().get("providers", {})
 
 
+def get_provider_keys() -> list[str]:
+    return list(_get_providers().keys())
+
+
 def _provider_is_configured(provider_key: str) -> bool:
     providers = _get_providers()
     provider = providers.get(provider_key, {})
@@ -159,11 +180,8 @@ def _render_recovery_links() -> None:
 
 
 def render_login_screen() -> None:
-    st.title("Account Access")
-    st.write(
-        "Sign in with your organization account. Passwords and MFA are managed by your "
-        "identity provider."
-    )
+    st.markdown("## Create your MANTIS Studio account")
+    st.write("Save projects, sync across devices, and unlock cloud backups.")
     _render_login_error()
 
     providers = _get_providers()
@@ -176,35 +194,67 @@ def render_login_screen() -> None:
     ]
     other_provider = other_providers[0] if other_providers else ""
 
-    col1, col2 = st.columns(2)
-    with col1:
-        _render_login_button(
-            "Continue with Google",
-            "google",
-            disabled=not google_ready,
-            key="login_google",
-        )
-        if not google_ready:
-            st.caption("Configure Google OIDC in secrets.toml to enable.")
-    with col2:
-        _render_login_button(
-            "Continue with Microsoft",
-            "microsoft",
-            disabled=not microsoft_ready,
-            key="login_microsoft",
-        )
-        if not microsoft_ready:
-            st.caption("Configure Microsoft Entra OIDC in secrets.toml to enable.")
+    with st.container(border=True):
+        st.markdown("### Continue with")
+        col1, col2 = st.columns(2)
+        with col1:
+            if google_ready:
+                _render_login_button(
+                    "Continue with Google",
+                    "google",
+                    disabled=False,
+                    key="login_google",
+                )
+            else:
+                st.caption("Google sign-in not configured.")
+        with col2:
+            if microsoft_ready:
+                _render_login_button(
+                    "Continue with Microsoft",
+                    "microsoft",
+                    disabled=False,
+                    key="login_microsoft",
+                )
+            else:
+                st.caption("Microsoft sign-in not configured.")
 
-    if other_provider:
-        st.divider()
-        _render_login_button(
-            "Continue with other OIDC provider",
-            other_provider,
-            disabled=not _provider_is_configured(other_provider),
-            key="login_other_oidc",
+        st.button(
+            "Continue with Apple (Coming soon)",
+            use_container_width=True,
+            disabled=True,
+            help="Apple login can be added later via a generic OIDC provider.",
+            key="login_apple_disabled",
         )
 
+        if other_provider:
+            st.divider()
+            _render_login_button(
+                "Continue with other OIDC provider",
+                other_provider,
+                disabled=not _provider_is_configured(other_provider),
+                key="login_other_oidc",
+            )
+
+    if not auth_is_configured():
+        st.info(
+            "Admin setup required: configure Google or Microsoft OIDC in secrets.toml to enable sign-in."
+        )
+        with st.expander("Admin setup instructions"):
+            st.markdown(
+                """
+1. Open `.streamlit/secrets.toml`
+2. Add providers under `[auth.providers]`
+3. Include `client_id` and `client_secret` for Google/Microsoft
+                """
+            )
+
+    st.markdown("#### Why we ask you to sign in")
+    st.caption(
+        "Accounts keep your projects private, enable cloud sync, and protect access to your workspace."
+    )
+    st.markdown(
+        "- [Privacy](/?page=privacy)\n- [Terms](/?page=terms)\n- [Legal hub](/pages/legal.py)"
+    )
     st.divider()
     _render_recovery_links()
 

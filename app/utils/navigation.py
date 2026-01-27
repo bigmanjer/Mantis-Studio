@@ -2,28 +2,30 @@ from typing import Dict, List, Tuple
 
 
 def get_nav_config(has_project: bool) -> Tuple[List[str], Dict[str, str]]:
-    if has_project:
-        nav_labels = [
-            "Dashboard",
-            "Projects",
-            "Editor",
-            "Outline",
-            "World Bible",
-            "AI Tools",
-        ]
-        pmap = {
-            "Dashboard": "home",
-            "Projects": "projects",
-            "Editor": "chapters",
-            "Outline": "outline",
-            "World Bible": "world",
-            "AI Tools": "ai",
-        }
-    else:
-        nav_labels = ["Dashboard", "Projects", "AI Tools"]
-        pmap = {
-            "Dashboard": "home",
-            "Projects": "projects",
-            "AI Tools": "ai",
-        }
+    nav_labels = [
+        "Dashboard",
+        "Projects",
+        "Outline",
+        "Editor",
+        "World Bible",
+        "Memory",
+        "Insights",
+        "Export",
+        "AI Tools",
+        "Legal",
+        "Account",
+    ]
+    pmap = {
+        "Dashboard": "home",
+        "Projects": "projects",
+        "Outline": "outline",
+        "Editor": "chapters",
+        "World Bible": "world",
+        "Memory": "memory",
+        "Insights": "insights",
+        "Export": "export",
+        "AI Tools": "ai",
+        "Legal": "legal",
+        "Account": "account",
+    }
     return nav_labels, pmap

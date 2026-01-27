@@ -1,12 +1,15 @@
 import base64
+from datetime import date
 from pathlib import Path
 
 import streamlit as st
 
-from app.utils import auth
+from app.ui.layout import render_footer
+from app.utils.versioning import get_app_version
 
 LEGAL_DIR = Path(__file__).resolve().parents[1] / "legal"
 ASSETS_DIR = Path(__file__).resolve().parents[1] / "assets"
+LAST_UPDATED = date(2026, 1, 12)
 
 
 def _logo_base64() -> str:
@@ -21,11 +24,6 @@ def _load_markdown(filename: str) -> str:
     if not path.exists():
         return "Content unavailable."
     return path.read_text(encoding="utf-8")
-
-
-def render_section(title: str, filename: str) -> None:
-    st.markdown(f"### {title}")
-    st.markdown(_load_markdown(filename))
 
 
 def _inject_styles() -> None:
@@ -57,34 +55,14 @@ def _inject_styles() -> None:
             height: 32px;
             object-fit: contain;
         }
-        .mantis-legal-title {
-            font-size: 26px;
-            font-weight: 700;
-            margin: 0;
-        }
-        .mantis-legal-subtitle {
-            color: rgba(230, 240, 245, 0.72);
-            margin: 4px 0 0 0;
-        }
-        .mantis-page-title {
-            font-size: 26px;
-            font-weight: 700;
-            margin: 0;
-            color: #f8fafc;
-        }
-        .mantis-page-sub {
-            color: rgba(230, 240, 245, 0.72);
-            margin-top: 4px;
-            font-size: 14px;
-        }
         .mantis-legal-card {
             padding: 18px 20px;
             border-radius: 16px;
             border: 1px solid rgba(120, 199, 190, 0.2);
             background: rgba(18, 24, 30, 0.35);
         }
-        .mantis-legal-nav {
-            margin-top: 8px;
+        .mantis-legal-card h3 {
+            margin-top: 0;
         }
         </style>
         """,
@@ -92,28 +70,25 @@ def _inject_styles() -> None:
     )
 
 
+def _render_card(title: str, subtitle: str, content: str) -> None:
+    with st.container(border=True):
+        st.markdown(f"### {title}")
+        st.caption(subtitle)
+        st.markdown(content)
+
+
 def main() -> None:
     st.set_page_config(page_title="Legal • MANTIS Studio", layout="wide")
-    auth.require_login()
     _inject_styles()
     logo_b64 = _logo_base64()
 
     sections = [
-        ("Terms of Service", "terms.md"),
-        ("Privacy Policy", "privacy.md"),
-        ("Copyright", "copyright.md"),
-        ("Brand IP Clarity", "Brand_ip_Clarity.md"),
-        ("Trademark Path", "Trademark_Path.md"),
+        ("Terms of Service", "terms.md", "Rules for using MANTIS Studio responsibly."),
+        ("Privacy Policy", "privacy.md", "How we handle data and privacy."),
+        ("Copyright & IP", "copyright.md", "Ownership, rights, and licensing guidance."),
+        ("Acceptable Use", "Brand_ip_Clarity.md", "Safety, usage, and content rules."),
+        ("Trademark & Brand", "Trademark_Path.md", "Brand use and trademark guidance."),
     ]
-
-    with st.sidebar:
-        st.markdown("### Legal")
-        selected_title = st.radio(
-            "Legal sections",
-            [title for title, _ in sections],
-            label_visibility="collapsed",
-            key="legal__section_nav",
-        )
 
     header_logo = (
         f'<div class="mantis-legal-logo"><img src="data:image/png;base64,{logo_b64}" alt="Mantis logo" /></div>'
@@ -127,27 +102,32 @@ def main() -> None:
             <div class="mantis-legal-header">
                 {header_logo}
                 <div>
-                    <div class="mantis-page-title">Legal</div>
-                    <div class="mantis-page-sub">Policies and documentation for MANTIS Studio.</div>
+                    <div class="mantis-page-title">Legal Hub</div>
+                    <div class="mantis-page-sub">Policies, IP, and compliance documentation.</div>
                 </div>
             </div>
             """,
             unsafe_allow_html=True,
         )
+        st.caption(f"Last updated: {LAST_UPDATED.strftime('%B %d, %Y')}")
     with header_cols[1]:
         if st.button("⬅ Back to Studio", use_container_width=True, key="legal_back"):
             if hasattr(st, "switch_page"):
                 st.switch_page("Mantis_Studio.py")
             else:
                 st.info("Use the sidebar to return to the studio.")
+
+    st.markdown("#### Table of contents")
+    toc_cols = st.columns(3)
+    for idx, (title, _, _) in enumerate(sections):
+        with toc_cols[idx % 3]:
+            st.markdown(f"- {title}")
+
     st.markdown("")
-    with st.container(border=True):
-        st.markdown('<div class="mantis-legal-card">', unsafe_allow_html=True)
-        for title, filename in sections:
-            if title == selected_title:
-                render_section(title, filename)
-                break
-        st.markdown("</div>", unsafe_allow_html=True)
+    for title, filename, subtitle in sections:
+        _render_card(title, subtitle, _load_markdown(filename))
+
+    render_footer(get_app_version())
 
 
 if __name__ == "__main__":
