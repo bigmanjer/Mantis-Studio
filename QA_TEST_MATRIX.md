@@ -1,6 +1,6 @@
 # QA Test Matrix
 
-> **Note:** This matrix reflects a static click-path review (code-level) in this environment after the SaaS-style redesign. Runtime verification still requires a live Streamlit session with valid API keys and Supabase credentials.
+> **Note:** This matrix reflects a static click-path review (code-level) in this environment. Runtime verification still requires a live Streamlit session with valid API keys and Supabase credentials.
 
 | Page | Control/Button label | Expected behavior | Actual behavior (static review) | Status (PASS/FAIL) | Fix commit reference / file + line |
 | --- | --- | --- | --- | --- | --- |
@@ -17,8 +17,6 @@
 | Dashboard/Home | Project list “📂 {title}” | Loads project and routes to Chapters | Loads project then sets `page = "chapters"` | PASS | Mantis_Studio.py (render_home) |
 | Dashboard/Home | Project list “Open” | Loads project and routes to Chapters | Loads project then sets `page = "chapters"` | PASS | Mantis_Studio.py (render_home) |
 | Dashboard/Home | ⚙️ AI Settings | Routes to AI Tools | `open_ai_settings()` sets `page = "ai"` + rerun | PASS | Mantis_Studio.py (render_home) |
-| Header | Project selector | Loads selected project and routes to Editor | Loads project + `page = "chapters"` | PASS | Mantis_Studio.py (_render_header_bar) |
-| Header | Account button | Opens Account Access | Calls `open_account_settings()` | PASS | Mantis_Studio.py (_render_header_bar) |
 | Sidebar | Navigation radio | Updates page route | Sets `page` based on nav map, reruns | PASS | Mantis_Studio.py (sidebar nav) |
 | Sidebar | 💾 Save | Saves active project | Calls `persist_project()` | PASS | Mantis_Studio.py (sidebar) |
 | Sidebar | ✖ Close | Closes project and routes Home | Clears `project`, sets `page = "home"` + rerun | PASS | Mantis_Studio.py (sidebar) |

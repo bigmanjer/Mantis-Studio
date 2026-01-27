@@ -2,15 +2,7 @@ from __future__ import annotations
 
 import streamlit as st
 
-from app.ui.components import card_end, card_start, header_bar
-from app.ui.theme import inject_theme
 from app.utils import auth, ui_key
-
-
-def _safe_inject_theme() -> None:
-    theme_fn = globals().get("inject_theme")
-    if callable(theme_fn):
-        theme_fn()
 
 
 def _inject_styles() -> None:
@@ -243,7 +235,7 @@ def _render_settings_ui(user: dict) -> None:
 
 def main() -> None:
     st.set_page_config(page_title="Account Access • MANTIS Studio", layout="wide")
-    _safe_inject_theme()
+    inject_theme()
     _inject_styles()
 
     header_bar(

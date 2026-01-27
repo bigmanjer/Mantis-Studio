@@ -3438,6 +3438,19 @@ def _run_ui():
                 last_exception = st.session_state.get("last_exception") or "—"
                 st.caption(f"Last exception: {last_exception}")
 
+            if debug_enabled():
+                st.divider()
+                st.markdown("### 🛠 Debug")
+                st.caption(f"Page: {st.session_state.get('page', 'unknown')}")
+                last_action = st.session_state.get("last_action") or "—"
+                last_action_ts = st.session_state.get("last_action_ts")
+                if last_action_ts:
+                    st.caption(f"Last action: {last_action} ({time.strftime('%H:%M:%S', time.localtime(last_action_ts))})")
+                else:
+                    st.caption(f"Last action: {last_action}")
+                last_exception = st.session_state.get("last_exception") or "—"
+                st.caption(f"Last exception: {last_exception}")
+
     def render_home():
         render_guest_banner("home")
         active_dir = get_active_projects_dir()
@@ -5314,10 +5327,6 @@ def _run_ui():
 
     def _render_current_page() -> None:
         rendered_page = False
-        active_dir = get_active_projects_dir()
-        recent_projects = _load_recent_projects(active_dir, st.session_state.projects_refresh_token)
-        if st.session_state.page not in {"account"}:
-            _render_header_bar(recent_projects)
         if st.session_state.page == "home":
             with key_scope("dashboard"):
                 render_home()

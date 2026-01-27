@@ -7,7 +7,6 @@ from typing import List
 
 import streamlit as st
 
-from app.ui.theme import inject_theme
 from app.utils import ui_key
 
 SECTIONS = [
@@ -27,12 +26,6 @@ LAST_UPDATED = max(date.fromisoformat(section["updated"]) for section in SECTION
 
 def _key(name: str) -> str:
     return ui_key("legal", name)
-
-
-def _safe_inject_theme() -> None:
-    theme_fn = globals().get("inject_theme")
-    if callable(theme_fn):
-        theme_fn()
 
 
 def _logo_base64() -> str:
@@ -157,7 +150,7 @@ def _render_footer() -> None:
 
 def main() -> None:
     st.set_page_config(page_title="Legal • MANTIS Studio", layout="wide")
-    _safe_inject_theme()
+    inject_theme()
     _inject_styles()
     logo_b64 = _logo_base64()
 
