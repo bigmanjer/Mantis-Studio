@@ -2306,7 +2306,7 @@ def _run_ui():
     def is_authenticated() -> bool:
         return auth.is_authenticated()
 
-    def require_account(
+    def require_login(
         action: Optional[str] = None,
         payload: Optional[Dict[str, Any]] = None,
         return_to: str = "home",
@@ -2327,6 +2327,15 @@ def _run_ui():
             queue_pending_action(action or "signup", payload, return_to, reason=GUEST_BANNER_TEXT)
             return False
         return True
+
+    def require_account(
+        action: Optional[str] = None,
+        payload: Optional[Dict[str, Any]] = None,
+        return_to: str = "home",
+        *,
+        feature: Optional[str] = None,
+    ) -> bool:
+        return require_login(action, payload, return_to, feature=feature)
 
     def create_guest_project(title: str = "Guest Sandbox") -> Project:
         storage_dir = st.session_state.get("projects_dir") or AppConfig.PROJECTS_DIR
@@ -3256,12 +3265,13 @@ def _run_ui():
             )
             if auth.debug_auth_enabled():
                 st.markdown("### Debug auth")
+                debug_user = auth.get_current_user()
                 st.code(
                     {
-                        "user_keys": list(getattr(st.user, "keys", lambda: [])()),
-                        "user_id": auth.get_user_id_with_fallback(st.user),
-                        "user_display_name": auth.get_user_display_name(st.user),
-                        "user_email": auth.get_user_email(st.user),
+                        "user_keys": list(getattr(debug_user, "keys", lambda: [])()),
+                        "user_id": auth.get_user_id_with_fallback(debug_user),
+                        "user_display_name": auth.get_user_display_name(debug_user),
+                        "user_email": auth.get_user_email(debug_user),
                     },
                     language="json",
                 )
@@ -3283,14 +3293,7 @@ def _run_ui():
             email = auth.get_user_email(user)
             if email:
                 st.caption(email)
-            provider_label = auth.get_provider_label(user)
-            if provider_label and not auth.is_email_provider(user):
-                st.caption(f"Signed in with {provider_label}.")
-            if auth.is_email_provider(user):
-                auth.render_email_account_controls(email)
-            manage_url = auth.get_manage_account_url(user)
-            if manage_url:
-                st.link_button("Manage account", manage_url, use_container_width=True)
+            auth.render_email_account_controls(email)
 
         auth.logout_button(
             key="account_logout",
@@ -3299,12 +3302,13 @@ def _run_ui():
 
         if auth.debug_auth_enabled():
             st.markdown("### Debug auth")
+            debug_user = auth.get_current_user()
             st.code(
                 {
-                    "user_keys": list(getattr(st.user, "keys", lambda: [])()),
-                    "user_id": auth.get_user_id_with_fallback(st.user),
-                    "user_display_name": auth.get_user_display_name(st.user),
-                    "user_email": auth.get_user_email(st.user),
+                    "user_keys": list(getattr(debug_user, "keys", lambda: [])()),
+                    "user_id": auth.get_user_id_with_fallback(debug_user),
+                    "user_display_name": auth.get_user_display_name(debug_user),
+                    "user_email": auth.get_user_email(debug_user),
                 },
                 language="json",
             )
@@ -3944,7 +3948,7 @@ def _run_ui():
             tag="Export",
             key_prefix="export_header",
         )
-        if not require_account(feature="export", return_to="export"):
+        if not require_login(feature="export", return_to="export"):
             return
 
         export_project = None

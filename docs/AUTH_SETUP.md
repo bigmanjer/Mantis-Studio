@@ -1,21 +1,21 @@
-# Auth Setup (Supabase + Optional OIDC)
+# Auth Setup (Supabase)
 
-This app supports **MANTIS accounts** via Supabase Auth (email/password + magic link + password reset). OIDC buttons (Google/Microsoft/Apple) remain optional.
+MANTIS Studio uses Supabase Auth for email/password account creation, login, and password reset.
+Guest mode remains available, but export is gated behind a logged-in account.
 
-## Supabase (required for email signup/login)
+## Supabase project
 
 1. Create a Supabase project.
-2. Enable **Email/Password** and/or **Magic Link** in Supabase Auth settings.
+2. Enable **Email/Password** in Supabase Auth settings.
 3. Copy the project **URL** and **anon public key**.
 
-### Streamlit secrets
+## Streamlit secrets
 
 Add to `.streamlit/secrets.toml` (or Streamlit Cloud secrets):
 
 ```toml
-[supabase]
-url = "https://your-project.supabase.co"
-anon_key = "your-anon-public-key"
+SUPABASE_URL = "https://your-project.supabase.co"
+SUPABASE_ANON_KEY = "your-anon-public-key"
 ```
 
 Environment variable alternative:
@@ -25,29 +25,24 @@ export SUPABASE_URL="https://your-project.supabase.co"
 export SUPABASE_ANON_KEY="your-anon-public-key"
 ```
 
-## Optional OIDC providers
+## Profiles table
 
-If you want Google/Microsoft/Apple buttons, configure `auth` providers in secrets:
+Create a `profiles` table so account settings can store display names and usernames:
 
-```toml
-[auth]
-cookie_secret = "streamlit-cookie-secret"
-
-[auth.providers.google]
-client_id = "..."
-client_secret = "..."
-
-[auth.providers.microsoft]
-client_id = "..."
-client_secret = "..."
-
-[auth.providers.apple]
-client_id = "..."
-client_secret = "..."
+```sql
+create table if not exists public.profiles (
+  id uuid primary key,
+  email text,
+  display_name text,
+  username text unique,
+  created_at timestamp with time zone default now()
+);
 ```
+
+Optional: add RLS policies if you need stricter access controls.
 
 ## Notes
 
-- Email sign-in requires Supabase; without it the email form will be disabled.
-- Password reset and magic-link sends are rate-limited in-app to avoid abuse.
-- Guest mode remains available, but export is gated behind sign-in.
+- Password reset and sign-up confirmation emails are sent by Supabase.
+- The app rate-limits reset requests in-session to avoid abuse.
+- Guest mode remains available, but export requires a signed-in account.

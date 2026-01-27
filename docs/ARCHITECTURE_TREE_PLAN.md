@@ -43,6 +43,5 @@
 
 ## Risks + Mitigations
 - **Widget keys changing** → `ui_key()` returns unchanged key names and is used consistently.
-- **Auth/Streamlit OIDC usage** → keep `app/utils/auth.py` as compatibility wrapper.
+- **Auth/Supabase usage** → keep `app/utils/auth.py` as compatibility wrapper.
 - **Project IO changes** → retain `Project.save/load` logic and storage paths; no migrations.
-

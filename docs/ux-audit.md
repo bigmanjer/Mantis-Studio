@@ -8,7 +8,7 @@ This audit compares the current in-app flow to what users typically expect in a 
 | --- | --- | --- | --- | --- | --- | --- |
 | Guest landing | Guest banner appears, but CTAs are inconsistent and sometimes say “Enable cloud save.” | Clear “Create account” + “Sign in” calls-to-action on the dashboard landing. | Medium | Conversion + clarity | Low | `Mantis_Studio.py` → `render_guest_banner`, sidebar guest card |
 | Account access | Account page is functional but visually utilitarian; debug info unavailable. | Polished account access screen with clear benefits + guest safe path + debug mode for ops. | Medium | Trust + clarity | Medium | `pages/Account Settings.py`, `app/utils/auth.py` |
-| Auth troubleshooting | No built-in visibility into `st.user` fields for debugging provider issues. | Toggleable debug panel showing `st.user` keys and selected `user_id`. | High | Login reliability | Low | `pages/Account Settings.py`, `Mantis_Studio.py`, `app/utils/auth.py` |
+| Auth troubleshooting | No built-in visibility into Supabase profile data for debugging login issues. | Toggleable debug panel showing Supabase user + profile IDs. | High | Login reliability | Low | `pages/Account Settings.py`, `Mantis_Studio.py`, `app/utils/auth.py` |
 | Legal access | Legal is available but needs consistent “SaaS policy hub” layout with last-updated dates. | A fully designed legal hub with table of contents and support contact. | Medium | Trust + compliance | Low | `pages/Legal Center.py` |
 | User ID resolution | Session could fail when `email` is missing from provider payload. | Never block; resolve ID via email → preferred_username/upn → name → sub. | High | Access + data storage | Medium | `app/utils/auth.py`, `Mantis_Studio.py` |
 | Auth configuration guidance | No centralized runbook; Cloud secrets setup is not documented end-to-end. | A clear setup/runbook with redirect URLs and common failure modes. | High | Ops + onboarding | Low | `docs/streamlit-auth-runbook.md`, README |
@@ -19,7 +19,7 @@ This audit compares the current in-app flow to what users typically expect in a 
    - Files: `app/utils/auth.py`, `Mantis_Studio.py`.
 
 2. **Add DEBUG_AUTH mode** (High)
-   - Expose `st.user` keys + chosen user_id on Account page.
+   - Expose Supabase user + profile IDs on the Account page.
   - Files: `pages/Account Settings.py`, `Mantis_Studio.py`.
 
 3. **Guest-first onboarding refresh** (Medium)
