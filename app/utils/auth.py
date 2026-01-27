@@ -368,6 +368,13 @@ def _logout(extra_state_keys: Iterable[str]) -> None:
         st.logout()
     except Exception:
         st.session_state["auth_error"] = "Sign out failed. Please try again."
+    st.session_state["page"] = "home"
+    st.session_state["guest_mode"] = True
+    st.session_state["_force_nav"] = True
+    try:
+        st.rerun()
+    except Exception:
+        return
 
 
 def logout_button(
