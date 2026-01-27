@@ -73,6 +73,17 @@ def auth_is_configured() -> bool:
     return bool(_get_secret(_SUPABASE_URL_KEY) and _get_secret(_SUPABASE_ANON_KEY) and create_client is not None)
 
 
+def debug_auth_enabled() -> bool:
+    secrets = st.secrets if hasattr(st, "secrets") else {}
+    if isinstance(secrets, dict):
+        return bool(secrets.get("debug_auth") or (secrets.get("auth", {}) or {}).get("debug_auth"))
+    return False
+
+
+def get_redirect_url() -> Optional[str]:
+    return _get_redirect_url()
+
+
 def _client():
     if not auth_is_configured():
         return None
@@ -251,7 +262,7 @@ def auth_login(email: str, password: str) -> Tuple[bool, str]:
     email = (email or "").strip().lower()
 
     try:
-        logger.info("[LOGIN] email=%s", _mask_email(email))
+        logger.info("[LOGIN] email=%s configured=%s", _mask_email(email), auth_is_configured())
         res = c.auth.sign_in_with_password({"email": email, "password": password})
         session, user = _extract_session_user(res)
 
@@ -390,3 +401,97 @@ def update_profile(user_id: str, email: str, display_name: str, username: str) -
 
 def render_email_account_controls(email: str) -> None:
     st.caption("Password is managed by MANTIS (Supabase email/password), not Google/Microsoft/Apple.")
+
+
+def get_user_initials(user: Optional[Any] = None) -> str:
+    display_name = get_user_display_name(user or get_current_user() or {})
+    parts = [part for part in display_name.replace("@", " ").split() if part]
+    if len(parts) >= 2:
+        return f"{parts[0][0]}{parts[1][0]}".upper()
+    if parts:
+        return parts[0][:2].upper()
+    return "ME"
+
+
+def get_user_avatar_url(user: Optional[Any] = None) -> str:
+    user = user or get_current_user() or {}
+    meta = (user or {}).get("user_metadata") or {}
+    return str(meta.get("avatar_url") or meta.get("picture") or "")
+
+
+def user_is_admin(user: Optional[Any] = None) -> bool:
+    secrets = st.secrets if hasattr(st, "secrets") else {}
+    authz = {}
+    if isinstance(secrets, dict):
+        authz = secrets.get("authz", {}) or {}
+    admin_emails = [e.strip().lower() for e in (authz.get("admin_emails") or []) if e and e.strip()]
+    email = get_user_email(user or get_current_user() or {}).lower()
+    return bool(email and email in admin_emails)
+
+
+def get_manage_account_url(user: Optional[Any] = None) -> str:
+    return ""
+
+
+def render_login_screen(intent: Optional[str] = None, allow_guest: bool = False) -> bool:
+    st.markdown(
+        """
+        <style>
+        .mantis-auth-hero {
+            padding: 24px 26px;
+            border-radius: 22px;
+            border: 1px solid rgba(34, 197, 94, 0.28);
+            background: linear-gradient(135deg, rgba(8, 20, 14, 0.95), rgba(5, 10, 16, 0.95));
+            box-shadow: 0 16px 32px rgba(0,0,0,0.3);
+        }
+        .mantis-auth-title {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+        .mantis-auth-sub {
+            color: rgba(226, 232, 240, 0.75);
+            font-size: 14px;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        """
+        <div class="mantis-auth-hero">
+            <div class="mantis-auth-title">Sign in to MANTIS</div>
+            <div class="mantis-auth-sub">Use your email + password to enable cloud sync and exports.</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    if intent:
+        st.info(intent)
+    if allow_guest:
+        st.warning("Guest mode is active. Exports require a MANTIS account.")
+    if not auth_is_configured():
+        st.warning("Supabase is not configured. Add SUPABASE_URL and SUPABASE_ANON_KEY to Streamlit secrets.")
+    if st.button("Open Account Access", use_container_width=True, key="auth_open_account"):
+        try:
+            if hasattr(st, "switch_page"):
+                st.switch_page("pages/Account Settings.py")
+        except Exception:
+            st.info("Open the Account page from the Streamlit page menu.")
+    return is_authenticated()
+
+
+def auth_self_test() -> Tuple[bool, str, Dict[str, Any]]:
+    c = _client()
+    if c is None:
+        return False, "Supabase client is not configured.", {"configured": False}
+    session = _get_session()
+    if not session:
+        return True, "Supabase client ready (no active session).", {"configured": True, "has_session": False}
+    try:
+        res = c.auth.get_user()
+        session_user, user = _extract_session_user(res)
+        return True, "Supabase session reachable.", {"configured": True, "has_session": True, "user": bool(user or session_user)}
+    except Exception as e:
+        logger.exception("[SELFTEST] exception")
+        return False, f"Supabase self-test failed: {type(e).__name__}: {e}", {"configured": True, "has_session": True}
