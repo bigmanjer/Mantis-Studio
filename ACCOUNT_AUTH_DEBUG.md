@@ -20,7 +20,7 @@ In Supabase → Authentication:
 
 ## Where to see logs
 Streamlit Cloud → “Manage app” → “Logs”.  
-Auth events are logged with prefixes like `[SIGNUP]`, `[LOGIN]`, `[RESET]`, and `[SELFTEST]`.
+Auth events are logged with prefixes like `[SIGNUP]`, `[LOGIN]`, `[RESET]`, and `[SELFTEST]` **when debug mode is on**.
 
 ## How to verify new users
 Supabase → Authentication → **Users**.  

@@ -69,13 +69,29 @@ def _go_back_to_studio() -> None:
         except Exception:
             pass
     st.info("Use the app navigation to return to the Studio (Dashboard).")
+    st.rerun()
 
 
 def _key(name: str) -> str:
     return ui_key("account", name)
 
 
+def _debug_enabled() -> bool:
+    try:
+        secrets = st.secrets
+    except Exception:
+        secrets = {}
+    if isinstance(secrets, dict):
+        return bool(secrets.get("DEBUG")) or bool(st.session_state.get("debug"))
+    try:
+        return bool(secrets["DEBUG"]) or bool(st.session_state.get("debug"))
+    except Exception:
+        return bool(st.session_state.get("debug"))
+
+
 def _render_debug_panel() -> None:
+    if not _debug_enabled():
+        return
     with st.expander("Debug (admin)", expanded=False):
         st.write("auth_is_configured():", auth.auth_is_configured())
         st.write("SUPABASE_URL set:", bool(st.secrets.get("SUPABASE_URL", "")))
@@ -221,9 +237,19 @@ def _render_settings_ui(user: dict) -> None:
         st.error(error)
 
     with st.form(_key("settings_form")):
-        st.text_input("Email", value=email, disabled=True)
-        display_name = st.text_input("Display name", value=profile.get("display_name", ""), placeholder="Your name")
-        username = st.text_input("Username", value=profile.get("username", ""), placeholder="your-handle")
+        st.text_input("Email", value=email, disabled=True, key=_key("settings_email"))
+        display_name = st.text_input(
+            "Display name",
+            value=profile.get("display_name", ""),
+            placeholder="Your name",
+            key=_key("settings_display_name"),
+        )
+        username = st.text_input(
+            "Username",
+            value=profile.get("username", ""),
+            placeholder="your-handle",
+            key=_key("settings_username"),
+        )
         save = st.form_submit_button("Save changes", use_container_width=True)
 
     if save:

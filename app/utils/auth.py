@@ -91,6 +91,19 @@ def debug_auth_enabled() -> bool:
     return False
 
 
+def _debug_enabled() -> bool:
+    try:
+        secrets = st.secrets
+    except Exception:
+        secrets = {}
+    if isinstance(secrets, dict):
+        return bool(secrets.get("DEBUG")) or bool(st.session_state.get("debug"))
+    try:
+        return bool(secrets["DEBUG"]) or bool(st.session_state.get("debug"))
+    except Exception:
+        return bool(st.session_state.get("debug"))
+
+
 def get_redirect_url() -> Optional[str]:
     return _get_redirect_url()
 
@@ -103,11 +116,12 @@ def _client():
         key = _get_secret(_SUPABASE_ANON_KEY).strip()
 
         # Helpful hint in logs if using new publishable key
-        if key.startswith("sb_publishable_"):
+        if key.startswith("sb_publishable_") and _debug_enabled():
             logger.info("[INIT] Using publishable key format (sb_publishable_...). If auth fails, try legacy anon key (eyJ...).")
 
         st.session_state[_SS_CLIENT] = create_client(url, key)
-        logger.info("[INIT] Supabase client created url=%s", url)
+        if _debug_enabled():
+            logger.info("[INIT] Supabase client created url=%s", url)
     return st.session_state[_SS_CLIENT]
 
 
@@ -243,11 +257,18 @@ def auth_signup(email: str, password: str) -> Tuple[bool, str]:
         if redirect_to:
             payload["options"] = {"email_redirect_to": redirect_to}
 
-        logger.info("[SIGNUP] email=%s redirect_to=%s configured=%s", _mask_email(email), _safe_str(redirect_to), auth_is_configured())
+        if _debug_enabled():
+            logger.info(
+                "[SIGNUP] email=%s redirect_to=%s configured=%s",
+                _mask_email(email),
+                _safe_str(redirect_to),
+                auth_is_configured(),
+            )
         res = c.auth.sign_up(payload)
         session, user = _extract_session_user(res)
 
-        logger.info("[SIGNUP] session=%s user=%s", bool(session), bool(user))
+        if _debug_enabled():
+            logger.info("[SIGNUP] session=%s user=%s", bool(session), bool(user))
 
         if session and user:
             _set_session(session)
@@ -273,11 +294,13 @@ def auth_login(email: str, password: str) -> Tuple[bool, str]:
     email = (email or "").strip().lower()
 
     try:
-        logger.info("[LOGIN] email=%s configured=%s", _mask_email(email), auth_is_configured())
+        if _debug_enabled():
+            logger.info("[LOGIN] email=%s configured=%s", _mask_email(email), auth_is_configured())
         res = c.auth.sign_in_with_password({"email": email, "password": password})
         session, user = _extract_session_user(res)
 
-        logger.info("[LOGIN] session=%s user=%s", bool(session), bool(user))
+        if _debug_enabled():
+            logger.info("[LOGIN] session=%s user=%s", bool(session), bool(user))
 
         if session and user:
             _set_session(session)
@@ -298,7 +321,8 @@ def auth_request_password_reset(email: str) -> Tuple[bool, str]:
 
     try:
         redirect_to = _get_redirect_url()
-        logger.info("[RESET] email=%s redirect_to=%s", _mask_email(email), _safe_str(redirect_to))
+        if _debug_enabled():
+            logger.info("[RESET] email=%s redirect_to=%s", _mask_email(email), _safe_str(redirect_to))
         if redirect_to:
             c.auth.reset_password_for_email(email, {"redirect_to": redirect_to})
         else:
