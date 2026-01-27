@@ -37,6 +37,59 @@ allowed_emails = ["admin@example.com"]
 admin_emails = ["admin@example.com"]
 ```
 
+## Keycloak self-registration + OIDC client (optional)
+Use this when you want Keycloak to handle sign up + login for MANTIS Studio.
+
+### 1) Enable account creation in Keycloak
+In the Keycloak Admin Console for your realm:
+- **Realm Settings → Login**
+  - **User registration** = ON (shows **Register** link on login screen).
+  - **Forgot password** = ON (shows **Forgot password?** on login screen).
+  - **Verify email** = ON (recommended).
+  - **Login with email** = ON (optional; allows email instead of username).
+
+> If you enable **Verify email** or **Forgot password**, you must configure SMTP under **Realm Settings → Email**. Otherwise these flows will fail.
+
+### 2) Configure the Keycloak OIDC client
+Create/verify a Keycloak client (OpenID Connect):
+- **Client type:** OpenID Connect
+- **Standard flow:** ON (authorization code flow)
+- **Client authentication:** ON (confidential client; required for `client_secret`)
+- **Valid Redirect URIs (must match exactly):**
+  - `http://localhost:8501/oauth2callback`
+  - `https://mantis-studio.streamlit.app/oauth2callback`
+- **Web Origins:**
+  - `http://localhost:8501`
+  - `https://mantis-studio.streamlit.app`
+
+> Most “can’t login / can’t create account” issues are due to a redirect URI mismatch.
+
+### 3) Point Streamlit to Keycloak
+Keycloak discovery URL format:
+`https://<YOUR_KEYCLOAK_HOST>/realms/<REALM>/.well-known/openid-configuration`
+
+Add a provider block to secrets:
+```toml
+[auth]
+redirect_uri = "https://mantis-studio.streamlit.app/oauth2callback"
+cookie_secret = "replace-with-a-long-random-string"
+
+[auth.keycloak]
+client_id = "mantis"
+client_secret = "YOUR_CLIENT_SECRET"
+server_metadata_url = "https://KEYCLOAK_HOST/realms/YOUR_REALM/.well-known/openid-configuration"
+```
+
+For local testing, use `redirect_uri = "http://localhost:8501/oauth2callback"` and ensure the localhost redirect URI is registered in Keycloak.
+
+### 4) How “Create account” works in MANTIS
+Streamlit’s `st.login()` uses a standard OIDC redirect flow and does not expose custom OIDC parameters (such as `prompt=create`) yet. The easiest path is:
+- Show a **Sign in / Create account** button that calls `st.login()`.
+- Users click **Register** on the Keycloak login page if self-registration is enabled.
+
+### 5) Local profile creation (recommended)
+Even with Keycloak, create a local profile for each user (plan tier, preferences, saved AI keys, etc.) on first login.
+
 ### Redirect URLs
 - **Local:** `http://localhost:8501/oauth2callback`
 - **Streamlit Cloud:** `https://<your-app>.streamlit.app/oauth2callback`
