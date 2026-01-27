@@ -1232,13 +1232,10 @@ def _run_ui():
     page_icon = str(icon_path) if icon_path.exists() else "🪲"
     st.set_page_config(page_title=AppConfig.APP_NAME, page_icon=page_icon, layout="wide")
 
-    raw_user = st.user
+    user = st.user
     config_data = load_app_config()
 
-    raw_user_id = auth.get_user_id(raw_user) if raw_user else ""
-    has_auth_identity = bool(raw_user and raw_user_id)
-    user = raw_user if has_auth_identity else None
-    is_guest = not has_auth_identity
+    is_guest = not bool(user)
     st.session_state["guest_mode"] = is_guest
     if is_guest:
         st.session_state.setdefault("guest_session_id", uuid.uuid4().hex[:8])
@@ -1983,18 +1980,12 @@ def _run_ui():
 
     if is_guest:
         user_id = f"guest_{st.session_state['guest_session_id']}"
-        if raw_user and not raw_user_id:
-            st.warning(
-                "We couldn't read a user identifier from your login, so you're in Guest mode. "
-                "Sign out and sign back in to enable cloud saving."
-            )
-            auth.logout_button(key="auth_missing_user_id_logout")
     else:
-        if not auth.is_user_allowed(user):
-            st.error("Your account is not authorized to access this workspace.")
-            auth.logout_button(label="Sign out", key="auth_denied_logout")
+        user_id = auth.get_user_id(user)
+        if not user_id:
+            st.error("We could not determine a user identifier from your login. Please try again.")
+            auth.logout_button(key="auth_missing_user_id_logout")
             st.stop()
-        user_id = raw_user_id
 
     if st.session_state.user_id != user_id:
         st.session_state.user_id = user_id

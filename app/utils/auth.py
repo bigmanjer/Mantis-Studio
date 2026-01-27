@@ -169,10 +169,6 @@ def is_authenticated() -> bool:
     return bool(getattr(st, "user", None))
 
 
-def is_user_allowed(user: Optional[Any] = None) -> bool:
-    return _user_is_allowed(user)
-
-
 def render_login_screen(intent: Optional[str] = None, allow_guest: bool = False) -> bool:
     st.markdown(
         """
