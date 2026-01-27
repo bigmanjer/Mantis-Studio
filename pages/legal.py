@@ -82,6 +82,40 @@ def _inject_styles() -> None:
             color: rgba(230, 240, 245, 0.72);
             margin: 4px 0 0 0;
         }
+        .mantis-legal-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            border-radius: 999px;
+            border: 1px solid rgba(120, 199, 190, 0.35);
+            background: rgba(15, 23, 42, 0.5);
+            color: rgba(226, 232, 240, 0.85);
+            font-size: 12px;
+        }
+        .mantis-legal-summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 16px;
+            margin: 18px 0 8px;
+        }
+        .mantis-legal-card {
+            padding: 14px 16px;
+            border-radius: 16px;
+            border: 1px solid rgba(148, 163, 184, 0.25);
+            background: rgba(15, 23, 42, 0.55);
+        }
+        .mantis-legal-sidebar {
+            position: sticky;
+            top: 16px;
+            padding: 16px;
+            border-radius: 16px;
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            background: rgba(7, 12, 18, 0.7);
+        }
+        .mantis-legal-sidebar h4 {
+            margin-top: 0;
+        }
         .stMarkdown p, .stMarkdown li {
             font-size: 16px;
             line-height: 1.7;
@@ -139,12 +173,31 @@ def main() -> None:
                 <div>
                     <div class="mantis-legal-title">Legal Center</div>
                     <div class="mantis-legal-subtitle">Readable policies, clear updates, and trust-first explanations.</div>
+                    <div class="mantis-legal-chip">Last updated {LAST_UPDATED.strftime('%B %d, %Y')}</div>
                 </div>
             </div>
             """,
             unsafe_allow_html=True,
         )
-        st.caption(f"Last updated: {LAST_UPDATED.strftime('%B %d, %Y')}")
+        st.markdown(
+            """
+            <div class="mantis-legal-summary">
+                <div class="mantis-legal-card">
+                    <strong>Clarity first</strong>
+                    <div>Short summaries, plain-language details, and clear next steps.</div>
+                </div>
+                <div class="mantis-legal-card">
+                    <strong>Trust & safety</strong>
+                    <div>We highlight how data is handled and where responsibilities sit.</div>
+                </div>
+                <div class="mantis-legal-card">
+                    <strong>Support ready</strong>
+                    <div>Questions? Reach out anytime at legal@mantis-studio.example.</div>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
     with header_cols[1]:
         if st.button("⬅ Back to Studio", use_container_width=True, key="legal_back"):
             if hasattr(st, "switch_page"):
@@ -153,15 +206,34 @@ def main() -> None:
                 st.info("Use the sidebar to return to the studio.")
 
     st.markdown("")
-    with st.container(border=True):
-        st.markdown(f"## {section['title']}")
-        st.caption(f"Last updated: {section['updated']}")
-        if toc:
-            st.markdown("#### Table of contents")
-            for item in toc:
-                st.markdown(f"- {item}")
-            st.divider()
-        st.markdown(markdown)
+    main_cols = st.columns([3, 1], gap="large")
+    with main_cols[0]:
+        with st.container(border=True):
+            st.markdown(f"## {section['title']}")
+            st.caption(f"Last updated: {section['updated']}")
+            if toc:
+                st.markdown("#### Table of contents")
+                for item in toc:
+                    st.markdown(f"- {item}")
+                st.divider()
+            st.markdown(markdown)
+    with main_cols[1]:
+        links_html = "".join(f"<li><strong>{item['title']}</strong></li>" for item in SECTIONS)
+        st.markdown(
+            f"""
+            <div class="mantis-legal-sidebar">
+                <h4>Quick links</h4>
+                <p>Jump to core policies and support resources.</p>
+                <ul>
+                    {links_html}
+                </ul>
+                <hr style="border-color: rgba(148, 163, 184, 0.25); margin: 12px 0;">
+                <strong>Need help?</strong>
+                <div>support@mantis-studio.example</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
     _render_footer()
 
