@@ -56,6 +56,12 @@ _SS_RESET_LAST_TS = "_sb_reset_last_ts"
 
 RESET_COOLDOWN_SECONDS = 60
 
+_DEFAULT_SECRETS = {
+    _SUPABASE_URL_KEY: "https://ojccaojeazwkqeqrutzo.supabase.co",
+    _SUPABASE_ANON_KEY: "sb_publishable_Iv3r0kQptOsNqcoNoFF8oA_Ty0nDBi4",
+    _SUPABASE_REDIRECT_URL_KEY: "https://mantis-studio.streamlit.app/Account_Settings",
+}
+
 
 @dataclass
 class AuthResult:
@@ -66,9 +72,12 @@ class AuthResult:
 def _get_secret(name: str, default: str = "") -> str:
     # Streamlit Cloud + local secrets.toml
     try:
-        return str(st.secrets.get(name, default) or default)
+        value = st.secrets.get(name, default)
+        if value:
+            return str(value)
     except Exception:
-        return default
+        value = default
+    return str(_DEFAULT_SECRETS.get(name, value) or value)
 
 
 def auth_is_configured() -> bool:
