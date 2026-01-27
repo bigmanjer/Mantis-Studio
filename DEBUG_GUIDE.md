@@ -15,23 +15,28 @@ Add this to `.streamlit/secrets.toml` (or your Streamlit Cloud secrets):
 DEBUG = true
 ```
 
-Restart the app. The sidebar will show a **Debug** panel with:
+Restart the app. The sidebar will show a **Debug** expander with:
 
 - Current page name
 - Last clicked action
 - Last exception string
 
-### Option B — Session state (local/dev)
+### Option B — Toggle in the UI
 
-If you are running locally and want to toggle via Python:
+Open the **Debug** expander in the sidebar and switch on **Enable debug mode**. This sets
+`st.session_state.debug = True` for the current session.
+
+### Option C — Session state (local/dev)
+
+If you are running locally and want to toggle via Python, set:
 
 ```python
 st.session_state.debug = True
 ```
 
-This can be set in a temporary local scratch panel or via `streamlit run` with a one-off snippet.
+This can be set in a temporary local scratch panel or via a local snippet before the main UI renders.
 
 ## Exception handling
 
 Unhandled exceptions are logged and surfaced as a friendly error message.
-When debug mode is enabled, the full exception stack is shown in the UI.
+When debug mode is enabled, routing changes, button clicks, and full exception stacks are shown in the UI.

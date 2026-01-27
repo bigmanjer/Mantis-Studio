@@ -1356,10 +1356,24 @@ def _run_ui():
             for pending_key, pending_value in pending.items():
                 st.session_state[pending_key] = pending_value
 
+    def _debug_mode_enabled() -> bool:
+        try:
+            secrets = st.secrets
+        except Exception:
+            secrets = {}
+        if isinstance(secrets, dict):
+            return bool(secrets.get("DEBUG")) or bool(st.session_state.get("debug"))
+        try:
+            return bool(secrets["DEBUG"]) or bool(st.session_state.get("debug"))
+        except Exception:
+            return bool(st.session_state.get("debug"))
+
     def _record_action(action_label: Optional[str], action_key: Optional[str]) -> None:
         label = (action_label or action_key or "action").strip()
         st.session_state["last_action"] = label
         st.session_state["last_action_ts"] = time.time()
+        if _debug_mode_enabled():
+            logger.info("[UI] action=%s", label)
 
     @contextmanager
     def key_scope(prefix: str) -> Generator[None, None, None]:
@@ -2077,6 +2091,7 @@ def _run_ui():
     init_state("projects_dir", None)
     init_state("project", None)
     init_state("page", "home")
+    init_state("_last_page", st.session_state.get("page", "home"))
     init_state("auto_save", not is_guest)
     init_state("ghost_text", "")
     init_state("pending_improvement_text", "")
@@ -2126,16 +2141,7 @@ def _run_ui():
     AppConfig.OPENAI_MODEL = st.session_state.openai_model
 
     def debug_enabled() -> bool:
-        try:
-            secrets = st.secrets
-        except Exception:
-            secrets = {}
-        if isinstance(secrets, dict):
-            return bool(secrets.get("DEBUG")) or bool(st.session_state.get("debug"))
-        try:
-            return bool(secrets["DEBUG"]) or bool(st.session_state.get("debug"))
-        except Exception:
-            return bool(st.session_state.get("debug"))
+        return _debug_mode_enabled()
 
     def open_legal_page() -> None:
         if hasattr(st, "switch_page"):
@@ -3425,31 +3431,37 @@ def _run_ui():
                         st.session_state.page = "home"
                         st.rerun()
 
-            if debug_enabled():
-                st.divider()
-                st.markdown("### 🛠 Debug")
-                st.caption(f"Page: {st.session_state.get('page', 'unknown')}")
-                last_action = st.session_state.get("last_action") or "—"
-                last_action_ts = st.session_state.get("last_action_ts")
-                if last_action_ts:
-                    st.caption(f"Last action: {last_action} ({time.strftime('%H:%M:%S', time.localtime(last_action_ts))})")
-                else:
-                    st.caption(f"Last action: {last_action}")
-                last_exception = st.session_state.get("last_exception") or "—"
-                st.caption(f"Last exception: {last_exception}")
+            st.divider()
+            try:
+                secrets = st.secrets
+            except Exception:
+                secrets = {}
+            if isinstance(secrets, dict):
+                debug_locked = bool(secrets.get("DEBUG"))
+            else:
+                try:
+                    debug_locked = bool(secrets["DEBUG"])
+                except Exception:
+                    debug_locked = False
 
-            if debug_enabled():
-                st.divider()
-                st.markdown("### 🛠 Debug")
-                st.caption(f"Page: {st.session_state.get('page', 'unknown')}")
-                last_action = st.session_state.get("last_action") or "—"
-                last_action_ts = st.session_state.get("last_action_ts")
-                if last_action_ts:
-                    st.caption(f"Last action: {last_action} ({time.strftime('%H:%M:%S', time.localtime(last_action_ts))})")
+            with st.expander("Debug", expanded=False):
+                st.toggle("Enable debug mode", key="debug", disabled=debug_locked)
+                if debug_locked:
+                    st.caption("Debug mode is forced on by secrets.")
+                if debug_enabled():
+                    st.caption(f"Page: {st.session_state.get('page', 'unknown')}")
+                    last_action = st.session_state.get("last_action") or "—"
+                    last_action_ts = st.session_state.get("last_action_ts")
+                    if last_action_ts:
+                        st.caption(
+                            f"Last action: {last_action} ({time.strftime('%H:%M:%S', time.localtime(last_action_ts))})"
+                        )
+                    else:
+                        st.caption(f"Last action: {last_action}")
+                    last_exception = st.session_state.get("last_exception") or "—"
+                    st.caption(f"Last exception: {last_exception}")
                 else:
-                    st.caption(f"Last action: {last_action}")
-                last_exception = st.session_state.get("last_exception") or "—"
-                st.caption(f"Last exception: {last_exception}")
+                    st.caption("Enable debug mode to view routing, action, and exception details.")
 
     def render_home():
         render_guest_banner("home")
@@ -5370,6 +5382,20 @@ def _run_ui():
                 st.rerun()
         if rendered_page:
             render_app_footer()
+
+    current_page = st.session_state.get("page", "home")
+    last_page = st.session_state.get("_last_page", current_page)
+    if current_page != last_page:
+        if debug_enabled():
+            logger.info(
+                "[ROUTE] from=%s to=%s action=%s",
+                last_page,
+                current_page,
+                st.session_state.get("last_action") or "—",
+            )
+        st.session_state["_last_page"] = current_page
+    else:
+        st.session_state["_last_page"] = current_page
 
     try:
         _render_current_page()
