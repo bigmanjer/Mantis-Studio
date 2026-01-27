@@ -6,8 +6,10 @@ import streamlit as st
 
 GOOGLE_ACCOUNT_URL = "https://myaccount.google.com/"
 MICROSOFT_ACCOUNT_URL = "https://myaccount.microsoft.com/"
+APPLE_ACCOUNT_URL = "https://appleid.apple.com/"
 GOOGLE_RECOVERY_URL = "https://accounts.google.com/signin/recovery"
 MICROSOFT_RECOVERY_URL = "https://account.live.com/password/reset"
+APPLE_RECOVERY_URL = "https://iforgot.apple.com/password/verify/appleid"
 
 DEFAULT_SESSION_CLEAR_KEYS = (
     "projects_dir",
@@ -133,6 +135,8 @@ def get_manage_account_url(user: Optional[Any] = None) -> str:
         return GOOGLE_ACCOUNT_URL
     if "microsoft" in provider_key or "entra" in provider_key:
         return MICROSOFT_ACCOUNT_URL
+    if "apple" in provider_key:
+        return APPLE_ACCOUNT_URL
     return _get_auth_config().get("provider_account_url", "")
 
 
@@ -177,55 +181,111 @@ def _render_recovery_links() -> None:
     st.markdown(
         f"- [Microsoft account recovery]({MICROSOFT_RECOVERY_URL})"
     )
+    st.markdown(
+        f"- [Apple ID recovery]({APPLE_RECOVERY_URL})"
+    )
 
 
-def render_login_screen() -> None:
-    st.markdown("## Create your MANTIS Studio account")
-    st.write("Save projects, sync across devices, and unlock cloud backups.")
+def is_authenticated() -> bool:
+    return bool(getattr(st, "user", None))
+
+
+def render_login_screen(intent: Optional[str] = None, allow_guest: bool = False) -> bool:
+    st.markdown(
+        """
+        <style>
+        .mantis-auth-hero {
+            padding: 26px 28px;
+            border-radius: 22px;
+            border: 1px solid rgba(120, 199, 190, 0.28);
+            background: linear-gradient(135deg, rgba(17, 24, 39, 0.95), rgba(8, 14, 20, 0.95));
+            box-shadow: 0 16px 32px rgba(0,0,0,0.3);
+        }
+        .mantis-auth-title {
+            font-size: 30px;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+        .mantis-auth-sub {
+            color: rgba(226, 232, 240, 0.75);
+            font-size: 15px;
+        }
+        .mantis-auth-card {
+            padding: 18px 20px;
+            border-radius: 16px;
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            background: rgba(15, 23, 42, 0.5);
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.markdown(
+        """
+        <div class="mantis-auth-hero">
+            <div class="mantis-auth-title">Create your MANTIS account</div>
+            <div class="mantis-auth-sub">Sync projects across devices, unlock cloud saves, and keep your drafts safe.</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    if intent:
+        st.info(intent)
     _render_login_error()
 
     providers = _get_providers()
     google_ready = _provider_is_configured("google")
     microsoft_ready = _provider_is_configured("microsoft")
+    apple_ready = _provider_is_configured("apple")
     other_providers = [
         key
         for key in providers.keys()
-        if key not in {"google", "microsoft"}
+        if key not in {"google", "microsoft", "apple"}
     ]
     other_provider = other_providers[0] if other_providers else ""
 
-    with st.container(border=True):
-        st.markdown("### Continue with")
-        col1, col2 = st.columns(2)
-        with col1:
-            if google_ready:
-                _render_login_button(
-                    "Continue with Google",
-                    "google",
-                    disabled=False,
-                    key="login_google",
-                )
-            else:
-                st.caption("Google sign-in not configured.")
-        with col2:
-            if microsoft_ready:
-                _render_login_button(
-                    "Continue with Microsoft",
-                    "microsoft",
-                    disabled=False,
-                    key="login_microsoft",
-                )
-            else:
-                st.caption("Microsoft sign-in not configured.")
-
-        st.button(
-            "Continue with Apple (Coming soon)",
-            use_container_width=True,
-            disabled=True,
-            help="Apple login can be added later via a generic OIDC provider.",
-            key="login_apple_disabled",
+    left, right = st.columns([1.1, 1])
+    with left:
+        st.markdown("#### Why we ask for login")
+        st.markdown(
+            """
+            - Keep your drafts synced across devices
+            - Protect your projects with your identity provider
+            - Enable cloud save + recovery when switching browsers
+            """
         )
-
+        st.markdown("**Privacy reassurance**")
+        st.caption("We only store what’s needed to keep your projects synced. No selling of personal data.")
+        if allow_guest:
+            if st.button("Continue in Guest mode", use_container_width=True, key="auth_continue_guest"):
+                return True
+    with right:
+        st.markdown('<div class="mantis-auth-card">', unsafe_allow_html=True)
+        _render_login_button(
+            "Continue with Google",
+            "google",
+            disabled=not google_ready,
+            key="login_google",
+        )
+        if not google_ready:
+            st.caption("Configure Google OIDC in secrets.toml to enable.")
+        _render_login_button(
+            "Continue with Microsoft",
+            "microsoft",
+            disabled=not microsoft_ready,
+            key="login_microsoft",
+        )
+        if not microsoft_ready:
+            st.caption("Configure Microsoft Entra OIDC in secrets.toml to enable.")
+        _render_login_button(
+            "Continue with Apple",
+            "apple",
+            disabled=not apple_ready,
+            key="login_apple",
+        )
+        if not apple_ready:
+            st.caption("Apple Sign In needs custom OIDC metadata. Coming soon—see README for setup notes.")
         if other_provider:
             st.divider()
             _render_login_button(
@@ -234,19 +294,7 @@ def render_login_screen() -> None:
                 disabled=not _provider_is_configured(other_provider),
                 key="login_other_oidc",
             )
-
-    if not auth_is_configured():
-        st.info(
-            "Admin setup required: configure Google or Microsoft OIDC in secrets.toml to enable sign-in."
-        )
-        with st.expander("Admin setup instructions"):
-            st.markdown(
-                """
-1. Open `.streamlit/secrets.toml`
-2. Add providers under `[auth.providers]`
-3. Include `client_id` and `client_secret` for Google/Microsoft
-                """
-            )
+        st.markdown("</div>", unsafe_allow_html=True)
 
     st.markdown("#### Why we ask you to sign in")
     st.caption(
@@ -257,6 +305,7 @@ def render_login_screen() -> None:
     )
     st.divider()
     _render_recovery_links()
+    return False
 
 
 def _user_is_allowed(user: Optional[Any] = None) -> bool:

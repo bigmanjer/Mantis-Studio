@@ -1,15 +1,25 @@
+from __future__ import annotations
+
 import base64
 from datetime import date
 from pathlib import Path
+from typing import List
 
 import streamlit as st
-
-from app.ui.layout import render_footer
-from app.utils.versioning import get_app_version
 
 LEGAL_DIR = Path(__file__).resolve().parents[1] / "legal"
 ASSETS_DIR = Path(__file__).resolve().parents[1] / "assets"
 LAST_UPDATED = date(2026, 1, 12)
+
+SECTIONS = [
+    {"title": "Terms of Service", "filename": "terms.md", "updated": "2024-06-01"},
+    {"title": "Privacy Policy", "filename": "privacy.md", "updated": "2024-06-01"},
+    {"title": "Cookie Policy", "filename": "cookie.md", "updated": "2024-06-01"},
+    {"title": "Contact", "filename": "contact.md", "updated": "2024-06-01"},
+    {"title": "Copyright", "filename": "copyright.md", "updated": "2024-06-01"},
+    {"title": "Brand IP Clarity", "filename": "Brand_ip_Clarity.md", "updated": "2024-06-01"},
+    {"title": "Trademark Path", "filename": "Trademark_Path.md", "updated": "2024-06-01"},
+]
 
 
 def _logo_base64() -> str:
@@ -24,6 +34,14 @@ def _load_markdown(filename: str) -> str:
     if not path.exists():
         return "Content unavailable."
     return path.read_text(encoding="utf-8")
+
+
+def _extract_toc(markdown_text: str) -> List[str]:
+    toc = []
+    for line in markdown_text.splitlines():
+        if line.startswith("## "):
+            toc.append(line.replace("##", "").strip())
+    return toc
 
 
 def _inject_styles() -> None:
@@ -55,14 +73,18 @@ def _inject_styles() -> None:
             height: 32px;
             object-fit: contain;
         }
-        .mantis-legal-card {
-            padding: 18px 20px;
-            border-radius: 16px;
-            border: 1px solid rgba(120, 199, 190, 0.2);
-            background: rgba(18, 24, 30, 0.35);
+        .mantis-legal-title {
+            font-size: 26px;
+            font-weight: 700;
+            margin: 0;
         }
-        .mantis-legal-card h3 {
-            margin-top: 0;
+        .mantis-legal-subtitle {
+            color: rgba(230, 240, 245, 0.72);
+            margin: 4px 0 0 0;
+        }
+        .stMarkdown p, .stMarkdown li {
+            font-size: 16px;
+            line-height: 1.7;
         }
         </style>
         """,
@@ -70,11 +92,17 @@ def _inject_styles() -> None:
     )
 
 
-def _render_card(title: str, subtitle: str, content: str) -> None:
-    with st.container(border=True):
-        st.markdown(f"### {title}")
-        st.caption(subtitle)
-        st.markdown(content)
+def _render_footer() -> None:
+    st.markdown("---")
+    f1, f2 = st.columns([1, 1])
+    with f1:
+        if st.button("⬅ Back to Studio", use_container_width=True, key="legal_footer_back"):
+            if hasattr(st, "switch_page"):
+                st.switch_page("Mantis_Studio.py")
+            else:
+                st.info("Use the sidebar to return to the studio.")
+    with f2:
+        st.caption("© MANTIS Studio • Built with Streamlit")
 
 
 def main() -> None:
@@ -82,13 +110,20 @@ def main() -> None:
     _inject_styles()
     logo_b64 = _logo_base64()
 
-    sections = [
-        ("Terms of Service", "terms.md", "Rules for using MANTIS Studio responsibly."),
-        ("Privacy Policy", "privacy.md", "How we handle data and privacy."),
-        ("Copyright & IP", "copyright.md", "Ownership, rights, and licensing guidance."),
-        ("Acceptable Use", "Brand_ip_Clarity.md", "Safety, usage, and content rules."),
-        ("Trademark & Brand", "Trademark_Path.md", "Brand use and trademark guidance."),
-    ]
+    titles = [section["title"] for section in SECTIONS]
+    with st.sidebar:
+        st.markdown("### Legal")
+        st.caption("Terms • Privacy • Cookie • Contact")
+        selected_title = st.radio(
+            "Legal sections",
+            titles,
+            label_visibility="collapsed",
+            key="legal__section_nav",
+        )
+
+    section = next((entry for entry in SECTIONS if entry["title"] == selected_title), SECTIONS[0])
+    markdown = _load_markdown(section["filename"])
+    toc = _extract_toc(markdown)
 
     header_logo = (
         f'<div class="mantis-legal-logo"><img src="data:image/png;base64,{logo_b64}" alt="Mantis logo" /></div>'
@@ -102,8 +137,8 @@ def main() -> None:
             <div class="mantis-legal-header">
                 {header_logo}
                 <div>
-                    <div class="mantis-page-title">Legal Hub</div>
-                    <div class="mantis-page-sub">Policies, IP, and compliance documentation.</div>
+                    <div class="mantis-legal-title">Legal Center</div>
+                    <div class="mantis-legal-subtitle">Readable policies, clear updates, and trust-first explanations.</div>
                 </div>
             </div>
             """,
@@ -117,17 +152,18 @@ def main() -> None:
             else:
                 st.info("Use the sidebar to return to the studio.")
 
-    st.markdown("#### Table of contents")
-    toc_cols = st.columns(3)
-    for idx, (title, _, _) in enumerate(sections):
-        with toc_cols[idx % 3]:
-            st.markdown(f"- {title}")
-
     st.markdown("")
-    for title, filename, subtitle in sections:
-        _render_card(title, subtitle, _load_markdown(filename))
+    with st.container(border=True):
+        st.markdown(f"## {section['title']}")
+        st.caption(f"Last updated: {section['updated']}")
+        if toc:
+            st.markdown("#### Table of contents")
+            for item in toc:
+                st.markdown(f"- {item}")
+            st.divider()
+        st.markdown(markdown)
 
-    render_footer(get_app_version())
+    _render_footer()
 
 
 if __name__ == "__main__":

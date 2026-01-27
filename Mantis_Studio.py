@@ -1229,18 +1229,17 @@ def _run_ui():
     def render_copyright():
         st.markdown("## Copyright\n\n© MANTIS Studio")
 
-    def render_app_footer() -> None:
-        render_footer(AppConfig.VERSION)
-
     icon_path = ASSETS_DIR / "mantis_logo_trans.png"
     page_icon = str(icon_path) if icon_path.exists() else "🪲"
     st.set_page_config(page_title=AppConfig.APP_NAME, page_icon=page_icon, layout="wide")
 
-    user = auth.get_current_user()
+    user = st.user
     config_data = load_app_config()
 
-    logged_in = auth.is_logged_in(user)
-    guest_mode = not logged_in
+    is_guest = not bool(user)
+    st.session_state["guest_mode"] = is_guest
+    if is_guest:
+        st.session_state.setdefault("guest_session_id", uuid.uuid4().hex[:8])
 
     if "ui_theme" not in st.session_state:
         st.session_state.ui_theme = config_data.get("ui_theme", "Dark")
@@ -1854,7 +1853,7 @@ def _run_ui():
     if "page" not in st.session_state:
         st.session_state.page = "home"
     if "auto_save" not in st.session_state:
-        st.session_state.auto_save = True
+        st.session_state.auto_save = not is_guest
     if "ghost_text" not in st.session_state:
         st.session_state.ghost_text = ""
     if "pending_improvement_text" not in st.session_state:
@@ -1918,23 +1917,98 @@ def _run_ui():
     AppConfig.OPENAI_API_KEY = st.session_state.openai_api_key
     AppConfig.OPENAI_MODEL = st.session_state.openai_model
 
-    st.session_state.guest_mode = guest_mode
-    if logged_in:
+    def open_legal_page() -> None:
+        if hasattr(st, "switch_page"):
+            st.switch_page("pages/legal.py")
+            return
+        st.toast("Open the Legal page from the sidebar menu if it did not open.")
+
+    GUEST_BANNER_TEXT = (
+        "Guest mode: creations are not saved. Create an account to save projects across devices."
+    )
+
+    def open_account_access(action: str, reason: str) -> None:
+        st.session_state["auth_redirect_action"] = action
+        st.session_state["auth_redirect_reason"] = reason
+        st.session_state["auth_redirect_return_page"] = st.session_state.get("page", "home")
+        if hasattr(st, "switch_page"):
+            st.switch_page("pages/account.py")
+        else:
+            st.info("Account access is available from the sidebar.")
+
+    def persist_project(
+        project: "Project",
+        *,
+        prompt_on_guest: bool = False,
+        action: str = "save",
+    ) -> bool:
+        if not is_guest:
+            project.save()
+            return True
+        if prompt_on_guest:
+            open_account_access(action, GUEST_BANNER_TEXT)
+        else:
+            project.last_modified = time.time()
+        return False
+
+    def render_guest_banner(context: str) -> None:
+        if not is_guest:
+            return
+        with st.container(border=True):
+            st.markdown("#### 👋 Guest mode")
+            st.caption(GUEST_BANNER_TEXT)
+            banner_cols = st.columns([1, 1])
+            with banner_cols[0]:
+                if st.button(
+                    "Create account to save",
+                    type="primary",
+                    use_container_width=True,
+                    key=f"guest_banner_create_{context}",
+                ):
+                    open_account_access("signup", GUEST_BANNER_TEXT)
+            with banner_cols[1]:
+                if st.button(
+                    "Enable cloud save",
+                    use_container_width=True,
+                    key=f"guest_banner_cloud_{context}",
+                ):
+                    open_account_access("enable_cloud_save", GUEST_BANNER_TEXT)
+
+    def render_footer() -> None:
+        st.markdown("---")
+        f1, f2, f3 = st.columns([1.2, 1, 1])
+        with f1:
+            if st.button("Legal & Privacy", use_container_width=True, key="footer_legal"):
+                open_legal_page()
+        with f2:
+            st.caption(f"Version {AppConfig.VERSION}")
+        with f3:
+            st.caption("Built with Streamlit • MANTIS Studio")
+
+    if is_guest:
+        user_id = f"guest_{st.session_state['guest_session_id']}"
+    else:
         user_id = auth.get_user_id(user)
         if not user_id:
             st.error("We could not determine a user identifier from your login. Please try again.")
             auth.logout_button(key="auth_missing_user_id_logout")
-        else:
-            if st.session_state.user_id != user_id:
-                st.session_state.user_id = user_id
-                st.session_state.projects_dir = get_user_projects_dir(user_id)
-                st.session_state.project = None
-                st.session_state.page = "home"
-            elif not st.session_state.projects_dir:
-                st.session_state.projects_dir = get_user_projects_dir(user_id)
-    else:
-        st.session_state.user_id = None
-        st.session_state.projects_dir = None
+            st.stop()
+
+    if st.session_state.user_id != user_id:
+        st.session_state.user_id = user_id
+        st.session_state.projects_dir = get_user_projects_dir(user_id)
+        st.session_state.project = None
+        st.session_state.page = "home"
+    elif not st.session_state.projects_dir:
+        st.session_state.projects_dir = get_user_projects_dir(user_id)
+
+    if is_guest:
+        st.session_state.auto_save = False
+
+    guest_continue_action = st.session_state.get("guest_continue_action")
+    if guest_continue_action and guest_continue_action != "create_project":
+        st.session_state["guest_continue_action"] = None
+        st.toast("You're still in Guest mode. Saving stays disabled until you create an account.")
 
     # Reliable navigation rerun (avoids Streamlit edge cases when returning early)
     if st.session_state.get("_force_nav"):
@@ -1945,8 +2019,8 @@ def _run_ui():
         return st.session_state.get("groq_model", AppConfig.DEFAULT_MODEL)
 
     def save_p():
-        if st.session_state.project and st.session_state.auto_save and not st.session_state.get("guest_mode"):
-            st.session_state.project.save()
+        if st.session_state.project and st.session_state.auto_save:
+            persist_project(st.session_state.project)
 
     def persist_project() -> bool:
         if st.session_state.get("guest_mode"):
@@ -2514,7 +2588,7 @@ def _run_ui():
                     )
                     suggested += 1
 
-        persist_project()
+        persist_project(p)
         st.session_state["last_entity_scan"] = time.time()
 
         if added > 0 or matched > 0 or flagged > 0:
@@ -2757,12 +2831,12 @@ def _run_ui():
             st.markdown("### ✅ Actions")
             action_cols = st.columns(4)
             with action_cols[0]:
-                st.checkbox(
-                    "Auto-save",
-                    key="auto_save",
-                    disabled=st.session_state.get("guest_mode"),
-                    help="Sign in to enable auto-save.",
-                )
+                if is_guest:
+                    st.checkbox("Auto-save (cloud)", key="auto_save", disabled=True)
+                    if st.button("Enable cloud save", use_container_width=True, key="guest_enable_cloud_save"):
+                        open_account_access("enable_cloud_save", GUEST_BANNER_TEXT)
+                else:
+                    st.checkbox("Auto-save", key="auto_save")
             with action_cols[1]:
                 if st.button("↻ Refresh Groq Models", use_container_width=True):
                     st.cache_data.clear()
@@ -2853,36 +2927,45 @@ def _run_ui():
 
             st.markdown("---")
             st.markdown("### 👤 Account")
-            account_cols = st.columns([1, 2.6])
-            display_name = "Guest"
-            email = ""
-            avatar_url = ""
-            if not st.session_state.get("guest_mode"):
+            if is_guest:
+                st.markdown("**Guest mode**")
+                st.caption("Projects and edits are not saved across devices.")
+                if st.button(
+                    "Create account to save",
+                    type="primary",
+                    use_container_width=True,
+                    key="sidebar_guest_create_account",
+                ):
+                    open_account_access("signup", GUEST_BANNER_TEXT)
+                if st.button(
+                    "Enable cloud save",
+                    use_container_width=True,
+                    key="sidebar_guest_cloud_save",
+                ):
+                    open_account_access("enable_cloud_save", GUEST_BANNER_TEXT)
+            else:
+                account_cols = st.columns([1, 2.6])
                 display_name = auth.get_user_display_name(user)
                 email = auth.get_user_email(user)
                 avatar_url = auth.get_user_avatar_url(user)
-            with account_cols[0]:
-                if avatar_url:
-                    st.image(avatar_url, width=44)
-                else:
-                    st.markdown(
-                        f"<div class='mantis-avatar'>{auth.get_user_initials(user) if user else 'GU'}</div>",
-                        unsafe_allow_html=True,
-                    )
-            with account_cols[1]:
-                st.markdown(f"**{display_name}**")
-                if email:
-                    st.caption(email)
-                if user and auth.user_is_admin(user):
-                    st.caption("Admin")
+                with account_cols[0]:
+                    if avatar_url:
+                        st.image(avatar_url, width=44)
+                    else:
+                        st.markdown(
+                            f"<div class='mantis-avatar'>{auth.get_user_initials(user)}</div>",
+                            unsafe_allow_html=True,
+                        )
+                with account_cols[1]:
+                    st.markdown(f"**{display_name}**")
+                    if email:
+                        st.caption(email)
+                    if auth.user_is_admin(user):
+                        st.caption("Admin")
 
-            manage_url = auth.get_manage_account_url(user)
-            if manage_url and not st.session_state.get("guest_mode"):
-                st.link_button("Manage account", manage_url, use_container_width=True)
-            if st.session_state.get("guest_mode"):
-                if st.button("Create free account", use_container_width=True, key="sidebar_create_account"):
-                    queue_pending_action("none", return_to=st.session_state.page)
-            else:
+                manage_url = auth.get_manage_account_url(user)
+                if manage_url:
+                    st.link_button("Manage account", manage_url, use_container_width=True)
                 auth.logout_button(
                     key="sidebar_logout",
                     extra_state_keys=["projects_dir", "project", "page", "_force_nav"],
@@ -2945,8 +3028,7 @@ def _run_ui():
                 cA, cB = st.columns(2)
                 with cA:
                     if st.button("💾 Save", type="primary", use_container_width=True):
-                        if require_account("save_project", return_to=st.session_state.page):
-                            p.save()
+                        if persist_project(p, prompt_on_guest=True, action="save"):
                             st.toast("Saved")
                 with cB:
                     if st.button("✖ Close", use_container_width=True):
@@ -2962,6 +3044,8 @@ def _run_ui():
         active_dir = get_active_projects_dir()
         recent_projects = _load_recent_projects(active_dir, st.session_state.projects_refresh_token)
         has_project = bool(recent_projects)
+
+        render_guest_banner("dashboard")
 
         banner_bytes = load_asset_bytes("mantis_banner_dark.png")
         st.markdown('<div class="mantis-banner">', unsafe_allow_html=True)
@@ -3056,12 +3140,6 @@ def _run_ui():
             st.session_state.ai_settings__flash = True
             st.session_state.page = "ai"
             st.rerun()
-
-        def open_legal_page() -> None:
-            if hasattr(st, "switch_page"):
-                st.switch_page("pages/legal.py")
-                return
-            st.toast("Open the Legal page from the sidebar menu if it did not open.")
 
         def open_primary_cta() -> None:
             if primary_target == "chapters" and latest_chapter_id:
@@ -3258,6 +3336,30 @@ def _run_ui():
         active_dir = get_active_projects_dir()
         recent_projects = _load_recent_projects(active_dir, st.session_state.projects_refresh_token)
 
+        render_guest_banner("projects")
+
+        if is_guest and st.session_state.get("guest_continue_action") == "create_project":
+            pending_project = st.session_state.pop("guest_pending_project", None)
+            pending_import = st.session_state.pop("guest_pending_import", None)
+            if pending_project or pending_import:
+                st.session_state["guest_continue_action"] = None
+                title = (pending_project or {}).get("title") or _random_project_title()
+                genre = (pending_project or {}).get("genre") or _random_project_genres()
+                author = (pending_project or {}).get("author") or ""
+                p = Project.create(title, author=author, genre=genre, storage_dir=get_active_projects_dir())
+                if pending_import:
+                    p.import_text_file(pending_import)
+                    if AppConfig.GROQ_API_KEY and get_ai_model():
+                        with st.spinner("Reviewing document and generating outline..."):
+                            p.outline = StoryEngine.reverse_engineer_outline(p, get_ai_model())
+                    else:
+                        st.warning("Add a Groq API key and model to auto-generate an outline.")
+                st.session_state.project = p
+                st.session_state.page = "outline"
+                st.session_state.first_run = False
+                st.toast("Guest project ready. Remember: it won't be saved.")
+                st.rerun()
+
         def open_latest_project() -> None:
             if not recent_projects:
                 st.toast("Complete the form below to create your first project.")
@@ -3305,6 +3407,10 @@ def _run_ui():
                 a = st.text_input("Author (optional)", placeholder="Your name")
                 submitted = st.form_submit_button("🚀 Initialize Project", type="primary", use_container_width=True)
                 if submitted:
+                    if is_guest:
+                        st.session_state["guest_pending_project"] = {"title": t, "genre": g, "author": a}
+                        open_account_access("create_project", GUEST_BANNER_TEXT)
+                        return
                     if not t:
                         t = _random_project_title()
                     if not g:
@@ -3321,7 +3427,7 @@ def _run_ui():
                         genre=g,
                         storage_dir=get_active_projects_dir(),
                     )
-                    p.save()
+                    persist_project(p, prompt_on_guest=True, action="create_project")
                     _bump_projects_refresh()
                     st.session_state.project = p
                     st.session_state.page = "outline"
@@ -3344,11 +3450,9 @@ def _run_ui():
                 else:
                     txt = uf.read().decode("utf-8", errors="replace")
                     if st.button("Import & Analyze", use_container_width=True):
-                        if not require_account(
-                            "import_project",
-                            payload={"text": txt},
-                            return_to="projects",
-                        ):
+                        if is_guest:
+                            st.session_state["guest_pending_import"] = txt
+                            open_account_access("create_project", GUEST_BANNER_TEXT)
                             return
                         try:
                             p = Project.create("Imported Project", storage_dir=get_active_projects_dir())
@@ -3358,7 +3462,7 @@ def _run_ui():
                                     p.outline = StoryEngine.reverse_engineer_outline(p, get_ai_model())
                             else:
                                 st.warning("Add a Groq API key and model to auto-generate an outline.")
-                            p.save()
+                            persist_project(p, prompt_on_guest=True, action="create_project")
                         except Exception:
                             logger.warning("Import failed for uploaded draft", exc_info=True)
                             st.error("Import failed. Please check the file and try again.")
@@ -3517,8 +3621,7 @@ def _run_ui():
                         st.rerun()
             return
         def save_outline_action() -> None:
-            if require_account("save_outline", return_to="outline"):
-                p.save()
+            if persist_project(p, prompt_on_guest=True, action="save"):
                 st.toast("Outline saved.")
 
         def scan_outline_action() -> None:
@@ -3558,8 +3661,7 @@ def _run_ui():
                     save_p()
             with top3:
                 if st.button("💾 Save Project", type="primary", use_container_width=True):
-                    if require_account("save_project", return_to="outline"):
-                        p.save()
+                    if persist_project(p, prompt_on_guest=True, action="save"):
                         st.toast("Saved")
 
         left, right = st.columns([2.1, 1])
@@ -3576,8 +3678,7 @@ def _run_ui():
                     save_p()
 
                 if st.button("💾 Save Outline", use_container_width=True):
-                    if require_account("save_outline", return_to="outline"):
-                        p.save()
+                    if persist_project(p, prompt_on_guest=True, action="save"):
                         # Automatically scan entities on save so World Bible stays in sync.
                         extract_entities_ui(p.outline or "", "Outline")
                         st.toast("Outline Saved & Entities Scanned")
@@ -3883,7 +3984,7 @@ def _run_ui():
                                     )
                                 review_queue.pop(idx)
                                 st.session_state["world_bible_review"] = review_queue
-                                persist_project()
+                                persist_project(p)
                                 st.toast("World Bible updated.")
                                 st.rerun()
                         with c2:
@@ -3919,7 +4020,7 @@ def _run_ui():
                         if ok:
                             aliases = [alias.strip() for alias in (a or "").split(",") if alias.strip()]
                             p.upsert_entity(n, category, d, aliases=aliases, allow_merge=True, allow_alias=True)
-                            persist_project()
+                            persist_project(p)
                             st.session_state[f"add_open_{category}"] = False
                             st.rerun()
                         if cancel:
@@ -4001,7 +4102,7 @@ def _run_ui():
                             new_desc = st.text_area("Notes", e.description, key=f"desc_{e.id}", height=140)
                             if new_desc != e.description:
                                 e.description = new_desc
-                                persist_project()
+                                persist_project(p)
 
                             alias_text = st.text_input(
                                 "Aliases (comma-separated)",
@@ -4010,7 +4111,7 @@ def _run_ui():
                             )
                             if alias_text != ", ".join(e.aliases or []):
                                 e.aliases = [a.strip() for a in alias_text.split(",") if a.strip()]
-                                persist_project()
+                                persist_project(p)
 
                             st.caption("Enrichment is currently unavailable.")
 
@@ -4040,7 +4141,7 @@ def _run_ui():
                                     with cdel1:
                                         if st.button("Confirm", type="primary", use_container_width=True):
                                             p.delete_entity(e.id)
-                                            persist_project()
+                                            persist_project(p)
                                             st.session_state.delete_entity_id = None
                                             st.session_state.delete_entity_name = None
                                             st.toast("Entity deleted.")
@@ -4089,8 +4190,7 @@ def _run_ui():
                 p.memory = memory_val
                 save_p()
             if st.button("💾 Save Memory", use_container_width=True):
-                if require_account("save_project", return_to="world"):
-                    p.save()
+                if persist_project(p, prompt_on_guest=True, action="save"):
                     st.toast("Memory saved")
 
             st.divider()
@@ -4180,7 +4280,7 @@ def _run_ui():
                                         1,
                                     )
                                     target_chapter.update_content(updated, "Coherence Fix")
-                                    persist_project()
+                                    persist_project(p)
                                     results.pop(idx)
                                     st.session_state["coherence_results"] = results
                                     update_locked_chapters()
@@ -4192,7 +4292,7 @@ def _run_ui():
                                         spacer = "\n\n" if (target_chapter.content or "").strip() else ""
                                         updated = f"{(target_chapter.content or '').rstrip()}{spacer}{insertion}"
                                         target_chapter.update_content(updated, "Coherence Fix (Appended)")
-                                        persist_project()
+                                        persist_project(p)
                                         results.pop(idx)
                                         st.session_state["coherence_results"] = results
                                         update_locked_chapters()
@@ -4362,13 +4462,15 @@ def _run_ui():
                     raw = match.group(1).strip()
                     title = sanitize_chapter_title(re.split(r" [-–:] ", raw, 1)[0].strip()) or title
             p.add_chapter(title)
-            persist_project()
+            persist_project(p)
             st.rerun()
 
         def go_to_outline() -> None:
             st.session_state.page = "outline"
             st.session_state._force_nav = True
             st.rerun()
+
+        render_guest_banner("editor")
 
         render_page_header(
             "Editor",
@@ -4388,7 +4490,7 @@ def _run_ui():
                 with c1:
                     if st.button("➕ Create Chapter 1", type="primary", use_container_width=True):
                         p.add_chapter("Chapter 1")
-                        persist_project()
+                        persist_project(p)
                         st.rerun()
                 with c2:
                     if st.button("🧩 Go to Outline", use_container_width=True):
@@ -4420,7 +4522,7 @@ def _run_ui():
                 clean = re.split(r" [-–:] ", raw, 1)[0].strip()
                 if len(clean) > 2:
                     curr.title = sanitize_chapter_title(clean)
-                    persist_project()
+                    persist_project(p)
 
         col_nav, col_editor, col_ai = st.columns([1.05, 3.2, 1.25])
 
@@ -4444,7 +4546,7 @@ def _run_ui():
                     else:
                         title = f"Chapter {next_idx}"
                     p.add_chapter(sanitize_chapter_title(title))
-                    persist_project()
+                    persist_project(p)
                     st.rerun()
 
         stream_ph = st.empty()
@@ -4474,9 +4576,8 @@ def _run_ui():
                 c1, c2 = st.columns([1, 1])
                 with c1:
                     if st.button("💾 Save Chapter", type="primary", use_container_width=True):
-                        if require_account("save_chapter", return_to="chapters"):
-                            curr.update_content(val, "manual")
-                            p.save()
+                        curr.update_content(val, "manual")
+                        if persist_project(p, prompt_on_guest=True, action="save"):
                             # Automatically scan entities from this chapter when the user explicitly saves it.
                             extract_entities_ui(curr.content or "", f"Ch {curr.index}")
                             st.toast("Chapter Saved & Entities Scanned")
@@ -4487,7 +4588,7 @@ def _run_ui():
                             st.error("Canon violation detected. Resolve issues before generating AI content.")
                         else:
                             curr.summary = summary
-                            persist_project()
+                            persist_project(p)
                             st.rerun()
 
                 def generate_improvement(style_choice, custom_instructions):
@@ -4552,7 +4653,7 @@ def _run_ui():
                     prev = st.session_state.get("chapter_text_prev", {})
                     if prev.get("chapter_id") == curr.id and prev.get("text") is not None:
                         curr.update_content(prev.get("text") or "", "Undo Apply")
-                        persist_project()
+                        persist_project(p)
                         st.session_state._chapter_sync_id = curr.id
                         st.session_state._chapter_sync_text = prev.get("text") or ""
                         st.toast("Previous chapter text restored.")
@@ -4587,7 +4688,7 @@ def _run_ui():
                                     "text": curr.content or "",
                                 }
                                 curr.update_content(draft.get("text", ""), "Draft Applied")
-                                persist_project()
+                                persist_project(p)
                                 st.session_state._chapter_sync_id = curr.id
                                 st.session_state._chapter_sync_text = draft.get("text", "")
                                 st.toast("Draft set as active.")
@@ -4628,7 +4729,7 @@ def _run_ui():
                             return
                         new_text = ((curr.content or "") + "\n" + full.strip()).strip()
                         curr.update_content(new_text, "AI Auto-Write")
-                        persist_project()
+                        persist_project(p)
 
                         # Queue sync into editor widget on next run (do NOT set ed_key here!)
                         st.session_state._chapter_sync_id = curr.id
@@ -4720,7 +4821,7 @@ def _run_ui():
                             }
                             new_text = pending_text or ""
                             curr.update_content(new_text, "AI Improve")
-                            persist_project()
+                            persist_project(p)
                             st.session_state._chapter_sync_id = curr.id
                             st.session_state._chapter_sync_text = new_text
                             st.toast("Chapter replaced with improved text.")
@@ -4742,7 +4843,7 @@ def _run_ui():
                             }
                             new_text = ((curr.content or "") + "\n" + (pending_text or "")).strip()
                             curr.update_content(new_text, "AI Improve Append")
-                            persist_project()
+                            persist_project(p)
                             st.session_state._chapter_sync_id = curr.id
                             st.session_state._chapter_sync_text = new_text
                             st.toast("Improved text appended to chapter.")
