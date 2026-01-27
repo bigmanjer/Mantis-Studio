@@ -7,6 +7,7 @@ from typing import List
 
 import streamlit as st
 
+from app.ui.theme import inject_theme as inject_mantis_theme
 from app.utils import ui_key
 
 SECTIONS = [
@@ -63,16 +64,16 @@ def _inject_styles() -> None:
             gap: 16px;
             padding: 18px 20px;
             border-radius: 16px;
-            border: 1px solid rgba(120, 199, 190, 0.35);
-            background: linear-gradient(135deg, rgba(24, 36, 45, 0.92), rgba(28, 44, 54, 0.92));
-            box-shadow: 0 12px 28px rgba(0, 0, 0, 0.22);
+            border: 1px solid rgba(34, 197, 94, 0.25);
+            background: linear-gradient(135deg, rgba(11, 20, 26, 0.95), rgba(7, 14, 20, 0.95));
+            box-shadow: var(--mantis-shadow);
         }
         .mantis-legal-logo {
             width: 48px;
             height: 48px;
             border-radius: 14px;
-            background: rgba(120, 199, 190, 0.12);
-            border: 1px solid rgba(120, 199, 190, 0.35);
+            background: rgba(34, 197, 94, 0.12);
+            border: 1px solid rgba(34, 197, 94, 0.35);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -88,7 +89,7 @@ def _inject_styles() -> None:
             margin: 0;
         }
         .mantis-legal-subtitle {
-            color: rgba(230, 240, 245, 0.72);
+            color: var(--mantis-text-muted);
             margin: 4px 0 0 0;
         }
         .mantis-legal-chip {
@@ -97,9 +98,9 @@ def _inject_styles() -> None:
             gap: 6px;
             padding: 4px 10px;
             border-radius: 999px;
-            border: 1px solid rgba(120, 199, 190, 0.35);
-            background: rgba(15, 23, 42, 0.5);
-            color: rgba(226, 232, 240, 0.85);
+            border: 1px solid rgba(34, 197, 94, 0.35);
+            background: rgba(34, 197, 94, 0.12);
+            color: var(--mantis-text);
             font-size: 12px;
         }
         .mantis-legal-summary {
@@ -111,16 +112,16 @@ def _inject_styles() -> None:
         .mantis-legal-card {
             padding: 14px 16px;
             border-radius: 16px;
-            border: 1px solid rgba(148, 163, 184, 0.25);
-            background: rgba(15, 23, 42, 0.55);
+            border: 1px solid var(--mantis-border);
+            background: var(--mantis-surface);
         }
         .mantis-legal-sidebar {
             position: sticky;
             top: 16px;
             padding: 16px;
             border-radius: 16px;
-            border: 1px solid rgba(148, 163, 184, 0.2);
-            background: rgba(7, 12, 18, 0.7);
+            border: 1px solid var(--mantis-border);
+            background: var(--mantis-surface-alt);
         }
         .mantis-legal-sidebar h4 {
             margin-top: 0;
@@ -136,6 +137,7 @@ def _inject_styles() -> None:
 
 
 def inject_theme() -> None:
+    inject_mantis_theme()
     _inject_styles()
 
 
@@ -212,7 +214,8 @@ def main() -> None:
             unsafe_allow_html=True,
         )
     with header_cols[1]:
-        if st.button("⬅ Back to Studio", use_container_width=True, key=_key("back")):
+        st.markdown("<div style='height: 6px;'></div>", unsafe_allow_html=True)
+        if st.button("⬅ Back to Studio", use_container_width=True, key=_key("back_top")):
             if hasattr(st, "switch_page"):
                 st.switch_page("Mantis_Studio.py")
             else:
