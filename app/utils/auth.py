@@ -37,7 +37,12 @@ def _get_authz_config() -> Dict[str, Any]:
 
 
 def get_current_user() -> Optional[Any]:
-    return st.user if hasattr(st, "user") else None
+    if not hasattr(st, "user"):
+        return None
+    try:
+        return st.user
+    except Exception:
+        return None
 
 
 def is_logged_in(user: Optional[Any] = None) -> bool:

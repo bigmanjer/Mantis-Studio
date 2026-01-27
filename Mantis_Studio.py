@@ -1233,7 +1233,7 @@ def _run_ui():
     page_icon = str(icon_path) if icon_path.exists() else "🪲"
     st.set_page_config(page_title=AppConfig.APP_NAME, page_icon=page_icon, layout="wide")
 
-    user = st.user
+    user = auth.get_current_user()
     config_data = load_app_config()
 
     logged_in = auth.is_authenticated()
