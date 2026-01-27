@@ -1,0 +1,182 @@
+
+  You can now view your Streamlit app in your browser.
+
+  Local URL: http://localhost:8501
+  Network URL: http://192.168.4.25:8501
+  External URL: http://149.115.47.78:8501
+
+2026-01-26 20:38:55.913 Uncaught app execution
+Traceback (most recent call last):
+  File "C:\Users\BIGMANJER\AppData\Local\Programs\Python\Python313\Lib\site-packages\streamlit\runtime\scriptrunner\exec_code.py", line 129, in exec_func_with_error_handling
+    result = func()
+  File "C:\Users\BIGMANJER\AppData\Local\Programs\Python\Python313\Lib\site-packages\streamlit\runtime\scriptrunner\script_runner.py", line 669, in code_to_exec
+    _mpa_v1(self._main_script_path)
+    ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\BIGMANJER\AppData\Local\Programs\Python\Python313\Lib\site-packages\streamlit\runtime\scriptrunner\script_runner.py", line 165, in _mpa_v1
+    page.run()
+    ~~~~~~~~^^
+  File "C:\Users\BIGMANJER\AppData\Local\Programs\Python\Python313\Lib\site-packages\streamlit\navigation\page.py", line 310, in run
+    exec(code, module.__dict__)  # noqa: S102
+    ~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\BIGMANJER\Documents\Mantis-Studio-main\pages\account.py", line 107, in <module>
+    main()
+    ~~~~^^
+  File "C:\Users\BIGMANJER\Documents\Mantis-Studio-main\pages\account.py", line 103, in main
+    _render_debug_auth(st.user if hasattr(st, "user") else None)
+    ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\BIGMANJER\Documents\Mantis-Studio-main\pages\account.py", line 9, in _render_debug_auth
+    if not auth.debug_auth_enabled():
+           ^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'app.utils.auth' has no attribute 'debug_auth_enabled'
+2026-01-26 20:39:07.047 Uncaught app execution
+Traceback (most recent call last):
+  File "C:\Users\BIGMANJER\AppData\Local\Programs\Python\Python313\Lib\site-packages\streamlit\runtime\scriptrunner\exec_code.py", line 129, in exec_func_with_error_handling
+    result = func()
+  File "C:\Users\BIGMANJER\AppData\Local\Programs\Python\Python313\Lib\site-packages\streamlit\runtime\scriptrunner\script_runner.py", line 669, in code_to_exec
+    _mpa_v1(self._main_script_path)
+    ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\BIGMANJER\AppData\Local\Programs\Python\Python313\Lib\site-packages\streamlit\runtime\scriptrunner\script_runner.py", line 165, in _mpa_v1
+    page.run()
+    ~~~~~~~~^^
+  File "C:\Users\BIGMANJER\AppData\Local\Programs\Python\Python313\Lib\site-packages\streamlit\navigation\page.py", line 310, in run
+    exec(code, module.__dict__)  # noqa: S102
+    ~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\BIGMANJER\Documents\Mantis-Studio-main\pages\account.py", line 107, in <module>
+    main()
+    ~~~~^^
+  File "C:\Users\BIGMANJER\Documents\Mantis-Studio-main\pages\account.py", line 103, in main
+    _render_debug_auth(st.user if hasattr(st, "user") else None)
+    ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\BIGMANJER\Documents\Mantis-Studio-main\pages\account.py", line 9, in _render_debug_auth
+    if not auth.debug_auth_enabled():
+           ^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'app.utils.auth' has no attribute 'debug_auth_enabled'
+2026-01-26 20:40:15.572 Uncaught app execution
+Traceback (most recent call last):
+  File "C:\Users\BIGMANJER\AppData\Local\Programs\Python\Python313\Lib\site-packages\streamlit\runtime\scriptrunner\exec_code.py", line 129, in exec_func_with_error_handling
+    result = func()
+  File "C:\Users\BIGMANJER\AppData\Local\Programs\Python\Python313\Lib\site-packages\streamlit\runtime\scriptrunner\script_runner.py", line 669, in code_to_exec
+    _mpa_v1(self._main_script_path)
+    ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\BIGMANJER\AppData\Local\Programs\Python\Python313\Lib\site-packages\streamlit\runtime\scriptrunner\script_runner.py", line 165, in _mpa_v1
+    page.run()
+    ~~~~~~~~^^
+  File "C:\Users\BIGMANJER\AppData\Local\Programs\Python\Python313\Lib\site-packages\streamlit\navigation\page.py", line 310, in run
+    exec(code, module.__dict__)  # noqa: S102
+    ~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\BIGMANJER\Documents\Mantis-Studio-main\pages\account.py", line 107, in <module>
+    main()
+    ~~~~^^
+  File "C:\Users\BIGMANJER\Documents\Mantis-Studio-main\pages\account.py", line 103, in main
+    _render_debug_auth(st.user if hasattr(st, "user") else None)
+    ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\BIGMANJER\Documents\Mantis-Studio-main\pages\account.py", line 9, in _render_debug_auth
+    if not auth.debug_auth_enabled():
+           ^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'app.utils.auth' has no attribute 'debug_auth_enabled'
+2026-01-26 20:57:17.756 Uncaught app execution
+Traceback (most recent call last):
+  File "C:\Users\BIGMANJER\AppData\Local\Programs\Python\Python313\Lib\site-packages\streamlit\runtime\scriptrunner\exec_code.py", line 129, in exec_func_with_error_handling
+    result = func()
+  File "C:\Users\BIGMANJER\AppData\Local\Programs\Python\Python313\Lib\site-packages\streamlit\runtime\scriptrunner\script_runner.py", line 669, in code_to_exec
+    _mpa_v1(self._main_script_path)
+    ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\BIGMANJER\AppData\Local\Programs\Python\Python313\Lib\site-packages\streamlit\runtime\scriptrunner\script_runner.py", line 165, in _mpa_v1
+    page.run()
+    ~~~~~~~~^^
+  File "C:\Users\BIGMANJER\AppData\Local\Programs\Python\Python313\Lib\site-packages\streamlit\navigation\page.py", line 310, in run
+    exec(code, module.__dict__)  # noqa: S102
+    ~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\BIGMANJER\Documents\Mantis-Studio-main\pages\account.py", line 107, in <module>
+    main()
+    ~~~~^^
+  File "C:\Users\BIGMANJER\Documents\Mantis-Studio-main\pages\account.py", line 103, in main
+    _render_debug_auth(st.user if hasattr(st, "user") else None)
+    ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\BIGMANJER\Documents\Mantis-Studio-main\pages\account.py", line 9, in _render_debug_auth
+    if not auth.debug_auth_enabled():
+           ^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'app.utils.auth' has no attribute 'debug_auth_enabled'
+2026-01-26 20:58:36.883 Uncaught app execution
+Traceback (most recent call last):
+  File "C:\Users\BIGMANJER\AppData\Local\Programs\Python\Python313\Lib\site-packages\streamlit\runtime\scriptrunner\exec_code.py", line 129, in exec_func_with_error_handling
+    result = func()
+  File "C:\Users\BIGMANJER\AppData\Local\Programs\Python\Python313\Lib\site-packages\streamlit\runtime\scriptrunner\script_runner.py", line 669, in code_to_exec
+    _mpa_v1(self._main_script_path)
+    ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\BIGMANJER\AppData\Local\Programs\Python\Python313\Lib\site-packages\streamlit\runtime\scriptrunner\script_runner.py", line 165, in _mpa_v1
+    page.run()
+    ~~~~~~~~^^
+  File "C:\Users\BIGMANJER\AppData\Local\Programs\Python\Python313\Lib\site-packages\streamlit\navigation\page.py", line 310, in run
+    exec(code, module.__dict__)  # noqa: S102
+    ~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\BIGMANJER\Documents\Mantis-Studio-main\pages\account.py", line 107, in <module>
+    main()
+    ~~~~^^
+  File "C:\Users\BIGMANJER\Documents\Mantis-Studio-main\pages\account.py", line 103, in main
+    _render_debug_auth(st.user if hasattr(st, "user") else None)
+    ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\BIGMANJER\Documents\Mantis-Studio-main\pages\account.py", line 9, in _render_debug_auth
+    if not auth.debug_auth_enabled():
+           ^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'app.utils.auth' has no attribute 'debug_auth_enabled'
+2026-01-26 20:59:00.456 Uncaught app execution
+Traceback (most recent call last):
+  File "C:\Users\BIGMANJER\AppData\Local\Programs\Python\Python313\Lib\site-packages\streamlit\runtime\scriptrunner\exec_code.py", line 129, in exec_func_with_error_handling
+    result = func()
+  File "C:\Users\BIGMANJER\AppData\Local\Programs\Python\Python313\Lib\site-packages\streamlit\runtime\scriptrunner\script_runner.py", line 669, in code_to_exec
+    _mpa_v1(self._main_script_path)
+    ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\BIGMANJER\AppData\Local\Programs\Python\Python313\Lib\site-packages\streamlit\runtime\scriptrunner\script_runner.py", line 165, in _mpa_v1
+    page.run()
+    ~~~~~~~~^^
+  File "C:\Users\BIGMANJER\AppData\Local\Programs\Python\Python313\Lib\site-packages\streamlit\navigation\page.py", line 310, in run
+    exec(code, module.__dict__)  # noqa: S102
+    ~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\BIGMANJER\Documents\Mantis-Studio-main\pages\account.py", line 107, in <module>
+    main()
+    ~~~~^^
+  File "C:\Users\BIGMANJER\Documents\Mantis-Studio-main\pages\account.py", line 103, in main
+    _render_debug_auth(st.user if hasattr(st, "user") else None)
+    ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\BIGMANJER\Documents\Mantis-Studio-main\pages\account.py", line 9, in _render_debug_auth
+    if not auth.debug_auth_enabled():
+           ^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'app.utils.auth' has no attribute 'debug_auth_enabled'
+2026-01-26 20:59:46.791 Script compilation error
+Traceback (most recent call last):
+  File "C:\Users\BIGMANJER\AppData\Local\Programs\Python\Python313\Lib\site-packages\streamlit\runtime\scriptrunner\script_runner.py", line 573, in _run_script
+    code = self._script_cache.get_bytecode(script_path)
+  File "C:\Users\BIGMANJER\AppData\Local\Programs\Python\Python313\Lib\site-packages\streamlit\runtime\scriptrunner\script_cache.py", line 68, in get_bytecode
+    with open_python_file(script_path) as f:
+         ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "C:\Users\BIGMANJER\AppData\Local\Programs\Python\Python313\Lib\site-packages\streamlit\source_util.py", line 54, in open_python_file
+    return tokenize.open(filename)
+           ~~~~~~~~~~~~~^^^^^^^^^^
+  File "C:\Users\BIGMANJER\AppData\Local\Programs\Python\Python313\Lib\tokenize.py", line 455, in open
+    buffer = _builtin_open(filename, 'rb')
+FileNotFoundError: [Errno 2] No such file or directory: 'C:\\Users\\BIGMANJER\\Documents\\Mantis-Studio-main\\mantis_studio.py'
+2026-01-26 20:59:46.838 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2026-01-26 21:01:44.980 Uncaught app execution
+Traceback (most recent call last):
+  File "C:\Users\BIGMANJER\AppData\Local\Programs\Python\Python313\Lib\site-packages\streamlit\runtime\scriptrunner\exec_code.py", line 129, in exec_func_with_error_handling
+    result = func()
+  File "C:\Users\BIGMANJER\AppData\Local\Programs\Python\Python313\Lib\site-packages\streamlit\runtime\scriptrunner\script_runner.py", line 669, in code_to_exec
+    _mpa_v1(self._main_script_path)
+    ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\BIGMANJER\AppData\Local\Programs\Python\Python313\Lib\site-packages\streamlit\runtime\scriptrunner\script_runner.py", line 165, in _mpa_v1
+    page.run()
+    ~~~~~~~~^^
+  File "C:\Users\BIGMANJER\AppData\Local\Programs\Python\Python313\Lib\site-packages\streamlit\navigation\page.py", line 310, in run
+    exec(code, module.__dict__)  # noqa: S102
+    ~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\BIGMANJER\Documents\Mantis-Studio-main\pages\account.py", line 107, in <module>
+    main()
+    ~~~~^^
+  File "C:\Users\BIGMANJER\Documents\Mantis-Studio-main\pages\account.py", line 103, in main
+    _render_debug_auth(st.user if hasattr(st, "user") else None)
+    ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\BIGMANJER\Documents\Mantis-Studio-main\pages\account.py", line 9, in _render_debug_auth
+    if not auth.debug_auth_enabled():
+           ^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'app.utils.auth' has no attribute 'debug_auth_enabled'
