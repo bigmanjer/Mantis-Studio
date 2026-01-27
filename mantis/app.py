@@ -1121,12 +1121,13 @@ def _run_ui():
             )
             if auth.debug_auth_enabled():
                 st.markdown("### Debug auth")
+                debug_user = auth.get_current_user()
                 st.code(
                     {
-                        "user_keys": list(getattr(st.user, "keys", lambda: [])()),
-                        "user_id": auth.get_user_id_with_fallback(st.user),
-                        "user_display_name": auth.get_user_display_name(st.user),
-                        "user_email": auth.get_user_email(st.user),
+                        "user_keys": list(getattr(debug_user, "keys", lambda: [])()),
+                        "user_id": auth.get_user_id_with_fallback(debug_user),
+                        "user_display_name": auth.get_user_display_name(debug_user),
+                        "user_email": auth.get_user_email(debug_user),
                     },
                     language="json",
                 )
@@ -1148,9 +1149,7 @@ def _run_ui():
             email = auth.get_user_email(user)
             if email:
                 st.caption(email)
-            manage_url = auth.get_manage_account_url(user)
-            if manage_url:
-                st.link_button("Manage account", manage_url, use_container_width=True)
+            auth.render_email_account_controls(email)
 
         auth.logout_button(
             key="account_logout",
@@ -1159,12 +1158,13 @@ def _run_ui():
 
         if auth.debug_auth_enabled():
             st.markdown("### Debug auth")
+            debug_user = auth.get_current_user()
             st.code(
                 {
-                    "user_keys": list(getattr(st.user, "keys", lambda: [])()),
-                    "user_id": auth.get_user_id_with_fallback(st.user),
-                    "user_display_name": auth.get_user_display_name(st.user),
-                    "user_email": auth.get_user_email(st.user),
+                    "user_keys": list(getattr(debug_user, "keys", lambda: [])()),
+                    "user_id": auth.get_user_id_with_fallback(debug_user),
+                    "user_display_name": auth.get_user_display_name(debug_user),
+                    "user_email": auth.get_user_email(debug_user),
                 },
                 language="json",
             )
