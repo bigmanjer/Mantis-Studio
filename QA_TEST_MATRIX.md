@@ -33,3 +33,17 @@
 | Legal pages reachable via footer | Navigate to `/Legal_Center` | Legal page renders | Playwright browser crashed before loading URL | Fail (env) | Same Playwright crash as above. |
 | Selftest (CLI) | `python scripts/smoke_test.py` | PASS | PASS | Pass | Selftest runs in CLI mode. |
 | Python compileall | `python -m compileall .` | No compile errors | No compile errors | Pass | Includes repo tree. |
+
+## Phase 3.3 — AI provider keys & export gating
+
+| Page/Area | Action | Expected | Actual | Pass/Fail | Notes |
+| --- | --- | --- | --- | --- | --- |
+| Guest: OpenAI session key | Paste OpenAI key in AI Settings → Use for this session → Generate outline | Outline generation runs | Not run (manual) | Pending | Requires valid OpenAI key. |
+| Guest: Groq session key | Paste Groq key in AI Settings → Use for this session → Generate chapter | Chapter generation runs | Not run (manual) | Pending | Requires valid Groq key. |
+| Guest: no key | Attempt generation without any key | Button disabled + “Add API key” message | Not run (manual) | Pending | Verify in Outline/Editor. |
+| Guest: Export page | Navigate to Export page while signed out | Paywall card + Sign in button, no crash | Not run (manual) | Pending | Requires auth configured. |
+| Logged-in: save OpenAI key | Save OpenAI key to account and rerun | Status shows “Using saved key” | Not run (manual) | Pending | Requires auth + key. |
+| Logged-in: save Groq key | Save Groq key to account and rerun | Status shows “Using saved key” | Not run (manual) | Pending | Requires auth + key. |
+| Clear session key | Clear session key then attempt generation | Generation disabled unless saved/default key | Not run (manual) | Pending | Validate fallback order. |
+| Widget key stability | Use app normally | No StreamlitDuplicateElementKey | Not run (manual) | Pending | General smoke check. |
+| App boots (Streamlit Cloud) | Deploy/run on Streamlit Cloud | No red error screens | Not run (manual) | Pending | Cloud environment verification. |
