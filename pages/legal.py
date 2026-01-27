@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+from datetime import date
 from pathlib import Path
 from typing import List
 
@@ -8,6 +9,7 @@ import streamlit as st
 
 LEGAL_DIR = Path(__file__).resolve().parents[1] / "legal"
 ASSETS_DIR = Path(__file__).resolve().parents[1] / "assets"
+LAST_UPDATED = date(2026, 1, 12)
 
 SECTIONS = [
     {"title": "Terms of Service", "filename": "terms.md", "updated": "2024-06-01"},
@@ -142,6 +144,7 @@ def main() -> None:
             """,
             unsafe_allow_html=True,
         )
+        st.caption(f"Last updated: {LAST_UPDATED.strftime('%B %d, %Y')}")
     with header_cols[1]:
         if st.button("⬅ Back to Studio", use_container_width=True, key="legal_back"):
             if hasattr(st, "switch_page"):

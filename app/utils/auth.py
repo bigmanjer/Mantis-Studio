@@ -28,6 +28,23 @@ def _get_authz_config() -> Dict[str, Any]:
     return st.secrets.get("authz", {}) if hasattr(st, "secrets") else {}
 
 
+def get_current_user() -> Optional[Any]:
+    return st.user if hasattr(st, "user") else None
+
+
+def is_logged_in(user: Optional[Any] = None) -> bool:
+    user = user or get_current_user()
+    return bool(user)
+
+
+def auth_is_configured() -> bool:
+    providers = _get_auth_config().get("providers", {})
+    return any(
+        provider.get("client_id") and provider.get("client_secret")
+        for provider in providers.values()
+    )
+
+
 def _normalize_list(values: Optional[Iterable[str]]) -> list[str]:
     return [value.strip().lower() for value in values or [] if value and value.strip()]
 
@@ -125,6 +142,10 @@ def get_manage_account_url(user: Optional[Any] = None) -> str:
 
 def _get_providers() -> Dict[str, Any]:
     return _get_auth_config().get("providers", {})
+
+
+def get_provider_keys() -> list[str]:
+    return list(_get_providers().keys())
 
 
 def _provider_is_configured(provider_key: str) -> bool:
@@ -275,6 +296,13 @@ def render_login_screen(intent: Optional[str] = None, allow_guest: bool = False)
             )
         st.markdown("</div>", unsafe_allow_html=True)
 
+    st.markdown("#### Why we ask you to sign in")
+    st.caption(
+        "Accounts keep your projects private, enable cloud sync, and protect access to your workspace."
+    )
+    st.markdown(
+        "- [Privacy](/?page=privacy)\n- [Terms](/?page=terms)\n- [Legal hub](/pages/legal.py)"
+    )
     st.divider()
     _render_recovery_links()
     return False
