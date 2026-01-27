@@ -1,10 +1,24 @@
 #!/usr/bin/env python3
 """Streamlit entrypoint shim for MANTIS Studio."""
 
+import datetime
+import json
+import logging
+import os
+import random
+import re
+import shutil
+import sys
+import time
+import uuid
+from dataclasses import asdict, dataclass, field, fields
+from pathlib import Path
+from typing import Any, Callable, Dict, Generator, List, Optional
+
+import requests
+
 from mantis.app import run_app
 
-
-import sys
 from app.utils.navigation import get_nav_config
 
 # NOTE: Streamlit-dependent utilities are imported inside _run_ui() so
