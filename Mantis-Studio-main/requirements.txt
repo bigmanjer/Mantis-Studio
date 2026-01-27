@@ -1,6 +1,0 @@
-streamlit>=1.30.0
-requests
-pandas
-plotly
-Pillow
-python-dotenv
