@@ -3,6 +3,7 @@ from __future__ import annotations
 import streamlit as st
 
 from app.ui.components import card_end, card_start, header_bar
+from app.ui.theme import inject_theme as inject_mantis_theme
 from app.utils import auth, ui_key
 
 
@@ -12,32 +13,17 @@ def _inject_styles() -> None:
         <style>
         .mantis-wrap { max-width: 1100px; margin: 0 auto; padding-bottom: 40px; }
         .mantis-topbar { display:flex; justify-content: space-between; align-items:center; gap:12px; margin: 8px 0 18px; }
-        .mantis-pill {
-            display:inline-flex; align-items:center; gap:8px;
-            padding: 8px 14px; border-radius:999px;
-            border: 1px solid rgba(34,197,94,.35);
-            background: rgba(2, 44, 20, .55);
-            color: rgba(226,232,240,.92);
-            font-size: 13px;
-        }
         .mantis-hero {
             padding: 26px 28px;
             border-radius: 24px;
             border: 1px solid rgba(34,197,94,.25);
             background: radial-gradient(1200px 500px at 20% 10%, rgba(34,197,94,.18), transparent 60%),
-                        linear-gradient(135deg, rgba(9, 26, 18, 0.98), rgba(7, 14, 22, 0.98));
-            box-shadow: 0 18px 40px rgba(0,0,0,.40);
+                        linear-gradient(135deg, rgba(11, 20, 26, 0.98), rgba(7, 14, 20, 0.98));
+            box-shadow: var(--mantis-shadow);
             margin-bottom: 18px;
         }
         .mantis-title { font-size: 34px; font-weight: 800; letter-spacing: .2px; }
-        .mantis-sub { color: rgba(226,232,240,.74); margin-top: 6px; font-size: 14px; }
-        .mantis-card {
-            padding: 18px 20px;
-            border-radius: 18px;
-            border: 1px solid rgba(148,163,184,.18);
-            background: rgba(15, 23, 42, .45);
-            box-shadow: 0 10px 24px rgba(0,0,0,.25);
-        }
+        .mantis-sub { color: var(--mantis-text-muted); margin-top: 6px; font-size: 14px; }
         .mantis-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
@@ -46,10 +32,16 @@ def _inject_styles() -> None:
         .mantis-mini {
             border-radius: 16px;
             padding: 14px;
-            border: 1px solid rgba(148,163,184,.16);
-            background: rgba(2, 6, 23, .35);
+            border: 1px solid var(--mantis-border);
+            background: var(--mantis-surface-alt);
         }
-        .muted { color: rgba(226,232,240,.72); }
+        .muted { color: var(--mantis-text-muted); }
+        .mantis-callout {
+            padding: 12px 16px;
+            border-radius: 16px;
+            border: 1px solid rgba(34,197,94,.2);
+            background: rgba(34,197,94,.08);
+        }
         </style>
         """,
         unsafe_allow_html=True,
@@ -57,6 +49,7 @@ def _inject_styles() -> None:
 
 
 def inject_theme() -> None:
+    inject_mantis_theme()
     _inject_styles()
 
 
@@ -115,7 +108,17 @@ def _render_login_ui() -> None:
     if error:
         st.error(error)
 
-    colA, colB = st.columns([1.2, 1], vertical_alignment="top")
+    st.markdown(
+        """
+        <div class="mantis-hero">
+            <div class="mantis-title">Account Access</div>
+            <div class="mantis-sub">Secure your workspace, unlock exports, and sync settings across devices.</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    colA, colB = st.columns([1.25, 1], vertical_alignment="top")
 
     with colA:
         card_start("Guest mode vs Account")
@@ -220,6 +223,15 @@ def _render_login_ui() -> None:
                 st.rerun()
 
         card_end()
+
+    st.markdown(
+        """
+        <div class="mantis-callout">
+            Need help? Check your inbox for verification links or reset emails, then return here to sign in.
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 def _render_settings_ui(user: dict) -> None:
