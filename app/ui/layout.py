@@ -1,3 +1,5 @@
+import streamlit as st
+
 from mantis.ui.layout import render_footer
 
 
