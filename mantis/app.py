@@ -1,11 +1,50 @@
 #!/usr/bin/env python3
-"""Streamlit entrypoint shim for MANTIS Studio."""
+# Mantis_Studio.py — MANTIS Studio
+#
+# Run:
+#   python -m streamlit run Mantis_Studio.py
+#
+# Requirements:
+#   streamlit>=1.42.0
+#   requests
+#   Authlib>=1.3.2
+#   python-dotenv (optional)
+#   pandas
+#   plotly
+#
+# Notes:
+# - This preserves ALL current features from your v47 generator build:
+#   Projects (create/load/delete), Outline generation/title generation/reverse engineer,
+#   Entity scanning & enrich, World Bible categories, Chapters w/ AI autowrite,
+#   Summaries, Rewrite presets, Export markdown, Import story text, Auto-save, Ghost text flow.
+#
+# - This is a UI/first-time appearance upgrade:
+#   First-run welcome, clearer home, cleaner sidebar, better empty states, safer buttons/layout.
 
-from mantis.app import run_app
-
-
+import datetime
+import difflib
+import json
+import os
+from pathlib import Path
+import random
+import re
+import shutil
 import sys
-from app.utils.navigation import get_nav_config
+import time
+import uuid
+from types import SimpleNamespace
+from typing import Any, Callable, Dict, Generator, List, Optional
+
+import requests
+# (UI-only imports are loaded inside _run_ui() so selftests can run without Streamlit installed.)
+
+from mantis.config.settings import AppConfig, ensure_storage_dirs, load_app_config, logger, save_app_config
+from mantis.core.export import project_to_markdown
+from mantis.core.models import Chapter, Entity, Project, sanitize_chapter_title
+from mantis.core.storage import get_user_projects_dir
+from mantis.core.world_bible import queue_world_bible_suggestion
+from mantis.services.llm import AIEngine, AnalysisEngine, REWRITE_PRESETS, StoryEngine, rewrite_prompt
+from mantis.state.session import initialize_session_state, install_key_helpers, ui_key
 
 # NOTE: Streamlit-dependent utilities are imported inside _run_ui() so
 # `python Mantis_Studio.py --selftest` can run without Streamlit installed.
@@ -22,1050 +61,15 @@ REPAIR_MODE = "--repair" in sys.argv
 # ============================================================
 # 1) CONFIG
 # ============================================================
-
-def get_app_version() -> str:
-    """Return the user-visible app version.
-
-    Priority:
-      1) Explicit env var (useful for CI/CD overrides)
-      2) VERSION.txt next to this file (repo-controlled)
-      3) A safe fallback string
-    """
-    env_version = os.getenv("MANTIS_APP_VERSION")
-    if env_version:
-        return env_version
-
-    try:
-        version_path = Path(__file__).with_name("VERSION.txt")
-        if version_path.exists():
-            raw = version_path.read_text(encoding="utf-8").strip()
-            if raw:
-                return raw
-    except Exception:
-        # Never block app start on version metadata.
-        pass
-
-    return "47.0"
-
-
-class AppConfig:
-    APP_NAME = "MANTIS Studio"
-    VERSION = get_app_version()
-    PROJECTS_DIR = os.getenv("MANTIS_PROJECTS_DIR", "projects")
-    BACKUPS_DIR = os.path.join(PROJECTS_DIR, ".backups")
-    USERS_DIR = os.getenv("MANTIS_USERS_DIR", os.path.join(PROJECTS_DIR, "users"))
-    GROQ_API_URL = os.getenv("GROQ_API_URL", "https://api.groq.com/openai/v1")
-    GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
-    GROQ_TIMEOUT = int(os.getenv("GROQ_TIMEOUT", "300"))
-    DEFAULT_MODEL = os.getenv("GROQ_MODEL", "llama3-8b-8192")
-    OPENAI_API_URL = os.getenv("OPENAI_API_URL", "https://api.openai.com/v1")
-    OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
-    OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
-    CONFIG_PATH = os.getenv(
-        "MANTIS_CONFIG_PATH",
-        os.path.join(PROJECTS_DIR, ".mantis_config.json"),
-    )
-    MAX_PROMPT_CHARS = 16000
-    SUMMARY_CONTEXT_CHARS = 4000
-    MAX_UPLOAD_MB = int(os.getenv("MANTIS_MAX_UPLOAD_MB", "10"))
-    SAVE_LOCK_TIMEOUT = int(os.getenv("MANTIS_SAVE_LOCK_TIMEOUT", "5"))
-    SAVE_LOCK_RETRY_SLEEP = float(os.getenv("MANTIS_SAVE_LOCK_RETRY_SLEEP", "0.1"))
-    WORLD_BIBLE_CONFIDENCE = float(os.getenv("MANTIS_WORLD_BIBLE_CONFIDENCE", "0.75"))
-
-
-os.makedirs(AppConfig.PROJECTS_DIR, exist_ok=True)
-os.makedirs(AppConfig.BACKUPS_DIR, exist_ok=True)
-os.makedirs(AppConfig.USERS_DIR, exist_ok=True)
-
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
-logger = logging.getLogger("MANTIS")
-
-
-def load_app_config() -> Dict[str, str]:
-    try:
-        with open(AppConfig.CONFIG_PATH, "r", encoding="utf-8") as fh:
-            data = json.load(fh)
-            if isinstance(data, dict):
-                return data
-    except FileNotFoundError:
-        return {}
-    except Exception:
-        logger.warning("Failed to load app config", exc_info=True)
-    return {}
-
-
-def save_app_config(data: Dict[str, str]) -> None:
-    try:
-        with open(AppConfig.CONFIG_PATH, "w", encoding="utf-8") as fh:
-            json.dump(data, fh, indent=2)
-    except Exception:
-        logger.warning("Failed to save app config", exc_info=True)
-
-
-def _truncate_prompt(prompt: str, limit: int) -> str:
-    if not prompt:
-        return prompt
-    if len(prompt) <= limit:
-        return prompt
-    logger.warning("Prompt length %s exceeded limit %s; truncating", len(prompt), limit)
-    return prompt[:limit]
-
-
-def _acquire_lock(lock_path: str, timeout: int, retry_sleep: float) -> bool:
-    start = time.time()
-    while True:
-        try:
-            fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-            with os.fdopen(fd, "w", encoding="utf-8") as lock_file:
-                lock_file.write(str(os.getpid()))
-            return True
-        except FileExistsError:
-            try:
-                age = time.time() - os.path.getmtime(lock_path)
-            except OSError:
-                age = 0
-            if age > max(timeout * 5, 5):
-                try:
-                    os.remove(lock_path)
-                except OSError:
-                    pass
-            if time.time() - start >= timeout:
-                return False
-            time.sleep(retry_sleep)
-
-
-def _release_lock(lock_path: str) -> None:
-    try:
-        os.remove(lock_path)
-    except OSError:
-        pass
-
-
-def get_user_projects_dir(user_id: str) -> str:
-    user_dir = os.path.join(AppConfig.USERS_DIR, user_id)
-    os.makedirs(user_dir, exist_ok=True)
-    return user_dir
-
-
 # ============================================================
 # 2) MODELS
 # ============================================================
-
-@dataclass
-class Entity:
-    id: str
-    name: str
-    category: str
-    description: str = ""
-    aliases: List[str] = field(default_factory=list)
-    tags: str = ""
-    created_at: float = field(default_factory=time.time)
-
-    def merge(self, new_desc: str):
-        """Smart merge that avoids exact duplicates and formats as bullets."""
-        if not new_desc:
-            return
-        new_desc = new_desc.strip()
-        if not new_desc or new_desc in (self.description or ""):
-            return
-
-        # Normalize text to check for duplicates (basic)
-        curr = (self.description or "").lower()
-        current_sentences = set(re.split(r"[.!?\n]", curr))
-        new_sentences = [s.strip() for s in re.split(r"[.!?\n]", new_desc) if s.strip()]
-
-        to_add = []
-        for s in new_sentences:
-            if s.lower() not in current_sentences:
-                to_add.append(s)
-
-        if to_add:
-            if self.description and not self.description.startswith("-"):
-                self.description = f"- {self.description.strip()}"
-            elif not self.description:
-                self.description = ""
-
-            for item in to_add:
-                if self.description:
-                    self.description += f"\n- {item}"
-                else:
-                    self.description = f"- {item}"
-
-
-@dataclass
-class Chapter:
-    id: str
-    index: int
-    title: str = "Untitled Chapter"
-    content: str = ""
-    summary: str = ""
-    word_count: int = 0
-    target_words: int = 1000
-    created_at: float = field(default_factory=time.time)
-    modified_at: float = field(default_factory=time.time)
-    history: List[Dict[str, Any]] = field(default_factory=list)
-
-    def update_content(self, new_text: str, source: str = "manual"):
-        if self.content == new_text:
-            return
-        self.history.append(
-            {"timestamp": time.time(), "source": source, "previous_text": self.content}
-        )
-        if len(self.history) > 10:
-            self.history.pop(0)
-        self.content = new_text
-        self.word_count = len((new_text or "").split())
-        self.modified_at = time.time()
-
-    def restore_revision(self, text: str):
-        self.content = text
-        self.word_count = len((text or "").split())
-        self.modified_at = time.time()
-
-
-@dataclass
-class Project:
-    id: str
-    title: str
-    author: str = ""
-    genre: str = ""
-    outline: str = ""
-    memory: str = ""
-    memory_hard: str = ""
-    memory_soft: str = ""
-    author_note: str = ""
-    style_guide: str = ""
-    default_word_count: int = 1000
-    world_db: Dict[str, Entity] = field(default_factory=dict)
-    chapters: Dict[str, Chapter] = field(default_factory=dict)
-    created_at: float = field(default_factory=time.time)
-    last_modified: float = field(default_factory=time.time)
-    filepath: Optional[str] = None
-    storage_dir: Optional[str] = None
-
-    @classmethod
-    def create(
-        cls,
-        title: str,
-        author: str = "",
-        genre: str = "",
-        storage_dir: Optional[str] = None,
-    ) -> "Project":
-        storage_dir = storage_dir or AppConfig.PROJECTS_DIR
-        os.makedirs(storage_dir, exist_ok=True)
-        final_title = (title or "").strip()
-        if not final_title:
-            base = "Untitled Project"
-            final_title = base
-            counter = 1
-            if os.path.exists(storage_dir):
-                while True:
-                    found = False
-                    for f in os.listdir(storage_dir):
-                        if final_title.replace(" ", "_") in f:
-                            found = True
-                            break
-                    if not found:
-                        break
-                    final_title = f"{base} ({counter})"
-                    counter += 1
-        return cls(
-            id=str(uuid.uuid4()),
-            title=final_title,
-            author=author.strip(),
-            genre=genre.strip(),
-            storage_dir=storage_dir,
-        )
-
-    @staticmethod
-    def _normalize_category(category: str) -> str:
-        normalized = (category or "").strip().lower()
-        mapping = {
-            "character": "Character",
-            "characters": "Character",
-            "location": "Location",
-            "locations": "Location",
-            "faction": "Faction",
-            "factions": "Faction",
-            "lore": "Lore",
-            "rule": "Lore",
-            "rules": "Lore",
-            "item": "Item",
-            "items": "Item",
-        }
-        return mapping.get(normalized, "Lore")
-
-    @staticmethod
-    def _normalize_entity_name(name: str) -> str:
-        base = (name or "").strip().lower()
-        if not base:
-            return ""
-        base = re.sub(r"[\"'`]", "", base)
-        base = re.sub(r"\((.*?)\)", r" \1 ", base)
-        base = re.sub(r"\b(mr|mrs|ms|dr|prof|sir|madam)\.?\b", "", base)
-        base = re.sub(r"[^\w\s/-]", " ", base)
-        base = re.sub(r"\s+", " ", base).strip()
-        abbrev_map = {
-            "st": "saint",
-            "mt": "mount",
-            "ft": "fort",
-        }
-        tokens = [abbrev_map.get(token, token) for token in base.split()]
-        return " ".join(tokens).strip()
-
-    @classmethod
-    def _entity_aliases(cls, name: str) -> List[str]:
-        normalized = cls._normalize_entity_name(name)
-        if not normalized:
-            return []
-        parts = re.split(r"\s*/\s*|\s+or\s+|\s+\|\s+", normalized)
-        aliases = []
-        for part in parts:
-            part = part.strip()
-            if part:
-                aliases.append(part)
-        if normalized not in aliases:
-            aliases.append(normalized)
-        return aliases
-
-    @staticmethod
-    def _token_set(name: str) -> set[str]:
-        return {token for token in re.split(r"\s+", name) if token}
-
-    @classmethod
-    def _initials_match(cls, left_norm: str, right_norm: str) -> bool:
-        left_tokens = left_norm.split()
-        right_tokens = right_norm.split()
-        if not left_tokens or not right_tokens:
-            return False
-        if left_tokens[-1] != right_tokens[-1]:
-            return False
-        left_initials = {t[0] for t in left_tokens[:-1] if len(t) == 1}
-        right_initials = {t[0] for t in right_tokens[:-1] if len(t) == 1}
-        if left_initials and right_tokens[0] and right_tokens[0][0] in left_initials:
-            return True
-        if right_initials and left_tokens[0] and left_tokens[0][0] in right_initials:
-            return True
-        return False
-
-    @classmethod
-    def _names_match(cls, left: str, right: str) -> bool:
-        left_norm = cls._normalize_entity_name(left)
-        right_norm = cls._normalize_entity_name(right)
-        if not left_norm or not right_norm:
-            return False
-        if left_norm == right_norm:
-            return True
-
-        left_tokens = cls._token_set(left_norm)
-        right_tokens = cls._token_set(right_norm)
-        if left_tokens & right_tokens:
-            if left_norm in right_norm or right_norm in left_norm:
-                return True
-            if len(left_tokens) > 1 and len(right_tokens) > 1:
-                if left_tokens.intersection(right_tokens):
-                    return True
-
-        if cls._initials_match(left_norm, right_norm):
-            return True
-
-        similarity = difflib.SequenceMatcher(None, left_norm, right_norm).ratio()
-        return similarity >= 0.85
-
-    @classmethod
-    def _merge_aliases(cls, entity: Entity, incoming: List[str], primary: str) -> None:
-        normalized_existing = {
-            cls._normalize_entity_name(entity.name)
-        }
-        for alias in entity.aliases:
-            normalized_existing.add(cls._normalize_entity_name(alias))
-        for alias in incoming:
-            clean = (alias or "").strip()
-            if not clean:
-                continue
-            normalized = cls._normalize_entity_name(clean)
-            if not normalized or normalized in normalized_existing:
-                continue
-            if cls._normalize_entity_name(primary) == normalized:
-                continue
-            entity.aliases.append(clean)
-            normalized_existing.add(normalized)
-
-    def _build_match_aliases(self, name: str, aliases: Optional[List[str]] = None) -> List[str]:
-        incoming_match_aliases = self._entity_aliases(name)
-        for alias in (aliases or []):
-            incoming_match_aliases.extend(self._entity_aliases(alias))
-        return incoming_match_aliases
-
-    def find_entity_match(
-        self,
-        name: str,
-        category: str,
-        aliases: Optional[List[str]] = None,
-    ) -> Optional[Entity]:
-        clean_name = (name or "").strip()
-        if not clean_name:
-            return None
-
-        normalized_category = self._normalize_category(category)
-        incoming_match_aliases = self._build_match_aliases(clean_name, aliases)
-
-        for ent in self.world_db.values():
-            if self._normalize_category(ent.category) != normalized_category:
-                continue
-            candidates = [ent.name] + (ent.aliases or [])
-            matched = any(
-                self._names_match(candidate, incoming)
-                for candidate in candidates
-                for incoming in incoming_match_aliases
-            )
-            if matched:
-                return ent
-        return None
-
-    def upsert_entity(
-        self,
-        name: str,
-        category: str,
-        desc: str = "",
-        aliases: Optional[List[str]] = None,
-        allow_merge: bool = True,
-        allow_alias: bool = True,
-    ) -> tuple[Optional[Entity], str]:
-        clean_name = (name or "").strip()
-        if not clean_name:
-            return None, "skipped"
-
-        normalized_category = self._normalize_category(category)
-        incoming_aliases = [a for a in (aliases or []) if (a or "").strip()]
-        incoming_aliases = list(dict.fromkeys([a.strip() for a in incoming_aliases if a.strip()]))
-        incoming_match_aliases = self._build_match_aliases(clean_name, incoming_aliases)
-
-        for ent in self.world_db.values():
-            if self._normalize_category(ent.category) != normalized_category:
-                continue
-
-            candidates = [ent.name] + (ent.aliases or [])
-            matched = any(
-                self._names_match(candidate, incoming)
-                for candidate in candidates
-                for incoming in incoming_match_aliases
-            )
-            if matched:
-                if allow_alias:
-                    self._merge_aliases(ent, [clean_name] + incoming_aliases, ent.name)
-                if allow_merge:
-                    ent.merge(desc)
-                self.last_modified = time.time()
-                return ent, "matched"
-
-        e = Entity(
-            id=str(uuid.uuid4()),
-            name=clean_name,
-            category=normalized_category,
-            description=(desc or "").strip(),
-            aliases=[],
-        )
-        if allow_alias:
-            self._merge_aliases(e, incoming_aliases, clean_name)
-        self.world_db[e.id] = e
-        self.last_modified = time.time()
-        return e, "created"
-
-    def add_entity(self, name: str, category: str, desc: str = "") -> Optional[Entity]:
-        """Smart Add with Fuzzy Matching."""
-        ent, _ = self.upsert_entity(name, category, desc, allow_merge=True, allow_alias=True)
-        return ent
-
-    def delete_entity(self, eid: str):
-        if eid in self.world_db:
-            del self.world_db[eid]
-            self.last_modified = time.time()
-
-    def add_chapter(self, title: str = "Untitled", content: str = "") -> Chapter:
-        existing = [c.index for c in self.chapters.values()]
-        index = (max(existing) + 1) if existing else 1
-
-        if (title == "Untitled" or title.startswith("Chapter")) and self.outline:
-            pattern = re.compile(rf"Chapter {index}[:\s]+(.*?)(?=\n|$)", re.IGNORECASE)
-            match = pattern.search(self.outline)
-            if match:
-                raw_text = match.group(1).strip()
-                split_text = re.split(r" [-–:] ", raw_text, 1)
-                final_title = sanitize_chapter_title(split_text[0].strip())
-                if len(final_title) > 2:
-                    title = final_title
-
-        c = Chapter(
-            id=str(uuid.uuid4()),
-            index=index,
-            title=sanitize_chapter_title(title),
-            content=content or "",
-            target_words=self.default_word_count,
-        )
-        c.word_count = len((content or "").split())
-        self.chapters[c.id] = c
-        self.last_modified = time.time()
-        return c
-
-    def get_ordered_chapters(self) -> List[Chapter]:
-        return sorted(self.chapters.values(), key=lambda c: c.index)
-
-    def get_total_word_count(self) -> int:
-        return sum(c.word_count for c in self.chapters.values())
-
-    def import_text_file(self, full_text: str) -> int:
-        split_pattern = r"(?i)\n\s*(?:chapter|part)\s+(?:\d+|[a-z]+)[:.]?\s*.*?(?=\n)"
-        parts = re.split(split_pattern, full_text or "")
-        headers = re.findall(split_pattern, full_text or "")
-        if len(parts) < 2:
-            self.add_chapter("Imported Text", full_text or "")
-            return 1
-
-        count = 0
-        if parts[0].strip():
-            self.add_chapter("Prologue", parts[0].strip())
-            count += 1
-        for i, content in enumerate(parts[1:]):
-            if not content.strip():
-                continue
-            title = headers[i].strip() if i < len(headers) else f"Chapter {i+1}"
-            title = sanitize_chapter_title(title)
-            self.add_chapter(title, content.strip())
-            count += 1
-        return count
-
-    def to_dict(self) -> Dict[str, Any]:
-        d = asdict(self)
-        d.pop("filepath", None)
-        d.pop("storage_dir", None)
-        d["world_db"] = {k: asdict(v) for k, v in self.world_db.items()}
-        d["chapters"] = {k: asdict(v) for k, v in self.chapters.items()}
-        return d
-
-    def save(self) -> str:
-        safe_title = re.sub(r'[<>:"/\\|?*]', "_", self.title)[:60]
-        filename = f"{self.id}_{safe_title.replace(' ', '_')}.json"
-        storage_dir = self.storage_dir or AppConfig.PROJECTS_DIR
-        os.makedirs(storage_dir, exist_ok=True)
-        path = os.path.join(storage_dir, filename)
-        lock_path = path + ".lock"
-        tmp = path + ".tmp"
-        last_error: Optional[Exception] = None
-        if not _acquire_lock(
-            lock_path,
-            AppConfig.SAVE_LOCK_TIMEOUT,
-            AppConfig.SAVE_LOCK_RETRY_SLEEP,
-        ):
-            logger.error("Save lock timeout for %s", path)
-            return path
-        try:
-            for attempt in range(1, 4):
-                try:
-                    if os.path.exists(path):
-                        os.makedirs(AppConfig.BACKUPS_DIR, exist_ok=True)
-                        stamp = time.strftime("%Y%m%d_%H%M%S")
-                        backup_name = f"{stamp}__{os.path.basename(path)}"
-                        backup_path = os.path.join(AppConfig.BACKUPS_DIR, backup_name)
-                        try:
-                            shutil.copy2(path, backup_path)
-                        except Exception:
-                            logger.warning("Backup failed for %s", path, exc_info=True)
-                    with open(tmp, "w", encoding="utf-8") as f:
-                        json.dump(self.to_dict(), f, indent=2, ensure_ascii=False)
-                    os.replace(tmp, path)
-                    break
-                except Exception as exc:
-                    last_error = exc
-                    logger.warning("Save attempt %s failed for %s", attempt, path, exc_info=True)
-                    time.sleep(0.1)
-            else:
-                logger.error("Save failed after retries for %s: %s", path, last_error)
-        finally:
-            _release_lock(lock_path)
-
-        self.filepath = path
-        self.storage_dir = storage_dir
-        self.last_modified = time.time()
-        return path
-
-    @classmethod
-    def load(cls, path: str) -> "Project":
-        with open(path, "r", encoding="utf-8") as fh:
-            data = json.load(fh)
-
-        proj = cls(
-            id=data.get("id") or str(uuid.uuid4()),
-            title=data.get("title") or "Untitled Project",
-        )
-        proj.author = data.get("author", "")
-        proj.genre = data.get("genre", "")
-        proj.outline = data.get("outline", "")
-        proj.memory = data.get("memory", data.get("memory_notes", ""))
-        proj.memory_hard = data.get("memory_hard", "")
-        proj.memory_soft = data.get("memory_soft", "")
-        proj.author_note = data.get("author_note", data.get("authors_note", ""))
-        proj.style_guide = data.get("style_guide", data.get("style_note", ""))
-        proj.default_word_count = data.get("default_word_count", 1000)
-        proj.created_at = data.get("created_at", time.time())
-        proj.last_modified = data.get("last_modified", time.time())
-
-        ent_fields = {f.name for f in fields(Entity)}
-        world_db_data = data.get("world_db") or data.get("characters") or {}
-        if isinstance(world_db_data, list):
-            world_db_data = {
-                (item.get("id") or str(uuid.uuid4())): item
-                for item in world_db_data
-                if isinstance(item, dict)
-            }
-        if not isinstance(world_db_data, dict):
-            world_db_data = {}
-        for k, v in world_db_data.items():
-            if "category" not in v:
-                v["category"] = "Character"
-            clean = {key: val for key, val in v.items() if key in ent_fields}
-            clean["id"] = clean.get("id") or k or str(uuid.uuid4())
-            clean["name"] = clean.get("name") or "Unknown"
-            clean["category"] = Project._normalize_category(clean.get("category", "Lore"))
-            if "aliases" in clean and not isinstance(clean["aliases"], list):
-                clean["aliases"] = [str(clean["aliases"])]
-            try:
-                proj.world_db[clean["id"]] = Entity(**clean)
-            except TypeError:
-                logger.warning("Skipping malformed entity entry: %s", k, exc_info=True)
-
-        chap_fields = {f.name for f in fields(Chapter)}
-        chapter_data = data.get("chapters") or {}
-        if isinstance(chapter_data, list):
-            chapter_data = {
-                (item.get("id") or str(uuid.uuid4())): item
-                for item in chapter_data
-                if isinstance(item, dict)
-            }
-        if not isinstance(chapter_data, dict):
-            chapter_data = {}
-        fallback_index = 1
-        for k, v in chapter_data.items():
-            clean = {key: val for key, val in v.items() if key in chap_fields}
-            clean["id"] = clean.get("id") or k or str(uuid.uuid4())
-            try:
-                clean_index = int(clean.get("index") or fallback_index)
-            except (TypeError, ValueError):
-                clean_index = fallback_index
-            clean["index"] = clean_index
-            clean["title"] = clean.get("title") or f"Chapter {clean_index}"
-            fallback_index = max(fallback_index, clean_index + 1)
-            try:
-                proj.chapters[clean["id"]] = Chapter(**clean)
-            except TypeError:
-                logger.warning("Skipping malformed chapter entry: %s", k, exc_info=True)
-
-        proj.storage_dir = os.path.dirname(path)
-        proj.filepath = path
-        return proj
-
-    @classmethod
-    def delete_file(cls, filepath: str):
-        try:
-            os.remove(filepath)
-        except OSError:
-            logger.warning("Failed to delete project file: %s", filepath, exc_info=True)
-
-
 # ============================================================
 # 3) AI ENGINE
 # ============================================================
-
-class AIEngine:
-    def __init__(self, timeout: int = AppConfig.GROQ_TIMEOUT, base_url: Optional[str] = None):
-        self.base_url = (base_url or AppConfig.GROQ_API_URL).rstrip("/")
-        self.timeout = timeout
-        self.session = requests.Session()
-
-    def probe_models(self, api_key: str) -> List[str]:
-        headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
-        try:
-            r = self.session.get(f"{self.base_url}/models", headers=headers, timeout=5)
-            r.raise_for_status()
-            data = r.json()
-            return [m.get("id") for m in data.get("data", []) if m.get("id")]
-        except Exception:
-            logger.warning("Model probe failed for %s", self.base_url, exc_info=True)
-            return []
-
-    def generate_stream(self, prompt: str, model: str) -> Generator[str, None, None]:
-        if "streamlit" in sys.modules:
-            import streamlit as st
-
-            results = st.session_state.get("coherence_results", [])
-            if len(results) > 2:
-                yield (
-                    "ERROR: Canon violation detected.\n"
-                    "Resolve Hard Canon conflicts before generating AI content."
-                )
-                return
-            project = st.session_state.get("project")
-            hard_rules = ""
-            if project:
-                hard_rules = (project.memory_hard or project.memory or "").strip()
-            if hard_rules:
-                prompt = (
-                    "HARD CANON RULES (NON-NEGOTIABLE):\n"
-                    f"{hard_rules}\n\n"
-                    f"{prompt}"
-                )
-        if not model:
-            yield "Groq model not configured."
-            return
-
-        api_key = (AppConfig.GROQ_API_KEY or "").strip()
-        if not api_key:
-            yield "Groq API key not configured."
-            return
-
-        prompt = _truncate_prompt(prompt, AppConfig.MAX_PROMPT_CHARS)
-        headers = {"Content-Type": "application/json"}
-        headers["Authorization"] = f"Bearer {api_key}"
-
-        def _groq_non_stream() -> Generator[str, None, None]:
-            payload = {
-                "model": model,
-                "messages": [{"role": "user", "content": prompt}],
-                "stream": False,
-            }
-            try:
-                r = self.session.post(
-                    f"{self.base_url}/chat/completions",
-                    json=payload,
-                    headers=headers,
-                    timeout=self.timeout,
-                )
-                r.raise_for_status()
-                data = r.json()
-                choice = (data.get("choices") or [{}])[0]
-                content = (choice.get("message") or {}).get("content") or choice.get("text") or ""
-                if content:
-                    yield content
-                else:
-                    yield "Groq response empty."
-            except Exception:
-                logger.warning("Groq non-stream generation failed", exc_info=True)
-                yield "Groq generation failed."
-
-        payload = {
-            "model": model,
-            "messages": [{"role": "user", "content": prompt}],
-            "stream": True,
-        }
-        try:
-            with self.session.post(
-                f"{self.base_url}/chat/completions",
-                json=payload,
-                headers=headers,
-                stream=True,
-                timeout=self.timeout,
-            ) as r:
-                r.raise_for_status()
-                yielded = False
-                for raw in r.iter_lines():
-                    if not raw:
-                        continue
-                    line = raw.decode("utf-8").strip()
-                    if not line.startswith("data:"):
-                        continue
-                    data = line.replace("data:", "", 1).strip()
-                    if data == "[DONE]":
-                        break
-                    try:
-                        chunk = json.loads(data)
-                    except json.JSONDecodeError:
-                        continue
-                    delta = chunk.get("choices", [{}])[0].get("delta", {})
-                    content = delta.get("content")
-                    if content:
-                        yielded = True
-                        yield content
-                if not yielded:
-                    yield from _groq_non_stream()
-        except Exception:
-            logger.warning("Groq streaming generation failed, retrying non-stream", exc_info=True)
-            yield from _groq_non_stream()
-
-    def generate(self, prompt: str, model: str) -> Dict[str, str]:
-        full_text = ""
-        for chunk in self.generate_stream(prompt, model):
-            full_text += chunk
-        return {"text": full_text}
-
-    def generate_json(self, prompt: str, model: str) -> Optional[List[Dict[str, Any]]]:
-        res = self.generate(f"Return ONLY valid JSON. List of objects. No markdown.\n\n{prompt}", model)
-        txt = (res.get("text", "") or "").strip()
-        txt = re.sub(r"```json\s*", "", txt)
-        txt = re.sub(r"```\s*", "", txt).strip()
-        try:
-            d = json.loads(txt)
-            if isinstance(d, list):
-                return d
-            if isinstance(d, dict):
-                return [d]
-            return None
-        except Exception:
-            logger.warning("JSON parse failed for AI response", exc_info=True)
-            return None
-
-
-class AnalysisEngine:
-    @staticmethod
-    def extract_entities(text: str, model: str) -> list:
-        if not text or len(text) < 50:
-            return []
-        prompt = (
-            "Analyze text. Identify Characters, Locations, Factions, and important Lore.\n"
-            "Return JSON List: [{'name': 'X', 'category': 'Character|Location|Faction|Lore', "
-            "'description': 'Z', 'aliases': ['Alt Name'], 'confidence': 0.0}]\n"
-            f"TEXT:\n{text[:6000]}"
-        )
-        return AIEngine().generate_json(prompt, model) or []
-
-    @staticmethod
-    def generate_title(outline: str, genre: str, model: str) -> str:
-        prompt = (
-            f"GENRE: {genre}\n"
-            f"OUTLINE: {outline[:2000]}\n"
-            "TASK: Create a creative, catchy title for this story.\n"
-            "RULES: Output ONLY the title. No quotes. No prefixes like 'Title:'."
-        )
-        raw = (AIEngine().generate(prompt, model).get("text", "Untitled") or "").strip()
-        clean = re.sub(r"(?i)^(here is a title|sure|suggested title|title)[:\s-]*", "", raw).strip()
-        clean = clean.replace('"', "").replace("'", "").strip()
-        return clean.split("\n")[0] if clean else "Untitled"
-
-
-    @staticmethod
-    def detect_genre(outline: str, model: str) -> str:
-        """
-        Attempts to infer a concise genre label from the outline text.
-        Uses AI if available, otherwise falls back to a lightweight heuristic.
-        """
-        outline = (outline or "").strip()
-        if not outline:
-            return ""
-
-        # Heuristic fallback first (fast, offline-safe)
-        low = outline.lower()
-        heuristic_map = [
-            ("space", "Science Fiction"),
-            ("spaceship", "Science Fiction"),
-            ("alien", "Science Fiction"),
-            ("cyber", "Cyberpunk"),
-            ("hacker", "Cyberpunk"),
-            ("detective", "Mystery/Thriller"),
-            ("murder", "Mystery/Thriller"),
-            ("serial killer", "Mystery/Thriller"),
-            ("dragon", "Fantasy"),
-            ("magic", "Fantasy"),
-            ("kingdom", "Fantasy"),
-            ("vampire", "Horror"),
-            ("zombie", "Horror"),
-            ("haunted", "Horror"),
-            ("romance", "Romance"),
-            ("love triangle", "Romance"),
-            ("coming of age", "Coming-of-Age"),
-            ("war", "Historical/War"),
-            ("wwii", "Historical/War"),
-            ("post-apocalyptic", "Post-Apocalyptic"),
-            ("apocalypse", "Post-Apocalyptic"),
-        ]
-        for needle, genre in heuristic_map:
-            if needle in low:
-                return genre
-
-        # AI-based inference
-        prompt = (
-            "You are a book editor. Infer the most fitting genre from the outline.\n"
-            "Rules:\n"
-            "- Output ONLY a short genre label (2-4 words).\n"
-            "- No quotes, no prefix, no punctuation at the end.\n\n"
-            f"OUTLINE:\n{outline[:2500]}"
-        )
-        try:
-            raw = (AIEngine().generate(prompt, model).get("text", "") or "").strip()
-            raw = re.sub(r'(?i)^(genre)[:\s-]*', '', raw).strip()
-            raw = raw.replace('"', "").replace("'", "").strip()
-            genre = raw.splitlines()[0].strip()
-            # Keep it clean / short
-            genre = re.sub(r"[^\w\s/&-]", "", genre).strip()
-            if len(genre) > 40:
-                genre = genre[:40].strip()
-            return genre
-        except Exception:
-            logger.warning("Genre detection failed", exc_info=True)
-            return ""
-
-    @staticmethod
-    def enrich_entity(name: str, category: str, desc: str, model: str) -> str:
-        prompt = (
-            f"NAME: {name}\nCATEGORY: {category}\nCURRENT INFO: {desc}\n"
-            "TASK: Expand on this entry with creative details, backstory, or physical description.\n"
-            "RULES: Keep it concise (under 50 words). Bullet points are okay."
-        )
-        return AIEngine().generate(prompt, model).get("text", "") or ""
-
-    @staticmethod
-    def coherence_check(
-        memory: str,
-        author_note: str,
-        style_guide: str,
-        outline: str,
-        world_bible: str,
-        chapters: List[Dict[str, Any]],
-        model: str,
-    ) -> List[Dict[str, Any]]:
-        if not chapters:
-            return []
-        prompt = (
-            "You are a developmental editor checking continuity and canon coherence.\n"
-            "Identify contradictions, timeline issues, or inconsistent details.\n"
-            "Return ONLY JSON (no markdown) as a list of objects with keys:\n"
-            "- chapter_index (number)\n"
-            "- issue (short description)\n"
-            "- target_excerpt (exact text to replace, must exist in the chapter)\n"
-            "- suggested_rewrite (replacement text to fix coherence)\n"
-            "- confidence (low|medium|high)\n\n"
-            f"PROJECT MEMORY:\n{(memory or '')[:2000]}\n\n"
-            f"AUTHOR NOTE:\n{(author_note or '')[:1200]}\n\n"
-            f"STYLE GUIDE:\n{(style_guide or '')[:1200]}\n\n"
-            f"WORLD BIBLE:\n{(world_bible or '')[:2400]}\n\n"
-            f"OUTLINE:\n{(outline or '')[:2000]}\n\n"
-            "CHAPTERS (summaries + excerpts):\n"
-            f"{json.dumps(chapters, ensure_ascii=False)}"
-        )
-        return AIEngine().generate_json(prompt, model) or []
-
-
-class StoryEngine:
-    @staticmethod
-    def summarize(text: str, model: str) -> str:
-        if not text:
-            return ""
-        prompt = f"Summarize this scene concisely (under 100 words):\n\n{text[:4000]}"
-        return AIEngine().generate(prompt, model).get("text", "") or ""
-
-    @staticmethod
-    def generate_chapter_prompt(project: Project, chapter_index: int, target_words: int) -> str:
-        hard_rules = (project.memory_hard or project.memory or "").strip()[:1500]
-        hard_block = f"HARD CANON RULES (STRICT):\n{hard_rules}\n\n" if hard_rules else ""
-        soft_guidelines = (project.memory_soft or "").strip()[:1500]
-        soft_block = f"SOFT GUIDELINES (STYLE/CONTEXT):\n{soft_guidelines}\n\n" if soft_guidelines else ""
-        memory_context = (project.memory or "").strip()[:1500]
-        memory_block = f"PROJECT MEMORY:\n{memory_context}\n\n" if memory_context else ""
-        author_note = (project.author_note or "").strip()[:1200]
-        author_block = f"AUTHOR NOTE:\n{author_note}\n\n" if author_note else ""
-        style_guide = (project.style_guide or "").strip()[:1200]
-        style_block = f"STYLE GUIDE:\n{style_guide}\n\n" if style_guide else ""
-        outline_context = (project.outline or "")[:3000]
-        match = re.search(rf"(?i)Chapter {chapter_index}[:\s]+(.*?)(?=\n|$)", project.outline or "")
-        if match:
-            specific_beat = match.group(1).strip()
-            outline_context += f"\n\nCURRENT CHAPTER OBJECTIVE: {specific_beat}"
-
-        prev_chaps = [c for c in project.get_ordered_chapters() if c.index < chapter_index]
-        story_so_far = ""
-        prev_text = ""
-
-        if prev_chaps:
-            story_so_far = "PREVIOUS EVENTS:\n"
-            for c in prev_chaps[-5:]:
-                summ = c.summary if c.summary else "No summary."
-                story_so_far += f"Ch {c.index}: {summ}\n"
-            prev_text = f"\nIMMEDIATELY PRECEDING SCENE:\n{(prev_chaps[-1].content or '')[-1500:]}\n"
-
-        prompt = (
-            f"TITLE: {project.title}\nGENRE: {project.genre}\n"
-            f"{hard_block}"
-            f"{soft_block}"
-            f"{memory_block}"
-            f"{author_block}"
-            f"{style_block}"
-            f"OUTLINE CONTEXT:\n{outline_context}\n\n"
-            f"{story_so_far}"
-            f"{prev_text}\n"
-            f"TASK: Write Chapter {chapter_index}.\n"
-            f"LENGTH GOAL: {target_words} words.\n"
-            "INSTRUCTIONS:\n"
-            "1. Continue directly from the preceding scene (if any).\n"
-            "2. Match the writing style and tone of the previous text.\n"
-            "3. Focus on the 'Current Chapter Objective' if provided.\n"
-            "4. Do not output the chapter title. Just the story prose."
-        )
-        return prompt
-
-    @staticmethod
-    def reverse_engineer_outline(project: Project, model: str) -> str:
-        chaps = project.get_ordered_chapters()
-        if not chaps:
-            return "No content."
-        txt = ""
-        for c in chaps:
-            txt += f"Ch {c.index} ({c.title}): {c.summary or (c.content or '')[:300]}\n"
-        prompt = f"Create a structured outline based on these chapters:\n\n{txt}"
-        return AIEngine().generate(prompt, model).get("text", "") or ""
-
-
 # ============================================================
 # 4) UTILS
 # ============================================================
-
-REWRITE_PRESETS = {
-    "Custom": "Use your own custom instructions",
-    "Fix Grammar": "Correct grammar and spelling only.",
-    "Improve Flow": "Fix awkward phrasing and sentence rhythm.",
-    "Sensory Expansion": "Show, Don't Tell - Add smells, sounds, and textures.",
-    "Deepen POV": "Add more internal monologue and emotional reaction.",
-    "Make Witty": "Add humor, banter, and irony.",
-    "Make Darker": "Grim, moody, noir-style descriptions.",
-    "Expand": "Write more details, double the length.",
-}
-
-def rewrite_prompt(text: str, preset: str, custom: str = "") -> str:
-    instr = custom if preset == "Custom" else REWRITE_PRESETS.get(preset, "")
-    return f"Act as an editor.\nTASK: {preset}\nDETAILS: {instr}\n\nINPUT TEXT:\n{text}"
-
-def project_to_markdown(project: Project) -> str:
-    md = [f"# {project.title}", f"**Genre:** {project.genre}\n"]
-    if project.outline:
-        md.append("## Outline")
-        md.append(project.outline + "\n")
-    if project.memory:
-        md.append("## Memory")
-        md.append(project.memory + "\n")
-    if project.author_note:
-        md.append("## Author Note")
-        md.append(project.author_note + "\n")
-    if project.style_guide:
-        md.append("## Style Guide")
-        md.append(project.style_guide + "\n")
-    md.append("## World Bible")
-    for c in project.world_db.values():
-        md.append(f"- **{c.name}** ({c.category}): {c.description}")
-    md.append("\n## Chapters")
-    for c in project.get_ordered_chapters():
-        md.append(f"### {c.index}. {c.title}")
-        md.append((c.content or "") + "\n")
-    return "\n".join(md)
-
-
-def sanitize_chapter_title(title: str) -> str:
-    raw = (title or "").strip()
-    if not raw:
-        return ""
-    clean = raw.replace("“", "").replace("”", "").replace("’", "")
-    clean = clean.replace('"', "").replace("'", "")
-    clean = re.sub(r"^\*+|\*+$", "", clean).strip()
-    clean = re.sub(r"\s{2,}", " ", clean).strip()
-    return clean
-
-
 # ============================================================
 # 5) STREAMLIT UI (Appearance + First-time Onboarding)
 # ============================================================
@@ -1074,16 +78,14 @@ def sanitize_chapter_title(title: str) -> str:
 
 def _run_ui():
     import streamlit as st
-    from contextlib import contextmanager
-    from pathlib import Path
-    from app.components.ui import action_card, card, primary_button, section_header, stat_tile
-    from app.ui.layout import render_footer
-    from app.utils import auth
+    from mantis import router
+    from mantis.services import auth
+    from mantis.ui.components.ui import action_card, card, primary_button, section_header, stat_tile
+    from mantis.ui.layout import apply_theme, get_theme_tokens, render_footer, render_header
 
-    widget_counters: Dict[tuple, int] = {}
-    key_prefix_stack: List[str] = []
+    key_scope, _ = install_key_helpers(st)
 
-    ASSETS_DIR = Path(__file__).parent / "assets"
+    ASSETS_DIR = Path(__file__).resolve().parents[1] / "assets"
 
     @st.cache_data(show_spinner=False)
     def load_asset_bytes(filename: str) -> Optional[bytes]:
@@ -1093,11 +95,7 @@ def _run_ui():
         try:
             return path.read_bytes()
         except Exception:
-            logging.getLogger("MANTIS").warning(
-                "Failed to load asset %s",
-                path,
-                exc_info=True,
-            )
+            logger.warning("Failed to load asset %s", path, exc_info=True)
             return None
 
     def asset_base64(filename: str) -> str:
@@ -1105,77 +103,6 @@ def _run_ui():
         if not payload:
             return ""
         return base64.b64encode(payload).decode("utf-8")
-
-    def _current_prefix() -> str:
-        return "__".join(key_prefix_stack) or "global"
-
-    def _slugify(value: str) -> str:
-        slug = re.sub(r"[^a-z0-9]+", "_", (value or "").lower()).strip("_")
-        return slug[:40] or "widget"
-
-    def _auto_key(widget_type: str, label: Optional[str], key: Optional[str]) -> str:
-        if key:
-            return key
-        prefix = _current_prefix()
-        slug = _slugify(label or widget_type)
-        counter_key = (prefix, widget_type, slug)
-        widget_counters[counter_key] = widget_counters.get(counter_key, 0) + 1
-        index = widget_counters[counter_key]
-        return f"{prefix}__{slug}__{index}"
-
-    @contextmanager
-    def key_scope(prefix: str) -> Generator[None, None, None]:
-        key_prefix_stack.append(prefix)
-        try:
-            yield
-        finally:
-            key_prefix_stack.pop()
-
-    def _wrap_widget(widget_fn, widget_type: str):
-        def _wrapped(label=None, *args, **kwargs):
-            kwargs["key"] = _auto_key(widget_type, label, kwargs.get("key"))
-            return widget_fn(label, *args, **kwargs)
-
-        return _wrapped
-
-    def _wrap_widget_no_label(widget_fn, widget_type: str):
-        def _wrapped(*args, **kwargs):
-            kwargs["key"] = _auto_key(widget_type, None, kwargs.get("key"))
-            return widget_fn(*args, **kwargs)
-
-        return _wrapped
-
-    def _maybe_wrap(name: str, widget_type: str, has_label: bool = True) -> None:
-        if not hasattr(st, name):
-            return
-        original = getattr(st, name)
-        wrapped = _wrap_widget(original, widget_type) if has_label else _wrap_widget_no_label(original, widget_type)
-        setattr(st, name, wrapped)
-
-    _maybe_wrap("button", "button")
-    _maybe_wrap("text_input", "text_input")
-    _maybe_wrap("text_area", "text_area")
-    _maybe_wrap("selectbox", "selectbox")
-    _maybe_wrap("radio", "radio")
-    _maybe_wrap("checkbox", "checkbox")
-    _maybe_wrap("number_input", "number_input")
-    _maybe_wrap("slider", "slider")
-    _maybe_wrap("multiselect", "multiselect")
-    _maybe_wrap("file_uploader", "file_uploader")
-    _maybe_wrap("download_button", "download_button")
-    _maybe_wrap("form_submit_button", "form_submit_button")
-    _maybe_wrap("toggle", "toggle")
-    _maybe_wrap("feedback", "feedback")
-    _maybe_wrap("date_input", "date_input")
-    _maybe_wrap("time_input", "time_input")
-    _maybe_wrap("color_picker", "color_picker")
-    _maybe_wrap("camera_input", "camera_input")
-    _maybe_wrap("audio_input", "audio_input")
-    _maybe_wrap("chat_input", "chat_input", has_label=False)
-    # NOTE: st.page_link does not take a "label" as its first positional argument.
-    # Wrapping it with the generic label-first wrapper can break routing.
-    # If we need auto-keys for page_link later, add a signature-aware wrapper.
-    # _maybe_wrap("page_link", "page_link")
 
     def get_canon_health() -> tuple[str, str]:
         results = st.session_state.get("coherence_results", [])
@@ -1227,698 +154,25 @@ def _run_ui():
     page_icon = str(icon_path) if icon_path.exists() else "🪲"
     st.set_page_config(page_title=AppConfig.APP_NAME, page_icon=page_icon, layout="wide")
 
-    user = auth.get_current_user()
     config_data = load_app_config()
 
-    logged_in = auth.is_authenticated()
-    is_guest = not logged_in
-    st.session_state["guest_mode"] = is_guest
-    if is_guest:
-        st.session_state.setdefault("guest_session_id", uuid.uuid4().hex[:8])
-
-    if "ui_theme" not in st.session_state:
-        st.session_state.ui_theme = config_data.get("ui_theme", "Dark")
-    if "daily_word_goal" not in st.session_state:
-        st.session_state.daily_word_goal = int(config_data.get("daily_word_goal", 500))
-    if "weekly_sessions_goal" not in st.session_state:
-        st.session_state.weekly_sessions_goal = int(config_data.get("weekly_sessions_goal", 4))
-    if "focus_minutes" not in st.session_state:
-        st.session_state.focus_minutes = int(config_data.get("focus_minutes", 25))
-    if "activity_log" not in st.session_state:
-        st.session_state.activity_log = list(config_data.get("activity_log", []))
-    if "projects_refresh_token" not in st.session_state:
-        st.session_state.projects_refresh_token = 0
-    if "delete_project_path" not in st.session_state:
-        st.session_state.delete_project_path = None
-    if "delete_project_title" not in st.session_state:
-        st.session_state.delete_project_title = None
-    if "delete_entity_id" not in st.session_state:
-        st.session_state.delete_entity_id = None
-    if "delete_entity_name" not in st.session_state:
-        st.session_state.delete_entity_name = None
-    if "export_project_path" not in st.session_state:
-        st.session_state.export_project_path = None
-    if "world_search" not in st.session_state:
-        st.session_state.world_search = ""
-    if "world_search_pending" not in st.session_state:
-        st.session_state.world_search_pending = None
-    if "world_focus_entity" not in st.session_state:
-        st.session_state.world_focus_entity = None
-    if "world_focus_tab" not in st.session_state:
-        st.session_state.world_focus_tab = None
-    if "world_tabs" not in st.session_state:
-        st.session_state.world_tabs = "Characters"
-    if "world_bible_review" not in st.session_state:
-        st.session_state.world_bible_review = []
-    if "last_entity_scan" not in st.session_state:
-        st.session_state.last_entity_scan = None
-    if "locked_chapters" not in st.session_state:
-        st.session_state.locked_chapters = set()
-    if "_chapter_sync_id" not in st.session_state:
-        st.session_state._chapter_sync_id = None
-    if "_chapter_sync_text" not in st.session_state:
-        st.session_state._chapter_sync_text = None
-    if "curr_chap_id" not in st.session_state:
-        st.session_state.curr_chap_id = None
-    if "out_txt_project_id" not in st.session_state:
-        st.session_state.out_txt_project_id = None
-    if "_outline_sync" not in st.session_state:
-        st.session_state._outline_sync = None
-    st.session_state.setdefault("canon_health_log", [])
+    session_info = initialize_session_state(st, auth, config_data)
+    user = session_info["user"]
+    is_guest = session_info["is_guest"]
 
     theme = st.session_state.ui_theme if st.session_state.ui_theme in ("Dark", "Light") else "Dark"
-    theme_tokens = {
-        "Dark": {
-            "bg": "#020617",
-            "bg_glow": "radial-gradient(circle at 20% 20%, rgba(34,197,94,0.18), transparent 45%), radial-gradient(circle at 80% 0%, rgba(74,222,128,0.18), transparent 40%)",
-            "text": "#ecfdf5",
-            "muted": "#b6c3d1",
-            "input_bg": "#0b1216",
-            "input_border": "#166534",
-            "button_bg": "linear-gradient(180deg, #0f1a15, #0b1411)",
-            "button_border": "#163f2a",
-            "button_hover_border": "#22c55e",
-            "primary_bg": "linear-gradient(135deg, #15803d, #22c55e)",
-            "primary_border": "rgba(34,197,94,0.55)",
-            "primary_hover_border": "#4ade80",
-            "card_bg": "linear-gradient(180deg, rgba(6,18,14,0.95), rgba(4,12,10,0.95))",
-            "card_border": "#163523",
-            "sidebar_bg": "linear-gradient(180deg, #020617, #07150f)",
-            "sidebar_border": "#123123",
-            "sidebar_title": "#7dd3a7",
-            "divider": "#143023",
-            "expander_border": "#1f3b2d",
-            "header_gradient": "linear-gradient(135deg, #0b1216, #0f1a15)",
-            "header_logo_bg": "rgba(34,197,94,0.2)",
-            "header_sub": "#c7f2da",
-            "shadow_strong": "0 18px 40px rgba(0,0,0,0.55)",
-            "shadow_button": "0 10px 22px rgba(0,0,0,0.4)",
-            "sidebar_brand_bg": "linear-gradient(180deg, rgba(6,18,14,0.85), rgba(4,10,8,0.95))",
-            "sidebar_brand_border": "rgba(34,197,94,0.25)",
-            "sidebar_logo_bg": "rgba(34,197,94,0.12)",
-            "accent": "#22c55e",
-            "accent_soft": "rgba(34,197,94,0.18)",
-            "accent_glow": "rgba(34,197,94,0.35)",
-            "surface": "rgba(6,18,14,0.85)",
-            "surface_alt": "rgba(5,14,11,0.9)",
-            "success": "#22c55e",
-            "warning": "#f59e0b",
-        },
-        "Light": {
-            "bg": "#f8fafc",
-            "bg_glow": "radial-gradient(circle at 20% 20%, rgba(34,197,94,0.18), transparent 45%), radial-gradient(circle at 80% 0%, rgba(74,222,128,0.18), transparent 40%)",
-            "text": "#0f172a",
-            "muted": "#6b7280",
-            "input_bg": "#ffffff",
-            "input_border": "#cce5d6",
-            "button_bg": "linear-gradient(180deg, #ffffff, #ecfdf3)",
-            "button_border": "#cdebd9",
-            "button_hover_border": "#22c55e",
-            "primary_bg": "linear-gradient(135deg, #34d399, #22c55e)",
-            "primary_border": "rgba(34,197,94,0.25)",
-            "primary_hover_border": "#16a34a",
-            "card_bg": "#ffffff",
-            "card_border": "#e1efe6",
-            "sidebar_bg": "linear-gradient(180deg, #f3f4f6, #e5e7eb)",
-            "sidebar_border": "#d1d5db",
-            "sidebar_title": "#166534",
-            "divider": "#deeee3",
-            "expander_border": "#d7e9df",
-            "header_gradient": "linear-gradient(135deg, #e6f9ef, #c7f4dc)",
-            "header_logo_bg": "#e7fdf1",
-            "header_sub": "#2f6f43",
-            "shadow_strong": "0 12px 24px rgba(12,26,18,0.08)",
-            "shadow_button": "0 8px 16px rgba(12,26,18,0.12)",
-            "sidebar_brand_bg": "linear-gradient(180deg, rgba(255,255,255,0.9), rgba(243,244,246,0.95))",
-            "sidebar_brand_border": "rgba(15,23,42,0.08)",
-            "sidebar_logo_bg": "rgba(15,23,42,0.08)",
-            "accent": "#22c55e",
-            "accent_soft": "rgba(34,197,94,0.18)",
-            "accent_glow": "rgba(34,197,94,0.35)",
-            "surface": "rgba(255,255,255,0.9)",
-            "surface_alt": "rgba(241,245,249,0.95)",
-            "success": "#16a34a",
-            "warning": "#d97706",
-        },
-    }
-    tokens = theme_tokens[theme]
+    tokens = get_theme_tokens(theme)[theme]
+    apply_theme(tokens)
 
-    st.markdown(
-        f"""
-    <style>
-    @import url('https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@400;600&family=Inter:wght@400;600&family=Space+Grotesk:wght@500;700&display=swap');
-    :root {{
-        --mantis-bg: {tokens["bg"]};
-        --mantis-bg-glow: {tokens["bg_glow"]};
-        --mantis-text: {tokens["text"]};
-        --mantis-muted: {tokens["muted"]};
-        --mantis-input-bg: {tokens["input_bg"]};
-        --mantis-input-border: {tokens["input_border"]};
-        --mantis-button-bg: {tokens["button_bg"]};
-        --mantis-button-border: {tokens["button_border"]};
-        --mantis-button-hover-border: {tokens["button_hover_border"]};
-        --mantis-primary-bg: {tokens["primary_bg"]};
-        --mantis-primary-border: {tokens["primary_border"]};
-        --mantis-primary-hover-border: {tokens["primary_hover_border"]};
-        --mantis-card-bg: {tokens["card_bg"]};
-        --mantis-card-border: {tokens["card_border"]};
-        --mantis-sidebar-bg: {tokens["sidebar_bg"]};
-        --mantis-sidebar-border: {tokens["sidebar_border"]};
-        --mantis-sidebar-title: {tokens["sidebar_title"]};
-        --mantis-divider: {tokens["divider"]};
-        --mantis-expander-border: {tokens["expander_border"]};
-        --mantis-header-gradient: {tokens["header_gradient"]};
-        --mantis-header-logo-bg: {tokens["header_logo_bg"]};
-        --mantis-header-sub: {tokens["header_sub"]};
-        --mantis-shadow-strong: {tokens["shadow_strong"]};
-        --mantis-shadow-button: {tokens["shadow_button"]};
-        --mantis-sidebar-brand-bg: {tokens["sidebar_brand_bg"]};
-        --mantis-sidebar-brand-border: {tokens["sidebar_brand_border"]};
-        --mantis-sidebar-logo-bg: {tokens["sidebar_logo_bg"]};
-        --mantis-accent: {tokens["accent"]};
-        --mantis-accent-soft: {tokens["accent_soft"]};
-        --mantis-accent-glow: {tokens["accent_glow"]};
-        --mantis-surface: {tokens["surface"]};
-        --mantis-surface-alt: {tokens["surface_alt"]};
-        --mantis-success: {tokens["success"]};
-        --mantis-warning: {tokens["warning"]};
-    }}
-    .stApp {{
-        background-color: var(--mantis-bg);
-        background-image: var(--mantis-bg-glow);
-        color: var(--mantis-text);
-        font-family: 'Inter', sans-serif;
-    }}
-    .block-container {{ padding-top: 2.6rem; padding-bottom: 2.6rem; max-width: 1380px; }}
-    header[data-testid="stHeader"] {{ height: 2.6rem; }}
-    h1, h2, h3 {{ letter-spacing: -0.02em; font-family: 'Space Grotesk', sans-serif; }}
-    .stMarkdown, .stMarkdown p, .stMarkdown span, .stMarkdown li, .stMarkdown div,
-    .stTextInput label, .stSelectbox label, .stCheckbox label, .stRadio label,
-    .stNumberInput label, .stTextArea label {{
-        color: var(--mantis-text) !important;
-    }}
-    .stTextInput input,
-    .stNumberInput input,
-    .stSelectbox div[data-baseweb="select"] > div,
-    .stMultiSelect div[data-baseweb="select"] > div {{
-        background-color: var(--mantis-input-bg) !important;
-        color: var(--mantis-text) !important;
-        border: 1px solid var(--mantis-input-border) !important;
-    }}
-    div[data-baseweb="select"] input {{
-        color: var(--mantis-text) !important;
-    }}
-    div[data-baseweb="select"] span {{
-        color: var(--mantis-text) !important;
-    }}
-    div[data-baseweb="menu"] {{
-        background: var(--mantis-card-bg) !important;
-        border: 1px solid var(--mantis-card-border) !important;
-    }}
-    div[data-baseweb="option"] {{
-        color: var(--mantis-text) !important;
-        background: transparent !important;
-    }}
-    div[data-baseweb="option"]:hover {{
-        background: var(--mantis-accent-soft) !important;
-    }}
-    .stTextArea textarea {{ background-color: var(--mantis-input-bg) !important; color: var(--mantis-text) !important; font-family: 'Crimson Pro', serif !important; font-size: 18px !important; line-height: 1.65 !important; border: 1px solid var(--mantis-input-border) !important; }}
-
-    .mantis-muted {{ color: var(--mantis-muted); }}
-    div[data-testid="stCaptionContainer"] {{ color: var(--mantis-muted); }}
-
-    .mantis-header {{
-        display:flex;
-        align-items:center;
-        justify-content: space-between;
-        gap:14px;
-        padding:18px 24px;
-        border-radius:22px;
-        background: var(--mantis-header-gradient);
-        border: 1px solid var(--mantis-primary-border);
-        margin-top: 18px;
-        margin-bottom: 18px;
-        box-shadow: var(--mantis-shadow-strong);
-    }}
-    .mantis-header-left {{
-        display:flex;
-        align-items:center;
-        gap:14px;
-    }}
-    .mantis-header-right {{
-        display:flex;
-        gap:10px;
-        align-items:center;
-    }}
-    .mantis-header-logo {{
-        width:88px;
-        height:88px;
-        border-radius:18px;
-        background: rgba(0,0,0,0.35);
-        display:flex;
-        align-items:center;
-        justify-content:center;
-        overflow:hidden;
-        box-shadow:
-            inset 0 0 0 1px rgba(255,255,255,0.15),
-            0 0 18px rgba(34,197,94,0.45);
-    }}
-    .mantis-header-logo img {{
-        height:60px;
-        width:auto;
-        padding:0;
-        border-radius:0;
-    }}
-    .mantis-header-title {{
-        font-size:22px;
-        font-weight:800;
-        color: var(--mantis-text);
-        letter-spacing: 0.01em;
-    }}
-    .mantis-header-sub {{
-        color: var(--mantis-header-sub);
-        font-size:12px;
-    }}
-    .mantis-header-meta {{
-        display:flex;
-        flex-direction:column;
-        align-items:flex-end;
-        gap:4px;
-        font-size:12px;
-        color: var(--mantis-muted);
-    }}
-
-    .stButton>button {{
-        border-radius: 16px !important;
-        font-weight: 600 !important;
-        padding: 0.7rem 1.1rem !important;
-        transition: all 0.15s ease-in-out;
-        border: 1px solid var(--mantis-button-border) !important;
-        background: var(--mantis-button-bg) !important;
-        color: var(--mantis-text) !important;
-    }}
-    .stButton>button:hover {{
-        transform: translateY(-1px);
-        border-color: var(--mantis-button-hover-border) !important;
-        box-shadow: var(--mantis-shadow-button);
-    }}
-    .stButton>button:active {{ transform: translateY(0); }}
-    .stButton>button:focus {{ outline: none !important; box-shadow: none !important; }}
-
-    /* --- BUTTON HIERARCHY --- */
-    .stButton>button[kind="primary"] {{
-        background: var(--mantis-primary-bg) !important;
-        border-color: var(--mantis-primary-border) !important;
-        box-shadow: var(--mantis-shadow-button);
-        color: #ffffff !important;
-    }}
-    .stButton>button[kind="primary"]:hover {{
-        border-color: var(--mantis-primary-hover-border) !important;
-        box-shadow: var(--mantis-shadow-strong);
-    }}
-    .stButton>button[kind="secondary"] {{
-        background: var(--mantis-button-bg) !important;
-    }}
-
-
-    [data-testid="stVerticalBlock"] [data-testid="stContainer"] {{ border-radius: 16px !important; }}
-    .stExpander {{ border: 1px solid var(--mantis-expander-border) !important; border-radius: 16px !important; }}
-    hr {{ border-color: var(--mantis-divider) !important; }}
-    section[data-testid="stSidebar"] {{ background: var(--mantis-sidebar-bg); border-right: 1px solid var(--mantis-sidebar-border); }}
-    section[data-testid="stSidebar"] h1, section[data-testid="stSidebar"] h2, section[data-testid="stSidebar"] h3 {{ color: var(--mantis-text); }}
-    div[data-testid="stSidebarNav"] {{ display: none; }}
-    div[data-testid="stToast"] {{ border-radius: 14px !important; }}
-
-    /* --- CARD POLISH --- */
-    div[data-testid="stContainer"] {{
-        background: var(--mantis-card-bg);
-        border-radius: 20px !important;
-        padding: 22px !important;
-        border: 1px solid var(--mantis-card-border) !important;
-        box-shadow: var(--mantis-shadow-strong);
-        margin-bottom: 18px;
-    }}
-    .mantis-pill {{
-        display:inline-flex;
-        align-items:center;
-        gap:6px;
-        padding:6px 10px;
-        border-radius:999px;
-        font-size:12px;
-        background: var(--mantis-accent-soft);
-        border: 1px solid var(--mantis-accent-glow);
-        color: var(--mantis-text);
-        letter-spacing: 0.02em;
-    }}
-    .mantis-hero-caption {{
-        font-size:12px;
-        color: var(--mantis-muted);
-        margin-top:4px;
-    }}
-    div[data-testid="stContainer"] h3 {{
-        margin-top: 0;
-        margin-bottom: 12px;
-        color: var(--mantis-text);
-    }}
-    .mantis-hero {{
-        background: var(--mantis-surface);
-        border-radius: 22px;
-        padding: 22px 24px;
-        border: 1px solid var(--mantis-card-border);
-        box-shadow: var(--mantis-shadow-strong);
-    }}
-    .mantis-hero-title {{
-        font-size: 28px;
-        font-weight: 700;
-        margin-bottom: 6px;
-    }}
-    .mantis-hero-sub {{
-        color: var(--mantis-muted);
-        font-size: 14px;
-    }}
-    .mantis-page-header {{
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        gap: 12px;
-    }}
-    .mantis-page-title {{
-        font-size: 26px;
-        font-weight: 700;
-        margin: 0;
-        color: var(--mantis-text);
-    }}
-    .mantis-page-sub {{
-        color: var(--mantis-muted);
-        margin-top: 4px;
-        font-size: 14px;
-    }}
-    .mantis-tag {{
-        display:inline-flex;
-        align-items:center;
-        gap:6px;
-        padding:6px 12px;
-        border-radius:999px;
-        font-size:12px;
-        font-weight:600;
-        background: var(--mantis-accent-soft);
-        color: var(--mantis-text);
-        border: 1px solid var(--mantis-accent-glow);
-    }}
-    .mantis-kpi-grid {{
-        display:grid;
-        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-        gap:12px;
-        margin-top: 14px;
-    }}
-    .mantis-kpi-card {{
-        padding: 12px 14px;
-        border-radius: 16px;
-        background: var(--mantis-surface-alt);
-        border: 1px solid var(--mantis-card-border);
-    }}
-    .mantis-kpi-label {{
-        font-size:11px;
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-        color: var(--mantis-muted);
-        margin-bottom: 6px;
-    }}
-    .mantis-kpi-value {{
-        font-size:20px;
-        font-weight:700;
-    }}
-    .mantis-section-title {{
-        font-size:20px;
-        font-weight:700;
-        margin-bottom: 6px;
-    }}
-    .mantis-section-header {{
-        display:flex;
-        align-items:flex-end;
-        justify-content:space-between;
-        gap:16px;
-        margin: 6px 0 14px;
-    }}
-    .mantis-section-caption {{
-        color: var(--mantis-muted);
-        font-size: 13px;
-    }}
-    .mantis-soft {{
-        background: var(--mantis-surface-alt);
-        border-radius: 16px;
-        padding: 14px;
-        border: 1px solid var(--mantis-card-border);
-    }}
-    .mantis-stat-tile {{
-        display:flex;
-        flex-direction:column;
-        gap:6px;
-        padding: 12px 14px;
-        border-radius: 16px;
-        background: var(--mantis-surface-alt);
-        border: 1px solid var(--mantis-card-border);
-    }}
-    .mantis-stat-icon {{
-        width: 30px;
-        height: 30px;
-        border-radius: 10px;
-        display:flex;
-        align-items:center;
-        justify-content:center;
-        background: var(--mantis-accent-soft);
-        border: 1px solid var(--mantis-accent-glow);
-        font-size: 14px;
-    }}
-    .mantis-stat-label {{
-        font-size: 11px;
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-        color: var(--mantis-muted);
-    }}
-    .mantis-stat-value {{
-        font-size: 20px;
-        font-weight: 700;
-        color: var(--mantis-text);
-    }}
-    .mantis-stat-help {{
-        font-size: 12px;
-        color: var(--mantis-muted);
-    }}
-
-    /* --- SIDEBAR POLISH --- */
-    section[data-testid="stSidebar"] {{
-        background: var(--mantis-sidebar-bg);
-        border-right: 1px solid var(--mantis-sidebar-border);
-    }}
-    section[data-testid="stSidebar"] h3 {{
-        color: var(--mantis-sidebar-title);
-        font-weight: 700;
-        letter-spacing: 0.04em;
-        text-transform: uppercase;
-        font-size: 12px;
-    }}
-    section[data-testid="stSidebar"] .stMarkdown,
-    section[data-testid="stSidebar"] p,
-    section[data-testid="stSidebar"] label {{
-        color: var(--mantis-text);
-    }}
-
-
-    /* --- SIDEBAR BRAND --- */
-    .mantis-sidebar-brand{{
-        display:flex;
-        gap:12px;
-        align-items:center;
-        padding:14px 12px 12px 12px;
-        margin: 4px 8px 10px 8px;
-        border-radius: 16px;
-        background: var(--mantis-sidebar-brand-bg);
-        border: 1px solid var(--mantis-sidebar-brand-border);
-        box-shadow: var(--mantis-shadow-button);
-    }}
-    .mantis-sidebar-logo{{
-        width:70px;
-        height:70px;
-        border-radius: 14px;
-        background: var(--mantis-sidebar-logo-bg);
-        display:flex;
-        align-items:center;
-        justify-content:center;
-        overflow:hidden;
-        box-shadow: inset 0 0 0 1px rgba(0,0,0,0.05), 0 6px 16px rgba(0,0,0,0.2);
-        flex: 0 0 auto;
-    }}
-    .mantis-sidebar-logo img{{
-        height:48px;
-        width:auto;
-        display:block;
-    }}
-    .mantis-avatar {{
-        height:44px;
-        width:44px;
-        border-radius:50%;
-        background: var(--mantis-surface-alt);
-        color: var(--mantis-text);
-        display:flex;
-        align-items:center;
-        justify-content:center;
-        font-weight:700;
-        font-size:0.9rem;
-        border: 1px solid var(--mantis-card-border);
-    }}
-    .mantis-logo-fallback {{
-        font-size: 0.95rem;
-        font-weight: 700;
-        color: var(--mantis-sidebar-title);
-    }}
-    .mantis-sidebar-title{{
-        font-weight:800;
-        font-size:14px;
-        color: var(--mantis-text);
-        line-height:1.1;
-    }}
-    .mantis-sidebar-sub{{
-        font-size:12px;
-        color: var(--mantis-muted);
-        margin-top:2px;
-        line-height:1.1;
-    }}
-    .mantis-banner img {{
-        max-height: 180px;
-        object-fit: contain;
-    }}
-
-    /* --- NAV RADIO STYLE --- */
-    div[role="radiogroup"] > label {{
-        background: var(--mantis-surface-alt);
-        padding: 10px 12px;
-        border-radius: 12px;
-        border: 1px solid var(--mantis-card-border);
-        margin-bottom: 8px;
-    }}
-    div[role="radiogroup"] > label span {{
-        color: var(--mantis-text);
-    }}
-    div[role="radiogroup"] > label:has(input:checked) {{
-        border-color: var(--mantis-accent);
-        box-shadow: 0 0 0 1px var(--mantis-accent-glow);
-    }}
-</style>
-    """,
-        unsafe_allow_html=True,
-    )
-
-    # --- BRAND HEADER (UI only) ---
     header_logo_b64 = asset_base64("mantis_logo_trans.png")
-    header_logo_html = (
-        f'<img src="data:image/png;base64,{header_logo_b64}" alt="MANTIS logo" />'
-        if header_logo_b64
-        else '<span class="mantis-logo-fallback">M</span>'
-    )
-    st.markdown(
-        f"""
-        <div class="mantis-header">
-            <div class="mantis-header-left">
-                <div class="mantis-header-logo">
-                    {header_logo_html}
-                </div>
-                <div style="line-height:1.15;">
-                    <div class="mantis-header-title">
-                        MANTIS Studio — v{AppConfig.VERSION}
-                    </div>
-                    <div class="mantis-header-sub">
-                        Modular narrative workspace
-                    </div>
-                </div>
-            </div>
-            <div class="mantis-header-right">
-                <span class="mantis-pill">Workspace</span>
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+    render_header(AppConfig.VERSION, header_logo_b64)
 
-    if "user_id" not in st.session_state:
-        st.session_state.user_id = None
-    if "projects_dir" not in st.session_state:
-        st.session_state.projects_dir = None
-    if "project" not in st.session_state:
-        st.session_state.project = None
-    if "page" not in st.session_state:
-        st.session_state.page = "home"
-    if "auto_save" not in st.session_state:
-        st.session_state.auto_save = not is_guest
-    if "ghost_text" not in st.session_state:
-        st.session_state.ghost_text = ""
-    if "pending_improvement_text" not in st.session_state:
-        st.session_state.pending_improvement_text = ""
-    if "pending_improvement_meta" not in st.session_state:
-        st.session_state.pending_improvement_meta = {}
-    if "chapter_text_prev" not in st.session_state:
-        st.session_state.chapter_text_prev = {}
-    if "chapter_drafts" not in st.session_state:
-        st.session_state.chapter_drafts = []
-    if "editor_improve__copy_buffer" not in st.session_state:
-        st.session_state.editor_improve__copy_buffer = ""
-    if "first_run" not in st.session_state:
-        st.session_state.first_run = True
-    if "is_premium" not in st.session_state:
-        st.session_state.is_premium = True
-    if "guest_mode" not in st.session_state:
-        st.session_state.guest_mode = guest_mode
-    if "pending_action" not in st.session_state:
-        st.session_state.pending_action = None
-    if "guest_project" not in st.session_state:
-        st.session_state.guest_project = None
-    if "openai_base_url" not in st.session_state:
-        st.session_state.openai_base_url = config_data.get(
-            "openai_base_url",
-            AppConfig.OPENAI_API_URL,
-        )
-    if "openai_api_key" not in st.session_state:
-        st.session_state.openai_api_key = config_data.get(
-            "openai_api_key",
-            AppConfig.OPENAI_API_KEY,
-        )
-    if "openai_model" not in st.session_state:
-        st.session_state.openai_model = config_data.get(
-            "openai_model",
-            AppConfig.OPENAI_MODEL,
-        )
-    if "openai_model_list" not in st.session_state:
-        st.session_state.openai_model_list = []
-    if "openai_model_tests" not in st.session_state:
-        st.session_state.openai_model_tests = {}
-    if "ui_theme" not in st.session_state:
-        st.session_state.ui_theme = config_data.get("ui_theme", "Dark")
-    if "groq_base_url" not in st.session_state:
-        st.session_state.groq_base_url = config_data.get("groq_base_url", AppConfig.GROQ_API_URL)
-    if "groq_api_key" not in st.session_state:
-        st.session_state.groq_api_key = config_data.get("groq_api_key", AppConfig.GROQ_API_KEY)
-    if "groq_model" not in st.session_state:
-        st.session_state.groq_model = config_data.get("groq_model", AppConfig.DEFAULT_MODEL)
-    if "groq_model_list" not in st.session_state:
-        st.session_state.groq_model_list = []
-    if "groq_model_tests" not in st.session_state:
-        st.session_state.groq_model_tests = {}
-    if "_force_nav" not in st.session_state:
-        st.session_state._force_nav = False
-
-    AppConfig.GROQ_API_URL = st.session_state.groq_base_url
-    AppConfig.GROQ_API_KEY = st.session_state.groq_api_key
-    AppConfig.DEFAULT_MODEL = st.session_state.groq_model
-    AppConfig.OPENAI_API_URL = st.session_state.openai_base_url
-    AppConfig.OPENAI_API_KEY = st.session_state.openai_api_key
-    AppConfig.OPENAI_MODEL = st.session_state.openai_model
-
+    
     def open_legal_page() -> None:
         if hasattr(st, "switch_page"):
-            st.switch_page("pages/Legal Center.py")
+            st.switch_page("pages/legal.py")
             return
-        st.session_state.page = "legal"
-        st.rerun()
+        st.toast("Open the Legal page from the sidebar menu if it did not open.")
 
     GUEST_BANNER_TEXT = (
         "Guest mode: your creations won’t be saved unless you create an account."
@@ -1940,29 +194,10 @@ def _run_ui():
             "return_to": return_to or st.session_state.get("page", "home"),
         }
         if hasattr(st, "switch_page"):
-            st.switch_page("pages/Account Settings.py")
-            return
-        st.session_state.page = "account"
-        st.rerun()
-
-    def open_account_settings(
-        *,
-        action: str = "profile",
-        reason: Optional[str] = None,
-        return_to: Optional[str] = None,
-    ) -> None:
-        if st.session_state.get("guest_mode"):
-            request_account_access(
-                action,
-                reason or GUEST_BANNER_TEXT,
-                return_to=return_to or st.session_state.get("page", "home"),
-            )
-            return
-        if hasattr(st, "switch_page"):
-            st.switch_page("pages/Account Settings.py")
-            return
-        st.session_state.page = "account"
-        st.rerun()
+            st.switch_page("pages/account.py")
+        else:
+            st.session_state.page = "account"
+            st.rerun()
 
     def persist_project(
         project: "Project",
@@ -1996,14 +231,14 @@ def _run_ui():
                     "Create account",
                     type="primary",
                     use_container_width=True,
-                    key=f"guest_banner_create_{context}",
+                    key=ui_key(f"guest_banner_create_{context}"),
                 ):
                     request_account_access("signup", GUEST_BANNER_TEXT)
             with banner_cols[1]:
                 if st.button(
                     "Sign in",
                     use_container_width=True,
-                    key=f"guest_banner_signin_{context}",
+                    key=ui_key(f"guest_banner_signin_{context}"),
                 ):
                     request_account_access("signin", GUEST_BANNER_TEXT)
 
@@ -2067,10 +302,10 @@ def _run_ui():
         st.session_state["auth_redirect_reason"] = reason or GUEST_BANNER_TEXT
         st.session_state["auth_redirect_return_page"] = return_to
         if hasattr(st, "switch_page"):
-            st.switch_page("pages/Account Settings.py")
-            return
-        st.session_state.page = "account"
-        st.rerun()
+            st.switch_page("pages/account.py")
+        else:
+            st.session_state.page = "account"
+            st.rerun()
 
     def require_account(action: str, payload: Optional[Dict[str, Any]] = None, return_to: str = "home") -> bool:
         if st.session_state.get("guest_mode"):
@@ -2176,8 +411,6 @@ def _run_ui():
                     unsafe_allow_html=True,
                 )
             with right:
-                if st.button("👤 Profile & settings", use_container_width=True):
-                    open_account_settings(return_to=st.session_state.get("page", "home"))
                 if primary_label and primary_action:
                     if st.button(primary_label, type="primary", use_container_width=True, key=f"{key_prefix}__primary"):
                         primary_action()
@@ -2488,20 +721,6 @@ def _run_ui():
         except Exception as exc:
             return False, str(exc)
 
-    def _queue_world_bible_suggestion(item: Dict[str, Any]) -> None:
-        queue = st.session_state.setdefault("world_bible_review", [])
-        key = (
-            f"{Project._normalize_category(item.get('category'))}|"
-            f"{Project._normalize_entity_name(item.get('name'))}|"
-            f"{(item.get('description') or '').strip().lower()}|"
-            f"{item.get('type', 'new')}"
-        )
-        existing_keys = {q.get("_key") for q in queue}
-        if key in existing_keys:
-            return
-        item["_key"] = key
-        queue.append(item)
-
     def extract_entities_ui(text: str, label: str):
         """Scan text for entities and update the World Bible.
 
@@ -2545,7 +764,7 @@ def _run_ui():
                     aliases=aliases if isinstance(aliases, list) else None,
                 )
                 if existing and desc:
-                    _queue_world_bible_suggestion(
+                    queue_world_bible_suggestion(
                         {
                             "type": "update",
                             "entity_id": existing.id,
@@ -2558,7 +777,7 @@ def _run_ui():
                         }
                     )
                 else:
-                    _queue_world_bible_suggestion(
+                    queue_world_bible_suggestion(
                         {
                             "type": "new",
                             "name": name,
@@ -2588,7 +807,7 @@ def _run_ui():
             else:
                 matched += 1
                 if desc:
-                    _queue_world_bible_suggestion(
+                    queue_world_bible_suggestion(
                         {
                             "type": "update",
                             "entity_id": ent.id,
@@ -2628,9 +847,6 @@ def _run_ui():
     if query == "copyright":
         render_copyright()
         render_app_footer()
-        return
-    if query == "legal":
-        open_legal_page()
         return
 
     def render_ai_settings():
@@ -2910,13 +1126,6 @@ def _run_ui():
             email = auth.get_user_email(user)
             if email:
                 st.caption(email)
-            provider_label = auth.get_provider_label(user)
-            if provider_label and not auth.is_email_provider(user):
-                st.caption(
-                    f"Signed in with {provider_label}. Password and recovery are managed by your provider."
-                )
-            if auth.is_email_provider(user):
-                auth.render_email_account_controls(email)
             manage_url = auth.get_manage_account_url(user)
             if manage_url:
                 st.link_button("Manage account", manage_url, use_container_width=True)
@@ -2948,9 +1157,9 @@ def _run_ui():
         st.info("Open the Legal Hub for full policies and documentation.")
         if st.button("Open Legal Hub", use_container_width=True):
             if hasattr(st, "switch_page"):
-                st.switch_page("pages/Legal Center.py")
+                st.switch_page("pages/legal.py")
             else:
-                st.info("Use the studio footer to open Legal.")
+                st.info("Use the sidebar to open Legal from the page menu.")
 
     with st.sidebar:
         with key_scope("sidebar"):
@@ -2975,6 +1184,52 @@ def _run_ui():
                 unsafe_allow_html=True,
             )
 
+            st.markdown("---")
+            st.markdown("### 👤 Account")
+            if is_guest:
+                st.markdown("**Guest mode**")
+                st.caption("Projects and edits are not saved across devices.")
+                if st.button(
+                    "Create account",
+                    type="primary",
+                    use_container_width=True,
+                    key="sidebar_guest_create_account",
+                ):
+                    request_account_access("signup", GUEST_BANNER_TEXT)
+                if st.button(
+                    "Sign in",
+                    use_container_width=True,
+                    key="sidebar_guest_cloud_save",
+                ):
+                    request_account_access("signin", GUEST_BANNER_TEXT)
+            else:
+                account_cols = st.columns([1, 2.6])
+                display_name = auth.get_user_display_name(user)
+                email = auth.get_user_email(user)
+                avatar_url = auth.get_user_avatar_url(user)
+                with account_cols[0]:
+                    if avatar_url:
+                        st.image(avatar_url, width=44)
+                    else:
+                        st.markdown(
+                            f"<div class='mantis-avatar'>{auth.get_user_initials(user)}</div>",
+                            unsafe_allow_html=True,
+                        )
+                with account_cols[1]:
+                    st.markdown(f"**{display_name}**")
+                    if email:
+                        st.caption(email)
+                    if auth.user_is_admin(user):
+                        st.caption("Admin")
+
+                manage_url = auth.get_manage_account_url(user)
+                if manage_url:
+                    st.link_button("Manage account", manage_url, use_container_width=True)
+                auth.logout_button(
+                    key="sidebar_logout",
+                    extra_state_keys=["projects_dir", "project", "page", "_force_nav"],
+                )
+
             st.markdown("### 🎨 Appearance")
             st.selectbox("Theme", ["Dark", "Light"], key="ui_theme")
             st.divider()
@@ -2994,7 +1249,7 @@ def _run_ui():
             st.markdown("### 🧭 Navigation")
             st.caption("Dashboard • Projects • Editor • World Bible • Memory • Insights • Export")
 
-            nav_labels, pmap = get_nav_config(bool(st.session_state.project))
+            nav_labels, pmap = router.get_nav_config(bool(st.session_state.project))
             current_page = st.session_state.page
             reverse_map = {v: k for k, v in pmap.items()}
             current_label = reverse_map.get(current_page, "Dashboard")
@@ -4887,50 +3142,79 @@ def _run_ui():
                         st.session_state.pending_improvement_meta = {}
                         st.rerun()
 
-    rendered_page = False
-    if st.session_state.page == "home":
-        with key_scope("dashboard"):
-            render_home()
-        rendered_page = True
-    elif st.session_state.page == "projects":
-        with key_scope("projects"):
-            render_projects()
-        rendered_page = True
-    elif st.session_state.page == "ai":
-        with key_scope("settings"):
-            render_ai_settings()
-        rendered_page = True
-    elif st.session_state.page == "account":
-        with key_scope("account"):
-            render_account()
-        rendered_page = True
-    elif st.session_state.page == "legal":
-        with key_scope("legal"):
-            render_legal_redirect()
-        rendered_page = True
-    elif st.session_state.page == "export":
-        with key_scope("export"):
-            render_export()
-        rendered_page = True
-    else:
-        pg = st.session_state.page
-        if pg == "outline":
-            with key_scope("outline"):
-                render_outline()
-            rendered_page = True
-        elif pg == "world":
-            with key_scope("world"):
-                render_world()
-            rendered_page = True
-        elif pg == "chapters":
-            with key_scope("editor"):
-                render_chapters()
-            rendered_page = True
-        else:
-            st.session_state.page = "home"
-            st.rerun()
-    if rendered_page:
+    ctx = SimpleNamespace(
+        st=st,
+        auth=auth,
+        AppConfig=AppConfig,
+        Project=Project,
+        Chapter=Chapter,
+        Entity=Entity,
+        AIEngine=AIEngine,
+        AnalysisEngine=AnalysisEngine,
+        StoryEngine=StoryEngine,
+        REWRITE_PRESETS=REWRITE_PRESETS,
+        rewrite_prompt=rewrite_prompt,
+        project_to_markdown=project_to_markdown,
+        queue_world_bible_suggestion=queue_world_bible_suggestion,
+        action_card=action_card,
+        card=card,
+        primary_button=primary_button,
+        section_header=section_header,
+        stat_tile=stat_tile,
+        render_page_header=render_page_header,
+        render_app_footer=render_app_footer,
+        render_guest_banner=render_guest_banner,
+        request_account_access=request_account_access,
+        persist_project=persist_project,
+        get_ai_model=get_ai_model,
+        save_p=save_p,
+        get_active_projects_dir=get_active_projects_dir,
+        queue_pending_action=queue_pending_action,
+        require_account=require_account,
+        create_guest_project=create_guest_project,
+        resume_pending_action=resume_pending_action,
+        open_legal_page=open_legal_page,
+        render_privacy=render_privacy,
+        render_terms=render_terms,
+        render_copyright=render_copyright,
+        user=user,
+        is_guest=is_guest,
+        config_data=config_data,
+        key_scope=key_scope,
+        ui_key=ui_key,
+        GUEST_BANNER_TEXT=GUEST_BANNER_TEXT,
+        render_home=render_home,
+        render_projects=render_projects,
+        render_outline=render_outline,
+        render_world=render_world,
+        render_chapters=render_chapters,
+        render_export=render_export,
+        render_ai_settings=render_ai_settings,
+        render_account=render_account,
+        render_legal_redirect=render_legal_redirect,
+    )
+
+    scope_map = {
+        "home": "dashboard",
+        "projects": "projects",
+        "ai": "settings",
+        "account": "account",
+        "legal": "legal",
+        "export": "export",
+        "outline": "outline",
+        "world": "world",
+        "chapters": "editor",
+    }
+    page = st.session_state.page
+    renderer = router.resolve_route(page)
+    scope = scope_map.get(page)
+    if scope:
+        with key_scope(scope):
+            renderer(ctx)
         render_app_footer()
+    else:
+        st.session_state.page = "home"
+        st.rerun()
 
 
 def run_selftest() -> int:
@@ -5045,12 +3329,15 @@ def run_repair() -> int:
     return 0
 
 
-# If launched directly by Python (e.g., from the .bat launcher), support utility flags.
-if SELFTEST_MODE:
-    raise SystemExit(run_selftest())
+def run_app() -> int:
+    ensure_storage_dirs()
+    if SELFTEST_MODE:
+        return run_selftest()
+    if REPAIR_MODE:
+        return run_repair()
+    _run_ui()
+    return 0
 
-if REPAIR_MODE:
-    raise SystemExit(run_repair())
 
-# Default: run the Streamlit UI (Streamlit will execute this script).
-_run_ui()
+if __name__ == "__main__":
+    raise SystemExit(run_app())
