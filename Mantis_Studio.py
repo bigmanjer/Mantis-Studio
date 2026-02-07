@@ -3269,20 +3269,6 @@ def _run_ui():
         if st.button("⬅ Back to Studio", use_container_width=True):
             st.session_state.page = "home"
             st.rerun()
-            )
-
-        if auth.debug_auth_enabled():
-            st.markdown("### Debug auth")
-            debug_user = auth.get_current_user()
-            st.code(
-                {
-                    "user_keys": list(getattr(debug_user, "keys", lambda: [])()),
-                    "user_id": auth.get_user_id_with_fallback(debug_user),
-                    "user_display_name": auth.get_user_display_name(debug_user),
-                    "user_email": auth.get_user_email(debug_user),
-                },
-                language="json",
-            )
 
     def render_legal_redirect():
         render_page_header(
@@ -5312,7 +5298,8 @@ def run_selftest() -> int:
     print("[MANTIS SELFTEST]")
     try:
         os.makedirs(AppConfig.PROJECTS_DIR, exist_ok=True)
-        user_projects_dir = get_user_projects_dir(f"selftest_{uuid.uuid4().hex[:8]}")
+        # Use default projects directory - user accounts removed
+        user_projects_dir = AppConfig.PROJECTS_DIR
 
         p = Project.create("SELFTEST_PROJECT", author="MANTIS", genre="Test", storage_dir=user_projects_dir)
         p.outline = "Chapter 1: Test - This is a test outline."
