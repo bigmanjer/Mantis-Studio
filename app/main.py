@@ -2682,6 +2682,13 @@ def _run_ui():
 
     DEFAULT_PROJECT_TITLE = "Default Project Title"
     DEFAULT_PROJECT_GENRES = ["Default Genre 1", "Default Genre 2"]
+    MAX_DRAFT_EXCERPT_LENGTH = 600
+    AI_ERROR_MARKERS = (
+        "not configured",
+        "generation failed",
+        "response empty",
+        "error",
+    )
 
     def _format_genre_list(genres: List[str]) -> str:
         return " · ".join(genres)
@@ -2708,7 +2715,12 @@ def _run_ui():
                 ok, _ = test_groq_model(base_url, key, model)
             return ok
         except Exception:
-            logger.warning("AI availability check failed", exc_info=True)
+            logger.warning(
+                "AI availability check failed for provider=%s model=%s",
+                provider,
+                model,
+                exc_info=True,
+            )
             return False
 
     def _build_project_context(
@@ -2728,20 +2740,12 @@ def _run_ui():
         if author:
             parts.append(f"Author: {author}")
         if draft_excerpt:
-            parts.append(f"Draft excerpt: {(draft_excerpt or '').strip()[:600]}")
+            parts.append(f"Draft excerpt: {(draft_excerpt or '').strip()[:MAX_DRAFT_EXCERPT_LENGTH]}")
         return "\n".join(parts) if parts else "A new creative writing project."
 
     def _ai_response_has_error(raw: str) -> bool:
         low = (raw or "").lower()
-        return any(
-            marker in low
-            for marker in (
-                "not configured",
-                "generation failed",
-                "response empty",
-                "error",
-            )
-        )
+        return any(marker in low for marker in AI_ERROR_MARKERS)
 
     def _generate_project_title(context: str, genre_hint: str, model: str, provider: str) -> str:
         prompt = (
