@@ -49,6 +49,10 @@ def get_routes() -> Dict[str, PageRenderer]:
         "export": render_export,
         "ai": render_ai_settings,
         "legal": render_legal_redirect,
+        "terms": render_legal_redirect,
+        "privacy": render_legal_redirect,
+        "copyright": render_legal_redirect,
+        "cookie": render_legal_redirect,
     }
 
 
