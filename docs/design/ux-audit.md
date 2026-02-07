@@ -11,7 +11,7 @@ This audit compares the current in-app flow to what users typically expect in a 
 | Auth troubleshooting | No built-in visibility into Supabase profile data for debugging login issues. | Toggleable debug panel showing Supabase user + profile IDs. | High | Login reliability | Low | `pages/Account Settings.py`, `app/main.py`, `app/utils/auth.py` |
 | Legal access | Legal is available but needs consistent “SaaS policy hub” layout with last-updated dates. | A fully designed legal hub with table of contents and support contact. | Medium | Trust + compliance | Low | `pages/Legal Center.py` |
 | User ID resolution | Session could fail when `email` is missing from provider payload. | Never block; resolve ID via email → preferred_username/upn → name → sub. | High | Access + data storage | Medium | `app/utils/auth.py`, `app/main.py` |
-| Auth configuration guidance | No centralized runbook; Cloud secrets setup is not documented end-to-end. | A clear setup/runbook with redirect URLs and common failure modes. | High | Ops + onboarding | Low | `docs/runbooks/streamlit-auth-runbook.md`, README |
+| Auth configuration guidance | No centralized runbook; Cloud secrets setup is not documented end-to-end. | A clear setup/runbook with redirect URLs and common failure modes. | High | Ops + onboarding | Low | `docs/runbooks/AUTH_SETUP.md`, README |
 
 ## Prioritized roadmap
 1. **Fix auth user ID fallback chain** (High)
@@ -36,4 +36,4 @@ This audit compares the current in-app flow to what users typically expect in a 
 
 6. **Secrets runbook + Cloud setup** (High)
    - Document Cloud secrets and failure modes.
-   - Files: `docs/runbooks/streamlit-auth-runbook.md`, `README.md`.
+   - Files: `docs/runbooks/AUTH_SETUP.md`, `README.md`.
