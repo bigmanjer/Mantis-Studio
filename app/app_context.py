@@ -98,7 +98,6 @@ REPAIR_MODE = "--repair" in sys.argv
 def _run_ui():
     import streamlit as st
     from app import router
-    from app.services import auth_service as auth
     from app.components.ui import action_card, card, primary_button, section_header, stat_tile
     from app.layout.layout import apply_theme, get_theme_tokens, render_footer, render_header
 
@@ -175,10 +174,10 @@ def _run_ui():
 
     config_data = load_app_config()
 
-    session_info = initialize_session_state(st, auth, config_data)
-    user = session_info["user"]
-    is_guest = session_info["is_guest"]
-    logged_in = auth.is_logged_in(user)
+    initialize_session_state(st, config_data)
+    user = None
+    is_guest = False
+    logged_in = False
 
     theme = st.session_state.ui_theme if st.session_state.ui_theme in ("Dark", "Light") else "Dark"
     tokens = get_theme_tokens(theme)[theme]
@@ -192,89 +191,21 @@ def _run_ui():
         st.session_state.page = "legal"
         st.rerun()
 
-    GUEST_BANNER_TEXT = (
-        "Guest mode: your work saves locally in this session. Create an account to sync and export."
-    )
-
-    def request_account_access(
-        action: str,
-        reason: str,
-        *,
-        payload: Optional[Dict[str, Any]] = None,
-        return_to: Optional[str] = None,
-    ) -> None:
-        st.session_state["auth_redirect_action"] = action
-        st.session_state["auth_redirect_reason"] = reason
-        st.session_state["auth_redirect_return_page"] = return_to or st.session_state.get("page", "home")
-        st.session_state.pending_action = {
-            "action": action,
-            "payload": payload or {},
-            "return_to": return_to or st.session_state.get("page", "home"),
-        }
-        st.session_state.page = "account"
-        st.rerun()
-
     def persist_project(
         project: "Project",
         *,
-        prompt_on_guest: bool = False,
         action: str = "save",
     ) -> bool:
         project.save()
-        if is_guest and prompt_on_guest:
-            st.toast("Saved locally. Create an account to sync and export.")
         return True
-
-    def render_guest_banner(context: str) -> None:
-        if not is_guest:
-            return
-        with st.container(border=True):
-            st.markdown("#### 👋 Guest mode")
-            st.caption(GUEST_BANNER_TEXT)
-            banner_cols = st.columns([1, 1])
-            with banner_cols[0]:
-                if st.button(
-                    "Create account",
-                    type="primary",
-                    use_container_width=True,
-                    key=ui_key(f"guest_banner_create_{context}"),
-                ):
-                    request_account_access("signup", GUEST_BANNER_TEXT)
-            with banner_cols[1]:
-                if st.button(
-                    "Sign in",
-                    use_container_width=True,
-                    key=ui_key(f"guest_banner_signin_{context}"),
-                ):
-                    request_account_access("signin", GUEST_BANNER_TEXT)
 
     def render_app_footer() -> None:
         render_footer(AppConfig.VERSION)
 
-    if is_guest:
-        user_id = f"guest_{st.session_state['guest_session_id']}"
-    else:
-        user_id = auth.get_user_id_with_fallback(user)
-        if not user_id:
-            st.warning("We couldn't read a user identifier. Please sign in again.")
-            auth.logout_button(key="auth_missing_user_id_logout")
-            st.stop()
+    user_id = None
 
-    user_changed = st.session_state.user_id != user_id
-    if user_changed:
-        st.session_state.user_id = user_id
-        st.session_state.project = None
-        st.session_state.page = "home"
-    if user_changed or not st.session_state.projects_dir:
+    if not st.session_state.projects_dir:
         st.session_state.projects_dir = AppConfig.PROJECTS_DIR
-
-    if is_guest:
-        st.session_state.auto_save = False
-
-    guest_continue_action = st.session_state.get("guest_continue_action")
-    if guest_continue_action and guest_continue_action != "create_project":
-        st.session_state["guest_continue_action"] = None
-        st.toast("You're still in Guest mode. Saves stay local until you create an account.")
 
     # Reliable navigation rerun (avoids Streamlit edge cases when returning early)
     if st.session_state.get("_force_nav"):
@@ -288,17 +219,13 @@ def _run_ui():
         session_key = (st.session_state.get("ai_keys") or {}).get(provider, "")
         if session_key:
             return session_key
-        if not is_guest:
-            return config_data.get(f"{provider}_api_key", "") or ""
-        return AppConfig.GROQ_API_KEY if provider == "groq" else AppConfig.OPENAI_API_KEY
+        return config_data.get(f"{provider}_api_key", "") or ""
 
     def _display_ai_key(provider: str) -> str:
         session_key = (st.session_state.get("ai_keys") or {}).get(provider, "")
         if session_key:
             return session_key
-        if not is_guest:
-            return config_data.get(f"{provider}_api_key", "") or ""
-        return ""
+        return config_data.get(f"{provider}_api_key", "") or ""
 
     def _set_ai_key(provider: str, value: str) -> None:
         cleaned = (value or "").strip()
@@ -321,43 +248,11 @@ def _run_ui():
             persist_project(st.session_state.project)
 
     def get_active_projects_dir() -> Optional[str]:
-        if st.session_state.get("guest_mode"):
-            return st.session_state.get("projects_dir") or AppConfig.PROJECTS_DIR
         return st.session_state.get("projects_dir") or AppConfig.PROJECTS_DIR
-
-    def queue_pending_action(
-        action: str,
-        payload: Optional[Dict[str, Any]] = None,
-        return_to: str = "home",
-        reason: Optional[str] = None,
-    ) -> None:
-        st.session_state.pending_action = {
-            "action": action,
-            "payload": payload or {},
-            "return_to": return_to,
-        }
-        st.session_state["auth_redirect_action"] = action
-        st.session_state["auth_redirect_reason"] = reason or GUEST_BANNER_TEXT
-        st.session_state["auth_redirect_return_page"] = return_to
-        st.session_state.page = "account"
-        st.rerun()
-
-    def require_account(action: str, payload: Optional[Dict[str, Any]] = None, return_to: str = "home") -> bool:
-        if st.session_state.get("guest_mode"):
-            queue_pending_action(action, payload, return_to, reason=GUEST_BANNER_TEXT)
-            return False
-        return True
-
-    def create_guest_project(title: str = "Guest Sandbox") -> Project:
-        storage_dir = st.session_state.get("projects_dir") or AppConfig.PROJECTS_DIR
-        p = Project.create(title, storage_dir=storage_dir)
-        p.filepath = None
-        st.session_state.guest_project = p
-        return p
 
     def resume_pending_action() -> None:
         pending = st.session_state.get("pending_action")
-        if not pending or st.session_state.get("guest_mode"):
+        if not pending:
             return
         action = pending.get("action")
         payload = pending.get("payload") or {}
@@ -408,7 +303,7 @@ def _run_ui():
         st.session_state.page = return_to
         st.rerun()
 
-    if logged_in and st.session_state.get("pending_action"):
+    if st.session_state.get("pending_action"):
         resume_pending_action()
 
 
@@ -892,8 +787,7 @@ def _run_ui():
             st.toast("Model list refreshed")
 
         def save_settings_action() -> None:
-            if require_account("save_app_settings", return_to="ai"):
-                save_app_settings()
+            save_app_settings()
 
         render_page_header(
             "AI Tools",
@@ -1097,12 +991,7 @@ def _run_ui():
             st.markdown("### ✅ Actions")
             action_cols = st.columns(4)
             with action_cols[0]:
-                if is_guest:
-                    st.checkbox("Auto-save (cloud)", key="auto_save", disabled=True)
-                    if st.button("Enable cloud save", use_container_width=True, key="guest_enable_cloud_save"):
-                        request_account_access("enable_cloud_save", GUEST_BANNER_TEXT)
-                else:
-                    st.checkbox("Auto-save", key="auto_save")
+                st.checkbox("Auto-save", key="auto_save")
             with action_cols[1]:
                 if st.button("↻ Refresh Groq Models", use_container_width=True):
                     st.cache_data.clear()
@@ -1115,70 +1004,7 @@ def _run_ui():
                     st.toast("OpenAI model list refreshed")
             with action_cols[3]:
                 if st.button("💾 Save AI Settings", use_container_width=True):
-                    if require_account("save_app_settings", return_to="ai"):
-                        save_app_settings()
-
-    def render_account():
-        render_page_header(
-            "Account",
-            "Create an account to save projects and enable cloud sync.",
-            tag="Access",
-            key_prefix="account_header",
-        )
-        if st.session_state.get("guest_mode"):
-            auth.render_login_screen(
-                intent=st.session_state.get("auth_redirect_reason") or GUEST_BANNER_TEXT,
-                allow_guest=True,
-            )
-            if auth.debug_auth_enabled():
-                st.markdown("### Debug auth")
-                debug_user = auth.get_current_user()
-                st.code(
-                    {
-                        "user_keys": list(getattr(debug_user, "keys", lambda: [])()),
-                        "user_id": auth.get_user_id_with_fallback(debug_user),
-                        "user_display_name": auth.get_user_display_name(debug_user),
-                        "user_email": auth.get_user_email(debug_user),
-                    },
-                    language="json",
-                )
-            return
-
-        st.success("You're signed in.")
-        account_cols = st.columns([1, 3])
-        avatar_url = auth.get_user_avatar_url(user)
-        with account_cols[0]:
-            if avatar_url:
-                st.image(avatar_url, width=64)
-            else:
-                st.markdown(
-                    f"<div class='mantis-avatar'>{auth.get_user_initials(user)}</div>",
-                    unsafe_allow_html=True,
-                )
-        with account_cols[1]:
-            st.markdown(f"**{auth.get_user_display_name(user)}**")
-            email = auth.get_user_email(user)
-            if email:
-                st.caption(email)
-            auth.render_email_account_controls(email)
-
-        auth.logout_button(
-            key="account_logout",
-            extra_state_keys=["projects_dir", "project", "page", "_force_nav"],
-        )
-
-        if auth.debug_auth_enabled():
-            st.markdown("### Debug auth")
-            debug_user = auth.get_current_user()
-            st.code(
-                {
-                    "user_keys": list(getattr(debug_user, "keys", lambda: [])()),
-                    "user_id": auth.get_user_id_with_fallback(debug_user),
-                    "user_display_name": auth.get_user_display_name(debug_user),
-                    "user_email": auth.get_user_email(debug_user),
-                },
-                language="json",
-            )
+                    save_app_settings()
 
     def render_legal_redirect():
         render_page_header(
@@ -1216,50 +1042,6 @@ def _run_ui():
             )
 
             st.markdown("---")
-            st.markdown("### 👤 Account")
-            if is_guest:
-                st.markdown("**Guest mode**")
-                st.caption("Projects and edits are not saved across devices.")
-                if st.button(
-                    "Create account",
-                    type="primary",
-                    use_container_width=True,
-                    key="sidebar_guest_create_account",
-                ):
-                    request_account_access("signup", GUEST_BANNER_TEXT)
-                if st.button(
-                    "Sign in",
-                    use_container_width=True,
-                    key="sidebar_guest_cloud_save",
-                ):
-                    request_account_access("signin", GUEST_BANNER_TEXT)
-            else:
-                account_cols = st.columns([1, 2.6])
-                display_name = auth.get_user_display_name(user)
-                email = auth.get_user_email(user)
-                avatar_url = auth.get_user_avatar_url(user)
-                with account_cols[0]:
-                    if avatar_url:
-                        st.image(avatar_url, width=44)
-                    else:
-                        st.markdown(
-                            f"<div class='mantis-avatar'>{auth.get_user_initials(user)}</div>",
-                            unsafe_allow_html=True,
-                        )
-                with account_cols[1]:
-                    st.markdown(f"**{display_name}**")
-                    if email:
-                        st.caption(email)
-                    if auth.user_is_admin(user):
-                        st.caption("Admin")
-
-                manage_url = auth.get_manage_account_url(user)
-                if manage_url:
-                    st.link_button("Manage account", manage_url, use_container_width=True)
-                auth.logout_button(
-                    key="sidebar_logout",
-                    extra_state_keys=["projects_dir", "project", "page", "_force_nav"],
-                )
 
             st.markdown("### 🎨 Appearance")
             st.selectbox("Theme", ["Dark", "Light"], key="ui_theme")
@@ -1272,8 +1054,6 @@ def _run_ui():
                 projects_dir = get_active_projects_dir()
                 if projects_dir:
                     st.caption(f"🗂 Projects folder: `{projects_dir}`")
-                else:
-                    st.caption("🗂 Guest workspace (not saved)")
                 st.caption(f"📚 Total words: {p.get_total_word_count()}")
 
             st.divider()
@@ -1306,8 +1086,6 @@ def _run_ui():
                     st.session_state.page = "export"
                 elif next_page == "legal":
                     st.session_state.page = "legal"
-                elif next_page == "account":
-                    st.session_state.page = "account"
                 else:
                     st.session_state.page = next_page
                 st.rerun()
@@ -1318,7 +1096,7 @@ def _run_ui():
                 cA, cB = st.columns(2)
                 with cA:
                     if st.button("💾 Save", type="primary", use_container_width=True):
-                        if persist_project(p, prompt_on_guest=True, action="save"):
+                        if persist_project(p, action="save"):
                             st.toast("Saved")
                 with cB:
                     if st.button("✖ Close", use_container_width=True):
@@ -1330,7 +1108,6 @@ def _run_ui():
                 st.info("No project loaded.")
 
     def render_home():
-        render_guest_banner("home")
         active_dir = get_active_projects_dir()
         recent_projects = _load_recent_projects(active_dir, st.session_state.projects_refresh_token)
         has_project = bool(recent_projects)
@@ -1391,12 +1168,9 @@ def _run_ui():
 
         def open_recent_project(target: str, focus_tab: Optional[str] = None) -> None:
             if not recent_projects and not st.session_state.project:
-                if st.session_state.get("guest_mode"):
-                    st.session_state.project = st.session_state.guest_project or create_guest_project()
-                else:
-                    st.session_state.page = "projects"
-                    st.toast("Create or import a project to unlock this module.")
-                    st.rerun()
+                st.session_state.page = "projects"
+                st.toast("Create or import a project to unlock this module.")
+                st.rerun()
             if recent_projects and not st.session_state.project:
                 loaded = load_project_safe(recent_projects[0]["path"], context="recent project")
                 if not loaded:
@@ -1408,9 +1182,6 @@ def _run_ui():
             st.rerun()
 
         def open_export() -> None:
-            if st.session_state.get("guest_mode"):
-                queue_pending_action("export_project", return_to="export")
-                return
             export_path = None
             if st.session_state.project and st.session_state.project.filepath:
                 export_path = st.session_state.project.filepath
@@ -1436,9 +1207,6 @@ def _run_ui():
             open_recent_project(primary_target)
 
         def open_new_project() -> None:
-            if st.session_state.get("guest_mode"):
-                queue_pending_action("create_project", return_to="projects")
-                return
             st.session_state.page = "projects"
             st.rerun()
 
@@ -1611,31 +1379,8 @@ def _run_ui():
 
 
     def render_projects():
-        render_guest_banner("projects")
         active_dir = get_active_projects_dir()
         recent_projects = _load_recent_projects(active_dir, st.session_state.projects_refresh_token)
-
-        if is_guest and st.session_state.get("guest_continue_action") == "create_project":
-            pending_project = st.session_state.pop("guest_pending_project", None)
-            pending_import = st.session_state.pop("guest_pending_import", None)
-            if pending_project or pending_import:
-                st.session_state["guest_continue_action"] = None
-                title = (pending_project or {}).get("title") or _random_project_title()
-                genre = (pending_project or {}).get("genre") or _random_project_genres()
-                author = (pending_project or {}).get("author") or ""
-                p = Project.create(title, author=author, genre=genre, storage_dir=get_active_projects_dir())
-                if pending_import:
-                    p.import_text_file(pending_import)
-                    if AppConfig.GROQ_API_KEY and get_ai_model():
-                        with st.spinner("Reviewing document and generating outline..."):
-                            p.outline = StoryEngine.reverse_engineer_outline(p, get_ai_model())
-                    else:
-                        st.warning("Add a Groq API key and model to auto-generate an outline.")
-                st.session_state.project = p
-                st.session_state.page = "outline"
-                st.session_state.first_run = False
-                st.toast("Guest project ready. Saved locally for this session.")
-                st.rerun()
 
         def open_latest_project() -> None:
             if not recent_projects:
@@ -1661,15 +1406,6 @@ def _run_ui():
             key_prefix="projects_header",
         )
 
-        if st.session_state.get("guest_mode"):
-            with st.container(border=True):
-                st.markdown("### Guest sandbox")
-                st.caption("Explore MANTIS Studio with local saves. Create an account to sync and export.")
-                if st.button("Start guest sandbox", use_container_width=True):
-                    st.session_state.project = st.session_state.guest_project or create_guest_project()
-                    st.session_state.page = "outline"
-                    st.rerun()
-
         section_header(
             "Start a new project",
             "Set a title, genre, and author details to build your base.",
@@ -1688,19 +1424,13 @@ def _run_ui():
                         t = _random_project_title()
                     if not g:
                         g = _random_project_genres()
-                    if not is_guest and not require_account(
-                        "create_project",
-                        payload={"title": t, "author": a, "genre": g},
-                        return_to="projects",
-                    ):
-                        return
                     p = Project.create(
                         t,
                         author=a,
                         genre=g,
                         storage_dir=get_active_projects_dir(),
                     )
-                    persist_project(p, prompt_on_guest=True, action="create_project")
+                    persist_project(p, action="create_project")
                     _bump_projects_refresh()
                     st.session_state.project = p
                     st.session_state.page = "outline"
@@ -1731,7 +1461,7 @@ def _run_ui():
                                     p.outline = StoryEngine.reverse_engineer_outline(p, get_ai_model())
                             else:
                                 st.warning("Add a Groq API key and model to auto-generate an outline.")
-                            persist_project(p, prompt_on_guest=True, action="create_project")
+                            persist_project(p, action="create_project")
                         except Exception:
                             logger.warning("Import failed for uploaded draft", exc_info=True)
                             st.error("Import failed. Please check the file and try again.")
@@ -1770,18 +1500,12 @@ def _run_ui():
                             st.caption(genre)
                         with row3:
                             if st.button("⬇️ Export", key=f"export_{full}", use_container_width=True):
-                                if require_account("export_project", return_to="export"):
-                                    st.session_state.export_project_path = full
-                                    st.rerun()
+                                st.session_state.export_project_path = full
+                                st.rerun()
                         with row4:
                             if st.button("🗑", key=f"del_{full}", use_container_width=True):
-                                if require_account(
-                                    "delete_project",
-                                    payload={"path": full},
-                                    return_to="projects",
-                                ):
-                                    st.session_state.delete_project_path = full
-                                    st.session_state.delete_project_title = title
+                                st.session_state.delete_project_path = full
+                                st.session_state.delete_project_title = title
                     except Exception:
                         logger.warning("Failed to load project metadata: %s", full, exc_info=True)
 
@@ -1839,13 +1563,6 @@ def _run_ui():
             tag="Export",
             key_prefix="export_header",
         )
-        if st.session_state.get("guest_mode"):
-            with st.container(border=True):
-                st.markdown("### 🔒 Export is for members")
-                st.caption("Exporting downloads is available after you sign in or create a MANTIS account.")
-                if st.button("Sign in / Create account", type="primary", use_container_width=True):
-                    request_account_access("export_project", GUEST_BANNER_TEXT, return_to="export")
-            return
 
         export_project = None
         export_path = st.session_state.get("export_project_path")
@@ -1880,19 +1597,12 @@ def _run_ui():
         if not p:
             with st.container(border=True):
                 st.info("📭 No project loaded. Create or open a project to edit an outline.")
-                cols = st.columns(2)
-                with cols[0]:
-                    if st.button("Go to Projects", use_container_width=True):
-                        st.session_state.page = "projects"
-                        st.rerun()
-                with cols[1]:
-                    if st.session_state.get("guest_mode") and st.button("Start guest sandbox", use_container_width=True):
-                        st.session_state.project = st.session_state.guest_project or create_guest_project()
-                        st.session_state.page = "outline"
-                        st.rerun()
+                if st.button("Go to Projects", use_container_width=True):
+                    st.session_state.page = "projects"
+                    st.rerun()
             return
         def save_outline_action() -> None:
-            if persist_project(p, prompt_on_guest=True, action="save"):
+            if persist_project(p, action="save"):
                 st.toast("Outline saved.")
 
         def scan_outline_action() -> None:
@@ -1932,7 +1642,7 @@ def _run_ui():
                     save_p()
             with top3:
                 if st.button("💾 Save Project", type="primary", use_container_width=True):
-                    if persist_project(p, prompt_on_guest=True, action="save"):
+                    if persist_project(p, action="save"):
                         st.toast("Saved")
 
         left, right = st.columns([2.1, 1])
@@ -1949,7 +1659,7 @@ def _run_ui():
                     save_p()
 
                 if st.button("💾 Save Outline", use_container_width=True):
-                    if persist_project(p, prompt_on_guest=True, action="save"):
+                    if persist_project(p, action="save"):
                         # Automatically scan entities on save so World Bible stays in sync.
                         extract_entities_ui(p.outline or "", "Outline")
                         st.toast("Outline Saved & Entities Scanned")
@@ -1988,16 +1698,9 @@ def _run_ui():
         if not p:
             with st.container(border=True):
                 st.info("📭 No project loaded. Open or create a project to access the World Bible.")
-                cols = st.columns(2)
-                with cols[0]:
-                    if st.button("Go to Projects", use_container_width=True):
-                        st.session_state.page = "projects"
-                        st.rerun()
-                with cols[1]:
-                    if st.session_state.get("guest_mode") and st.button("Start guest sandbox", use_container_width=True):
-                        st.session_state.project = st.session_state.guest_project or create_guest_project()
-                        st.session_state.page = "world"
-                        st.rerun()
+                if st.button("Go to Projects", use_container_width=True):
+                    st.session_state.page = "projects"
+                    st.rerun()
             return
         def open_add_entity() -> None:
             tab_label = st.session_state.get("world_tabs") or "Characters"
@@ -2461,7 +2164,7 @@ def _run_ui():
                 p.memory = memory_val
                 save_p()
             if st.button("💾 Save Memory", use_container_width=True):
-                if persist_project(p, prompt_on_guest=True, action="save"):
+                if persist_project(p, action="save"):
                     st.toast("Memory saved")
 
             st.divider()
@@ -2705,22 +2408,13 @@ def _run_ui():
             st.metric("AI Readiness", f"{readiness}%")
 
     def render_chapters():
-        # Single guest banner for the editor page (avoid duplicate widgets / duplicate keys).
-        render_guest_banner("editor")
         p = st.session_state.project
         if not p:
             with st.container(border=True):
                 st.info("📭 No project loaded. Create or open a project to start writing.")
-                cols = st.columns(2)
-                with cols[0]:
-                    if st.button("Go to Projects", use_container_width=True):
-                        st.session_state.page = "projects"
-                        st.rerun()
-                with cols[1]:
-                    if st.session_state.get("guest_mode") and st.button("Start guest sandbox", use_container_width=True):
-                        st.session_state.project = st.session_state.guest_project or create_guest_project()
-                        st.session_state.page = "chapters"
-                        st.rerun()
+                if st.button("Go to Projects", use_container_width=True):
+                    st.session_state.page = "projects"
+                    st.rerun()
             return
         chaps = p.get_ordered_chapters()
 
@@ -2879,7 +2573,7 @@ def _run_ui():
                         help="Save this chapter and scan for new World Bible entities.",
                     ):
                         curr.update_content(val, "manual")
-                        if persist_project(p, prompt_on_guest=True, action="save"):
+                        if persist_project(p, action="save"):
                             # Automatically scan entities from this chapter when the user explicitly saves it.
                             extract_entities_ui(curr.content or "", f"Ch {curr.index}")
                             st.toast("Chapter Saved & Entities Scanned")
@@ -3204,7 +2898,6 @@ def _run_ui():
 
     ctx = SimpleNamespace(
         st=st,
-        auth=auth,
         AppConfig=AppConfig,
         Project=Project,
         Chapter=Chapter,
@@ -3223,26 +2916,18 @@ def _run_ui():
         stat_tile=stat_tile,
         render_page_header=render_page_header,
         render_app_footer=render_app_footer,
-        render_guest_banner=render_guest_banner,
-        request_account_access=request_account_access,
         persist_project=persist_project,
         get_ai_model=get_ai_model,
         save_p=save_p,
         get_active_projects_dir=get_active_projects_dir,
-        queue_pending_action=queue_pending_action,
-        require_account=require_account,
-        create_guest_project=create_guest_project,
         resume_pending_action=resume_pending_action,
         open_legal_page=open_legal_page,
         render_privacy=render_privacy,
         render_terms=render_terms,
         render_copyright=render_copyright,
-        user=user,
-        is_guest=is_guest,
         config_data=config_data,
         key_scope=key_scope,
         ui_key=ui_key,
-        GUEST_BANNER_TEXT=GUEST_BANNER_TEXT,
         render_home=render_home,
         render_projects=render_projects,
         render_outline=render_outline,
@@ -3250,7 +2935,6 @@ def _run_ui():
         render_chapters=render_chapters,
         render_export=render_export,
         render_ai_settings=render_ai_settings,
-        render_account=render_account,
         render_legal_redirect=render_legal_redirect,
     )
 
@@ -3258,7 +2942,6 @@ def _run_ui():
         "home": "dashboard",
         "projects": "projects",
         "ai": "settings",
-        "account": "account",
         "legal": "legal",
         "export": "export",
         "outline": "outline",
