@@ -103,6 +103,9 @@ class AppConfig:
     SUMMARY_CONTEXT_CHARS = 4000
     MAX_UPLOAD_MB = int(os.getenv("MANTIS_MAX_UPLOAD_MB", "10"))
     SAVE_LOCK_TIMEOUT = int(os.getenv("MANTIS_SAVE_LOCK_TIMEOUT", "5"))
+    
+    # Documentation URLs
+    GETTING_STARTED_URL = "https://github.com/bigmanjer/Mantis-Studio/blob/main/GETTING_STARTED.md"
     SAVE_LOCK_RETRY_SLEEP = float(os.getenv("MANTIS_SAVE_LOCK_RETRY_SLEEP", "0.1"))
     WORLD_BIBLE_CONFIDENCE = float(os.getenv("MANTIS_WORLD_BIBLE_CONFIDENCE", "0.75"))
 
@@ -2212,12 +2215,12 @@ def _run_ui():
         if context == "home" and st.session_state.get("first_run", True):
             with st.container(border=True):
                 st.markdown("### 👋 Welcome to Mantis Studio!")
-                st.markdown("""
+                st.markdown(f"""
                 **Your AI-powered writing environment is ready.**
                 
                 **Getting Started:**
                 - 📁 Click **Projects** in the sidebar to create your first story
-                - 📖 Check out the [Getting Started Guide](https://github.com/bigmanjer/Mantis-Studio/blob/main/GETTING_STARTED.md) for a complete walkthrough
+                - 📖 Check out the [Getting Started Guide]({AppConfig.GETTING_STARTED_URL}) for a complete walkthrough
                 - 💡 Everything auto-saves locally—no account needed to start writing!
                 
                 **Quick Tips:**
@@ -2239,7 +2242,7 @@ def _run_ui():
         
         # Show context-specific tips for first-time users on other pages
         elif st.session_state.get("first_run", True) and context != "home":
-            st.info(f"💡 **Tip**: Check out the [Getting Started Guide](https://github.com/bigmanjer/Mantis-Studio/blob/main/GETTING_STARTED.md) for help using this section.", icon="💡")
+            st.info(f"💡 **Tip**: Check out the [Getting Started Guide]({AppConfig.GETTING_STARTED_URL}) for help using this section.", icon="💡")
 
     def render_app_footer() -> None:
         render_footer(AppConfig.VERSION)

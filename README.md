@@ -322,11 +322,37 @@ Should **not** clutter main navigation for most users.
 
 ## 8. Versioning System
 
-* Version stored in `VERSION.txt`
-* GitHub Action: `.github/workflows/version-bump.yml`
-* Automatically increments version on merge
+* **Current Version**: 84.7 (stored in `VERSION.txt`)
+* **Version Format**: `MAJOR.MINOR` (e.g., 84.7, 84.8, 85.0)
 
-Displayed in UI header for transparency.
+### Versioning Rules
+
+The version increments with each merge following these rules:
+
+1. **Minor version** increments by 0.1 with each merge
+   - Example: 84.7 → 84.8 → 84.9
+   
+2. **When minor reaches .9**, the next increment becomes `(MAJOR+1).0`
+   - Example: 84.9 → 85.0 → 85.1
+
+3. **Manual updates** to VERSION.txt are reflected immediately in the UI
+
+### How It Works
+
+* Version is read from `VERSION.txt` at startup
+* Can be overridden with `MANTIS_APP_VERSION` environment variable
+* Displayed in UI header for transparency
+* Use `python scripts/bump_version.py` to automatically increment version following the rules
+
+### Manual Version Bump
+
+To bump the version for the next release:
+
+```bash
+python scripts/bump_version.py
+```
+
+This script automatically handles the rollover from x.9 to (x+1).0.
 
 ---
 
