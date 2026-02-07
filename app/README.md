@@ -53,27 +53,25 @@ app/
 
 ## Migration Status
 
-The directory structure has been created and organized. The following components are in place:
+The directory structure is in place. The following components are active:
 
 - ✅ Router with view mappings
 - ✅ State management module
-- ✅ View files (currently thin wrappers)
-- ✅ Service modules (copied from mantis/)
+- ✅ View files (thin wrappers)
+- ✅ Service modules
 - ✅ Component modules
 - ✅ Layout modules (theme/styles)
 - ✅ Utility modules
 
 ## Current Implementation
 
-Currently, the actual render logic still resides in `app/main.py` for backward compatibility. 
+Currently, the actual render logic resides in `app/main.py` for backward compatibility. 
 The view files in `app/views/` are thin wrappers that delegate to the main file's render functions.
 
-This allows the new structure to coexist with the existing implementation while providing a clear 
-path for future refactoring.
+This allows the structure to provide a clear path for future refactoring while maintaining stability.
 
 ## Future Enhancements
 
 1. Extract render functions from `app/main.py` into respective view files
 2. Move business logic from `app/main.py` to service modules
 3. Extract layout components (sidebar, header) into layout modules
-4. Deprecate and remove the `mantis/` directory once migration is complete

@@ -130,14 +130,8 @@ When you first open the app, you'll see:
 
 1. **Sidebar on the left** with navigation (Dashboard, Projects, Outline, etc.)
 2. **Main area** showing your Dashboard
-3. A banner saying you're in "Guest mode"
 
-### Guest Mode vs. Account
-
-- **Guest Mode**: Your work saves locally on your computer. Great for trying things out!
-- **Account Mode**: (Currently being set up) Will let you sync across devices
-
-For now, don't worry about accounts—just start creating!
+Your work saves locally on your computer. Start creating right away!
 
 ---
 
@@ -311,10 +305,9 @@ pip install -r requirements.txt --upgrade
 
 Now that you're set up, try these:
 
-1. 📖 Read the full [README.md](README.md) for advanced features
+1. 📖 Read the full [README.md](../../README.md) for advanced features
 2. 🎨 Check out [DESIGN_SYSTEM.md](../design/DESIGN_SYSTEM.md) to understand the UI
-3. 🔐 Review [AUTH_SETUP.md](../runbooks/AUTH_SETUP.md) for account features
-4. 🐛 Found a bug? [Open an issue](https://github.com/bigmanjer/Mantis-Studio/issues)
+3. 🐛 Found a bug? [Open an issue](https://github.com/bigmanjer/Mantis-Studio/issues)
 
 ---
 
@@ -337,7 +330,6 @@ Mantis Studio is actively being improved! Here's what you might notice:
 - Export to Word/TXT formats
 
 🚧 **Still being polished:**
-- Account sync (coming soon)
 - Some AI features may be experimental
 - UI improvements are ongoing
 

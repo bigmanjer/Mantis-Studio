@@ -1506,14 +1506,41 @@ def _run_ui():
         )
         return results or []
 
+    LEGAL_DIR = Path(__file__).resolve().parents[1] / "legal"
+
+    def _read_legal_file(filename: str, fallback: str) -> str:
+        path = LEGAL_DIR / filename
+        if path.exists():
+            return path.read_text(encoding="utf-8")
+        return fallback
+
     def render_privacy():
-        st.markdown("## Privacy Policy\n\nLocal-only storage. No analytics.")
+        content = _read_legal_file("privacy.md", "## Privacy Policy\n\nLocal-only storage. No analytics.")
+        st.markdown(content)
+        if st.button("← Back to Legal Center", key=ui_key("privacy", "back")):
+            st.session_state.page = "legal"
+            st.rerun()
 
     def render_terms():
-        st.markdown("## Terms of Service\n\nProvided as-is for creative use.")
+        content = _read_legal_file("terms.md", "## Terms of Service\n\nProvided as-is for creative use.")
+        st.markdown(content)
+        if st.button("← Back to Legal Center", key=ui_key("terms", "back")):
+            st.session_state.page = "legal"
+            st.rerun()
 
     def render_copyright():
-        st.markdown("## Copyright\n\n© MANTIS Studio")
+        content = _read_legal_file("copyright.md", "## Copyright\n\n© MANTIS Studio")
+        st.markdown(content)
+        if st.button("← Back to Legal Center", key=ui_key("copyright", "back")):
+            st.session_state.page = "legal"
+            st.rerun()
+
+    def render_cookie():
+        content = _read_legal_file("cookie.md", "## Cookie Policy\n\nEssential cookies only.")
+        st.markdown(content)
+        if st.button("← Back to Legal Center", key=ui_key("cookie", "back")):
+            st.session_state.page = "legal"
+            st.rerun()
 
     icon_path = ASSETS_DIR / "mantis_logo_trans.png"
     page_icon = str(icon_path) if icon_path.exists() else "🪲"
@@ -3145,7 +3172,7 @@ def _run_ui():
                 st.toast("No entities detected in this text.", icon="🤷")
 
     query = st.query_params.get("page")
-    if query in {"privacy", "terms", "copyright", "legal"}:
+    if query in {"privacy", "terms", "copyright", "cookie", "legal"}:
         st.session_state.page = query
         st.query_params.clear()
         st.rerun()
@@ -3540,15 +3567,31 @@ def _run_ui():
 
     def render_legal_redirect():
         render_page_header(
-            "Legal",
+            "Legal Center",
             "Review policies, IP guidance, and acceptable use.",
             tag="Policies",
             key_prefix="legal_header",
         )
-        st.info("Open the Legal Hub for full policies and documentation.")
-        if st.button("Open Legal Hub", use_container_width=True):
-            st.session_state.page = "legal"
-            st.rerun()
+
+        legal_pages = [
+            ("Terms of Service", "terms", "terms.md"),
+            ("Privacy Policy", "privacy", "privacy.md"),
+            ("Copyright", "copyright", "copyright.md"),
+            ("Cookie Policy", "cookie", "cookie.md"),
+            ("Brand & IP Clarity", "brand_ip", "Brand_ip_Clarity.md"),
+            ("Trademark Path", "trademark", "Trademark_Path.md"),
+            ("Contact", "contact_legal", "contact.md"),
+        ]
+
+        cols = st.columns(2)
+        for idx, (label, key_suffix, filename) in enumerate(legal_pages):
+            with cols[idx % 2]:
+                path = LEGAL_DIR / filename
+                if path.exists():
+                    with st.expander(label):
+                        st.markdown(path.read_text(encoding="utf-8"))
+                else:
+                    st.caption(f"{label} — not available")
 
     with st.sidebar:
         with key_scope("sidebar"):
@@ -5664,6 +5707,10 @@ def _run_ui():
         elif st.session_state.page == "copyright":
             with key_scope("copyright"):
                 render_copyright()
+            rendered_page = True
+        elif st.session_state.page == "cookie":
+            with key_scope("cookie"):
+                render_cookie()
             rendered_page = True
         elif st.session_state.page == "export":
             with key_scope("export"):

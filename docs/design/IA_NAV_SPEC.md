@@ -6,30 +6,36 @@
 - **Write (Outline)** → `page="outline"`
 - **Editor** → `page="chapters"`
 - **World Bible** → `page="world"`
-- **Export** → `page="export"` (gated for guests)
+- **Export** → `page="export"`
 - **AI Settings** → `page="ai"`
-
-> Account is removed from primary nav and is accessible via the header menu.
 
 ## Secondary Navigation (Header)
 - **App title + logo** (left)
 - **Current project selector** (center)
   - Loads selected project and routes to `chapters`.
-- **Quick actions** (contextual – optional per page)
-- **Account menu** (right)
-  - Profile & settings → `open_account_settings()`
-  - Log out → `auth.logout_button()`
+- **Quick actions** (contextual per page)
+
+## Footer Navigation
+- **Terms** → `page="terms"` (renders `legal/terms.md`)
+- **Privacy** → `page="privacy"` (renders `legal/privacy.md`)
+- **Legal** → `page="legal"` (Legal Center with all policies)
+- **Support** → external link to GitHub Issues
+- **Contact** → mailto link
+- **Version** → displays current app version
 
 ## Page Rendering Map
 - `home` → Dashboard / Home
 - `projects` → Projects
 - `outline` → Outline (Write)
 - `chapters` → Editor (Write)
-- `world` → World Bible (Entities + Memory + Insights)
+- `world` → World Bible
 - `export` → Export
 - `ai` → AI Settings
-- `account` → Account Access
-- `legal` → Legal hub redirect
+- `legal` → Legal Center (all policies)
+- `terms` → Terms of Service
+- `privacy` → Privacy Policy
+- `copyright` → Copyright Notice
+- `cookie` → Cookie Policy
 
 ## Header Actions by Page
 - **Dashboard:** Resume project, New project
@@ -39,4 +45,3 @@
 - **World Bible:** Add entity, Run coherence check
 - **Export:** Export current project
 - **AI Settings:** Save settings, Refresh models
-- **Account:** Back to Studio, Log out

@@ -40,6 +40,10 @@ def get_nav_config(has_project: bool) -> Tuple[List[str], Dict[str, str]]:
 
 
 def get_routes() -> Dict[str, PageRenderer]:
+    # Legal sub-pages (terms, privacy, etc.) are rendered by dedicated
+    # functions inside app/main.py.  The router maps them to the Legal
+    # Center as a fallback so resolve_route() always returns a valid
+    # renderer.
     return {
         "home": render_home,
         "projects": render_projects,
@@ -49,6 +53,10 @@ def get_routes() -> Dict[str, PageRenderer]:
         "export": render_export,
         "ai": render_ai_settings,
         "legal": render_legal_redirect,
+        "terms": render_legal_redirect,
+        "privacy": render_legal_redirect,
+        "copyright": render_legal_redirect,
+        "cookie": render_legal_redirect,
     }
 
 
