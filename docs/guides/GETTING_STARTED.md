@@ -183,17 +183,15 @@ AI writing assistance makes Mantis Studio truly powerful. Here's how to enable i
 
 **Option 1: Groq (Recommended for beginners)**
 1. Go to https://console.groq.com
-2. Start a free Groq API key setup
+2. Create a free Groq account
 3. Navigate to "API Keys" in the dashboard
-4. Click "Create API Key"
-5. Copy the key (it looks like `gsk_...`)
+4. Click "Create API Key" and copy the key (it looks like `gsk_...`)
 
 **Option 2: OpenAI (More powerful, costs money)**
 1. Go to https://platform.openai.com
-2. Create an API key
-3. Add payment method (pay-as-you-go)
-4. Create an API key
-5. Copy the key (it looks like `sk-...`)
+2. Add a payment method (pay-as-you-go)
+3. Create an API key
+4. Copy the key (it looks like `sk-...`)
 
 ### Adding the Key to Mantis Studio
 

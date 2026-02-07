@@ -188,6 +188,10 @@ def _release_lock(lock_path: str) -> None:
         pass
 
 
+class _MissingSecretsError(Exception):
+    pass
+
+
 def _get_streamlit():
     if "streamlit" not in sys.modules:
         return None
@@ -239,9 +243,14 @@ def _get_secret_key(st, provider: str) -> str:
         return ""
     try:
         secrets = st.secrets
-    except Exception:
+    except (AttributeError, FileNotFoundError):
         return ""
+    try:
+        from streamlit.errors import StreamlitSecretNotFoundError
+    except ImportError:
+        StreamlitSecretNotFoundError = _MissingSecretsError
     provider = _normalize_provider(provider)
+    secret_errors = (AttributeError, KeyError, TypeError, StreamlitSecretNotFoundError)
     try:
         if provider == "openai":
             return str(
@@ -256,7 +265,7 @@ def _get_secret_key(st, provider: str) -> str:
             or (secrets.get("groq") or {}).get("api_key")
             or ""
         ).strip()
-    except Exception:
+    except secret_errors:
         return ""
 
 
@@ -2097,7 +2106,7 @@ def _run_ui():
                 **Getting Started:**
                 - 📁 Click **Projects** in the sidebar to create your first story
                 - 📖 Check out the [Getting Started Guide]({AppConfig.GETTING_STARTED_URL}) for a complete walkthrough
-                - 💡 Everything auto-saves locally—no setup needed to start writing!
+                - 💡 Everything autosaves locally—no setup needed to start writing!
                 
                 **Quick Tips:**
                 - Use **Outline** to plan your story structure
@@ -2847,7 +2856,7 @@ def _run_ui():
 
         with tabs[1]:
             card_start("✨ OpenAI Configuration")
-            st.caption("OpenAI provides advanced models like GPT-4. Requires a paid API plan.")
+            st.caption("OpenAI provides advanced models like GPT-4. Requires paid API access.")
             
             _render_key_controls("openai")
             
@@ -4243,7 +4252,7 @@ def _run_ui():
                                 e.aliases = [a.strip() for a in alias_text.split(",") if a.strip()]
                                 persist_project(p)
 
-                            st.caption("Enrichment is currently unavailable.")
+                            st.caption("Enrichment tools are not included in this build.")
 
                             refs = mention_refs.get(e.id, [])
                             if refs:
