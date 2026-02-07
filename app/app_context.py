@@ -53,13 +53,13 @@ from typing import Any, Callable, Dict, List, Optional
 import requests
 # (UI-only imports are loaded inside _run_ui() so selftests can run without Streamlit installed.)
 
-from mantis.config.settings import AppConfig, ensure_storage_dirs, load_app_config, logger, save_app_config
-from mantis.core.export import project_to_markdown
-from mantis.core.models import Chapter, Entity, Project, sanitize_chapter_title
+from app.config.settings import AppConfig, ensure_storage_dirs, load_app_config, logger, save_app_config
+from app.services.export import project_to_markdown
+from app.services.projects import Chapter, Entity, Project, sanitize_chapter_title
 # User accounts removed - get_user_projects_dir function no longer available
-from mantis.core.world_bible import queue_world_bible_suggestion
-from mantis.services.llm import AIEngine, AnalysisEngine, REWRITE_PRESETS, StoryEngine, rewrite_prompt
-from mantis.state.session import initialize_session_state, install_key_helpers, ui_key
+from app.services.world_bible import queue_world_bible_suggestion
+from app.services.ai import AIEngine, AnalysisEngine, REWRITE_PRESETS, StoryEngine, rewrite_prompt
+from app.state import initialize_session_state, install_key_helpers, ui_key
 
 # NOTE: Streamlit-dependent utilities are imported inside _run_ui() so
 # `python Mantis_Studio.py --selftest` can run without Streamlit installed.
@@ -93,10 +93,10 @@ REPAIR_MODE = "--repair" in sys.argv
 
 def _run_ui():
     import streamlit as st
-    from mantis import router
-    from mantis.services import auth
-    from mantis.ui.components.ui import action_card, card, primary_button, section_header, stat_tile
-    from mantis.ui.layout import apply_theme, get_theme_tokens, render_footer, render_header
+    from app import router
+    from app.services import auth_service as auth
+    from app.components.ui import action_card, card, primary_button, section_header, stat_tile
+    from app.layout.layout import apply_theme, get_theme_tokens, render_footer, render_header
 
     key_scope, _ = install_key_helpers(st)
 

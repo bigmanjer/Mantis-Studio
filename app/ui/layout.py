@@ -1,7 +1,6 @@
 import streamlit as st
 
 from app.utils import ui_key
-from mantis.ui.layout import render_footer
 
 
 def render_footer(

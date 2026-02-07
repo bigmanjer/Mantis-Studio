@@ -4,7 +4,7 @@ from typing import Any, Dict
 
 import streamlit as st
 
-from mantis.core.models import Project
+from app.services.projects import Project
 
 
 def queue_world_bible_suggestion(item: Dict[str, Any]) -> None:
