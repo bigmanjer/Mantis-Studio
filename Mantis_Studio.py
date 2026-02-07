@@ -87,7 +87,7 @@ class AppConfig:
     VERSION = get_app_version()
     PROJECTS_DIR = os.getenv("MANTIS_PROJECTS_DIR", "projects")
     BACKUPS_DIR = os.path.join(PROJECTS_DIR, ".backups")
-    USERS_DIR = os.getenv("MANTIS_USERS_DIR", os.path.join(PROJECTS_DIR, "users"))
+    # USERS_DIR = os.getenv("MANTIS_USERS_DIR", os.path.join(PROJECTS_DIR, "users"))  # Temporarily disabled
     GROQ_API_URL = os.getenv("GROQ_API_URL", "https://api.groq.com/openai/v1")
     GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
     GROQ_TIMEOUT = int(os.getenv("GROQ_TIMEOUT", "300"))
@@ -109,7 +109,7 @@ class AppConfig:
 
 os.makedirs(AppConfig.PROJECTS_DIR, exist_ok=True)
 os.makedirs(AppConfig.BACKUPS_DIR, exist_ok=True)
-os.makedirs(AppConfig.USERS_DIR, exist_ok=True)
+# os.makedirs(AppConfig.USERS_DIR, exist_ok=True)  # Temporarily disabled
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("MANTIS")
@@ -175,10 +175,11 @@ def _release_lock(lock_path: str) -> None:
         pass
 
 
-def get_user_projects_dir(user_id: str) -> str:
-    user_dir = os.path.join(AppConfig.USERS_DIR, user_id)
-    os.makedirs(user_dir, exist_ok=True)
-    return user_dir
+# Temporarily disabled - user accounts removed
+# def get_user_projects_dir(user_id: str) -> str:
+#     user_dir = os.path.join(AppConfig.USERS_DIR, user_id)
+#     os.makedirs(user_dir, exist_ok=True)
+#     return user_dir
 
 
 def _get_streamlit():
@@ -200,42 +201,45 @@ def _provider_label(provider: str) -> str:
     return "OpenAI" if _normalize_provider(provider) == "openai" else "Groq"
 
 
-def _get_user_keys_path(user_id: str) -> Optional[str]:
-    if not user_id:
-        return None
-    user_dir = get_user_projects_dir(user_id)
-    return os.path.join(user_dir, ".mantis_ai_keys.json")
+# Temporarily disabled - user accounts removed
+# def _get_user_keys_path(user_id: str) -> Optional[str]:
+#     if not user_id:
+#         return None
+#     user_dir = get_user_projects_dir(user_id)
+#     return os.path.join(user_dir, ".mantis_ai_keys.json")
 
 
-def _load_user_keys(user_id: str) -> Dict[str, str]:
-    path = _get_user_keys_path(user_id)
-    if not path or not os.path.exists(path):
-        return {}
-    try:
-        with open(path, "r", encoding="utf-8") as fh:
-            data = json.load(fh)
-        if isinstance(data, dict):
-            return {
-                key: str(value)
-                for key, value in data.items()
-                if key in {"openai", "groq"} and value
-            }
-    except Exception:
-        logger.warning("Failed to load user AI keys", exc_info=True)
-    return {}
+# Temporarily disabled - user accounts removed
+# def _load_user_keys(user_id: str) -> Dict[str, str]:
+#     path = _get_user_keys_path(user_id)
+#     if not path or not os.path.exists(path):
+#         return {}
+#     try:
+#         with open(path, "r", encoding="utf-8") as fh:
+#             data = json.load(fh)
+#         if isinstance(data, dict):
+#             return {
+#                 key: str(value)
+#                 for key, value in data.items()
+#                 if key in {"openai", "groq"} and value
+#             }
+#     except Exception:
+#         logger.warning("Failed to load user AI keys", exc_info=True)
+#     return {}
 
 
-def _save_user_keys(user_id: str, keys: Dict[str, str]) -> bool:
-    path = _get_user_keys_path(user_id)
-    if not path:
-        return False
-    try:
-        with open(path, "w", encoding="utf-8") as fh:
-            json.dump(keys, fh, indent=2)
-        return True
-    except Exception:
-        logger.warning("Failed to save user AI keys", exc_info=True)
-        return False
+# Temporarily disabled - user accounts removed
+# def _save_user_keys(user_id: str, keys: Dict[str, str]) -> bool:
+#     path = _get_user_keys_path(user_id)
+#     if not path:
+#         return False
+#     try:
+#         with open(path, "w", encoding="utf-8") as fh:
+#             json.dump(keys, fh, indent=2)
+#         return True
+#     except Exception:
+#         logger.warning("Failed to save user AI keys", exc_info=True)
+#         return False
 
 
 def _ensure_session_keys(st) -> Dict[str, str]:
@@ -246,12 +250,13 @@ def _ensure_session_keys(st) -> Dict[str, str]:
     return keys
 
 
-def _get_saved_keys(st, user_id: str) -> Dict[str, str]:
-    cached_user = st.session_state.get("ai_saved_keys_user_id")
-    if user_id and cached_user != user_id:
-        st.session_state["ai_saved_keys_user_id"] = user_id
-        st.session_state["ai_saved_keys_cache"] = _load_user_keys(user_id)
-    return st.session_state.get("ai_saved_keys_cache", {})
+# Temporarily disabled - user accounts removed
+# def _get_saved_keys(st, user_id: str) -> Dict[str, str]:
+#     cached_user = st.session_state.get("ai_saved_keys_user_id")
+#     if user_id and cached_user != user_id:
+#         st.session_state["ai_saved_keys_user_id"] = user_id
+#         st.session_state["ai_saved_keys_cache"] = _load_user_keys(user_id)
+#     return st.session_state.get("ai_saved_keys_cache", {})
 
 
 def set_session_key(provider: str, key: str) -> None:
@@ -274,20 +279,21 @@ def clear_session_key(provider: str) -> None:
     st.session_state["ai_session_keys"] = keys
 
 
-def save_user_key(provider: str, key: str, user_id: Optional[str]) -> bool:
-    st = _get_streamlit()
-    if not st or not user_id:
-        return False
-    provider = _normalize_provider(provider)
-    normalized = (key or "").strip()
-    if not normalized:
-        return False
-    saved = dict(_get_saved_keys(st, user_id))
-    saved[provider] = normalized
-    if not _save_user_keys(user_id, saved):
-        return False
-    st.session_state["ai_saved_keys_cache"] = saved
-    return True
+# Temporarily disabled - user accounts removed
+# def save_user_key(provider: str, key: str, user_id: Optional[str]) -> bool:
+#     st = _get_streamlit()
+#     if not st or not user_id:
+#         return False
+#     provider = _normalize_provider(provider)
+#     normalized = (key or "").strip()
+#     if not normalized:
+#         return False
+#     saved = dict(_get_saved_keys(st, user_id))
+#     saved[provider] = normalized
+#     if not _save_user_keys(user_id, saved):
+#         return False
+#     st.session_state["ai_saved_keys_cache"] = saved
+#     return True
 
 
 def _get_secret_key(st, provider: str) -> str:
@@ -328,17 +334,18 @@ def get_effective_key(provider: str, user_id: Optional[str] = None) -> tuple[str
         session_key = _ensure_session_keys(st).get(provider, "")
         if session_key:
             return session_key, "session"
-        try:
-            from app.utils import auth
-
-            if auth.is_authenticated():
-                user_id = user_id or st.session_state.get("user_id")
-                if user_id:
-                    saved_key = _get_saved_keys(st, user_id).get(provider, "")
-                    if saved_key:
-                        return saved_key, "saved"
-        except Exception:
-            pass
+        # Temporarily disabled - user accounts removed
+        # try:
+        #     from app.utils import auth
+        # 
+        #     if auth.is_authenticated():
+        #         user_id = user_id or st.session_state.get("user_id")
+        #         if user_id:
+        #             saved_key = _get_saved_keys(st, user_id).get(provider, "")
+        #             if saved_key:
+        #                 return saved_key, "saved"
+        # except Exception:
+        #     pass
     default_key = _get_server_default_key(provider)
     if default_key:
         return default_key, "default"
@@ -2092,7 +2099,7 @@ def _run_ui():
 
     guest_mode = st.session_state.get("guest_mode", is_guest)
 
-    init_state("user_id", None)
+    # init_state("user_id", None)  # Temporarily disabled - user accounts removed
     init_state("projects_dir", None)
     init_state("project", None)
     init_state("page", "home")
@@ -2125,8 +2132,8 @@ def _run_ui():
     )
     init_state("ai_provider", config_data.get("ai_provider", "groq"))
     init_state("ai_session_keys", {"openai": "", "groq": ""})
-    init_state("ai_saved_keys_cache", {})
-    init_state("ai_saved_keys_user_id", "")
+    # init_state("ai_saved_keys_cache", {})  # Temporarily disabled - user accounts removed
+    # init_state("ai_saved_keys_user_id", "")  # Temporarily disabled - user accounts removed
     init_state("openai_key_input", "")
     init_state("openai_model", config_data.get("openai_model", AppConfig.OPENAI_MODEL))
     init_state("openai_model_list", [])
@@ -2164,6 +2171,7 @@ def _run_ui():
         "Guest mode: your work saves locally in this session. Create an account to sync and export."
     )
 
+    # Temporarily disabled - user accounts removed
     def request_account_access(
         action: str,
         reason: str,
@@ -2171,32 +2179,18 @@ def _run_ui():
         payload: Optional[Dict[str, Any]] = None,
         return_to: Optional[str] = None,
     ) -> None:
-        st.session_state["auth_redirect_action"] = action
-        st.session_state["auth_redirect_reason"] = reason
-        st.session_state["auth_redirect_return_page"] = return_to or st.session_state.get("page", "home")
-        st.session_state.pending_action = {
-            "action": action,
-            "payload": payload or {},
-            "return_to": return_to or st.session_state.get("page", "home"),
-        }
-        st.session_state.page = "account"
-        st.rerun()
+        # Disabled - no account functionality
+        pass
 
+    # Temporarily disabled - user accounts removed
     def open_account_settings(
         *,
         action: str = "profile",
         reason: Optional[str] = None,
         return_to: Optional[str] = None,
     ) -> None:
-        if st.session_state.get("guest_mode"):
-            request_account_access(
-                action,
-                reason or GUEST_BANNER_TEXT,
-                return_to=return_to or st.session_state.get("page", "home"),
-            )
-            return
-        st.session_state.page = "account"
-        st.rerun()
+        # Disabled - no account functionality
+        pass
 
     def persist_project(
         project: "Project",
@@ -2209,28 +2203,10 @@ def _run_ui():
             st.toast("Saved locally. Create an account to sync and export.")
         return True
 
+    # Temporarily disabled - user accounts removed
     def render_guest_banner(context: str) -> None:
-        if not is_guest:
-            return
-        with st.container(border=True):
-            st.markdown("#### 👋 Guest mode")
-            st.caption(GUEST_BANNER_TEXT)
-            banner_cols = st.columns([1, 1])
-            with banner_cols[0]:
-                if st.button(
-                    "Create account",
-                    type="primary",
-                    use_container_width=True,
-                    key=f"guest_banner_create_{context}",
-                ):
-                    request_account_access("signup", GUEST_BANNER_TEXT)
-            with banner_cols[1]:
-                if st.button(
-                    "Sign in",
-                    use_container_width=True,
-                    key=f"guest_banner_signin_{context}",
-                ):
-                    request_account_access("signin", GUEST_BANNER_TEXT)
+        # Guest banner disabled - no account functionality
+        pass
 
     def render_app_footer() -> None:
         render_footer(AppConfig.VERSION)
@@ -2278,31 +2254,37 @@ def _run_ui():
                 tags.append("Project active")
             render_tag_list(tags)
 
-            user = auth.get_current_user() or {}
-            initials = auth.get_user_initials(user)
-            with st.expander(f"Account {initials}", expanded=False):
-                if st.button("Profile & settings", use_container_width=True):
-                    open_account_settings()
-                st.caption("Billing (coming soon)")
-                if auth.is_authenticated():
-                    auth.logout_button(label="Log out", key="header_logout")
+            # Temporarily disabled - user accounts removed
+            # user = auth.get_current_user() or {}
+            # initials = auth.get_user_initials(user)
+            # with st.expander(f"Account {initials}", expanded=False):
+            #     if st.button("Profile & settings", use_container_width=True):
+            #         open_account_settings()
+            #     st.caption("Billing (coming soon)")
+            #     if auth.is_authenticated():
+            #         auth.logout_button(label="Log out", key="header_logout")
 
-    if is_guest:
-        user_id = f"guest_{st.session_state['guest_session_id']}"
-    else:
-        user_id = auth.get_user_id_with_fallback(user)
-        if not user_id:
-            st.warning("We couldn't read a user identifier. Please sign in again.")
-            auth.logout_button(key="auth_missing_user_id_logout")
-            st.stop()
+    # Temporarily disabled - user accounts removed
+    # if is_guest:
+    #     user_id = f"guest_{st.session_state['guest_session_id']}"
+    # else:
+    #     user_id = auth.get_user_id_with_fallback(user)
+    #     if not user_id:
+    #         st.warning("We couldn't read a user identifier. Please sign in again.")
+    #         auth.logout_button(key="auth_missing_user_id_logout")
+    #         st.stop()
+    # 
+    # if st.session_state.user_id != user_id:
+    #     st.session_state.user_id = user_id
+    #     st.session_state.projects_dir = get_user_projects_dir(user_id)
+    #     st.session_state.project = None
+    #     st.session_state.page = "home"
+    # elif not st.session_state.projects_dir:
+    #     st.session_state.projects_dir = get_user_projects_dir(user_id)
 
-    if st.session_state.user_id != user_id:
-        st.session_state.user_id = user_id
-        st.session_state.projects_dir = get_user_projects_dir(user_id)
-        st.session_state.project = None
-        st.session_state.page = "home"
-    elif not st.session_state.projects_dir:
-        st.session_state.projects_dir = get_user_projects_dir(user_id)
+    # Set default projects directory (no user-specific directories)
+    if not st.session_state.get("projects_dir"):
+        st.session_state.projects_dir = AppConfig.PROJECTS_DIR
 
     if is_guest:
         st.session_state.auto_save = False
@@ -2337,26 +2319,22 @@ def _run_ui():
             return st.session_state.get("projects_dir") or AppConfig.PROJECTS_DIR
         return st.session_state.get("projects_dir") or AppConfig.PROJECTS_DIR
 
+    # Temporarily disabled - user accounts removed
     def queue_pending_action(
         action: str,
         payload: Optional[Dict[str, Any]] = None,
         return_to: str = "home",
         reason: Optional[str] = None,
     ) -> None:
-        st.session_state.pending_action = {
-            "action": action,
-            "payload": payload or {},
-            "return_to": return_to,
-        }
-        st.session_state["auth_redirect_action"] = action
-        st.session_state["auth_redirect_reason"] = reason or GUEST_BANNER_TEXT
-        st.session_state["auth_redirect_return_page"] = return_to
-        st.session_state.page = "account"
-        st.rerun()
+        # Disabled - no account functionality
+        pass
 
+    # Temporarily disabled - user accounts removed
     def is_authenticated() -> bool:
-        return auth.is_authenticated()
+        # Always return False - no authentication
+        return False
 
+    # Temporarily disabled - user accounts removed
     def require_login(
         action: Optional[str] = None,
         payload: Optional[Dict[str, Any]] = None,
@@ -2364,21 +2342,10 @@ def _run_ui():
         *,
         feature: Optional[str] = None,
     ) -> bool:
-        if feature:
-            if is_authenticated():
-                return True
-            action_key = "export_project" if feature == "export" else feature
-            with st.container(border=True):
-                st.markdown("#### Create an account to export")
-                st.caption("Sign in to unlock exports and keep your drafts in sync.")
-                if st.button("Sign in / Create account", type="primary", use_container_width=True):
-                    request_account_access(action_key, GUEST_BANNER_TEXT, return_to=return_to)
-            return False
-        if st.session_state.get("guest_mode"):
-            queue_pending_action(action or "signup", payload, return_to, reason=GUEST_BANNER_TEXT)
-            return False
+        # Always return True - no login required
         return True
 
+    # Temporarily disabled - user accounts removed
     def require_account(
         action: Optional[str] = None,
         payload: Optional[Dict[str, Any]] = None,
@@ -2386,7 +2353,8 @@ def _run_ui():
         *,
         feature: Optional[str] = None,
     ) -> bool:
-        return require_login(action, payload, return_to, feature=feature)
+        # Always return True - no account required
+        return True
 
     def create_guest_project(title: str = "Guest Sandbox") -> Project:
         storage_dir = st.session_state.get("projects_dir") or AppConfig.PROJECTS_DIR
@@ -3046,24 +3014,25 @@ def _run_ui():
                 if st.button(f"Clear session key", use_container_width=True, key=f"{provider}_clear_session"):
                     clear_session_key(provider)
                     st.toast(f"{provider_label} session key cleared.")
-            with key_cols[2]:
-                if is_authenticated():
-                    if st.button(
-                        "Save to my account",
-                        use_container_width=True,
-                        key=f"{provider}_save_account",
-                    ):
-                        if key_value.strip():
-                            if save_user_key(provider, key_value, st.session_state.get("user_id")):
-                                queue_widget_update(key_input_state, "")
-                                st.toast(f"{provider_label} key saved to your account.")
-                                st.rerun()
-                        else:
-                            st.warning("Paste a key first.")
-                else:
-                    st.caption("Sign in to save keys.")
+            # Temporarily disabled - user accounts removed
+            # with key_cols[2]:
+            #     if is_authenticated():
+            #         if st.button(
+            #             "Save to my account",
+            #             use_container_width=True,
+            #             key=f"{provider}_save_account",
+            #         ):
+            #             if key_value.strip():
+            #                 if save_user_key(provider, key_value, st.session_state.get("user_id")):
+            #                     queue_widget_update(key_input_state, "")
+            #                     st.toast(f"{provider_label} key saved to your account.")
+            #                     st.rerun()
+            #             else:
+            #                 st.warning("Paste a key first.")
+            #     else:
+            #         st.caption("Sign in to save keys.")
 
-            _, source = get_effective_key(provider, st.session_state.get("user_id"))
+            _, source = get_effective_key(provider)
             st.caption(f"Status: {_status_label(source)}")
 
         with tabs[0]:
@@ -3293,78 +3262,13 @@ def _run_ui():
                     save_app_settings()
         card_end()
 
+    # Temporarily disabled - user accounts removed
     def render_account():
-        header_bar(
-            "Account Access",
-            "Manage your profile, cloud sync, and login settings.",
-            pill="Account",
-        )
-        if st.session_state.get("guest_mode"):
-            card_start("Sign in or create an account")
-            auth.render_login_screen(
-                intent=st.session_state.get("auth_redirect_reason") or GUEST_BANNER_TEXT,
-                allow_guest=True,
-            )
-            if st.button("⬅ Back to Studio", use_container_width=True):
-                st.session_state.page = "home"
-                st.rerun()
-            card_end()
-            if auth.debug_auth_enabled():
-                st.markdown("### Debug auth")
-                debug_user = auth.get_current_user()
-                st.code(
-                    {
-                        "user_keys": list(getattr(debug_user, "keys", lambda: [])()),
-                        "user_id": auth.get_user_id_with_fallback(debug_user),
-                        "user_display_name": auth.get_user_display_name(debug_user),
-                        "user_email": auth.get_user_email(debug_user),
-                    },
-                    language="json",
-                )
-            return
-
-        card_start("You're signed in")
-        account_cols = st.columns([1, 3])
-        avatar_url = auth.get_user_avatar_url(user)
-        with account_cols[0]:
-            if avatar_url:
-                st.image(avatar_url, width=64)
-            else:
-                st.markdown(
-                    f"<div class='mantis-avatar'>{auth.get_user_initials(user)}</div>",
-                    unsafe_allow_html=True,
-                )
-        with account_cols[1]:
-            st.markdown(f"**{auth.get_user_display_name(user)}**")
-            email = auth.get_user_email(user)
-            if email:
-                st.caption(email)
-            auth.render_email_account_controls(email)
-        card_end()
-
-        action_cols = st.columns(2)
-        with action_cols[0]:
-            if st.button("⬅ Back to Studio", use_container_width=True):
-                st.session_state.page = "home"
-                st.rerun()
-        with action_cols[1]:
-            auth.logout_button(
-                key="account_logout",
-                extra_state_keys=["projects_dir", "project", "page", "_force_nav"],
-            )
-
-        if auth.debug_auth_enabled():
-            st.markdown("### Debug auth")
-            debug_user = auth.get_current_user()
-            st.code(
-                {
-                    "user_keys": list(getattr(debug_user, "keys", lambda: [])()),
-                    "user_id": auth.get_user_id_with_fallback(debug_user),
-                    "user_display_name": auth.get_user_display_name(debug_user),
-                    "user_email": auth.get_user_email(debug_user),
-                },
-                language="json",
-            )
+        # Account page is disabled
+        st.info("Account functionality is temporarily disabled.")
+        if st.button("⬅ Back to Studio", use_container_width=True):
+            st.session_state.page = "home"
+            st.rerun()
 
     def render_legal_redirect():
         render_page_header(
@@ -5394,7 +5298,8 @@ def run_selftest() -> int:
     print("[MANTIS SELFTEST]")
     try:
         os.makedirs(AppConfig.PROJECTS_DIR, exist_ok=True)
-        user_projects_dir = get_user_projects_dir(f"selftest_{uuid.uuid4().hex[:8]}")
+        # Use default projects directory - user accounts removed
+        user_projects_dir = AppConfig.PROJECTS_DIR
 
         p = Project.create("SELFTEST_PROJECT", author="MANTIS", genre="Test", storage_dir=user_projects_dir)
         p.outline = "Chapter 1: Test - This is a test outline."
