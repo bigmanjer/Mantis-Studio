@@ -6,11 +6,11 @@ This is the primary Streamlit application entry point for MANTIS Studio.
 It implements a state-driven (not page-driven) navigation system.
 
 Run with:
-    streamlit run Mantis_Studio.py
+    streamlit run app/main.py
 
 Or with utility flags:
-    python Mantis_Studio.py --selftest    # Run self-tests
-    python Mantis_Studio.py --repair      # Repair project files
+    python -m app.main --selftest    # Run self-tests
+    python -m app.main --repair      # Repair project files
 
 Architecture:
     - State-based navigation via st.session_state.page
@@ -47,10 +47,14 @@ from typing import Any, Callable, Dict, List, Optional
 
 import requests
 
+ROOT_DIR = Path(__file__).resolve().parents[1]
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
+
 from app.utils.navigation import get_nav_config
 
 # NOTE: Streamlit-dependent utilities are imported inside _run_ui() so
-# `python Mantis_Studio.py --selftest` can run without Streamlit installed.
+# `python -m app.main --selftest` can run without Streamlit installed.
 
 
 # ===== v45 BRANDING (SAFE, ORIGINAL TEMPLATE) =====
@@ -78,7 +82,7 @@ def get_app_version() -> str:
         return env_version
 
     try:
-        version_path = Path(__file__).with_name("VERSION.txt")
+        version_path = Path(__file__).resolve().parents[1] / "VERSION.txt"
         if version_path.exists():
             raw = version_path.read_text(encoding="utf-8").strip()
             if raw:
@@ -1339,7 +1343,7 @@ def _run_ui():
     widget_counters: Dict[tuple, int] = {}
     key_prefix_stack: List[str] = []
 
-    ASSETS_DIR = Path(__file__).parent / "assets"
+    ASSETS_DIR = Path(__file__).resolve().parents[1] / "assets"
 
     @st.cache_data(show_spinner=False)
     def load_asset_bytes(filename: str) -> Optional[bytes]:
