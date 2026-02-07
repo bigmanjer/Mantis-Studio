@@ -175,9 +175,6 @@ def _run_ui():
     config_data = load_app_config()
 
     initialize_session_state(st, config_data)
-    user = None
-    is_guest = False
-    logged_in = False
 
     theme = st.session_state.ui_theme if st.session_state.ui_theme in ("Dark", "Light") else "Dark"
     tokens = get_theme_tokens(theme)[theme]
@@ -202,7 +199,6 @@ def _run_ui():
     def render_app_footer() -> None:
         render_footer(AppConfig.VERSION)
 
-    user_id = None
 
     if not st.session_state.projects_dir:
         st.session_state.projects_dir = AppConfig.PROJECTS_DIR
