@@ -258,7 +258,7 @@ Now you can use AI features like:
 - Your current section is highlighted in the sidebar
 - All your work auto-saves as you type
 - Use the project selector to switch between stories
-- Check the version number at the top (currently v84.7)
+- Check the version number in the UI header to see which version you're running
 
 ---
 
@@ -347,4 +347,4 @@ We're committed to making this the best writing environment possible. Your feedb
 
 **Ready to start writing? Let's go! 🚀**
 
-*Last updated: Version 84.7*
+*For version information, check the VERSION.txt file or the app header.*

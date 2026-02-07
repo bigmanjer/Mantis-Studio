@@ -32,7 +32,7 @@ def bump_version(current_version: str) -> str:
         major = int(parts[0])
         minor = int(parts[1])
         
-        # Increment minor by 1 (represents 0.1 increment)
+        # Increment minor by 1 (e.g., version x.7 becomes x.8)
         minor += 1
         
         # If minor reaches 10, roll over to next major
