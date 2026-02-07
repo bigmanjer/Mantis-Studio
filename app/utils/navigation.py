@@ -27,7 +27,7 @@ _DEFAULT_MAP: Dict[str, str] = {
 
 def get_nav_config(has_project: bool) -> Tuple[List[str], Dict[str, str]]:
     try:
-        from mantis.router import get_nav_config as _get_nav_config
+        from app.router import get_nav_config as _get_nav_config
 
         return _get_nav_config(has_project)
     except Exception:
