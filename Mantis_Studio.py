@@ -293,7 +293,7 @@ def clear_session_key(provider: str) -> None:
 #     if not _save_user_keys(user_id, saved):
 #         return False
 #     st.session_state["ai_saved_keys_cache"] = saved
-    return True
+#     return True
 
 
 def _get_secret_key(st, provider: str) -> str:
