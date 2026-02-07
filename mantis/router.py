@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from typing import Callable, Dict, List, Tuple
 
-from mantis.ui.pages.account import render_account
 from mantis.ui.pages.ai_tools import render_ai_settings
 from mantis.ui.pages.chapters import render_chapters
 from mantis.ui.pages.export import render_export
@@ -49,7 +48,6 @@ def get_routes() -> Dict[str, PageRenderer]:
         "world": render_world,
         "export": render_export,
         "ai": render_ai_settings,
-        "account": render_account,
         "legal": render_legal_redirect,
     }
 
