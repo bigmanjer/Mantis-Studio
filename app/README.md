@@ -22,7 +22,6 @@ app/
 │   ├── world_bible.py    # World Bible (formerly world.py)
 │   ├── ai_tools.py       # AI configuration
 │   ├── export.py         # Export functionality
-│   ├── account.py        # Account management
 │   └── legal.py          # Legal pages
 │
 ├── components/           # Reusable UI blocks
@@ -33,7 +32,6 @@ app/
 ├── services/             # Business logic (no UI)
 │   ├── projects.py       # Project management logic
 │   ├── storage.py        # Storage and persistence
-│   ├── auth.py           # Authentication
 │   ├── ai.py             # AI/LLM services
 │   └── export.py         # Export logic
 │

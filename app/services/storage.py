@@ -37,13 +37,6 @@ def _release_lock(lock_path: str) -> None:
         pass
 
 
-# Temporarily disabled - user accounts removed
-# def get_user_projects_dir(user_id: str) -> str:
-#     user_dir = os.path.join(AppConfig.USERS_DIR, user_id)
-#     os.makedirs(user_dir, exist_ok=True)
-#     return user_dir
-
-
 def resolve_storage_dir(storage_dir: Optional[str]) -> str:
     storage_dir = storage_dir or AppConfig.PROJECTS_DIR
     os.makedirs(storage_dir, exist_ok=True)

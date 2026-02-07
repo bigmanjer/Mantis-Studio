@@ -29,7 +29,6 @@ app/
 │   ├── world_bible.py    (formerly world.py)
 │   ├── ai_tools.py
 │   ├── export.py
-│   ├── account.py
 │   └── legal.py
 ├── components/           # Reusable UI components
 │   ├── buttons.py
@@ -38,7 +37,6 @@ app/
 ├── services/             # Business logic
 │   ├── projects.py       (from models.py)
 │   ├── storage.py
-│   ├── auth.py
 │   ├── ai.py             (formerly llm.py)
 │   └── export.py
 └── utils/                # Utilities
@@ -63,9 +61,9 @@ assets/
 - app/router.py
 - app/README.md
 - app/layout/sidebar.py, header.py, styles.py, __init__.py
-- app/views/dashboard.py, projects.py, outline.py, editor.py, world_bible.py, ai_tools.py, export.py, account.py, legal.py, __init__.py
+- app/views/dashboard.py, projects.py, outline.py, editor.py, world_bible.py, ai_tools.py, export.py, legal.py, __init__.py
 - app/components/buttons.py, forms.py, editors.py
-- app/services/projects.py, storage.py, auth.py, ai.py, export.py
+- app/services/projects.py, storage.py, ai.py, export.py
 - app/utils/helpers.py
 - data/projects/ (directory)
 - assets/styles.css
@@ -138,9 +136,9 @@ All requirements from the problem statement have been met:
 | app/state.py | ✅ |
 | app/router.py | ✅ |
 | app/layout/ (sidebar, header, styles) | ✅ |
-| app/views/ (all 9 view files) | ✅ |
+| app/views/ (all 8 view files) | ✅ |
 | app/components/ (buttons, forms, editors) | ✅ |
-| app/services/ (all 5 service files) | ✅ |
+| app/services/ (all 4 service files) | ✅ |
 | app/utils/ (versioning, helpers) | ✅ |
 | data/projects/ | ✅ |
 | assets/styles.css | ✅ |

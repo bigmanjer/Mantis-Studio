@@ -130,14 +130,9 @@ When you first open the app, you'll see:
 
 1. **Sidebar on the left** with navigation (Dashboard, Projects, Outline, etc.)
 2. **Main area** showing your Dashboard
-3. A banner saying you're in "Guest mode"
+3. A welcome banner with quick-start tips
 
-### Guest Mode vs. Account
-
-- **Guest Mode**: Your work saves locally on your computer. Great for trying things out!
-- **Account Mode**: (Currently being set up) Will let you sync across devices
-
-For now, don't worry about accounts—just start creating!
+All projects save locally on your computer, so you can start creating immediately.
 
 ---
 
@@ -188,14 +183,14 @@ AI writing assistance makes Mantis Studio truly powerful. Here's how to enable i
 
 **Option 1: Groq (Recommended for beginners)**
 1. Go to https://console.groq.com
-2. Sign up for a free account
+2. Start a free Groq API key setup
 3. Navigate to "API Keys" in the dashboard
 4. Click "Create API Key"
 5. Copy the key (it looks like `gsk_...`)
 
 **Option 2: OpenAI (More powerful, costs money)**
 1. Go to https://platform.openai.com
-2. Create an account
+2. Create an API key
 3. Add payment method (pay-as-you-go)
 4. Create an API key
 5. Copy the key (it looks like `sk-...`)
@@ -278,7 +273,7 @@ Now you can use AI features like:
 1. Did you add your API key to `.env` or `.streamlit/secrets.toml`?
 2. Did you restart Mantis Studio after adding the key?
 3. Is your API key valid? (Check on the provider's website)
-4. Do you have credits/quota remaining on your API account?
+4. Do you have credits/quota remaining on your API plan?
 
 ### "Where are my files saved?"
 
@@ -313,8 +308,7 @@ Now that you're set up, try these:
 
 1. 📖 Read the full [README.md](README.md) for advanced features
 2. 🎨 Check out [DESIGN_SYSTEM.md](../design/DESIGN_SYSTEM.md) to understand the UI
-3. 🔐 Review [AUTH_SETUP.md](../runbooks/AUTH_SETUP.md) for account features
-4. 🐛 Found a bug? [Open an issue](https://github.com/bigmanjer/Mantis-Studio/issues)
+3. 🐛 Found a bug? [Open an issue](https://github.com/bigmanjer/Mantis-Studio/issues)
 
 ---
 
@@ -337,7 +331,6 @@ Mantis Studio is actively being improved! Here's what you might notice:
 - Export to Word/TXT formats
 
 🚧 **Still being polished:**
-- Account sync (coming soon)
 - Some AI features may be experimental
 - UI improvements are ongoing
 

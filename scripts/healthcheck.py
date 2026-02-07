@@ -48,7 +48,6 @@ def import_modules() -> int:
     failures = 0
     modules = [
         "app.main",
-        "app.utils.auth",
         "app.utils.navigation",
         "app.ui.layout",
     ]
@@ -58,16 +57,6 @@ def import_modules() -> int:
         except Exception as exc:  # noqa: BLE001 - healthcheck should capture all failures
             failures += 1
             print(f"[import] {module}: {exc}")
-    page_checks = {
-        "pages.account_settings": ROOT / "pages" / "Account Settings.py",
-        "pages.legal_center": ROOT / "pages" / "Legal Center.py",
-    }
-    for label, path in page_checks.items():
-        try:
-            _import_page_module(label, path)
-        except Exception as exc:  # noqa: BLE001 - healthcheck should capture all failures
-            failures += 1
-            print(f"[import] {label}: {exc}")
     return failures
 
 

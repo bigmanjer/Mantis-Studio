@@ -31,13 +31,9 @@
 - AI Tools
   - Open settings
   - Fetch/test models (if API keys set)
-- Auth access
-  - Account page (from guest banner)
-  - Guest mode CTA prompts
 - Legal footer
   - Legal link opens Legal Center
 
 ## Expected Results
 - No blank screens.
-- No AttributeError in guest mode.
 - Project JSON data remains compatible and persistent.

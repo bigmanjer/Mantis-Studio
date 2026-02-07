@@ -26,7 +26,7 @@ Directory Structure:
     ├── layout/               # UI layout components (sidebar, header, styles)
     ├── views/                # UI screens (dashboard, projects, editor, etc.)
     ├── components/           # Reusable UI blocks
-    ├── services/             # Business logic (projects, storage, auth, AI, export)
+    ├── services/             # Business logic (projects, storage, AI, export)
     └── utils/                # Utilities (versioning, helpers)
 """
 
@@ -99,7 +99,6 @@ class AppConfig:
     VERSION = get_app_version()
     PROJECTS_DIR = os.getenv("MANTIS_PROJECTS_DIR", "projects")
     BACKUPS_DIR = os.path.join(PROJECTS_DIR, ".backups")
-    # USERS_DIR = os.getenv("MANTIS_USERS_DIR", os.path.join(PROJECTS_DIR, "users"))  # Temporarily disabled
     GROQ_API_URL = os.getenv("GROQ_API_URL", "https://api.groq.com/openai/v1")
     GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
     GROQ_TIMEOUT = int(os.getenv("GROQ_TIMEOUT", "300"))
@@ -124,7 +123,6 @@ class AppConfig:
 
 os.makedirs(AppConfig.PROJECTS_DIR, exist_ok=True)
 os.makedirs(AppConfig.BACKUPS_DIR, exist_ok=True)
-# os.makedirs(AppConfig.USERS_DIR, exist_ok=True)  # Temporarily disabled
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("MANTIS")
@@ -190,13 +188,6 @@ def _release_lock(lock_path: str) -> None:
         pass
 
 
-# Temporarily disabled - user accounts removed
-# def get_user_projects_dir(user_id: str) -> str:
-#     user_dir = os.path.join(AppConfig.USERS_DIR, user_id)
-#     os.makedirs(user_dir, exist_ok=True)
-#     return user_dir
-
-
 def _get_streamlit():
     if "streamlit" not in sys.modules:
         return None
@@ -216,62 +207,12 @@ def _provider_label(provider: str) -> str:
     return "OpenAI" if _normalize_provider(provider) == "openai" else "Groq"
 
 
-# Temporarily disabled - user accounts removed
-# def _get_user_keys_path(user_id: str) -> Optional[str]:
-#     if not user_id:
-#         return None
-#     user_dir = get_user_projects_dir(user_id)
-#     return os.path.join(user_dir, ".mantis_ai_keys.json")
-
-
-# Temporarily disabled - user accounts removed
-# def _load_user_keys(user_id: str) -> Dict[str, str]:
-#     path = _get_user_keys_path(user_id)
-#     if not path or not os.path.exists(path):
-#         return {}
-#     try:
-#         with open(path, "r", encoding="utf-8") as fh:
-#             data = json.load(fh)
-#         if isinstance(data, dict):
-#             return {
-#                 key: str(value)
-#                 for key, value in data.items()
-#                 if key in {"openai", "groq"} and value
-#             }
-#     except Exception:
-#         logger.warning("Failed to load user AI keys", exc_info=True)
-#     return {}
-
-
-# Temporarily disabled - user accounts removed
-# def _save_user_keys(user_id: str, keys: Dict[str, str]) -> bool:
-#     path = _get_user_keys_path(user_id)
-#     if not path:
-#         return False
-#     try:
-#         with open(path, "w", encoding="utf-8") as fh:
-#             json.dump(keys, fh, indent=2)
-#         return True
-#     except Exception:
-#         logger.warning("Failed to save user AI keys", exc_info=True)
-#         return False
-
-
 def _ensure_session_keys(st) -> Dict[str, str]:
     keys = st.session_state.setdefault("ai_session_keys", {})
     for provider in ("openai", "groq"):
         keys.setdefault(provider, "")
     st.session_state["ai_session_keys"] = keys
     return keys
-
-
-# Temporarily disabled - user accounts removed
-# def _get_saved_keys(st, user_id: str) -> Dict[str, str]:
-#     cached_user = st.session_state.get("ai_saved_keys_user_id")
-#     if user_id and cached_user != user_id:
-#         st.session_state["ai_saved_keys_user_id"] = user_id
-#         st.session_state["ai_saved_keys_cache"] = _load_user_keys(user_id)
-#     return st.session_state.get("ai_saved_keys_cache", {})
 
 
 def set_session_key(provider: str, key: str) -> None:
@@ -293,42 +234,30 @@ def clear_session_key(provider: str) -> None:
     keys[provider] = ""
     st.session_state["ai_session_keys"] = keys
 
-
-# Temporarily disabled - user accounts removed
-# def save_user_key(provider: str, key: str, user_id: Optional[str]) -> bool:
-#     st = _get_streamlit()
-#     if not st or not user_id:
-#         return False
-#     provider = _normalize_provider(provider)
-#     normalized = (key or "").strip()
-#     if not normalized:
-#         return False
-#     saved = dict(_get_saved_keys(st, user_id))
-#     saved[provider] = normalized
-#     if not _save_user_keys(user_id, saved):
-#         return False
-#     st.session_state["ai_saved_keys_cache"] = saved
-#     return True
-
-
 def _get_secret_key(st, provider: str) -> str:
     if not st or not hasattr(st, "secrets"):
         return ""
-    secrets = st.secrets
+    try:
+        secrets = st.secrets
+    except Exception:
+        return ""
     provider = _normalize_provider(provider)
-    if provider == "openai":
+    try:
+        if provider == "openai":
+            return str(
+                secrets.get("openai_api_key")
+                or secrets.get("OPENAI_API_KEY")
+                or (secrets.get("openai") or {}).get("api_key")
+                or ""
+            ).strip()
         return str(
-            secrets.get("openai_api_key")
-            or secrets.get("OPENAI_API_KEY")
-            or (secrets.get("openai") or {}).get("api_key")
+            secrets.get("groq_api_key")
+            or secrets.get("GROQ_API_KEY")
+            or (secrets.get("groq") or {}).get("api_key")
             or ""
         ).strip()
-    return str(
-        secrets.get("groq_api_key")
-        or secrets.get("GROQ_API_KEY")
-        or (secrets.get("groq") or {}).get("api_key")
-        or ""
-    ).strip()
+    except Exception:
+        return ""
 
 
 def _get_server_default_key(provider: str) -> str:
@@ -342,25 +271,13 @@ def _get_server_default_key(provider: str) -> str:
     return (AppConfig.GROQ_API_KEY or "").strip()
 
 
-def get_effective_key(provider: str, user_id: Optional[str] = None) -> tuple[str, str]:
+def get_effective_key(provider: str) -> tuple[str, str]:
     provider = _normalize_provider(provider)
     st = _get_streamlit()
     if st:
         session_key = _ensure_session_keys(st).get(provider, "")
         if session_key:
             return session_key, "session"
-        # Temporarily disabled - user accounts removed
-        # try:
-        #     from app.utils import auth
-        # 
-        #     if auth.is_authenticated():
-        #         user_id = user_id or st.session_state.get("user_id")
-        #         if user_id:
-        #             saved_key = _get_saved_keys(st, user_id).get(provider, "")
-        #             if saved_key:
-        #                 return saved_key, "saved"
-        # except Exception:
-        #     pass
     default_key = _get_server_default_key(provider)
     if default_key:
         return default_key, "default"
@@ -1337,7 +1254,6 @@ def _run_ui():
     from app.ui.components import card_end, card_start, cta_tile, empty_state, header_bar, render_tag_list, section_title
     from app.ui.layout import render_footer
     from app.ui.theme import inject_theme
-    from app.utils import auth
     from app.utils.keys import ui_key
 
     widget_counters: Dict[tuple, int] = {}
@@ -1478,7 +1394,7 @@ def _run_ui():
         if not hard_rules or not (new_text or "").strip():
             return []
         active_provider = _normalize_provider(st.session_state.get("ai_provider", "groq"))
-        active_key, _ = get_effective_key(active_provider, st.session_state.get("user_id"))
+        active_key, _ = get_effective_key(active_provider)
         if not active_key or not get_ai_model():
             return []
         compiled_world_bible = "\n".join(
@@ -1517,14 +1433,7 @@ def _run_ui():
     st.set_page_config(page_title=AppConfig.APP_NAME, page_icon=page_icon, layout="wide")
     inject_theme()
 
-    user = auth.get_current_user()
     config_data = load_app_config()
-
-    logged_in = auth.is_authenticated()
-    is_guest = not logged_in
-    st.session_state["guest_mode"] = is_guest
-    if is_guest:
-        st.session_state.setdefault("guest_session_id", uuid.uuid4().hex[:8])
 
     init_state("ui_theme", config_data.get("ui_theme", "Dark"))
     init_state("daily_word_goal", int(config_data.get("daily_word_goal", 500)))
@@ -2112,14 +2021,10 @@ def _run_ui():
         unsafe_allow_html=True,
     )
 
-    guest_mode = st.session_state.get("guest_mode", is_guest)
-
-    # User accounts removed - user_id kept at None since get_effective_key() accepts optional user_id parameter
-    init_state("user_id", None)
     init_state("projects_dir", None)
     init_state("project", None)
     init_state("page", "home")
-    init_state("auto_save", not is_guest)
+    init_state("auto_save", True)
     init_state("ghost_text", "")
     init_state("pending_improvement_text", "")
     init_state("pending_improvement_meta", {})
@@ -2128,19 +2033,15 @@ def _run_ui():
     init_state("editor_improve__copy_buffer", "")
     init_state("first_run", True)
     init_state("is_premium", True)
-    init_state("guest_mode", is_guest)
-    init_state("pending_action", None)
-    init_state("guest_project", None)
     st.session_state.setdefault("ai_keys", {})
 
     def _resolve_api_key(provider: str, default_value: str) -> str:
         session_key = (st.session_state.get("ai_keys") or {}).get(provider, "")
         if session_key:
             return session_key
-        if not guest_mode:
-            config_key = config_data.get(f"{provider}_api_key", "")
-            if config_key:
-                return config_key
+        config_key = config_data.get(f"{provider}_api_key", "")
+        if config_key:
+            return config_key
         return default_value or ""
     init_state(
         "openai_base_url",
@@ -2148,9 +2049,6 @@ def _run_ui():
     )
     init_state("ai_provider", config_data.get("ai_provider", "groq"))
     init_state("ai_session_keys", {"openai": "", "groq": ""})
-    # User accounts removed - saved keys feature disabled
-    # init_state("ai_saved_keys_cache", {})
-    # init_state("ai_saved_keys_user_id", "")
     init_state("openai_key_input", "")
     init_state("openai_model", config_data.get("openai_model", AppConfig.OPENAI_MODEL))
     init_state("openai_model_list", [])
@@ -2184,46 +2082,12 @@ def _run_ui():
         st.session_state.page = "legal"
         st.rerun()
 
-    GUEST_BANNER_TEXT = (
-        "Guest mode: your work saves locally in this session. Create an account to sync and export."
-    )
-
-    # Temporarily disabled - user accounts removed
-    def request_account_access(
-        action: str,
-        reason: str,
-        *,
-        payload: Optional[Dict[str, Any]] = None,
-        return_to: Optional[str] = None,
-    ) -> None:
-        # Disabled - no account functionality
-        pass
-
-    # Temporarily disabled - user accounts removed
-    def open_account_settings(
-        *,
-        action: str = "profile",
-        reason: Optional[str] = None,
-        return_to: Optional[str] = None,
-    ) -> None:
-        # Disabled - no account functionality
-        pass
-
-    def persist_project(
-        project: "Project",
-        *,
-        prompt_on_guest: bool = False,
-        action: str = "save",
-    ) -> bool:
+    def persist_project(project: "Project") -> bool:
         project.save()
-        if is_guest and prompt_on_guest:
-            st.toast("Saved locally. Create an account to sync and export.")
         return True
 
-    # Temporarily disabled - user accounts removed
-    def render_guest_banner(context: str) -> None:
+    def render_intro_banner(context: str) -> None:
         """Show helpful context-aware guidance for users, especially first-timers."""
-        # Show first-time welcome on home page only
         if context == "home" and st.session_state.get("first_run", True):
             with st.container(border=True):
                 st.markdown("### 👋 Welcome to Mantis Studio!")
@@ -2233,7 +2097,7 @@ def _run_ui():
                 **Getting Started:**
                 - 📁 Click **Projects** in the sidebar to create your first story
                 - 📖 Check out the [Getting Started Guide]({AppConfig.GETTING_STARTED_URL}) for a complete walkthrough
-                - 💡 Everything auto-saves locally—no account needed to start writing!
+                - 💡 Everything auto-saves locally—no setup needed to start writing!
                 
                 **Quick Tips:**
                 - Use **Outline** to plan your story structure
@@ -2251,10 +2115,11 @@ def _run_ui():
                     if st.button("✅ Got it, don't show again", use_container_width=True):
                         st.session_state.first_run = False
                         st.rerun()
-        
-        # Show context-specific tips for first-time users on other pages
         elif st.session_state.get("first_run", True) and context != "home":
-            st.info(f"💡 **Tip**: Check out the [Getting Started Guide]({AppConfig.GETTING_STARTED_URL}) for help using this section.", icon="💡")
+            st.info(
+                f"💡 **Tip**: Check out the [Getting Started Guide]({AppConfig.GETTING_STARTED_URL}) for help using this section.",
+                icon="💡",
+            )
 
     def render_app_footer() -> None:
         render_footer(AppConfig.VERSION)
@@ -2296,51 +2161,13 @@ def _run_ui():
 
         with right_col:
             tags = []
-            if st.session_state.get("guest_mode"):
-                tags.append("Guest")
             if st.session_state.project:
                 tags.append("Project active")
             render_tag_list(tags)
 
-            # Temporarily disabled - user accounts removed
-            # user = auth.get_current_user() or {}
-            # initials = auth.get_user_initials(user)
-            # with st.expander(f"Account {initials}", expanded=False):
-            #     if st.button("Profile & settings", use_container_width=True):
-            #         open_account_settings()
-            #     st.caption("Billing (coming soon)")
-            #     if auth.is_authenticated():
-            #         auth.logout_button(label="Log out", key="header_logout")
-
-    # Temporarily disabled - user accounts removed
-    # if is_guest:
-    #     user_id = f"guest_{st.session_state['guest_session_id']}"
-    # else:
-    #     user_id = auth.get_user_id_with_fallback(user)
-    #     if not user_id:
-    #         st.warning("We couldn't read a user identifier. Please sign in again.")
-    #         auth.logout_button(key="auth_missing_user_id_logout")
-    #         st.stop()
-    # 
-    # if st.session_state.user_id != user_id:
-    #     st.session_state.user_id = user_id
-    #     st.session_state.projects_dir = get_user_projects_dir(user_id)
-    #     st.session_state.project = None
-    #     st.session_state.page = "home"
-    # elif not st.session_state.projects_dir:
-    #     st.session_state.projects_dir = get_user_projects_dir(user_id)
-
-    # Set default projects directory (no user-specific directories)
+    # Set default projects directory
     if not st.session_state.get("projects_dir"):
         st.session_state.projects_dir = AppConfig.PROJECTS_DIR
-
-    if is_guest:
-        st.session_state.auto_save = False
-
-    guest_continue_action = st.session_state.get("guest_continue_action")
-    if guest_continue_action and guest_continue_action != "create_project":
-        st.session_state["guest_continue_action"] = None
-        st.toast("You're still in Guest mode. Saves stay local until you create an account.")
 
     # Reliable navigation rerun (avoids Streamlit edge cases when returning early)
     if st.session_state.get("_force_nav"):
@@ -2355,7 +2182,7 @@ def _run_ui():
 
     def get_active_key_status() -> tuple[str, str, str]:
         provider = _normalize_provider(st.session_state.get("ai_provider", "groq"))
-        key, source = get_effective_key(provider, st.session_state.get("user_id"))
+        key, source = get_effective_key(provider)
         return provider, key, source
 
     def save_p():
@@ -2363,111 +2190,7 @@ def _run_ui():
             persist_project(st.session_state.project)
 
     def get_active_projects_dir() -> Optional[str]:
-        if st.session_state.get("guest_mode"):
-            return st.session_state.get("projects_dir") or AppConfig.PROJECTS_DIR
         return st.session_state.get("projects_dir") or AppConfig.PROJECTS_DIR
-
-    # Temporarily disabled - user accounts removed
-    def queue_pending_action(
-        action: str,
-        payload: Optional[Dict[str, Any]] = None,
-        return_to: str = "home",
-        reason: Optional[str] = None,
-    ) -> None:
-        # Disabled - no account functionality
-        pass
-
-    # Temporarily disabled - user accounts removed
-    def is_authenticated() -> bool:
-        # Always return False - no authentication
-        return False
-
-    # Temporarily disabled - user accounts removed
-    def require_login(
-        action: Optional[str] = None,
-        payload: Optional[Dict[str, Any]] = None,
-        return_to: str = "home",
-        *,
-        feature: Optional[str] = None,
-    ) -> bool:
-        # Always return True - no login required
-        return True
-
-    # Temporarily disabled - user accounts removed
-    def require_account(
-        action: Optional[str] = None,
-        payload: Optional[Dict[str, Any]] = None,
-        return_to: str = "home",
-        *,
-        feature: Optional[str] = None,
-    ) -> bool:
-        # Always return True - no account required
-        return True
-
-    def create_guest_project(title: str = "Guest Sandbox") -> Project:
-        storage_dir = st.session_state.get("projects_dir") or AppConfig.PROJECTS_DIR
-        p = Project.create(title, storage_dir=storage_dir)
-        p.filepath = None
-        st.session_state.guest_project = p
-        return p
-
-    def resume_pending_action() -> None:
-        pending = st.session_state.get("pending_action")
-        if not pending or st.session_state.get("guest_mode"):
-            return
-        action = pending.get("action")
-        payload = pending.get("payload") or {}
-        return_to = pending.get("return_to") or "home"
-        st.session_state.pending_action = None
-
-        if action == "create_project":
-            p = Project.create(
-                payload.get("title") or "Untitled Project",
-                author=payload.get("author", ""),
-                genre=payload.get("genre", ""),
-                storage_dir=get_active_projects_dir() or AppConfig.PROJECTS_DIR,
-            )
-            p.save()
-            st.session_state.project = p
-        elif action == "import_project":
-            text = payload.get("text") or ""
-            p = Project.create("Imported Project", storage_dir=get_active_projects_dir() or AppConfig.PROJECTS_DIR)
-            p.import_text_file(text)
-            active_provider = _normalize_provider(st.session_state.get("ai_provider", "groq"))
-            active_key, _ = get_effective_key(active_provider, st.session_state.get("user_id"))
-            if active_key and get_ai_model():
-                p.outline = StoryEngine.reverse_engineer_outline(p, get_ai_model())
-            p.save()
-            st.session_state.project = p
-        elif action == "save_project":
-            if st.session_state.project:
-                st.session_state.project.save()
-                st.toast("Project saved.")
-        elif action == "save_outline":
-            if st.session_state.project:
-                st.session_state.project.save()
-                st.toast("Outline saved.")
-        elif action == "save_chapter":
-            if st.session_state.project:
-                st.session_state.project.save()
-                st.toast("Chapter saved.")
-        elif action == "export_project":
-            if st.session_state.project:
-                st.session_state.project.save()
-                st.session_state.export_project_path = st.session_state.project.filepath
-        elif action == "save_app_settings":
-            save_app_settings()
-        elif action == "delete_project":
-            delete_path = payload.get("path")
-            if delete_path:
-                Project.delete_file(delete_path)
-                _bump_projects_refresh()
-
-        st.session_state.page = return_to
-        st.rerun()
-
-    if logged_in and st.session_state.get("pending_action"):
-        resume_pending_action()
 
 
     def load_project_safe(path: str, context: str = "project") -> Optional["Project"]:
@@ -2553,14 +2276,14 @@ def _run_ui():
         return AIEngine(base_url=base_url).probe_models(api_key)
 
     def refresh_models():
-        groq_key, _ = get_effective_key("groq", st.session_state.get("user_id"))
+        groq_key, _ = get_effective_key("groq")
         st.session_state.groq_model_list = _cached_models(
             st.session_state.groq_base_url,
             groq_key,
         ) or []
 
     def refresh_openai_models():
-        openai_key, _ = get_effective_key("openai", st.session_state.get("user_id"))
+        openai_key, _ = get_effective_key("openai")
         st.session_state.openai_model_list = _cached_models(
             st.session_state.openai_base_url,
             openai_key,
@@ -3023,8 +2746,7 @@ def _run_ui():
             st.toast("Model list refreshed")
 
         def save_settings_action() -> None:
-            if require_account("save_app_settings", return_to="ai"):
-                save_app_settings()
+            save_app_settings()
 
         header_bar(
             "AI Configuration",
@@ -3036,8 +2758,8 @@ def _run_ui():
             st.success("AI Settings opened. Configure a provider below to get started.")
 
         # Connection Status Overview
-        groq_key, groq_source = get_effective_key("groq", st.session_state.get("user_id"))
-        openai_key, openai_source = get_effective_key("openai", st.session_state.get("user_id"))
+        groq_key, groq_source = get_effective_key("groq")
+        openai_key, openai_source = get_effective_key("openai")
         
         card_start("📊 Connection Status")
         st.caption("Current status of your AI provider connections")
@@ -3125,13 +2847,13 @@ def _run_ui():
 
         with tabs[1]:
             card_start("✨ OpenAI Configuration")
-            st.caption("OpenAI provides advanced models like GPT-4. Requires a paid API account.")
+            st.caption("OpenAI provides advanced models like GPT-4. Requires a paid API plan.")
             
             _render_key_controls("openai")
             
-            openai_key, _ = get_effective_key("openai", st.session_state.get("user_id"))
+            openai_key, _ = get_effective_key("openai")
             if not openai_key:
-                st.info("💡 **Getting Started:** [Create an OpenAI account](https://platform.openai.com/api-keys) to get your API key.")
+                st.info("💡 **Getting Started:** [Create an OpenAI API key](https://platform.openai.com/api-keys) to get started.")
             
             st.markdown("#### Model Selection")
             if st.session_state.openai_model_list:
@@ -3257,7 +2979,7 @@ def _run_ui():
             
             _render_key_controls("groq")
             
-            groq_key, _ = get_effective_key("groq", st.session_state.get("user_id"))
+            groq_key, _ = get_effective_key("groq")
             if not groq_key:
                 st.info("💡 **Getting Started:** [Get a free Groq API key](https://console.groq.com/keys) to begin.")
             
@@ -3394,14 +3116,6 @@ def _run_ui():
             ):
                 save_settings_action()
 
-    # Temporarily disabled - user accounts removed
-    def render_account():
-        # Account page is disabled
-        st.info("Account functionality is temporarily disabled.")
-        if st.button("⬅ Back to Studio", use_container_width=True):
-            st.session_state.page = "home"
-            st.rerun()
-
     def render_legal_redirect():
         render_page_header(
             "Legal",
@@ -3462,7 +3176,7 @@ def _run_ui():
                         use_container_width=True,
                         help="Save all changes to this project"
                     ):
-                        if persist_project(p, prompt_on_guest=True, action="save"):
+                        if persist_project(p):
                             st.toast("Project saved successfully")
                 with action_cols[1]:
                     if st.button(
@@ -3489,7 +3203,7 @@ def _run_ui():
                 st.caption(f"Last exception: {last_exception}")
 
     def render_home():
-        render_guest_banner("home")
+        render_intro_banner("home")
         active_dir = get_active_projects_dir()
         recent_projects = _load_recent_projects(active_dir, st.session_state.projects_refresh_token)
 
@@ -3538,12 +3252,9 @@ def _run_ui():
 
         def open_recent_project(target: str, focus_tab: Optional[str] = None) -> None:
             if not recent_projects and not st.session_state.project:
-                if st.session_state.get("guest_mode"):
-                    st.session_state.project = st.session_state.guest_project or create_guest_project()
-                else:
-                    st.session_state.page = "projects"
-                    st.toast("Create or import a project to unlock this module.")
-                    st.rerun()
+                st.session_state.page = "projects"
+                st.toast("Create or import a project to unlock this module.")
+                st.rerun()
             if recent_projects and not st.session_state.project:
                 loaded = load_project_safe(recent_projects[0]["path"], context="recent project")
                 if not loaded:
@@ -3555,9 +3266,6 @@ def _run_ui():
             st.rerun()
 
         def open_export() -> None:
-            if st.session_state.get("guest_mode"):
-                queue_pending_action("export_project", return_to="export")
-                return
             export_path = None
             if st.session_state.project and st.session_state.project.filepath:
                 export_path = st.session_state.project.filepath
@@ -3583,9 +3291,6 @@ def _run_ui():
             open_recent_project(primary_target)
 
         def open_new_project() -> None:
-            if st.session_state.get("guest_mode"):
-                queue_pending_action("create_project", return_to="projects")
-                return
             st.session_state.page = "projects"
             st.rerun()
 
@@ -3734,16 +3439,16 @@ def _run_ui():
             )
         card_end()
 
-        groq_key, _ = get_effective_key("groq", st.session_state.get("user_id"))
-        openai_key, _ = get_effective_key("openai", st.session_state.get("user_id"))
+        groq_key, _ = get_effective_key("groq")
+        openai_key, _ = get_effective_key("openai")
         if not groq_key or not openai_key:
             card_start("🔑 Connect your AI providers", "Unlock generation, summaries, and entity tools with API access.")
             cta_left, cta_right = st.columns(2)
             with cta_left:
-                st.link_button("Create Groq Account", "https://console.groq.com/keys", use_container_width=True)
+                st.link_button("Get Groq API Key", "https://console.groq.com/keys", use_container_width=True)
             with cta_right:
                 st.link_button(
-                    "Create OpenAI Account",
+                    "Get OpenAI API Key",
                     "https://platform.openai.com/api-keys",
                     use_container_width=True,
                 )
@@ -3751,35 +3456,9 @@ def _run_ui():
 
 
     def render_projects():
-        render_guest_banner("projects")
+        render_intro_banner("projects")
         active_dir = get_active_projects_dir()
         recent_projects = _load_recent_projects(active_dir, st.session_state.projects_refresh_token)
-
-        if is_guest and st.session_state.get("guest_continue_action") == "create_project":
-            pending_project = st.session_state.pop("guest_pending_project", None)
-            pending_import = st.session_state.pop("guest_pending_import", None)
-            if pending_project or pending_import:
-                st.session_state["guest_continue_action"] = None
-                title = (pending_project or {}).get("title") or _random_project_title()
-                genre = (pending_project or {}).get("genre") or _random_project_genres()
-                author = (pending_project or {}).get("author") or ""
-                p = Project.create(title, author=author, genre=genre, storage_dir=get_active_projects_dir())
-                if pending_import:
-                    p.import_text_file(pending_import)
-                    active_provider = _normalize_provider(st.session_state.get("ai_provider", "groq"))
-                    active_key, _ = get_effective_key(active_provider, st.session_state.get("user_id"))
-                    if active_key and get_ai_model():
-                        with st.spinner("Reviewing document and generating outline..."):
-                            p.outline = StoryEngine.reverse_engineer_outline(p, get_ai_model())
-                    else:
-                        st.warning(
-                            f"Add a {_provider_label(active_provider)} API key and model to auto-generate an outline."
-                        )
-                st.session_state.project = p
-                st.session_state.page = "outline"
-                st.session_state.first_run = False
-                st.toast("Guest project ready. Saved locally for this session.")
-                st.rerun()
 
         def open_latest_project() -> None:
             if not recent_projects:
@@ -3804,15 +3483,6 @@ def _run_ui():
             tag="Workspace",
             key_prefix="projects_header",
         )
-
-        if st.session_state.get("guest_mode"):
-            with st.container(border=True):
-                st.markdown("### Guest sandbox")
-                st.caption("Explore MANTIS Studio with local saves. Create an account to sync and export.")
-                if st.button("Start guest sandbox", use_container_width=True):
-                    st.session_state.project = st.session_state.guest_project or create_guest_project()
-                    st.session_state.page = "outline"
-                    st.rerun()
 
         section_header(
             "Start a new project",
@@ -3844,19 +3514,13 @@ def _run_ui():
                         t = _random_project_title()
                     if not g:
                         g = _random_project_genres()
-                    if not is_guest and not require_account(
-                        "create_project",
-                        payload={"title": t, "author": a, "genre": g},
-                        return_to="projects",
-                    ):
-                        return
                     p = Project.create(
                         t,
                         author=a,
                         genre=g,
                         storage_dir=get_active_projects_dir(),
                     )
-                    persist_project(p, prompt_on_guest=True, action="create_project")
+                    persist_project(p)
                     _bump_projects_refresh()
                     st.session_state.project = p
                     st.session_state.page = "outline"
@@ -3883,7 +3547,7 @@ def _run_ui():
                             p = Project.create("Imported Project", storage_dir=get_active_projects_dir())
                             p.import_text_file(txt)
                             active_provider = _normalize_provider(st.session_state.get("ai_provider", "groq"))
-                            active_key, _ = get_effective_key(active_provider, st.session_state.get("user_id"))
+                            active_key, _ = get_effective_key(active_provider)
                             if active_key and get_ai_model():
                                 with st.spinner("Reviewing document and generating outline..."):
                                     p.outline = StoryEngine.reverse_engineer_outline(p, get_ai_model())
@@ -3891,7 +3555,7 @@ def _run_ui():
                                 st.warning(
                                     f"Add a {_provider_label(active_provider)} API key and model to auto-generate an outline."
                                 )
-                            persist_project(p, prompt_on_guest=True, action="create_project")
+                            persist_project(p)
                         except Exception:
                             logger.warning("Import failed for uploaded draft", exc_info=True)
                             st.error("Import failed. Please check the file and try again.")
@@ -3930,18 +3594,12 @@ def _run_ui():
                             st.caption(genre)
                         with row3:
                             if st.button("⬇️ Export", key=f"export_{full}", use_container_width=True):
-                                if require_account("export_project", return_to="export"):
-                                    st.session_state.export_project_path = full
-                                    st.rerun()
+                                st.session_state.export_project_path = full
+                                st.rerun()
                         with row4:
                             if st.button("🗑", key=f"del_{full}", use_container_width=True):
-                                if require_account(
-                                    "delete_project",
-                                    payload={"path": full},
-                                    return_to="projects",
-                                ):
-                                    st.session_state.delete_project_path = full
-                                    st.session_state.delete_project_title = title
+                                st.session_state.delete_project_path = full
+                                st.session_state.delete_project_title = title
                     except Exception:
                         logger.warning("Failed to load project metadata: %s", full, exc_info=True)
 
@@ -3999,9 +3657,6 @@ def _run_ui():
             tag="Export",
             key_prefix="export_header",
         )
-        if not require_login(feature="export", return_to="export"):
-            return
-
         export_project = None
         export_path = st.session_state.get("export_project_path")
         if export_path:
@@ -4036,27 +3691,16 @@ def _run_ui():
         if not p:
             with st.container(border=True):
                 st.info("📭 No project loaded. Create or open a project to edit an outline.")
-                cols = st.columns(2)
-                with cols[0]:
-                    if st.button(
-                        "📁 Go to Projects",
-                        use_container_width=True,
-                        help="Open or create a project to start planning your story"
-                    ):
-                        st.session_state.page = "projects"
-                        st.rerun()
-                with cols[1]:
-                    if st.session_state.get("guest_mode") and st.button(
-                        "🎭 Start Guest Sandbox",
-                        use_container_width=True,
-                        help="Try MANTIS Studio with a temporary project (no account needed)"
-                    ):
-                        st.session_state.project = st.session_state.guest_project or create_guest_project()
-                        st.session_state.page = "outline"
-                        st.rerun()
+                if st.button(
+                    "📁 Go to Projects",
+                    use_container_width=True,
+                    help="Open or create a project to start planning your story",
+                ):
+                    st.session_state.page = "projects"
+                    st.rerun()
             return
         def save_outline_action() -> None:
-            if persist_project(p, prompt_on_guest=True, action="save"):
+            if persist_project(p):
                 st.toast("Outline saved.")
 
         def scan_outline_action() -> None:
@@ -4102,7 +3746,7 @@ def _run_ui():
                     save_p()
             with top3:
                 if st.button("💾 Save Project", type="primary", use_container_width=True):
-                    if persist_project(p, prompt_on_guest=True, action="save"):
+                    if persist_project(p):
                         st.toast("Saved")
 
         left, right = st.columns([2.1, 1])
@@ -4130,7 +3774,7 @@ def _run_ui():
                     use_container_width=True,
                     help="Save and automatically scan for characters, locations, and other entities"
                 ):
-                    if persist_project(p, prompt_on_guest=True, action="save"):
+                    if persist_project(p):
                         # Automatically scan entities on save so World Bible stays in sync.
                         extract_entities_ui(p.outline or "", "Outline")
                         st.toast("Outline Saved & Entities Scanned")
@@ -4201,24 +3845,13 @@ def _run_ui():
         if not p:
             with st.container(border=True):
                 st.info("📭 No project loaded. Open or create a project to access the World Bible.")
-                cols = st.columns(2)
-                with cols[0]:
-                    if st.button(
-                        "📁 Go to Projects",
-                        use_container_width=True,
-                        help="Open or create a project to manage your story world"
-                    ):
-                        st.session_state.page = "projects"
-                        st.rerun()
-                with cols[1]:
-                    if st.session_state.get("guest_mode") and st.button(
-                        "🎭 Start Guest Sandbox",
-                        use_container_width=True,
-                        help="Try MANTIS Studio with a temporary project (no account needed)"
-                    ):
-                        st.session_state.project = st.session_state.guest_project or create_guest_project()
-                        st.session_state.page = "world"
-                        st.rerun()
+                if st.button(
+                    "📁 Go to Projects",
+                    use_container_width=True,
+                    help="Open or create a project to manage your story world",
+                ):
+                    st.session_state.page = "projects"
+                    st.rerun()
             return
         def open_add_entity() -> None:
             tab_label = st.session_state.get("world_tabs") or "Characters"
@@ -4687,7 +4320,7 @@ def _run_ui():
                 p.memory = memory_val
                 save_p()
             if st.button("💾 Save Memory", use_container_width=True):
-                if persist_project(p, prompt_on_guest=True, action="save"):
+                if persist_project(p):
                     st.toast("Memory saved")
 
             st.divider()
@@ -4947,30 +4580,18 @@ def _run_ui():
             st.metric("AI Readiness", f"{readiness}%")
 
     def render_chapters():
-        # Single guest banner for the editor page (avoid duplicate widgets / duplicate keys).
-        render_guest_banner("editor")
+        render_intro_banner("editor")
         p = st.session_state.project
         if not p:
             with st.container(border=True):
                 st.info("📭 No project loaded. Create or open a project to start writing.")
-                cols = st.columns(2)
-                with cols[0]:
-                    if st.button(
-                        "📁 Go to Projects",
-                        use_container_width=True,
-                        help="Open or create a project to start writing your story"
-                    ):
-                        st.session_state.page = "projects"
-                        st.rerun()
-                with cols[1]:
-                    if st.session_state.get("guest_mode") and st.button(
-                        "🎭 Start Guest Sandbox",
-                        use_container_width=True,
-                        help="Try MANTIS Studio with a temporary project (no account needed)"
-                    ):
-                        st.session_state.project = st.session_state.guest_project or create_guest_project()
-                        st.session_state.page = "chapters"
-                        st.rerun()
+                if st.button(
+                    "📁 Go to Projects",
+                    use_container_width=True,
+                    help="Open or create a project to start writing your story",
+                ):
+                    st.session_state.page = "projects"
+                    st.rerun()
             return
         chaps = p.get_ordered_chapters()
 
@@ -5121,7 +4742,7 @@ def _run_ui():
                 with c1:
                     if st.button("💾 Save Chapter", type="primary", use_container_width=True):
                         curr.update_content(val, "manual")
-                        if persist_project(p, prompt_on_guest=True, action="save"):
+                        if persist_project(p):
                             # Automatically scan entities from this chapter when the user explicitly saves it.
                             extract_entities_ui(curr.content or "", f"Ch {curr.index}")
                             st.toast("Chapter Saved & Entities Scanned")
@@ -5494,10 +5115,6 @@ def _run_ui():
             with key_scope("settings"):
                 render_ai_settings()
             rendered_page = True
-        elif st.session_state.page == "account":
-            with key_scope("account"):
-                render_account()
-            rendered_page = True
         elif st.session_state.page == "legal":
             with key_scope("legal"):
                 render_legal_redirect()
@@ -5544,7 +5161,7 @@ def run_selftest() -> int:
     print("[MANTIS SELFTEST]")
     try:
         os.makedirs(AppConfig.PROJECTS_DIR, exist_ok=True)
-        # Use default projects directory - user accounts removed
+        # Use default projects directory
         user_projects_dir = AppConfig.PROJECTS_DIR
 
         p = Project.create("SELFTEST_PROJECT", author="MANTIS", genre="Test", storage_dir=user_projects_dir)

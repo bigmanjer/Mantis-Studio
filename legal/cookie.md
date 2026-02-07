@@ -4,7 +4,6 @@
 MANTIS Studio does not use third-party advertising cookies. We only use essential cookies required to keep the app running and secure.
 
 ## What we use
-- **Session cookies** to keep you signed in during a visit.
 - **Preference cookies** for settings like theme choice (when you save settings).
 
 ## Managing cookies

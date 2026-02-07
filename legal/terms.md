@@ -7,8 +7,8 @@ These Terms of Service (“Terms”) govern access to and use of MANTIS Studio (
 ## 1. Eligibility
 You must be legally able to form a binding contract to use the Service.
 
-## 2. Account and Security
-You are responsible for safeguarding credentials and any activity under your account.
+## 2. Local Use and Security
+You are responsible for safeguarding access to your device and any data stored locally by the Service.
 
 ## 3. Acceptable Use
 You agree not to:

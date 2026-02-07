@@ -79,7 +79,6 @@ Mantis-Studio/
 - **scripts/**: Developer utilities (healthcheck, smoke test, version bump).
 
 ## Suggested renames / moves (recommendations)
-- **`app/auth_supabase.py` → `app/services/auth_supabase.py`** to keep auth in services.
 - **`app/ui/`** should be merged into `app/components/` or `app/layout/` (avoid 3 UI layers).
 - **`mantis/` → `legacy/`** once imports are fully removed to signal deprecation.
 - **`logs/launcher_*.log`** should be removed from git history and left ignored.

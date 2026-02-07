@@ -14,7 +14,6 @@
 3. **Installation**: `pip install -r requirements.txt` then `streamlit run app/main.py`
 4. **First Project**: Use the sidebar to create a new project, build your outline, and start writing!
 
-💡 **Just want to try it?** The app works great in "Guest Mode" without any account setup.
 
 ---
 
@@ -44,7 +43,6 @@ The app is **state‑driven**, not page‑driven. All navigation feeds a single 
 * **Streamlit** (UI + state)
 * **Session State** for routing and persistence
 * **Local JSON / serialized storage** (project data)
-* **OIDC Auth (optional)**: Google / Microsoft / Apple
 * **GitHub Actions** for version bumping
 
 ---
@@ -60,7 +58,6 @@ app/main.py
 This file:
 
 * Initializes global session state
-* Handles authentication gating
 * Renders the global layout (sidebar + main panel)
 * Routes all navigation internally (NOT Streamlit multipage routing)
 
@@ -96,7 +93,6 @@ This file:
 | **World Bible**       | Structured lore & entities                    |
 | **AI Tools**          | Utilities like rewrite, summarize, brainstorm |
 | **Export**            | Generate files (DOCX / PDF / TXT)             |
-| **Account**           | Authentication & profile settings             |
 | **Legal**             | Terms, privacy, licensing                     |
 
 ---
@@ -232,23 +228,7 @@ These tools should operate on **selected text or context**, not blindly.
 
 ---
 
-### 5.8 Account
-
-**Purpose:** Authentication & identity.
-
-**Current State:**
-
-* Google / Microsoft OIDC supported
-* Email‑only auth missing
-
-**Required Improvement:**
-
-* Manual email/password option
-* Clear login feedback (success/failure)
-
----
-
-### 5.9 Legal
+### 5.8 Legal
 
 Static informational pages:
 
@@ -305,18 +285,16 @@ Should **not** clutter main navigation for most users.
 
 ### Current Limitations
 
-* Account sync features are temporarily disabled (local-only mode works great!)
 * Some AI features are experimental
 * Legacy `/pages` directory exists but is not used (can be safely ignored)
 
 ### Recommended Next Steps for Contributors
 
-1. Complete account authentication flow reactivation
-2. Add in-app tutorial/walkthrough mode
-3. Create sample projects for users to explore
-4. Add keyboard shortcuts reference
-5. Improve error messages to be more helpful
-6. Add video tutorials for key workflows
+1. Add in-app tutorial/walkthrough mode
+2. Create sample projects for users to explore
+3. Add keyboard shortcuts reference
+4. Improve error messages to be more helpful
+5. Add video tutorials for key workflows
 
 ---
 
@@ -381,8 +359,7 @@ Recommended technical improvements:
 1. Remove legacy Streamlit multipage routing (`/pages`)
 2. Centralize all navigation and callbacks
 3. Normalize session state schema
-4. Finish Account authentication flow
-5. Polish UI spacing, hierarchy, and feedback states
+4. Polish UI spacing, hierarchy, and feedback states
 
 ---
 
@@ -414,7 +391,6 @@ Mantis-Studio/
 │   │   ├── world_bible.py
 │   │   ├── ai_tools.py
 │   │   ├── export.py
-│   │   ├── account.py
 │   │   └── legal.py
 │   │
 │   ├── components/           # Reusable UI blocks
@@ -425,7 +401,6 @@ Mantis-Studio/
 │   ├── services/             # Business logic (no UI)
 │   │   ├── projects.py
 │   │   ├── storage.py
-│   │   ├── auth.py
 │   │   ├── ai.py
 │   │   └── export.py
 │   │

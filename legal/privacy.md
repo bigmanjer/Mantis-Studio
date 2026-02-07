@@ -5,9 +5,8 @@ Effective date: 2024-01-01
 This Privacy Policy explains how MANTIS Studio (“we,” “us,” or “our”) collects, uses, and shares information when you use MANTIS Studio (“Service”).
 
 ## 1. Information We Collect
-- **Account information:** email address and authentication details (if applicable).
-- **Usage data:** device information, log data, and interaction events.
-- **User content:** prompts, files, and outputs you provide to the Service.
+- **Local project data:** prompts, files, and outputs you create are stored on your device.
+- **API request data:** if you use AI providers, request content is sent to those providers to complete your request.
 
 ## 2. How We Use Information
 We use information to:
@@ -24,7 +23,7 @@ We may share information with:
 We do not sell your personal information.
 
 ## 4. Data Retention
-We retain information as long as necessary to provide the Service or comply with legal obligations. You can request deletion by contacting us.
+Local project data remains on your device until you delete it. API providers may retain request data according to their own policies.
 
 ## 5. Security
 We use reasonable safeguards to protect data. No method of transmission or storage is 100% secure.
@@ -33,7 +32,7 @@ We use reasonable safeguards to protect data. No method of transmission or stora
 Your information may be processed in countries other than your own. We take steps to protect your information in accordance with this Policy.
 
 ## 7. Your Choices
-You may request access, correction, or deletion of your personal data by contacting us.
+You control your local project data and can delete it at any time from your device.
 
 ## 8. Changes to This Policy
 We may update this Policy. Continued use of the Service after updates means you accept the revised Policy.

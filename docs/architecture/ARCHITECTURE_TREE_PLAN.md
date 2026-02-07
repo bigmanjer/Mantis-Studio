@@ -17,7 +17,6 @@
 | `app/main.py` world bible/entity logic | `mantis/core/world_bible.py` | Group world bible + entity scanning/canon logic. |
 | `app/main.py` export helpers | `mantis/core/export.py` | Encapsulate export formatting and file generation. |
 | `app/main.py` AI/LLM helpers | `mantis/services/llm.py` | Separate LLM adapters and prompts. |
-| `app/utils/auth.py` | `mantis/services/auth.py` + `app/utils/auth.py` shim | Keep auth abstraction in services; preserve legacy import path. |
 | UI layout + styling in `app/main.py` | `mantis/ui/layout.py` | Extract layout/theming + header/footer components. |
 | Page renderers in `app/main.py` | `mantis/ui/pages/*.py` | One module per page to scale. |
 | Navigation logic in `app/main.py` | `mantis/router.py` | Central routing + navigation model. |
@@ -26,10 +25,10 @@
 
 ## Modules That Must Remain for Streamlit Cloud
 - **`app/main.py`** must remain the Streamlit entrypoint and stay executable by Streamlit Cloud.
-- Any Streamlit multipage files under `pages/` remain in place (account/legal pages).
+- Any Streamlit multipage files under `pages/` remain in place (if present).
 
 ## Backward Compatibility Strategy
-- **Legacy imports** (`app.utils.auth`, `app.utils.navigation`) become thin wrappers that re-export from `mantis.*`.
+- **Legacy imports** (`app.utils.navigation`) become thin wrappers that re-export from `mantis.*`.
 - **Project JSON format** stays unchanged: `Project.save()` and `Project.load()` preserve the same schema and file paths.
 - **On-disk paths** remain unchanged by default (`projects/`, backups, config file). No migrations needed.
 - **Widget keys** remain stable. Introduce a single `ui_key()` helper that returns the exact key string used today.
@@ -43,5 +42,4 @@
 
 ## Risks + Mitigations
 - **Widget keys changing** → `ui_key()` returns unchanged key names and is used consistently.
-- **Auth/Supabase usage** → keep `app/utils/auth.py` as compatibility wrapper.
 - **Project IO changes** → retain `Project.save/load` logic and storage paths; no migrations.

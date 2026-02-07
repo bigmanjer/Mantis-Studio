@@ -22,7 +22,6 @@ The repository has been reorganized to follow a cleaner, more maintainable archi
 | `mantis/ui/pages/*.py` | `app/views/*.py` | ✅ Migrated |
 | `mantis/ui/layout.py` | `app/layout/styles.py` | ✅ Migrated |
 | `mantis/ui/components/ui.py` | `app/components/buttons.py` | ✅ Migrated |
-| `mantis/services/auth.py` | `app/services/auth.py` | ✅ Copied |
 | `mantis/services/llm.py` | `app/services/ai.py` | ✅ Copied |
 | `mantis/core/storage.py` | `app/services/storage.py` | ✅ Copied |
 | `mantis/core/export.py` | `app/services/export.py` | ✅ Copied |
