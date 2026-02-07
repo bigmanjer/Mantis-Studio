@@ -2,7 +2,27 @@ from contextlib import contextmanager
 from collections.abc import Generator
 from typing import Optional
 
-import streamlit as st
+try:
+    import streamlit as st
+    _STREAMLIT_AVAILABLE = True
+except ImportError:
+    _STREAMLIT_AVAILABLE = False
+    # Create a mock streamlit module for type checking
+    class _MockStreamlit:
+        @staticmethod
+        @contextmanager
+        def container(*args, **kwargs):
+            yield
+        @staticmethod
+        def markdown(*args, **kwargs):
+            pass
+        @staticmethod
+        def caption(*args, **kwargs):
+            pass
+        @staticmethod
+        def button(*args, **kwargs):
+            return False
+    st = _MockStreamlit()
 
 
 @contextmanager
