@@ -57,6 +57,7 @@ def get_routes() -> Dict[str, PageRenderer]:
         "privacy": render_legal_redirect,
         "copyright": render_legal_redirect,
         "cookie": render_legal_redirect,
+        "help": render_legal_redirect,
     }
 
 
