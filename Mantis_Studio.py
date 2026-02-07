@@ -2432,6 +2432,15 @@ def _run_ui():
             st.error("We couldn't open that project file. It may be missing or corrupted.")
             return None
 
+    def show_api_key_notice(action: str) -> None:
+        """Display a notice that an API key is required for the specified action.
+        
+        Args:
+            action: Description of what the user is trying to do (e.g., "scan entities", "generate outlines")
+        """
+        provider, _, _ = get_active_key_status()
+        st.info(f"Add a {_provider_label(provider)} API key in AI Settings to {action}.")
+
     def render_page_header(
         title: str,
         subtitle: str,
@@ -2807,7 +2816,7 @@ def _run_ui():
         """
         provider, active_key, _ = get_active_key_status()
         if not active_key:
-            st.info(f"Add a {_provider_label(provider)} API key in AI Settings to scan entities.")
+            show_api_key_notice("scan entities")
             return
         last_scan = st.session_state.get("last_entity_scan")
         if last_scan and (time.time() - last_scan) < 15:
@@ -3512,21 +3521,33 @@ def _run_ui():
             st.caption(f"Canon health: {canon_icon} {canon_label}.")
             card_end()
 
-        section_title("Quick actions", "Jump straight into your most-used tools.")
+        section_title("Quick Actions", "Jump straight into your most-used tools.")
         quick_grid = st.container()
         with quick_grid:
             qcols = st.columns(3)
             with qcols[0]:
                 cta_tile("✍️ Editor", "Draft chapters and summaries.")
-                if st.button("Open Editor", use_container_width=True):
+                if st.button(
+                    "Open Editor",
+                    use_container_width=True,
+                    help="Start writing or editing your chapters"
+                ):
                     open_recent_project("chapters")
             with qcols[1]:
                 cta_tile("📝 Outline", "Plan beats, arcs, and chapter flow.")
-                if st.button("Open Outline", use_container_width=True):
+                if st.button(
+                    "Open Outline",
+                    use_container_width=True,
+                    help="Create or edit your story structure and plot outline"
+                ):
                     open_recent_project("outline")
             with qcols[2]:
                 cta_tile("🌍 World Bible", "Characters, places, factions, lore.")
-                if st.button("Open World Bible", use_container_width=True):
+                if st.button(
+                    "Open World Bible",
+                    use_container_width=True,
+                    help="Manage your story's canonical characters, locations, and lore"
+                ):
                     open_recent_project("world")
 
         quick_grid_two = st.container()
@@ -3538,14 +3559,22 @@ def _run_ui():
                     open_recent_project("world", focus_tab="Memory")
             with qcols[1]:
                 cta_tile("📊 Insights", "Canon health and analytics.")
-                if st.button("Open Insights", use_container_width=True):
+                if st.button(
+                    "Open Insights",
+                    use_container_width=True,
+                    help="View analytics and consistency insights for your story world"
+                ):
                     open_recent_project("world", focus_tab="Insights")
             with qcols[2]:
                 cta_tile("⬇️ Export", "Download your project.")
-                if st.button("Go to Export", use_container_width=True):
+                if st.button(
+                    "Go to Export",
+                    use_container_width=True,
+                    help="Export your project as markdown for sharing or publishing"
+                ):
                     open_export()
 
-        card_start("Recent projects", "Select a project to open and pick up where you left off.")
+        card_start("Recent Projects", "Select a project to open and pick up where you left off.")
         if not recent_projects:
             empty_state("No projects yet", "Create one to start writing.")
         else:
@@ -3555,7 +3584,11 @@ def _run_ui():
                 genre = meta.get("genre") or "—"
                 row = st.columns([2.2, 1, 1])
                 with row[0]:
-                    if st.button(f"📂 {title}", use_container_width=True):
+                    if st.button(
+                        f"📂 {title}",
+                        use_container_width=True,
+                        help=f"Open '{title}' in the editor"
+                    ):
                         loaded = load_project_safe(project_entry["path"], context="project")
                         if loaded:
                             st.session_state.project = loaded
@@ -3564,7 +3597,12 @@ def _run_ui():
                 with row[1]:
                     st.caption(genre)
                 with row[2]:
-                    if st.button("Open", use_container_width=True):
+                    if st.button(
+                        "Open",
+                        use_container_width=True,
+                        help=f"Load this project and start editing",
+                        key=f"open_{project_entry.get('path', '')}"
+                    ):
                         loaded = load_project_safe(project_entry["path"], context="project")
                         if loaded:
                             st.session_state.project = loaded
@@ -3893,11 +3931,19 @@ def _run_ui():
                 st.info("📭 No project loaded. Create or open a project to edit an outline.")
                 cols = st.columns(2)
                 with cols[0]:
-                    if st.button("Go to Projects", use_container_width=True):
+                    if st.button(
+                        "📁 Go to Projects",
+                        use_container_width=True,
+                        help="Open or create a project to start planning your story"
+                    ):
                         st.session_state.page = "projects"
                         st.rerun()
                 with cols[1]:
-                    if st.session_state.get("guest_mode") and st.button("Start guest sandbox", use_container_width=True):
+                    if st.session_state.get("guest_mode") and st.button(
+                        "🎭 Start Guest Sandbox",
+                        use_container_width=True,
+                        help="Try MANTIS Studio with a temporary project (no account needed)"
+                    ):
                         st.session_state.project = st.session_state.guest_project or create_guest_project()
                         st.session_state.page = "outline"
                         st.rerun()
@@ -4010,9 +4056,7 @@ def _run_ui():
                     button_help = "AI will generate a detailed chapter-by-chapter outline for your story"
                 
                 if not active_key:
-                    st.info(
-                        f"Add a {_provider_label(provider)} API key in AI Settings to generate outlines."
-                    )
+                    show_api_key_notice("generate outlines")
                 if st.button(
                     outline_label,
                     type="primary",
@@ -4054,11 +4098,19 @@ def _run_ui():
                 st.info("📭 No project loaded. Open or create a project to access the World Bible.")
                 cols = st.columns(2)
                 with cols[0]:
-                    if st.button("Go to Projects", use_container_width=True):
+                    if st.button(
+                        "📁 Go to Projects",
+                        use_container_width=True,
+                        help="Open or create a project to manage your story world"
+                    ):
                         st.session_state.page = "projects"
                         st.rerun()
                 with cols[1]:
-                    if st.session_state.get("guest_mode") and st.button("Start guest sandbox", use_container_width=True):
+                    if st.session_state.get("guest_mode") and st.button(
+                        "🎭 Start Guest Sandbox",
+                        use_container_width=True,
+                        help="Try MANTIS Studio with a temporary project (no account needed)"
+                    ):
                         st.session_state.project = st.session_state.guest_project or create_guest_project()
                         st.session_state.page = "world"
                         st.rerun()
@@ -4089,8 +4141,7 @@ def _run_ui():
             key_prefix="world_header",
         )
         if not get_active_key_status()[1]:
-            provider, _, _ = get_active_key_status()
-            st.info(f"Add a {_provider_label(provider)} API key in AI Settings to run scans.")
+            show_api_key_notice("run scans")
 
         st.markdown(
             """
@@ -4799,11 +4850,19 @@ def _run_ui():
                 st.info("📭 No project loaded. Create or open a project to start writing.")
                 cols = st.columns(2)
                 with cols[0]:
-                    if st.button("Go to Projects", use_container_width=True):
+                    if st.button(
+                        "📁 Go to Projects",
+                        use_container_width=True,
+                        help="Open or create a project to start writing your story"
+                    ):
                         st.session_state.page = "projects"
                         st.rerun()
                 with cols[1]:
-                    if st.session_state.get("guest_mode") and st.button("Start guest sandbox", use_container_width=True):
+                    if st.session_state.get("guest_mode") and st.button(
+                        "🎭 Start Guest Sandbox",
+                        use_container_width=True,
+                        help="Try MANTIS Studio with a temporary project (no account needed)"
+                    ):
                         st.session_state.project = st.session_state.guest_project or create_guest_project()
                         st.session_state.page = "chapters"
                         st.rerun()
@@ -4846,12 +4905,21 @@ def _run_ui():
                 st.info("📭 No chapters yet.\n\nCreate your first chapter — or let MANTIS write one from your outline.")
                 c1, c2 = st.columns([1, 1])
                 with c1:
-                    if st.button("➕ Create Chapter 1", type="primary", use_container_width=True):
+                    if st.button(
+                        "➕ Create Chapter 1",
+                        type="primary",
+                        use_container_width=True,
+                        help="Start your story by creating the first chapter"
+                    ):
                         p.add_chapter("Chapter 1")
                         persist_project(p)
                         st.rerun()
                 with c2:
-                    if st.button("🧩 Go to Outline", use_container_width=True):
+                    if st.button(
+                        "🧩 Go to Outline",
+                        use_container_width=True,
+                        help="Plan your story structure before writing chapters"
+                    ):
                         st.session_state.page = "outline"
                         st.session_state._force_nav = True
                         st.rerun()
