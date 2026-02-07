@@ -571,7 +571,7 @@ def render_footer(
     <div style="text-align: center; font-size: 0.85rem; color: #9CA3AF;">
         <a href="?page=terms">Terms</a> •
         <a href="?page=privacy">Privacy</a> •
-        <a href="/pages/legal.py">Legal</a> •
+        <a href="?page=legal">Legal</a> •
         <a href="{support_url}">Support</a> •
         <a href="mailto:{contact_email}">Contact</a> •
         <span>Version {version}</span>
