@@ -6,7 +6,7 @@ Note: This module is part of the new app/ structure.
 """
 from __future__ import annotations
 
-from mantis.core.models import Project
+from app.services.projects import Project
 
 
 def project_to_markdown(project: Project) -> str:

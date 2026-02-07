@@ -16,8 +16,8 @@ import uuid
 from dataclasses import asdict, dataclass, field, fields
 from typing import Any, Dict, List, Optional
 
-from mantis.config.settings import AppConfig, logger
-from mantis.core.storage import _acquire_lock, _release_lock, resolve_storage_dir
+from app.config.settings import AppConfig, logger
+from app.services.storage import _acquire_lock, _release_lock, resolve_storage_dir
 
 
 @dataclass

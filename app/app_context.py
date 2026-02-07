@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-MANTIS Studio - Alternative Implementation (Currently Unused)
+MANTIS Studio - Application Entry
 
 This file contains an alternative implementation of the MANTIS Studio UI.
 It is NOT the active entry point - see ../app/main.py instead.
@@ -52,6 +52,10 @@ from typing import Any, Callable, Dict, List, Optional
 
 import requests
 # (UI-only imports are loaded inside _run_ui() so selftests can run without Streamlit installed.)
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 from app.config.settings import AppConfig, ensure_storage_dirs, load_app_config, logger, save_app_config
 from app.services.export import project_to_markdown
@@ -174,6 +178,7 @@ def _run_ui():
     session_info = initialize_session_state(st, auth, config_data)
     user = session_info["user"]
     is_guest = session_info["is_guest"]
+    logged_in = auth.is_logged_in(user)
 
     theme = st.session_state.ui_theme if st.session_state.ui_theme in ("Dark", "Light") else "Dark"
     tokens = get_theme_tokens(theme)[theme]
@@ -255,13 +260,13 @@ def _run_ui():
             auth.logout_button(key="auth_missing_user_id_logout")
             st.stop()
 
-    if st.session_state.user_id != user_id:
+    user_changed = st.session_state.user_id != user_id
+    if user_changed:
         st.session_state.user_id = user_id
-        st.session_state.projects_dir = get_user_projects_dir(user_id)
         st.session_state.project = None
         st.session_state.page = "home"
-    elif not st.session_state.projects_dir:
-        st.session_state.projects_dir = get_user_projects_dir(user_id)
+    if user_changed or not st.session_state.projects_dir:
+        st.session_state.projects_dir = AppConfig.PROJECTS_DIR
 
     if is_guest:
         st.session_state.auto_save = False
@@ -2796,7 +2801,13 @@ def _run_ui():
                 st.markdown("### 📍 Chapters")
                 for c in chaps:
                     lbl = f"{c.index}. {(c.title or 'Untitled')[:18]}"
-                    if st.button(lbl, key=f"n_{c.id}", type="primary" if c.id == curr.id else "secondary", use_container_width=True):
+                    if st.button(
+                        lbl,
+                        key=f"n_{c.id}",
+                        type="primary" if c.id == curr.id else "secondary",
+                        use_container_width=True,
+                        help=c.title or "Untitled",
+                    ):
                         st.session_state.curr_chap_id = c.id
                         st.rerun()
 
@@ -2818,12 +2829,20 @@ def _run_ui():
 
         with col_editor:
             with st.container(border=True):
+                st.markdown("#### Drafting")
+                st.caption("Edit chapter title, target length, and content.")
                 h1, h2 = st.columns([3, 1])
                 with h1:
-                    curr.title = st.text_input("Title", curr.title, label_visibility="collapsed", help="Rename this chapter.")
+                    curr.title = st.text_input(
+                        "Chapter title",
+                        curr.title,
+                        label_visibility="collapsed",
+                        help="Rename this chapter.",
+                        placeholder="Chapter title",
+                    )
                 with h2:
                     curr.target_words = st.number_input(
-                        "Target",
+                        "Target words",
                         100,
                         10000,
                         int(curr.target_words),
@@ -2831,23 +2850,45 @@ def _run_ui():
                         help="Target word count for this chapter.",
                     )
 
-                val = st.text_area("Manuscript", curr.content, height=680, label_visibility="collapsed", key=f"ed_{curr.id}")
+                val = st.text_area(
+                    "Manuscript",
+                    curr.content,
+                    height=680,
+                    label_visibility="collapsed",
+                    key=f"ed_{curr.id}",
+                    help="Write your chapter content here. Auto-save captures changes when enabled.",
+                )
                 if val != curr.content:
                     curr.update_content(val, "manual")
                     save_p()
 
+                autosave_state = "On" if st.session_state.auto_save else "Manual"
+                try:
+                    last_edit = datetime.datetime.fromtimestamp(curr.modified_at).strftime("%b %d, %H:%M")
+                except (TypeError, ValueError, OSError):
+                    last_edit = "Unknown"
+                st.caption(f"🕒 Last edited: {last_edit} • 💾 Auto-save: {autosave_state}")
                 st.caption(f"📝 Chapter: {curr.word_count} words • 📚 Total: {p.get_total_word_count()} words")
 
                 c1, c2 = st.columns([1, 1])
                 with c1:
-                    if st.button("💾 Save Chapter", type="primary", use_container_width=True):
+                    if st.button(
+                        "💾 Save & Scan Entities",
+                        type="primary",
+                        use_container_width=True,
+                        help="Save this chapter and scan for new World Bible entities.",
+                    ):
                         curr.update_content(val, "manual")
                         if persist_project(p, prompt_on_guest=True, action="save"):
                             # Automatically scan entities from this chapter when the user explicitly saves it.
                             extract_entities_ui(curr.content or "", f"Ch {curr.index}")
                             st.toast("Chapter Saved & Entities Scanned")
                 with c2:
-                    if st.button("📝 Update Summary", use_container_width=True):
+                    if st.button(
+                        "📝 Generate Summary",
+                        use_container_width=True,
+                        help="Create or refresh the chapter summary.",
+                    ):
                         summary = StoryEngine.summarize(curr.content or "", get_ai_model())
                         if summary.strip().startswith("ERROR: Canon violation detected."):
                             st.error("Canon violation detected. Resolve issues before generating AI content.")
@@ -2875,7 +2916,7 @@ def _run_ui():
                         return ""
                     return full
 
-                with st.expander("✨ Modify / Improve Text"):
+                with st.expander("✨ Improve Draft"):
                     rewrite_locked = curr.index in locked_chapters
                     style = st.selectbox(
                         "How to improve?",
@@ -2910,7 +2951,7 @@ def _run_ui():
                             st.rerun()
 
                 if st.button(
-                    "↩️ Undo last apply",
+                    "↩️ Undo last AI apply",
                     use_container_width=True,
                     key=f"editor_improve__undo_{curr.id}",
                     help="Restore the previous chapter text, if available.",
@@ -2965,6 +3006,10 @@ def _run_ui():
                 st.caption("Generate new prose from your outline + previous context.")
 
                 canon_icon, canon_label = get_canon_health()
+                st.caption(
+                    "Canon status: "
+                    f"{canon_icon} {canon_label} • Legend: Canon Stable / Minor Canon Drift / High Canon Risk"
+                )
                 canon_blocked = canon_icon == "🔴"
                 if canon_blocked:
                     st.button(
@@ -2973,7 +3018,12 @@ def _run_ui():
                         use_container_width=True,
                         help="Resolve canon issues in World Bible → Memory before generating.",
                     )
-                elif st.button("✨ Auto-Write Chapter", type="primary", use_container_width=True):
+                elif st.button(
+                    "✨ Auto-Write Chapter",
+                    type="primary",
+                    use_container_width=True,
+                    help="Generate a new draft using your outline and chapter context.",
+                ):
                     prompt = StoryEngine.generate_chapter_prompt(p, curr.index, int(curr.target_words))
                     full = ""
                     for chunk in AIEngine().generate_stream(prompt, get_ai_model()):
@@ -3009,7 +3059,7 @@ def _run_ui():
                 if curr.summary:
                     st.info(curr.summary)
                 else:
-                    st.info("No summary yet. Click **Update Summary** to generate one.")
+                    st.info("No summary yet. Click **Generate Summary** to create one.")
 
         pending_text = st.session_state.get("pending_improvement_text") or ""
         pending_meta = st.session_state.get("pending_improvement_meta") or {}
@@ -3062,7 +3112,7 @@ def _run_ui():
                         )
 
                 apply_mode = st.selectbox(
-                    "Apply result as",
+                    "Apply improved text as",
                     [
                         "Replace chapter",
                         "Save as new draft/version",
@@ -3267,10 +3317,10 @@ def run_selftest() -> int:
         except OSError:
             logger.warning("Selftest cleanup failed for %s", path, exc_info=True)
         try:
-            if os.path.isdir(user_projects_dir):
-                shutil.rmtree(user_projects_dir)
+            if os.path.isdir(selftest_dir):
+                shutil.rmtree(selftest_dir)
         except OSError:
-            logger.warning("Selftest cleanup failed for %s", user_projects_dir, exc_info=True)
+            logger.warning("Selftest cleanup failed for %s", selftest_dir, exc_info=True)
         print("SELFTEST RESULT: PASS")
         return 0
     except Exception as e:
