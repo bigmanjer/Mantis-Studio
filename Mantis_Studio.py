@@ -2441,6 +2441,29 @@ def _run_ui():
         provider, _, _ = get_active_key_status()
         st.info(f"Add a {_provider_label(provider)} API key in AI Settings to {action}.")
 
+    def get_ai_button_help(
+        cooldown_seconds: int,
+        has_api_key: bool,
+        action_description: str,
+    ) -> str:
+        """Generate contextual help text for AI-powered buttons.
+        
+        Args:
+            cooldown_seconds: Remaining cooldown time in seconds (0 if no cooldown)
+            has_api_key: Whether the user has configured an API key
+            action_description: What the button does (e.g., "generate a chapter outline")
+        
+        Returns:
+            Appropriate help text explaining the button's state
+        """
+        if cooldown_seconds > 0:
+            return f"Available in {cooldown_seconds} seconds to prevent API overuse"
+        elif not has_api_key:
+            provider, _, _ = get_active_key_status()
+            return f"Configure {_provider_label(provider)} API key in AI Settings to use this feature"
+        else:
+            return f"AI will {action_description}"
+
     def render_page_header(
         title: str,
         subtitle: str,
@@ -3727,9 +3750,9 @@ def _run_ui():
                         help="Specify the genre(s) to help guide AI suggestions and tone."
                     )
                 a = st.text_input(
-                    "Author Name",
+                    "Author Name (Optional)",
                     placeholder="Your name",
-                    help="Optional: Add your name or pen name for attribution."
+                    help="Add your name or pen name for attribution. Leave blank if you prefer."
                 )
                 submitted = st.form_submit_button("🚀 Create Project", type="primary", use_container_width=True)
                 if submitted:
@@ -3915,7 +3938,7 @@ def _run_ui():
 
         with st.container(border=True):
             st.markdown(f"### {export_project.title}")
-            st.caption("Download a complete manuscript file including your outline, world bible entities, and all chapter content in markdown format.")
+            st.caption("Download your complete manuscript with outline, world bible, and chapters.")
             st.download_button(
                 "⬇️ Download Manuscript (.md)",
                 project_to_markdown(export_project),
@@ -4047,13 +4070,11 @@ def _run_ui():
                 )
                 
                 # Determine help text based on disabled state
-                button_help = None
-                if outline_cooldown:
-                    button_help = f"Available in {outline_cooldown} seconds to prevent API overuse"
-                elif not active_key:
-                    button_help = f"Configure {_provider_label(provider)} API key in AI Settings to use this feature"
-                else:
-                    button_help = "AI will generate a detailed chapter-by-chapter outline for your story"
+                button_help = get_ai_button_help(
+                    outline_cooldown,
+                    active_key,
+                    "generate a detailed chapter-by-chapter outline for your story"
+                )
                 
                 if not active_key:
                     show_api_key_notice("generate outlines")
@@ -4073,7 +4094,7 @@ def _run_ui():
                     )
                     # Show loading indicator before streaming starts
                     with outline_stream_ph.container():
-                        st.markdown("🔄 **Generating outline structure...**")
+                        st.markdown("🔄 **Generating chapter outline...**")
                     
                     for chunk in AIEngine().generate_stream(prompt, get_ai_model()):
                         full += chunk
