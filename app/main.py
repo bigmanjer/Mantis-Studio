@@ -2680,6 +2680,149 @@ def _run_ui():
             "modified_at": meta.get("last_modified") or meta.get("modified_at"),
         }
 
+    DEFAULT_PROJECT_TITLE = "Default Project Title"
+    DEFAULT_PROJECT_GENRES = ["Default Genre 1", "Default Genre 2"]
+    MAX_DRAFT_EXCERPT_LENGTH = 600
+    AI_ERROR_MARKERS = (
+        "not configured",
+        "generation failed",
+        "response empty",
+        "error",
+    )
+
+    def _format_genre_list(genres: List[str]) -> str:
+        return " · ".join(genres)
+
+    def _parse_genre_list(raw: str) -> List[str]:
+        cleaned = re.sub(r"(?i)^(genres?)[:\s-]*", "", (raw or "")).strip()
+        if not cleaned:
+            return []
+        cleaned = cleaned.replace("|", ",")
+        parts = re.split(r"[,\n·/]+", cleaned)
+        return [part.strip() for part in parts if part.strip()]
+
+    def _ai_generation_available() -> bool:
+        provider = _normalize_provider(st.session_state.get("ai_provider", "groq"))
+        key, _ = get_effective_key(provider, st.session_state.get("user_id"))
+        model = get_ai_model()
+        if not key or not model:
+            return False
+        base_url = _get_provider_base_url(provider)
+        try:
+            if provider == "openai":
+                ok, _ = test_openai_model(base_url, key, model)
+            else:
+                ok, _ = test_groq_model(base_url, key, model)
+            return ok
+        except Exception:
+            logger.warning(
+                "AI availability check failed for provider=%s model=%s",
+                provider,
+                model,
+                exc_info=True,
+            )
+            return False
+
+    def _build_project_context(
+        context: str,
+        title: str,
+        genre: str,
+        author: str,
+        draft_excerpt: str,
+    ) -> str:
+        parts = []
+        if context:
+            parts.append(context.strip())
+        if title:
+            parts.append(f"Title idea: {title}")
+        if genre:
+            parts.append(f"Genre hints: {genre}")
+        if author:
+            parts.append(f"Author: {author}")
+        safe_excerpt = draft_excerpt.strip()
+        if safe_excerpt:
+            parts.append(f"Draft excerpt: {safe_excerpt[:MAX_DRAFT_EXCERPT_LENGTH]}")
+        return "\n".join(parts) if parts else "A new creative writing project."
+
+    def _ai_response_has_error(raw: str) -> bool:
+        low = (raw or "").lower()
+        return any(marker in low for marker in AI_ERROR_MARKERS)
+
+    def _generate_project_title(context: str, genre_hint: str, model: str, provider: str) -> str:
+        prompt = (
+            "You are initializing a new creative writing project.\n"
+            f"PROJECT CONTEXT:\n{context}\n\n"
+            f"GENRE HINTS: {genre_hint or 'Open'}\n"
+            "TASK: Generate a creative, relevant project title.\n"
+            "RULES: Return ONLY the title. No quotes. No prefixes."
+        )
+        response = AIEngine(provider=provider).generate(prompt, model)
+        raw = (response.get("text", "") or "").strip()
+        if _ai_response_has_error(raw):
+            return ""
+        clean = re.sub(r"(?i)^(title|project title|suggested title)[:\s-]*", "", raw).strip()
+        clean = clean.replace('"', "").replace("'", "").strip()
+        return clean.splitlines()[0].strip() if clean else ""
+
+    def _generate_project_genres(context: str, title: str, model: str, provider: str) -> List[str]:
+        prompt = (
+            "You are initializing a new creative writing project.\n"
+            f"PROJECT CONTEXT:\n{context}\n\n"
+            f"TITLE: {title or 'New Project'}\n"
+            "TASK: Suggest 2-4 genres that fit this project.\n"
+            "RULES: Return ONLY a comma-separated list of genres."
+        )
+        response = AIEngine(provider=provider).generate(prompt, model)
+        raw = (response.get("text", "") or "").strip()
+        if _ai_response_has_error(raw):
+            return []
+        raw = raw.replace('"', "").replace("'", "").strip()
+        return _parse_genre_list(raw)
+
+    def _resolve_project_seed(
+        title: str,
+        genre: str,
+        author: str,
+        context: str = "",
+        draft_excerpt: str = "",
+    ) -> tuple[str, str, List[str], bool]:
+        final_title = (title or "").strip()
+        final_genre = (genre or "").strip()
+        ai_used = False
+
+        needs_title = not final_title
+        needs_genre = not final_genre
+        if needs_title or needs_genre:
+            ai_available = _ai_generation_available()
+            if ai_available:
+                provider = _normalize_provider(st.session_state.get("ai_provider", "groq"))
+                model = get_ai_model()
+                context_text = _build_project_context(
+                    context,
+                    final_title,
+                    final_genre,
+                    author,
+                    draft_excerpt,
+                )
+                if needs_title:
+                    generated_title = _generate_project_title(context_text, final_genre, model, provider)
+                    if generated_title:
+                        final_title = generated_title
+                        ai_used = True
+                if needs_genre:
+                    generated_genres = _generate_project_genres(context_text, final_title, model, provider)
+                    if generated_genres:
+                        final_genre = _format_genre_list(generated_genres)
+                        ai_used = True
+
+        if not final_title:
+            final_title = DEFAULT_PROJECT_TITLE
+        if not final_genre:
+            final_genre = _format_genre_list(DEFAULT_PROJECT_GENRES)
+
+        genre_list = _parse_genre_list(final_genre) or list(DEFAULT_PROJECT_GENRES)
+        return final_title, final_genre, genre_list, ai_used
+
     def _random_project_title() -> str:
         adjectives = [
             "Ashen",
@@ -3760,9 +3903,22 @@ def _run_ui():
             pending_import = st.session_state.pop("guest_pending_import", None)
             if pending_project or pending_import:
                 st.session_state["guest_continue_action"] = None
-                title = (pending_project or {}).get("title") or _random_project_title()
-                genre = (pending_project or {}).get("genre") or _random_project_genres()
+                title_input = (pending_project or {}).get("title") or ""
+                genre_input = (pending_project or {}).get("genre") or ""
                 author = (pending_project or {}).get("author") or ""
+                context = (pending_project or {}).get("context") or ""
+                title, genre, genre_list, ai_used = _resolve_project_seed(
+                    title_input,
+                    genre_input,
+                    author,
+                    context=context,
+                    draft_excerpt=pending_import or "",
+                )
+                st.session_state["project_seed_output"] = {
+                    "title": title,
+                    "genres": genre_list,
+                    "ai_used": ai_used,
+                }
                 p = Project.create(title, author=author, genre=genre, storage_dir=get_active_projects_dir())
                 if pending_import:
                     p.import_text_file(pending_import)
@@ -3840,20 +3996,22 @@ def _run_ui():
                 )
                 submitted = st.form_submit_button("🚀 Create Project", type="primary", use_container_width=True)
                 if submitted:
-                    if not t:
-                        t = _random_project_title()
-                    if not g:
-                        g = _random_project_genres()
+                    title, genre, genre_list, ai_used = _resolve_project_seed(t, g, a)
+                    st.session_state["project_seed_output"] = {
+                        "title": title,
+                        "genres": genre_list,
+                        "ai_used": ai_used,
+                    }
                     if not is_guest and not require_account(
                         "create_project",
-                        payload={"title": t, "author": a, "genre": g},
+                        payload={"title": title, "author": a, "genre": genre},
                         return_to="projects",
                     ):
                         return
                     p = Project.create(
-                        t,
+                        title,
                         author=a,
-                        genre=g,
+                        genre=genre,
                         storage_dir=get_active_projects_dir(),
                     )
                     persist_project(p, prompt_on_guest=True, action="create_project")
