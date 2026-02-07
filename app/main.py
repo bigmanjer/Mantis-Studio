@@ -330,7 +330,7 @@ def _get_secret_key(st, provider: str) -> str:
             or (secrets.get("groq") or {}).get("api_key")
             or ""
         ).strip()
-    except Exception:
+    except (KeyError, FileNotFoundError):
         return ""
 
 
