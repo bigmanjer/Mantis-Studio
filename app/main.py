@@ -314,21 +314,24 @@ def clear_session_key(provider: str) -> None:
 def _get_secret_key(st, provider: str) -> str:
     if not st or not hasattr(st, "secrets"):
         return ""
-    secrets = st.secrets
-    provider = _normalize_provider(provider)
-    if provider == "openai":
+    try:
+        secrets = st.secrets
+        provider = _normalize_provider(provider)
+        if provider == "openai":
+            return str(
+                secrets.get("openai_api_key")
+                or secrets.get("OPENAI_API_KEY")
+                or (secrets.get("openai") or {}).get("api_key")
+                or ""
+            ).strip()
         return str(
-            secrets.get("openai_api_key")
-            or secrets.get("OPENAI_API_KEY")
-            or (secrets.get("openai") or {}).get("api_key")
+            secrets.get("groq_api_key")
+            or secrets.get("GROQ_API_KEY")
+            or (secrets.get("groq") or {}).get("api_key")
             or ""
         ).strip()
-    return str(
-        secrets.get("groq_api_key")
-        or secrets.get("GROQ_API_KEY")
-        or (secrets.get("groq") or {}).get("api_key")
-        or ""
-    ).strip()
+    except (KeyError, FileNotFoundError):
+        return ""
 
 
 def _get_server_default_key(provider: str) -> str:
