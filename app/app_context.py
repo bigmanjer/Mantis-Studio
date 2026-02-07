@@ -255,12 +255,12 @@ def _run_ui():
             auth.logout_button(key="auth_missing_user_id_logout")
             st.stop()
 
-    if st.session_state.user_id != user_id:
+    user_changed = st.session_state.user_id != user_id
+    if user_changed:
         st.session_state.user_id = user_id
-        st.session_state.projects_dir = AppConfig.PROJECTS_DIR
         st.session_state.project = None
         st.session_state.page = "home"
-    elif not st.session_state.projects_dir:
+    if user_changed or not st.session_state.projects_dir:
         st.session_state.projects_dir = AppConfig.PROJECTS_DIR
 
     if is_guest:
@@ -2794,7 +2794,6 @@ def _run_ui():
         with col_nav:
             with st.container(border=True):
                 st.markdown("### 📍 Chapters")
-                st.caption("Select a chapter to edit.")
                 for c in chaps:
                     lbl = f"{c.index}. {(c.title or 'Untitled')[:18]}"
                     if st.button(
@@ -2826,7 +2825,7 @@ def _run_ui():
         with col_editor:
             with st.container(border=True):
                 st.markdown("#### Drafting")
-                st.caption("Update the chapter title, target length, and draft text.")
+                st.caption("Edit chapter title, target length, and content.")
                 h1, h2 = st.columns([3, 1])
                 with h1:
                     curr.title = st.text_input(
@@ -2858,12 +2857,10 @@ def _run_ui():
                     curr.update_content(val, "manual")
                     save_p()
 
-                autosave_state = "On" if st.session_state.auto_save else "Off (remember to save)"
+                autosave_state = "On" if st.session_state.auto_save else "Manual"
                 try:
                     last_edit = datetime.datetime.fromtimestamp(curr.modified_at).strftime("%b %d, %H:%M")
-                except (TypeError, ValueError, OSError) as exc:
-                    if isinstance(exc, OSError) and exc.errno != 22:
-                        raise
+                except (TypeError, ValueError, OSError):
                     last_edit = "Unknown"
                 st.caption(f"🕒 Last edited: {last_edit} • 💾 Auto-save: {autosave_state}")
                 st.caption(f"📝 Chapter: {curr.word_count} words • 📚 Total: {p.get_total_word_count()} words")
@@ -3004,7 +3001,10 @@ def _run_ui():
                 st.caption("Generate new prose from your outline + previous context.")
 
                 canon_icon, canon_label = get_canon_health()
-                st.caption(f"Canon status: {canon_icon} {canon_label} • 🟢 stable • 🟡 drift • 🔴 risk")
+                st.caption(
+                    "Canon status: "
+                    f"{canon_icon} {canon_label} • Legend: Canon Stable / Minor Canon Drift / High Canon Risk"
+                )
                 canon_blocked = canon_icon == "🔴"
                 if canon_blocked:
                     st.button(
