@@ -1,4 +1,18 @@
 #!/usr/bin/env python3
+"""
+MANTIS Studio - Alternative Implementation (Currently Unused)
+
+This file contains an alternative implementation of the MANTIS Studio UI.
+It is NOT the active entry point - see ../Mantis_Studio.py instead.
+
+This implementation is preserved for reference and potential future consolidation
+as described in README.md Section 9A (Repository Organization Recommendation).
+
+If you're looking to understand how the app works, refer to:
+    - ../Mantis_Studio.py (active entry point)
+    - mantis/router.py (navigation)
+    - mantis/ui/pages/* (view implementations)
+"""
 # Mantis_Studio.py — MANTIS Studio
 #
 # Run:

@@ -1,5 +1,26 @@
 #!/usr/bin/env python3
-"""Streamlit entrypoint shim for MANTIS Studio."""
+"""
+MANTIS Studio - Main Entry Point
+
+This is the primary Streamlit application entry point for MANTIS Studio.
+It implements a state-driven (not page-driven) navigation system.
+
+Run with:
+    streamlit run Mantis_Studio.py
+
+Or with utility flags:
+    python Mantis_Studio.py --selftest    # Run self-tests
+    python Mantis_Studio.py --repair      # Repair project files
+
+Architecture:
+    - State-based navigation via st.session_state.page
+    - Views are rendered by mantis.router based on page state
+    - All navigation happens within this single entry point
+    - NO Streamlit multipage routing (no /pages directory)
+
+Note: mantis/app.py contains an alternative implementation but is currently unused.
+      Future refactoring may consolidate these into the recommended structure from README.
+"""
 
 import datetime
 import json
@@ -17,8 +38,6 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
 import requests
-
-from mantis.app import run_app
 
 from app.utils.navigation import get_nav_config
 
