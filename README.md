@@ -9,7 +9,7 @@
 
 **New to Mantis Studio?** Start here!
 
-1. **[📖 Getting Started Guide](GETTING_STARTED.md)** ← Complete step-by-step installation and setup
+1. **[📖 Getting Started Guide](docs/guides/GETTING_STARTED.md)** ← Complete step-by-step installation and setup
 2. **Prerequisites**: Python 3.10+, basic command line knowledge
 3. **Installation**: `pip install -r requirements.txt` then `streamlit run Mantis_Studio.py`
 4. **First Project**: Use the sidebar to create a new project, build your outline, and start writing!
@@ -265,7 +265,7 @@ Should **not** clutter main navigation for most users.
 ### ✅ User Experience Enhancements
 
 **New Documentation:**
-- ✨ Comprehensive [Getting Started Guide](GETTING_STARTED.md) added
+- ✨ Comprehensive [Getting Started Guide](docs/guides/GETTING_STARTED.md) added
   - Step-by-step installation for all platforms (Windows/Mac/Linux)
   - First project walkthrough
   - AI setup instructions with screenshots
@@ -369,7 +369,7 @@ This script automatically handles the rollover from x.9 to (x+1).0.
 ## 10. Getting Started & Next Steps
 
 ### 👋 New Users
-**First time here?** Check out the **[Getting Started Guide](GETTING_STARTED.md)** for:
+**First time here?** Check out the **[Getting Started Guide](docs/guides/GETTING_STARTED.md)** for:
 - Step-by-step installation
 - Your first project walkthrough  
 - AI setup instructions

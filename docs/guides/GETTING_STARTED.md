@@ -312,8 +312,8 @@ pip install -r requirements.txt --upgrade
 Now that you're set up, try these:
 
 1. 📖 Read the full [README.md](README.md) for advanced features
-2. 🎨 Check out [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md) to understand the UI
-3. 🔐 Review [docs/AUTH_SETUP.md](docs/AUTH_SETUP.md) for account features
+2. 🎨 Check out [DESIGN_SYSTEM.md](../design/DESIGN_SYSTEM.md) to understand the UI
+3. 🔐 Review [AUTH_SETUP.md](../runbooks/AUTH_SETUP.md) for account features
 4. 🐛 Found a bug? [Open an issue](https://github.com/bigmanjer/Mantis-Studio/issues)
 
 ---
