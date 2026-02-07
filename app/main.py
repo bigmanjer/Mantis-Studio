@@ -2739,8 +2739,9 @@ def _run_ui():
             parts.append(f"Genre hints: {genre}")
         if author:
             parts.append(f"Author: {author}")
-        if draft_excerpt:
-            parts.append(f"Draft excerpt: {(draft_excerpt or '').strip()[:MAX_DRAFT_EXCERPT_LENGTH]}")
+        safe_excerpt = draft_excerpt.strip()
+        if safe_excerpt:
+            parts.append(f"Draft excerpt: {safe_excerpt[:MAX_DRAFT_EXCERPT_LENGTH]}")
         return "\n".join(parts) if parts else "A new creative writing project."
 
     def _ai_response_has_error(raw: str) -> bool:
@@ -2755,7 +2756,8 @@ def _run_ui():
             "TASK: Generate a creative, relevant project title.\n"
             "RULES: Return ONLY the title. No quotes. No prefixes."
         )
-        raw = (AIEngine(provider=provider).generate(prompt, model).get("text", "") or "").strip()
+        response = AIEngine(provider=provider).generate(prompt, model)
+        raw = (response.get("text", "") or "").strip()
         if _ai_response_has_error(raw):
             return ""
         clean = re.sub(r"(?i)^(title|project title|suggested title)[:\s-]*", "", raw).strip()
@@ -2770,7 +2772,8 @@ def _run_ui():
             "TASK: Suggest 2-4 genres that fit this project.\n"
             "RULES: Return ONLY a comma-separated list of genres."
         )
-        raw = (AIEngine(provider=provider).generate(prompt, model).get("text", "") or "").strip()
+        response = AIEngine(provider=provider).generate(prompt, model)
+        raw = (response.get("text", "") or "").strip()
         if _ai_response_has_error(raw):
             return []
         raw = raw.replace('"', "").replace("'", "").strip()
