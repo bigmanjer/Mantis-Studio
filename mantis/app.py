@@ -56,7 +56,7 @@ import requests
 from mantis.config.settings import AppConfig, ensure_storage_dirs, load_app_config, logger, save_app_config
 from mantis.core.export import project_to_markdown
 from mantis.core.models import Chapter, Entity, Project, sanitize_chapter_title
-from mantis.core.storage import get_user_projects_dir
+# User accounts removed - get_user_projects_dir function no longer available
 from mantis.core.world_bible import queue_world_bible_suggestion
 from mantis.services.llm import AIEngine, AnalysisEngine, REWRITE_PRESETS, StoryEngine, rewrite_prompt
 from mantis.state.session import initialize_session_state, install_key_helpers, ui_key
@@ -3235,9 +3235,11 @@ def run_selftest() -> int:
     print("[MANTIS SELFTEST]")
     try:
         os.makedirs(AppConfig.PROJECTS_DIR, exist_ok=True)
-        user_projects_dir = get_user_projects_dir(f"selftest_{uuid.uuid4().hex[:8]}")
+        # User accounts removed - use default projects directory
+        selftest_dir = os.path.join(AppConfig.PROJECTS_DIR, f"selftest_{uuid.uuid4().hex[:8]}")
+        os.makedirs(selftest_dir, exist_ok=True)
 
-        p = Project.create("SELFTEST_PROJECT", author="MANTIS", genre="Test", storage_dir=user_projects_dir)
+        p = Project.create("SELFTEST_PROJECT", author="MANTIS", genre="Test", storage_dir=selftest_dir)
         p.outline = "Chapter 1: Test - This is a test outline."
         path = p.save()
         if not os.path.exists(path):
