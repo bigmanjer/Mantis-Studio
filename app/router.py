@@ -2,14 +2,14 @@ from __future__ import annotations
 
 from typing import Callable, Dict, List, Tuple
 
-from mantis.ui.pages.ai_tools import render_ai_settings
-from mantis.ui.pages.chapters import render_chapters
-from mantis.ui.pages.export import render_export
-from mantis.ui.pages.home import render_home
-from mantis.ui.pages.legal import render_legal_redirect
-from mantis.ui.pages.outline import render_outline
-from mantis.ui.pages.projects import render_projects
-from mantis.ui.pages.world import render_world
+from app.views.ai_tools import render_ai_settings
+from app.views.chapters import render_chapters
+from app.views.export import render_export
+from app.views.home import render_home
+from app.views.legal import render_legal_redirect
+from app.views.outline import render_outline
+from app.views.projects import render_projects
+from app.views.world import render_world
 
 
 PageRenderer = Callable[[object], None]

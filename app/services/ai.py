@@ -8,8 +8,8 @@ from typing import Any, Dict, List, Optional
 
 import requests
 
-from mantis.config.settings import AppConfig, logger
-from mantis.core.models import Project
+from app.config.settings import AppConfig, logger
+from app.services.projects import Project
 
 
 def _truncate_prompt(prompt: str, limit: int) -> str:

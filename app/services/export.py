@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from mantis.core.models import Project
+from app.services.projects import Project
 
 
 def project_to_markdown(project: Project) -> str:
