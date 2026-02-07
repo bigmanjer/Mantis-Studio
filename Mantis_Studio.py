@@ -2099,7 +2099,8 @@ def _run_ui():
 
     guest_mode = st.session_state.get("guest_mode", is_guest)
 
-    # init_state("user_id", None)  # Temporarily disabled - user accounts removed
+    # User accounts removed - user_id no longer used but get_effective_key() accepts None
+    init_state("user_id", None)  # Kept for backward compatibility with get_effective_key()
     init_state("projects_dir", None)
     init_state("project", None)
     init_state("page", "home")
@@ -2132,8 +2133,9 @@ def _run_ui():
     )
     init_state("ai_provider", config_data.get("ai_provider", "groq"))
     init_state("ai_session_keys", {"openai": "", "groq": ""})
-    # init_state("ai_saved_keys_cache", {})  # Temporarily disabled - user accounts removed
-    # init_state("ai_saved_keys_user_id", "")  # Temporarily disabled - user accounts removed
+    # User accounts removed - saved keys feature disabled
+    # init_state("ai_saved_keys_cache", {})
+    # init_state("ai_saved_keys_user_id", "")
     init_state("openai_key_input", "")
     init_state("openai_model", config_data.get("openai_model", AppConfig.OPENAI_MODEL))
     init_state("openai_model_list", [])
