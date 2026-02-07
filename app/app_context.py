@@ -169,6 +169,9 @@ def _run_ui():
     def render_copyright():
         st.markdown("## Copyright\n\n© MANTIS Studio")
 
+    def render_help():
+        st.markdown("## Help\n\nVisit our [GitHub](https://github.com/bigmanjer/Mantis-Studio/issues) for support.")
+
     icon_path = ASSETS_DIR / "mantis_logo_trans.png"
     page_icon = str(icon_path) if icon_path.exists() else "🪲"
     st.set_page_config(page_title=AppConfig.APP_NAME, page_icon=page_icon, layout="wide")
@@ -881,6 +884,10 @@ def _run_ui():
         return
     if query == "copyright":
         render_copyright()
+        render_app_footer()
+        return
+    if query == "help":
+        render_help()
         render_app_footer()
         return
 

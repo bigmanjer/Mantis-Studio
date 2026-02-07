@@ -1542,6 +1542,13 @@ def _run_ui():
             st.session_state.page = "legal"
             st.rerun()
 
+    def render_help():
+        content = _read_legal_file("help.md", "## Help\n\nVisit our GitHub for support.")
+        st.markdown(content)
+        if st.button("← Back to Dashboard", key=ui_key("help", "back")):
+            st.session_state.page = "home"
+            st.rerun()
+
     icon_path = ASSETS_DIR / "mantis_logo_trans.png"
     page_icon = str(icon_path) if icon_path.exists() else "🪲"
     st.set_page_config(page_title=AppConfig.APP_NAME, page_icon=page_icon, layout="wide")
@@ -5711,6 +5718,10 @@ def _run_ui():
         elif st.session_state.page == "cookie":
             with key_scope("cookie"):
                 render_cookie()
+            rendered_page = True
+        elif st.session_state.page == "help":
+            with key_scope("help"):
+                render_help()
             rendered_page = True
         elif st.session_state.page == "export":
             with key_scope("export"):
