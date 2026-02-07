@@ -2,16 +2,21 @@
 """
 MANTIS Studio - Application Entry
 
-This file contains the active entry point for the MANTIS Studio UI.
+This file contains an alternative implementation of the MANTIS Studio UI.
+It is NOT the active entry point - see ../app/main.py instead.
+
+This implementation is preserved for reference and potential future consolidation
+as described in README.md Section 9A (Repository Organization Recommendation).
 
 If you're looking to understand how the app works, refer to:
-    - app/router.py (navigation)
-    - app/views/* (view implementations)
+    - ../app/main.py (active entry point)
+    - mantis/router.py (navigation)
+    - mantis/ui/pages/* (view implementations)
 """
-# app/app_context.py — MANTIS Studio
+# app/main.py — MANTIS Studio
 #
 # Run:
-#   python -m streamlit run app/app_context.py
+#   python -m streamlit run app/main.py
 #
 # Requirements:
 #   streamlit>=1.42.0
@@ -61,7 +66,7 @@ from app.services.ai import AIEngine, AnalysisEngine, REWRITE_PRESETS, StoryEngi
 from app.state import initialize_session_state, install_key_helpers, ui_key
 
 # NOTE: Streamlit-dependent utilities are imported inside _run_ui() so
-# `python -m app.app_context --selftest` can run without Streamlit installed.
+# `python app/main.py --selftest` can run without Streamlit installed.
 
 
 # ===== v45 BRANDING (SAFE, ORIGINAL TEMPLATE) =====

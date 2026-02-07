@@ -73,7 +73,7 @@ assets/
 - docs/guides/MIGRATION.md
 
 **Modified Files (3):**
-- app/app_context.py (updated documentation)
+- app/main.py (updated documentation)
 - app/utils/navigation.py (updated to use app/router)
 - .gitignore (added data/projects/)
 
@@ -86,7 +86,7 @@ assets/
 - View files are thin wrappers to main implementation
 
 **Future Migration Path:**
-1. Extract render functions from app/app_context.py to view files
+1. Extract render functions from app/main.py to view files
 2. Extract layout components (sidebar, header) to layout files
 3. Migrate business logic to service modules
 4. Update all imports to use app/ instead of mantis/
@@ -112,7 +112,7 @@ assets/
 **Created:**
 1. **app/README.md** - Comprehensive guide to the new structure
 2. **docs/guides/MIGRATION.md** - Detailed migration guide with file mappings
-3. Updated app/app_context.py docstring with new architecture notes
+3. Updated app/main.py docstring with new architecture notes
 
 **Key Benefits Documented:**
 - ✅ Improved organization with clear separation of concerns
@@ -134,7 +134,7 @@ All requirements from the problem statement have been met:
 
 | Requirement | Status |
 |------------|--------|
-| Single entrypoint (app/app_context.py) | ✅ |
+| Single entrypoint (app/main.py) | ✅ |
 | app/state.py | ✅ |
 | app/router.py | ✅ |
 | app/layout/ (sidebar, header, styles) | ✅ |
@@ -148,7 +148,7 @@ All requirements from the problem statement have been met:
 
 ### 🚀 Next Steps (Optional Future Work)
 
-1. Extract render functions from app/app_context.py to individual view files
+1. Extract render functions from app/main.py to individual view files
 2. Extract sidebar/header logic to app/layout/ modules
 3. Complete migration of business logic to app/services/
 4. Add comprehensive unit tests for each module

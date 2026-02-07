@@ -35,7 +35,7 @@ def _check_imports() -> bool:
 
 def _run_selftest() -> bool:
     result = subprocess.run(
-        [sys.executable, "-m", "app.app_context", "--selftest"],
+        [sys.executable, "-m", "app.main", "--selftest"],
         check=False,
         capture_output=True,
         text=True,

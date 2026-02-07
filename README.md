@@ -11,7 +11,7 @@
 
 1. **[📖 Getting Started Guide](docs/guides/GETTING_STARTED.md)** ← Complete step-by-step installation and setup
 2. **Prerequisites**: Python 3.10+, basic command line knowledge
-3. **Installation**: `pip install -r requirements.txt` then `streamlit run app/app_context.py`
+3. **Installation**: `pip install -r requirements.txt` then `streamlit run app/main.py`
 4. **First Project**: Use the sidebar to create a new project, build your outline, and start writing!
 
 💡 **Just want to try it?** The app works great in "Guest Mode" without any account setup.
@@ -34,7 +34,7 @@ Mantis Studio is meant to replace scattered tools (notes apps, docs, AI chats, s
 * Persistent memory and insights
 * Clean export for manuscripts or planning docs
 
-The app is **state‑driven**, not page‑driven. All navigation feeds a single app shell (`app/app_context.py`).
+The app is **state‑driven**, not page‑driven. All navigation feeds a single app shell (`app/main.py`).
 
 ---
 
@@ -54,7 +54,7 @@ The app is **state‑driven**, not page‑driven. All navigation feeds a single 
 ### Entrypoint
 
 ```
-app/app_context.py
+app/main.py
 ```
 
 This file:
@@ -395,7 +395,7 @@ To ensure long-term maintainability, eliminate dead UI, and prevent state bugs, 
 ```
 Mantis-Studio/
 │
-├── app/app_context.py        # Single entrypoint (routing + layout only)
+├── app/main.py          # Single entrypoint (routing + layout only)
 │
 ├── app/
 │   ├── state.py              # Session state schema + defaults

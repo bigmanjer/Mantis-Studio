@@ -47,7 +47,7 @@ def _import_page_module(label: str, path: pathlib.Path) -> Optional[ModuleType]:
 def import_modules() -> int:
     failures = 0
     modules = [
-        "Mantis_Studio",
+        "app.main",
         "app.utils.auth",
         "app.utils.navigation",
         "app.ui.layout",

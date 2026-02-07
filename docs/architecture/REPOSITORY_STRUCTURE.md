@@ -17,9 +17,9 @@ Mantis-Studio/
 ├── IA_NAV_SPEC.md
 ├── IMPLEMENTATION_SUMMARY.md
 ├── MIGRATION.md
-├── app/app_context.py
-├── README.md
 ├── app/
+│   └── main.py
+├── README.md
 ├── mantis/
 ├── assets/
 ├── docs/                # mixed docs
@@ -32,9 +32,9 @@ Mantis-Studio/
 **After (this change)**
 ```
 Mantis-Studio/
-├── app/app_context.py
-├── README.md
 ├── app/
+│   └── main.py
+├── README.md
 ├── mantis/
 ├── assets/
 ├── docs/
@@ -52,8 +52,8 @@ Mantis-Studio/
 
 ```
 Mantis-Studio/
-├── app/app_context.py             # Streamlit entrypoint
 ├── app/                           # Canonical Streamlit UI + services (current target)
+│   ├── main.py                    # Streamlit entrypoint
 │   ├── components/
 │   ├── layout/
 │   ├── services/
@@ -87,7 +87,7 @@ Mantis-Studio/
 ## Files to merge, split, move, or remove
 - **Merge**: `app/ui/` and `app/components/` once component boundaries are clarified.
 - **Move**: documentation files into `docs/` subfolders (completed in this change).
-- **Split**: large monolithic `app/app_context.py` into view/service modules after migration.
+- **Split**: large monolithic `app/main.py` into view/service modules after migration.
 - **Remove**: tracked log artifacts (keep runtime logs ignored).
 
 ## Breaking changes + mitigation
