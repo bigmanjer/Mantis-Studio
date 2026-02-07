@@ -2,6 +2,24 @@
 
 **Mantis Studio** is an all‑in‑one AI‑assisted writing and story‑development environment built with **Streamlit**. It is designed to take a project from *idea → outline → chapters → world‑building → export*, while maintaining persistent memory and structured data across sessions.
 
+
+---
+
+## 🚀 Quick Start (For First-Time Users)
+
+**New to Mantis Studio?** Start here!
+
+1. **[📖 Getting Started Guide](GETTING_STARTED.md)** ← Complete step-by-step installation and setup
+2. **Prerequisites**: Python 3.10+, basic command line knowledge
+3. **Installation**: `pip install -r requirements.txt` then `streamlit run Mantis_Studio.py`
+4. **First Project**: Use the sidebar to create a new project, build your outline, and start writing!
+
+💡 **Just want to try it?** The app works great in "Guest Mode" without any account setup.
+
+---
+
+## 📚 What This Document Covers
+
 This README explains **what the app does, how it is structured, what every major button/section is supposed to do, and how the UI flows from a user’s point of view**.
 
 ---
@@ -272,7 +290,17 @@ Displayed in UI header for transparency.
 
 ---
 
-## 9. Recommended Next Steps
+## 9. Getting Started & Next Steps
+
+### 👋 New Users
+**First time here?** Check out the **[Getting Started Guide](GETTING_STARTED.md)** for:
+- Step-by-step installation
+- Your first project walkthrough  
+- AI setup instructions
+- Troubleshooting help
+
+### 🔧 For Developers
+Recommended technical improvements:
 
 1. Remove legacy Streamlit multipage routing (`/pages`)
 2. Centralize all navigation and callbacks
