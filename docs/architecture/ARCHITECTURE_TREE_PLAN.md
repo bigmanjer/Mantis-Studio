@@ -39,7 +39,7 @@
 2. **Core extraction**: move settings, models, storage, and LLM services into `mantis/` modules; add shims.
 3. **UI extraction**: move layout/theming and page renderers into `mantis/ui` with a router in `mantis/router.py`.
 4. **Entrypoint shim**: reduce `Mantis_Studio.py` to import and run `mantis.app.run_app()`.
-5. **Docs + smoke test**: add `docs/SMOKE_TEST.md` with manual verification steps.
+5. **Docs + smoke test**: add `docs/runbooks/SMOKE_TEST.md` with manual verification steps.
 
 ## Risks + Mitigations
 - **Widget keys changing** → `ui_key()` returns unchanged key names and is used consistently.

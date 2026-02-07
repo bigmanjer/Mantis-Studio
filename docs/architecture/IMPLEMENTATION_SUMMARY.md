@@ -70,7 +70,7 @@ assets/
 - data/projects/ (directory)
 - assets/styles.css
 - .github/workflows/version-bump.yml
-- MIGRATION.md
+- docs/guides/MIGRATION.md
 
 **Modified Files (3):**
 - Mantis_Studio.py (updated documentation)
@@ -111,7 +111,7 @@ assets/
 
 **Created:**
 1. **app/README.md** - Comprehensive guide to the new structure
-2. **MIGRATION.md** - Detailed migration guide with file mappings
+2. **docs/guides/MIGRATION.md** - Detailed migration guide with file mappings
 3. Updated Mantis_Studio.py docstring with new architecture notes
 
 **Key Benefits Documented:**
