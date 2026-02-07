@@ -2099,8 +2099,8 @@ def _run_ui():
 
     guest_mode = st.session_state.get("guest_mode", is_guest)
 
-    # User accounts removed - user_id no longer used but get_effective_key() accepts None
-    init_state("user_id", None)  # Kept for backward compatibility with get_effective_key()
+    # User accounts removed - user_id kept at None since get_effective_key() accepts optional user_id parameter
+    init_state("user_id", None)
     init_state("projects_dir", None)
     init_state("project", None)
     init_state("page", "home")

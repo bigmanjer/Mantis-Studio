@@ -56,7 +56,7 @@ import requests
 from mantis.config.settings import AppConfig, ensure_storage_dirs, load_app_config, logger, save_app_config
 from mantis.core.export import project_to_markdown
 from mantis.core.models import Chapter, Entity, Project, sanitize_chapter_title
-# Removed: get_user_projects_dir (user accounts removed)
+# User accounts removed - get_user_projects_dir function no longer available
 from mantis.core.world_bible import queue_world_bible_suggestion
 from mantis.services.llm import AIEngine, AnalysisEngine, REWRITE_PRESETS, StoryEngine, rewrite_prompt
 from mantis.state.session import initialize_session_state, install_key_helpers, ui_key
