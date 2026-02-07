@@ -39,6 +39,7 @@ Thumbs.db
 
 # Project specific
 projects/
+data/projects/
 .mantis_config.json
 logs/*.log
 
