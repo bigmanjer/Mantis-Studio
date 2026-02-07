@@ -1,0 +1,57 @@
+from __future__ import annotations
+
+from typing import Callable, Dict, List, Tuple
+
+from app.views.ai_tools import render_ai_settings
+from app.views.editor import render_chapters
+from app.views.export import render_export
+from app.views.dashboard import render_home
+from app.views.legal import render_legal_redirect
+from app.views.outline import render_outline
+from app.views.projects import render_projects
+from app.views.world_bible import render_world
+
+
+PageRenderer = Callable[[object], None]
+
+
+def get_nav_config(has_project: bool) -> Tuple[List[str], Dict[str, str]]:
+    nav_labels = [
+        "Dashboard",
+        "Projects",
+        "Outline",
+        "Editor",
+        "World Bible",
+        "Export",
+        "AI Tools",
+    ]
+    pmap = {
+        "Dashboard": "home",
+        "Projects": "projects",
+        "Outline": "outline",
+        "Editor": "chapters",
+        "World Bible": "world",
+        "Memory": "memory",
+        "Insights": "insights",
+        "Export": "export",
+        "AI Tools": "ai",
+    }
+    return nav_labels, pmap
+
+
+def get_routes() -> Dict[str, PageRenderer]:
+    return {
+        "home": render_home,
+        "projects": render_projects,
+        "outline": render_outline,
+        "chapters": render_chapters,
+        "world": render_world,
+        "export": render_export,
+        "ai": render_ai_settings,
+        "legal": render_legal_redirect,
+    }
+
+
+def resolve_route(page_key: str) -> PageRenderer:
+    routes = get_routes()
+    return routes.get(page_key, render_home)

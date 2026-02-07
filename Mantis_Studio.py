@@ -14,12 +14,20 @@ Or with utility flags:
 
 Architecture:
     - State-based navigation via st.session_state.page
-    - Views are rendered by mantis.router based on page state
+    - Views are available in app/views/ directory
+    - Business logic in app/services/ directory
     - All navigation happens within this single entry point
     - NO Streamlit multipage routing (no /pages directory)
 
-Note: mantis/app.py contains an alternative implementation but is currently unused.
-      Future refactoring may consolidate these into the recommended structure from README.
+Directory Structure:
+    app/
+    ├── state.py              # Session state schema + defaults
+    ├── router.py             # Central navigation logic
+    ├── layout/               # UI layout components (sidebar, header, styles)
+    ├── views/                # UI screens (dashboard, projects, editor, etc.)
+    ├── components/           # Reusable UI blocks
+    ├── services/             # Business logic (projects, storage, auth, AI, export)
+    └── utils/                # Utilities (versioning, helpers)
 """
 
 import datetime
