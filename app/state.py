@@ -210,8 +210,6 @@ def initialize_session_state(st, auth, config_data: Dict[str, str]) -> Dict[str,
         st.session_state.openai_model_list = []
     if "openai_model_tests" not in st.session_state:
         st.session_state.openai_model_tests = {}
-    if "ui_theme" not in st.session_state:
-        st.session_state.ui_theme = config_data.get("ui_theme", "Dark")
     if "groq_base_url" not in st.session_state:
         st.session_state.groq_base_url = config_data.get("groq_base_url", AppConfig.GROQ_API_URL)
     st.session_state.groq_api_key = _resolve_api_key("groq", AppConfig.GROQ_API_KEY)
