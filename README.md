@@ -260,17 +260,67 @@ Should **not** clutter main navigation for most users.
 
 ---
 
-## 6. Known Issues (High Impact)
+## 6. Recent Improvements (Version 84.7)
 
-* Buttons triggering no action (missing callbacks)
-* Duplicate UI logic across files
-* Legacy `/pages` causing confusion
-* Inconsistent state keys
-* Account flow lacks fallback auth
+### ✅ User Experience Enhancements
+
+**New Documentation:**
+- ✨ Comprehensive [Getting Started Guide](GETTING_STARTED.md) added
+  - Step-by-step installation for all platforms (Windows/Mac/Linux)
+  - First project walkthrough
+  - AI setup instructions with screenshots
+  - Troubleshooting section for common issues
+  - FAQ for new users
+
+**README Improvements:**
+- 🚀 Added Quick Start section at the top for impatient users
+- 📖 Clear prerequisites and installation steps
+- 🔗 Prominent links to detailed guides
+
+**In-App Improvements:**
+- 👋 First-time welcome screen on Dashboard
+  - Clear getting started instructions
+  - Quick tips for navigation
+  - Direct link to create first project
+- 💡 Context-aware help tooltips throughout the app
+- 📝 Better descriptions for confusing features (World Bible, etc.)
+
+### 🎯 What Changed
+
+**For First-Time Users:**
+1. **Before**: Confusing empty dashboard with no guidance
+2. **After**: Friendly welcome message with clear next steps
+
+**Documentation:**
+1. **Before**: README was technical and developer-focused
+2. **After**: Quick Start section + dedicated Getting Started guide for writers
+
+**Navigation:**
+1. **Before**: No explanation of what "World Bible" or other features do
+2. **After**: Improved descriptions and contextual help
 
 ---
 
-## 7. Versioning System
+## 7. Known Issues & Planned Improvements
+
+### Current Limitations
+
+* Account sync features are temporarily disabled (local-only mode works great!)
+* Some AI features are experimental
+* Legacy `/pages` directory exists but is not used (can be safely ignored)
+
+### Recommended Next Steps for Contributors
+
+1. Complete account authentication flow reactivation
+2. Add in-app tutorial/walkthrough mode
+3. Create sample projects for users to explore
+4. Add keyboard shortcuts reference
+5. Improve error messages to be more helpful
+6. Add video tutorials for key workflows
+
+---
+
+## 8. Versioning System
 
 * Version stored in `VERSION.txt`
 * GitHub Action: `.github/workflows/version-bump.yml`
@@ -280,7 +330,7 @@ Displayed in UI header for transparency.
 
 ---
 
-## 8. Who This App Is For
+## 9. Who This App Is For
 
 * Novelists
 * Screenwriters
@@ -290,7 +340,7 @@ Displayed in UI header for transparency.
 
 ---
 
-## 9. Getting Started & Next Steps
+## 10. Getting Started & Next Steps
 
 ### 👋 New Users
 **First time here?** Check out the **[Getting Started Guide](GETTING_STARTED.md)** for:
