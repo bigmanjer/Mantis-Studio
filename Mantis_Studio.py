@@ -1,5 +1,26 @@
 #!/usr/bin/env python3
-"""Streamlit entrypoint shim for MANTIS Studio."""
+"""
+MANTIS Studio - Main Entry Point
+
+This is the primary Streamlit application entry point for MANTIS Studio.
+It implements a state-driven (not page-driven) navigation system.
+
+Run with:
+    streamlit run Mantis_Studio.py
+
+Or with utility flags:
+    python Mantis_Studio.py --selftest    # Run self-tests
+    python Mantis_Studio.py --repair      # Repair project files
+
+Architecture:
+    - State-based navigation via st.session_state.page
+    - Views are rendered by mantis.router based on page state
+    - All navigation happens within this single entry point
+    - NO Streamlit multipage routing (no /pages directory)
+
+Note: mantis/app.py contains an alternative implementation but is currently unused.
+      Future refactoring may consolidate these into the recommended structure from README.
+"""
 
 import datetime
 import json
@@ -17,8 +38,6 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
 import requests
-
-from mantis.app import run_app
 
 from app.utils.navigation import get_nav_config
 
@@ -2138,9 +2157,6 @@ def _run_ui():
             return bool(st.session_state.get("debug"))
 
     def open_legal_page() -> None:
-        if hasattr(st, "switch_page"):
-            st.switch_page("pages/Legal Center.py")
-            return
         st.session_state.page = "legal"
         st.rerun()
 
@@ -2163,9 +2179,6 @@ def _run_ui():
             "payload": payload or {},
             "return_to": return_to or st.session_state.get("page", "home"),
         }
-        if hasattr(st, "switch_page"):
-            st.switch_page("pages/Account Settings.py")
-            return
         st.session_state.page = "account"
         st.rerun()
 
@@ -2181,9 +2194,6 @@ def _run_ui():
                 reason or GUEST_BANNER_TEXT,
                 return_to=return_to or st.session_state.get("page", "home"),
             )
-            return
-        if hasattr(st, "switch_page"):
-            st.switch_page("pages/Account Settings.py")
             return
         st.session_state.page = "account"
         st.rerun()
@@ -2341,9 +2351,6 @@ def _run_ui():
         st.session_state["auth_redirect_action"] = action
         st.session_state["auth_redirect_reason"] = reason or GUEST_BANNER_TEXT
         st.session_state["auth_redirect_return_page"] = return_to
-        if hasattr(st, "switch_page"):
-            st.switch_page("pages/Account Settings.py")
-            return
         st.session_state.page = "account"
         st.rerun()
 
@@ -3368,10 +3375,8 @@ def _run_ui():
         )
         st.info("Open the Legal Hub for full policies and documentation.")
         if st.button("Open Legal Hub", use_container_width=True):
-            if hasattr(st, "switch_page"):
-                st.switch_page("pages/Legal Center.py")
-            else:
-                st.info("Use the studio footer to open Legal.")
+            st.session_state.page = "legal"
+            st.rerun()
 
     with st.sidebar:
         with key_scope("sidebar"):

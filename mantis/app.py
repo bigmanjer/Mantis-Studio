@@ -1,4 +1,18 @@
 #!/usr/bin/env python3
+"""
+MANTIS Studio - Alternative Implementation (Currently Unused)
+
+This file contains an alternative implementation of the MANTIS Studio UI.
+It is NOT the active entry point - see ../Mantis_Studio.py instead.
+
+This implementation is preserved for reference and potential future consolidation
+as described in README.md Section 9A (Repository Organization Recommendation).
+
+If you're looking to understand how the app works, refer to:
+    - ../Mantis_Studio.py (active entry point)
+    - mantis/router.py (navigation)
+    - mantis/ui/pages/* (view implementations)
+"""
 # Mantis_Studio.py — MANTIS Studio
 #
 # Run:
@@ -170,10 +184,8 @@ def _run_ui():
 
     
     def open_legal_page() -> None:
-        if hasattr(st, "switch_page"):
-            st.switch_page("pages/legal.py")
-            return
-        st.toast("Open the Legal page from the sidebar menu if it did not open.")
+        st.session_state.page = "legal"
+        st.rerun()
 
     GUEST_BANNER_TEXT = (
         "Guest mode: your work saves locally in this session. Create an account to sync and export."
@@ -194,11 +206,8 @@ def _run_ui():
             "payload": payload or {},
             "return_to": return_to or st.session_state.get("page", "home"),
         }
-        if hasattr(st, "switch_page"):
-            st.switch_page("pages/account.py")
-        else:
-            st.session_state.page = "account"
-            st.rerun()
+        st.session_state.page = "account"
+        st.rerun()
 
     def persist_project(
         project: "Project",
@@ -325,11 +334,8 @@ def _run_ui():
         st.session_state["auth_redirect_action"] = action
         st.session_state["auth_redirect_reason"] = reason or GUEST_BANNER_TEXT
         st.session_state["auth_redirect_return_page"] = return_to
-        if hasattr(st, "switch_page"):
-            st.switch_page("pages/account.py")
-        else:
-            st.session_state.page = "account"
-            st.rerun()
+        st.session_state.page = "account"
+        st.rerun()
 
     def require_account(action: str, payload: Optional[Dict[str, Any]] = None, return_to: str = "home") -> bool:
         if st.session_state.get("guest_mode"):
@@ -1178,10 +1184,8 @@ def _run_ui():
         )
         st.info("Open the Legal Hub for full policies and documentation.")
         if st.button("Open Legal Hub", use_container_width=True):
-            if hasattr(st, "switch_page"):
-                st.switch_page("pages/legal.py")
-            else:
-                st.info("Use the sidebar to open Legal from the page menu.")
+            st.session_state.page = "legal"
+            st.rerun()
 
     with st.sidebar:
         with key_scope("sidebar"):
