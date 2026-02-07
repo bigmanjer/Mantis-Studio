@@ -1,3 +1,9 @@
+"""AI and LLM services for Mantis Studio.
+
+Note: This module is part of the new app/ structure.
+      Current implementation still uses mantis.core.models for backward compatibility.
+      These imports will be updated when the migration is complete.
+"""
 from __future__ import annotations
 
 import json
@@ -8,8 +14,8 @@ from typing import Any, Dict, List, Optional
 
 import requests
 
-from app.config.settings import AppConfig, logger
-from app.services.projects import Project
+from mantis.config.settings import AppConfig, logger
+from mantis.core.models import Project
 
 
 def _truncate_prompt(prompt: str, limit: int) -> str:

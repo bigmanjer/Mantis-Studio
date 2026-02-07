@@ -4,7 +4,7 @@ import os
 import time
 from typing import Optional
 
-from app.config.settings import AppConfig
+from mantis.config.settings import AppConfig
 
 
 def _acquire_lock(lock_path: str, timeout: int, retry_sleep: float) -> bool:

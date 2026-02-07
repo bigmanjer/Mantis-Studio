@@ -1,3 +1,9 @@
+"""Project models and logic for Mantis Studio.
+
+Note: This module is part of the new app/ structure.
+      Current implementation still uses mantis.core.models for backward compatibility.
+      These imports will be updated when the migration is complete.
+"""
 from __future__ import annotations
 
 import difflib
@@ -10,8 +16,8 @@ import uuid
 from dataclasses import asdict, dataclass, field, fields
 from typing import Any, Dict, List, Optional
 
-from app.config.settings import AppConfig, logger
-from app.services.storage import _acquire_lock, _release_lock, resolve_storage_dir
+from mantis.config.settings import AppConfig, logger
+from mantis.core.storage import _acquire_lock, _release_lock, resolve_storage_dir
 
 
 @dataclass

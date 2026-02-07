@@ -1,6 +1,12 @@
+"""Export functionality for Mantis Studio.
+
+Note: This module is part of the new app/ structure.
+      Current implementation still uses mantis.core.models for backward compatibility.
+      These imports will be updated when the migration is complete.
+"""
 from __future__ import annotations
 
-from app.services.projects import Project
+from mantis.core.models import Project
 
 
 def project_to_markdown(project: Project) -> str:
