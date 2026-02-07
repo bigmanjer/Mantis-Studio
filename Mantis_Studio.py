@@ -105,6 +105,9 @@ class AppConfig:
     SAVE_LOCK_TIMEOUT = int(os.getenv("MANTIS_SAVE_LOCK_TIMEOUT", "5"))
     SAVE_LOCK_RETRY_SLEEP = float(os.getenv("MANTIS_SAVE_LOCK_RETRY_SLEEP", "0.1"))
     WORLD_BIBLE_CONFIDENCE = float(os.getenv("MANTIS_WORLD_BIBLE_CONFIDENCE", "0.75"))
+    
+    # Documentation URLs
+    GETTING_STARTED_URL = "https://github.com/bigmanjer/Mantis-Studio/blob/main/GETTING_STARTED.md"
 
 
 os.makedirs(AppConfig.PROJECTS_DIR, exist_ok=True)
@@ -2207,8 +2210,39 @@ def _run_ui():
 
     # Temporarily disabled - user accounts removed
     def render_guest_banner(context: str) -> None:
-        # Guest banner disabled - no account functionality
-        pass
+        """Show helpful context-aware guidance for users, especially first-timers."""
+        # Show first-time welcome on home page only
+        if context == "home" and st.session_state.get("first_run", True):
+            with st.container(border=True):
+                st.markdown("### 👋 Welcome to Mantis Studio!")
+                st.markdown(f"""
+                **Your AI-powered writing environment is ready.**
+                
+                **Getting Started:**
+                - 📁 Click **Projects** in the sidebar to create your first story
+                - 📖 Check out the [Getting Started Guide]({AppConfig.GETTING_STARTED_URL}) for a complete walkthrough
+                - 💡 Everything auto-saves locally—no account needed to start writing!
+                
+                **Quick Tips:**
+                - Use **Outline** to plan your story structure
+                - **Chapters** is your writing workspace  
+                - **World Bible** keeps track of characters and lore
+                - **Export** to get your work as a Word doc or PDF
+                """)
+                col1, col2 = st.columns(2)
+                with col1:
+                    if st.button("🚀 Create My First Project", use_container_width=True, type="primary"):
+                        st.session_state.first_run = False
+                        st.session_state.page = "projects"
+                        st.rerun()
+                with col2:
+                    if st.button("✅ Got it, don't show again", use_container_width=True):
+                        st.session_state.first_run = False
+                        st.rerun()
+        
+        # Show context-specific tips for first-time users on other pages
+        elif st.session_state.get("first_run", True) and context != "home":
+            st.info(f"💡 **Tip**: Check out the [Getting Started Guide]({AppConfig.GETTING_STARTED_URL}) for help using this section.", icon="💡")
 
     def render_app_footer() -> None:
         render_footer(AppConfig.VERSION)
@@ -4150,7 +4184,7 @@ def _run_ui():
 
         render_page_header(
             "World Bible",
-            "Track canonical characters, locations, factions, and lore.",
+            "Your story's encyclopedia: Track characters, locations, factions, and lore. Mantis uses this to keep your writing consistent.",
             primary_label="➕ Add Entity",
             primary_action=open_add_entity,
             primary_help="Add a new character, location, faction, or lore entry",
