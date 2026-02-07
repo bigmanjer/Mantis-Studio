@@ -3142,20 +3142,10 @@ def _run_ui():
                 st.toast("No entities detected in this text.", icon="🤷")
 
     query = st.query_params.get("page")
-    if query == "privacy":
-        render_privacy()
-        render_app_footer()
-        return
-    if query == "terms":
-        render_terms()
-        render_app_footer()
-        return
-    if query == "copyright":
-        render_copyright()
-        render_app_footer()
-        return
-    if query == "legal":
-        open_legal_page()
+    if query in {"privacy", "terms", "copyright", "legal"}:
+        st.session_state.page = query
+        st.query_params.clear()
+        st.rerun()
         return
 
     def render_ai_settings():
@@ -5659,6 +5649,18 @@ def _run_ui():
         elif st.session_state.page == "legal":
             with key_scope("legal"):
                 render_legal_redirect()
+            rendered_page = True
+        elif st.session_state.page == "privacy":
+            with key_scope("privacy"):
+                render_privacy()
+            rendered_page = True
+        elif st.session_state.page == "terms":
+            with key_scope("terms"):
+                render_terms()
+            rendered_page = True
+        elif st.session_state.page == "copyright":
+            with key_scope("copyright"):
+                render_copyright()
             rendered_page = True
         elif st.session_state.page == "export":
             with key_scope("export"):
