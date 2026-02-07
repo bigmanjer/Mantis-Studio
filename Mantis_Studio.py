@@ -5056,9 +5056,16 @@ def _run_ui():
         with col_nav:
             with st.container(border=True):
                 st.markdown("### 📍 Chapters")
+                st.caption("Select a chapter to edit.")
                 for c in chaps:
                     lbl = f"{c.index}. {(c.title or 'Untitled')[:18]}"
-                    if st.button(lbl, key=f"n_{c.id}", type="primary" if c.id == curr.id else "secondary", use_container_width=True):
+                    if st.button(
+                        lbl,
+                        key=f"n_{c.id}",
+                        type="primary" if c.id == curr.id else "secondary",
+                        use_container_width=True,
+                        help=c.title or "Untitled",
+                    ):
                         st.session_state.curr_chap_id = c.id
                         st.rerun()
 
@@ -5081,13 +5088,16 @@ def _run_ui():
 
         with col_editor:
             with st.container(border=True):
+                st.markdown("#### Drafting")
+                st.caption("Update the chapter title, target length, and draft text.")
                 h1, h2 = st.columns([3, 1])
                 with h1:
                     curr.title = st.text_input(
                         "Chapter Title",
                         curr.title,
                         label_visibility="collapsed",
-                        help="Edit the title of this chapter"
+                        help="Edit the title of this chapter",
+                        placeholder="Chapter title",
                     )
                 with h2:
                     curr.target_words = st.number_input(
@@ -5105,17 +5115,25 @@ def _run_ui():
                     height=680,
                     label_visibility="collapsed",
                     key=f"ed_{curr.id}",
-                    help="Write your chapter content here. Changes are auto-saved."
+                    help="Write your chapter content here. Auto-save captures changes when enabled.",
                 )
                 if val != curr.content:
                     curr.update_content(val, "manual")
                     save_p()
 
+                autosave_state = "On" if st.session_state.auto_save else "Off (remember to save)"
+                last_edit = datetime.datetime.fromtimestamp(curr.modified_at).strftime("%b %d, %H:%M")
+                st.caption(f"🕒 Last edited: {last_edit} • 💾 Auto-save: {autosave_state}")
                 st.caption(f"📝 Chapter: {curr.word_count} words • 📚 Total: {p.get_total_word_count()} words")
 
                 c1, c2 = st.columns([1, 1])
                 with c1:
-                    if st.button("💾 Save Chapter", type="primary", use_container_width=True):
+                    if st.button(
+                        "💾 Save & Scan Entities",
+                        type="primary",
+                        use_container_width=True,
+                        help="Save this chapter and scan for new World Bible entities.",
+                    ):
                         curr.update_content(val, "manual")
                         if persist_project(p, prompt_on_guest=True, action="save"):
                             # Automatically scan entities from this chapter when the user explicitly saves it.
@@ -5124,18 +5142,19 @@ def _run_ui():
                 with c2:
                     summary_cooldown = _cooldown_remaining(f"summary_{curr.id}", 10)
                     summary_label = (
-                        f"📝 Update Summary ({summary_cooldown}s)"
+                        f"📝 Generate Summary ({summary_cooldown}s)"
                         if summary_cooldown
-                        else "📝 Update Summary"
+                        else "📝 Generate Summary"
                     )
                     if not active_key:
                         st.info(
-                            f"Add a {_provider_label(provider)} API key in AI Settings to update summaries."
+                            f"Add a {_provider_label(provider)} API key in AI Settings to generate summaries."
                         )
                     if st.button(
                         summary_label,
                         use_container_width=True,
                         disabled=bool(summary_cooldown) or not active_key,
+                        help="Create or refresh the chapter summary.",
                     ):
                         _mark_action(f"summary_{curr.id}")
                         summary = StoryEngine.summarize(curr.content or "", get_ai_model())
@@ -5165,7 +5184,7 @@ def _run_ui():
                         return ""
                     return full
 
-                with st.expander("✨ Modify / Improve Text"):
+                with st.expander("✨ Improve Draft"):
                     rewrite_locked = curr.index in locked_chapters
                     style = st.selectbox(
                         "How to improve?",
@@ -5211,7 +5230,7 @@ def _run_ui():
                             st.rerun()
 
                 if st.button(
-                    "↩️ Undo last apply",
+                    "↩️ Undo last AI apply",
                     use_container_width=True,
                     key=f"editor_improve__undo_{curr.id}",
                     help="Restore the previous chapter text, if available.",
@@ -5266,6 +5285,7 @@ def _run_ui():
                 st.caption("Generate new prose from your outline + previous context.")
 
                 canon_icon, canon_label = get_canon_health()
+                st.caption(f"Canon status: {canon_icon} {canon_label}")
                 canon_blocked = canon_icon == "🔴"
                 if canon_blocked:
                     st.button(
@@ -5285,11 +5305,13 @@ def _run_ui():
                         if auto_cooldown
                         else "✨ Auto-Write Chapter"
                     )
+                    full = ""
                     if st.button(
                         auto_label,
                         type="primary",
                         use_container_width=True,
                         disabled=bool(auto_cooldown) or not active_key,
+                        help="Generate a new draft using your outline and chapter context.",
                     ):
                         _mark_action(f"auto_write_{curr.id}")
                         prompt = StoryEngine.generate_chapter_prompt(p, curr.index, int(curr.target_words))
@@ -5327,7 +5349,7 @@ def _run_ui():
                 if curr.summary:
                     st.info(curr.summary)
                 else:
-                    st.info("No summary yet. Click **Update Summary** to generate one.")
+                    st.info("No summary yet. Click **Generate Summary** to create one.")
 
         pending_text = st.session_state.get("pending_improvement_text") or ""
         pending_meta = st.session_state.get("pending_improvement_meta") or {}
@@ -5380,7 +5402,7 @@ def _run_ui():
                         )
 
                 apply_mode = st.selectbox(
-                    "Apply result as",
+                    "Apply improved text as",
                     [
                         "Replace chapter",
                         "Save as new draft/version",
