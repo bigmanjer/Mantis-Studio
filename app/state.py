@@ -5,7 +5,7 @@ import uuid
 from collections.abc import Generator
 from typing import Dict, List, Optional, Tuple
 
-from mantis.config.settings import AppConfig
+from app.config.settings import AppConfig
 
 
 def ui_key(name: str) -> str:

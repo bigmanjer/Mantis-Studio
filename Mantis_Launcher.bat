@@ -62,7 +62,7 @@ if not defined PYTHON_CMD (
 :: ============================================================== 
 set "APP_FILE="
 for %%F in (
-  Mantis_Studio.py
+  app\app_context.py
 ) do (
   if not defined APP_FILE if exist "%%~F" set "APP_FILE=%%~F"
 )

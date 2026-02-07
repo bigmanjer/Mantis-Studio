@@ -167,7 +167,7 @@ def get_user_display_name(user: dict) -> str:
 # -----------------------------
 def get_user_id_with_fallback(user: Any) -> str:
     """
-    Mantis_Studio.py calls this. Always return a stable user id string.
+    app/app_context.py calls this. Always return a stable user id string.
     """
     if not user:
         return str(st.session_state.get("guest_user_id") or "guest")
@@ -339,7 +339,7 @@ def logout_button(label: str = "Log out", key: str = "logout", extra_state_keys:
 
 
 # -----------------------------
-# Optional: Login gate helper (if Mantis_Studio.py uses it later)
+# Optional: Login gate helper (if app/app_context.py uses it later)
 # -----------------------------
 def require_login(
     reason: str = "Please sign in to continue.",

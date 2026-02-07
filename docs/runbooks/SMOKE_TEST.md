@@ -6,7 +6,7 @@
 3. `pip install -r requirements.txt`
 
 ## Run
-1. `streamlit run Mantis_Studio.py`
+1. `streamlit run app/app_context.py`
 
 ## Click-Test Checklist
 - Dashboard

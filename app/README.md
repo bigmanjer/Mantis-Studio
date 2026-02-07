@@ -45,7 +45,7 @@ app/
 
 ## Design Principles
 
-1. **Single Entry Point**: `Mantis_Studio.py` is the only entry point
+1. **Single Entry Point**: `app/app_context.py` is the only entry point
 2. **State-Driven Navigation**: Uses `st.session_state.page` for routing
 3. **Separation of Concerns**: UI (views) separate from logic (services)
 4. **Reusability**: Common components in `components/` directory
@@ -65,7 +65,7 @@ The directory structure has been created and organized. The following components
 
 ## Current Implementation
 
-Currently, the actual render logic still resides in `Mantis_Studio.py` for backward compatibility. 
+Currently, the actual render logic still resides in `app/app_context.py` for backward compatibility. 
 The view files in `app/views/` are thin wrappers that delegate to the main file's render functions.
 
 This allows the new structure to coexist with the existing implementation while providing a clear 
@@ -73,7 +73,7 @@ path for future refactoring.
 
 ## Future Enhancements
 
-1. Extract render functions from `Mantis_Studio.py` into respective view files
-2. Move business logic from `Mantis_Studio.py` to service modules
+1. Extract render functions from `app/app_context.py` into respective view files
+2. Move business logic from `app/app_context.py` to service modules
 3. Extract layout components (sidebar, header) into layout modules
 4. Deprecate and remove the `mantis/` directory once migration is complete

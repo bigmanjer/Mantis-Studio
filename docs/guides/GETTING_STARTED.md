@@ -113,7 +113,7 @@ This gives you a cool animated startup screen and auto-opens your browser!
 
 **Option B: Manual Launch (All Platforms)**
 ```bash
-streamlit run Mantis_Studio.py
+streamlit run app/app_context.py
 ```
 
 After a few seconds, your browser should automatically open to `http://localhost:8501`
@@ -270,7 +270,7 @@ Now you can use AI features like:
 1. Did you activate the virtual environment? (You should see `(.venv)` in your terminal)
 2. Did you install dependencies? Try running `pip install -r requirements.txt` again
 3. Is Streamlit installed? Try `pip install streamlit --upgrade`
-4. Try running with verbose errors: `streamlit run Mantis_Studio.py --logger.level=debug`
+4. Try running with verbose errors: `streamlit run app/app_context.py --logger.level=debug`
 
 ### "I don't see my AI features working"
 

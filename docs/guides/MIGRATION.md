@@ -65,7 +65,7 @@ The new structure **maintains backward compatibility** with existing code:
 - Maintained backward compatibility
 
 ### Phase 2: Future Extraction (Planned)
-- Extract render functions from `Mantis_Studio.py` to view files
+- Extract render functions from `app/app_context.py` to view files
 - Extract sidebar/header logic to layout files
 - Move business logic to service files
 - Update all imports to use `app/` instead of `mantis/`
