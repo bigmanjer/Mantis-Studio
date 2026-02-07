@@ -3043,15 +3043,20 @@ def _run_ui():
         st.markdown("### Choose Your AI Provider")
         st.caption("Select which provider to use for AI-powered features like outlining, brainstorming, and text generation.")
         
+        col1, col2 = st.columns(2)
+        with col1:
+            st.info("**Groq** - Fast & Free\n\nGreat for getting started quickly with no cost.")
+        with col2:
+            st.info("**OpenAI** - Advanced Models\n\nIncludes GPT-4 and other powerful models (paid).")
+        
         provider_choice = st.radio(
             "Which provider would you like to use?",
-            ["Groq (Fast & Free)", "OpenAI (Advanced Models)"],
+            ["Groq", "OpenAI"],
             horizontal=True,
             index=0 if st.session_state.ai_provider == "groq" else 1,
             key="ai_provider_choice",
-            help="Groq offers fast, free models. OpenAI provides more advanced models like GPT-4."
         )
-        provider_value = "groq" if "Groq" in provider_choice else "openai"
+        provider_value = "groq" if provider_choice == "Groq" else "openai"
         if provider_value != st.session_state.ai_provider:
             st.session_state.ai_provider = provider_value
 
@@ -3194,6 +3199,7 @@ def _run_ui():
                     else:
                         st.error("✗ Connection failed. Check your API key and base URL.")
 
+            if st.session_state.openai_model_list:
                 with st.expander("🧪 Advanced: Test All Models", expanded=False):
                     st.warning("⚠️ This will test each model individually. It may take time and consume API credits.")
                     openai_test_all_cooldown = _cooldown_remaining("openai_test_models", 20)
