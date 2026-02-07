@@ -2438,9 +2438,11 @@ def _run_ui():
         primary_label: Optional[str] = None,
         primary_action: Optional[Callable[[], None]] = None,
         primary_disabled: bool = False,
+        primary_help: Optional[str] = None,
         secondary_label: Optional[str] = None,
         secondary_action: Optional[Callable[[], None]] = None,
         secondary_disabled: bool = False,
+        secondary_help: Optional[str] = None,
         tag: Optional[str] = None,
         key_prefix: str = "page_header",
     ) -> None:
@@ -2454,6 +2456,7 @@ def _run_ui():
                     use_container_width=True,
                     key=f"{key_prefix}__primary",
                     disabled=primary_disabled,
+                    help=primary_help,
                 ):
                     primary_action()
         with action_cols[1]:
@@ -2463,6 +2466,7 @@ def _run_ui():
                     use_container_width=True,
                     key=f"{key_prefix}__secondary",
                     disabled=secondary_disabled,
+                    help=secondary_help,
                 ):
                     secondary_action()
 
@@ -2951,10 +2955,19 @@ def _run_ui():
         )
         action_row = st.columns(2)
         with action_row[0]:
-            if st.button("💾 Save settings", type="primary", use_container_width=True):
+            if st.button(
+                "💾 Save Settings",
+                type="primary",
+                use_container_width=True,
+                help="Save your AI provider configuration and API keys"
+            ):
                 save_settings_action()
         with action_row[1]:
-            if st.button("↻ Refresh models", use_container_width=True):
+            if st.button(
+                "↻ Refresh Models",
+                use_container_width=True,
+                help="Reload available models from connected AI providers"
+            ):
                 refresh_all_models()
         if st.session_state.pop("ai_settings__flash", False):
             st.success("AI Settings opened. Update providers and models below.")
@@ -2970,11 +2983,12 @@ def _run_ui():
             st.metric("Active model", get_ai_model() or "Not set")
 
         provider_choice = st.radio(
-            "Active provider",
+            "Active AI Provider",
             ["Groq", "OpenAI"],
             horizontal=True,
             index=0 if st.session_state.ai_provider == "groq" else 1,
             key="ai_provider_choice",
+            help="Select which AI provider to use for generation and analysis features"
         )
         provider_value = "groq" if provider_choice == "Groq" else "openai"
         if provider_value != st.session_state.ai_provider:
@@ -3326,28 +3340,24 @@ def _run_ui():
                 st.divider()
                 action_cols = st.columns(2)
                 with action_cols[0]:
-                    if st.button("💾 Save", type="primary", use_container_width=True):
+                    if st.button(
+                        "💾 Save Project",
+                        type="primary",
+                        use_container_width=True,
+                        help="Save all changes to this project"
+                    ):
                         if persist_project(p, prompt_on_guest=True, action="save"):
-                            st.toast("Saved")
+                            st.toast("Project saved successfully")
                 with action_cols[1]:
-                    if st.button("✖ Close", use_container_width=True):
+                    if st.button(
+                        "✖ Close Project",
+                        use_container_width=True,
+                        help="Save and close the current project"
+                    ):
                         save_p()
                         st.session_state.project = None
                         st.session_state.page = "home"
                         st.rerun()
-
-            if debug_enabled():
-                st.divider()
-                st.markdown("### 🛠 Debug")
-                st.caption(f"Page: {st.session_state.get('page', 'unknown')}")
-                last_action = st.session_state.get("last_action") or "—"
-                last_action_ts = st.session_state.get("last_action_ts")
-                if last_action_ts:
-                    st.caption(f"Last action: {last_action} ({time.strftime('%H:%M:%S', time.localtime(last_action_ts))})")
-                else:
-                    st.caption(f"Last action: {last_action}")
-                last_exception = st.session_state.get("last_exception") or "—"
-                st.caption(f"Last exception: {last_exception}")
 
             if debug_enabled():
                 st.divider()
@@ -3667,11 +3677,23 @@ def _run_ui():
             with st.form("new_project_form", clear_on_submit=False):
                 c1, c2 = st.columns([2, 1])
                 with c1:
-                    t = st.text_input("Title", placeholder="e.g., The Chronicle of Ash")
+                    t = st.text_input(
+                        "Project Title",
+                        placeholder="e.g., The Chronicle of Ash",
+                        help="Give your story a title. Leave blank for a randomly generated name."
+                    )
                 with c2:
-                    g = st.text_input("Genre", placeholder="e.g., Dark Fantasy, Sci-Fi Noir")
-                a = st.text_input("Author (optional)", placeholder="Your name")
-                submitted = st.form_submit_button("🚀 Initialize Project", type="primary", use_container_width=True)
+                    g = st.text_input(
+                        "Genre",
+                        placeholder="e.g., Dark Fantasy, Sci-Fi Noir",
+                        help="Specify the genre(s) to help guide AI suggestions and tone."
+                    )
+                a = st.text_input(
+                    "Author Name",
+                    placeholder="Your name",
+                    help="Optional: Add your name or pen name for attribution."
+                )
+                submitted = st.form_submit_button("🚀 Create Project", type="primary", use_container_width=True)
                 if submitted:
                     if not t:
                         t = _random_project_title()
@@ -3855,12 +3877,13 @@ def _run_ui():
 
         with st.container(border=True):
             st.markdown(f"### {export_project.title}")
-            st.caption("Download a single markdown file containing outline, world bible, and chapters.")
+            st.caption("Download a complete manuscript file including your outline, world bible entities, and all chapter content in markdown format.")
             st.download_button(
-                "⬇️ Download .md",
+                "⬇️ Download Manuscript (.md)",
                 project_to_markdown(export_project),
                 file_name=f"{export_project.title}.md",
                 use_container_width=True,
+                help="Download your complete project as a single markdown file for sharing or publishing",
             )
 
     def render_outline():
@@ -3937,12 +3960,23 @@ def _run_ui():
         with left:
             with st.container(border=True):
                 st.markdown("### 🧩 Blueprint")
-                val = st.text_area("Plot Outline", p.outline, height=560, key="out_txt", label_visibility="collapsed")
+                val = st.text_area(
+                    "Plot Outline",
+                    p.outline,
+                    height=560,
+                    key="out_txt",
+                    label_visibility="collapsed",
+                    help="Write your story's plot outline here. Changes are auto-saved."
+                )
                 if val != p.outline:
                     p.outline = val
                     save_p()
 
-                if st.button("💾 Save Outline", use_container_width=True):
+                if st.button(
+                    "💾 Save Outline",
+                    use_container_width=True,
+                    help="Save and automatically scan for characters, locations, and other entities"
+                ):
                     if persist_project(p, prompt_on_guest=True, action="save"):
                         # Automatically scan entities on save so World Bible stays in sync.
                         extract_entities_ui(p.outline or "", "Outline")
@@ -3953,12 +3987,28 @@ def _run_ui():
                 st.markdown("### 🏗️ Architect (AI)")
                 st.caption("Generate a chapter-by-chapter outline and append it to your blueprint.")
 
-                chaps = st.number_input("Chapters", 1, 50, 12)
+                chaps = st.number_input(
+                    "Number of Chapters",
+                    min_value=1,
+                    max_value=50,
+                    value=12,
+                    help="Specify how many chapters to generate in the AI outline"
+                )
                 provider, active_key, _ = get_active_key_status()
                 outline_cooldown = _cooldown_remaining("outline_generate", 12)
                 outline_label = (
                     f"✨ Generate Structure ({outline_cooldown}s)" if outline_cooldown else "✨ Generate Structure"
                 )
+                
+                # Determine help text based on disabled state
+                button_help = None
+                if outline_cooldown:
+                    button_help = f"Available in {outline_cooldown} seconds to prevent API overuse"
+                elif not active_key:
+                    button_help = f"Configure {_provider_label(provider)} API key in AI Settings to use this feature"
+                else:
+                    button_help = "AI will generate a detailed chapter-by-chapter outline for your story"
+                
                 if not active_key:
                     st.info(
                         f"Add a {_provider_label(provider)} API key in AI Settings to generate outlines."
@@ -3968,6 +4018,7 @@ def _run_ui():
                     type="primary",
                     use_container_width=True,
                     disabled=bool(outline_cooldown) or not active_key,
+                    help=button_help,
                 ):
                     _mark_action("outline_generate")
                     # use outline_stream_ph defined above
@@ -3976,6 +4027,10 @@ def _run_ui():
                         f"Write a detailed {chaps}-chapter outline for a {p.genre} novel: {p.title}. "
                         "Use structure: Chapter X: [Title] - [Summary]."
                     )
+                    # Show loading indicator before streaming starts
+                    with outline_stream_ph.container():
+                        st.markdown("🔄 **Generating outline structure...**")
+                    
                     for chunk in AIEngine().generate_stream(prompt, get_ai_model()):
                         full += chunk
                         outline_stream_ph.markdown(full)
@@ -4023,11 +4078,13 @@ def _run_ui():
         render_page_header(
             "World Bible",
             "Track canonical characters, locations, factions, and lore.",
-            primary_label="➕ Add entity",
+            primary_label="➕ Add Entity",
             primary_action=open_add_entity,
-            secondary_label="🔍 Run scan",
+            primary_help="Add a new character, location, faction, or lore entry",
+            secondary_label="🔍 Scan for Entities",
             secondary_action=lambda: extract_entities_ui(p.outline or "", "Outline"),
             secondary_disabled=not get_active_key_status()[1],
+            secondary_help="AI will scan your outline for characters, locations, and more" if get_active_key_status()[1] else "Configure AI provider in AI Settings to use this feature",
             tag="Canon",
             key_prefix="world_header",
         )
@@ -4774,10 +4831,12 @@ def _run_ui():
         render_page_header(
             "Editor",
             "Write chapters, update summaries, and apply AI improvements.",
-            primary_label="➕ New chapter",
+            primary_label="➕ New Chapter",
             primary_action=create_next_chapter,
-            secondary_label="🧩 Go to outline",
+            primary_help="Create a new chapter based on your outline",
+            secondary_label="🧩 Go to Outline",
             secondary_action=go_to_outline,
+            secondary_help="Jump to the outline page to plan your story structure",
             tag="Drafting",
             key_prefix="editor_header",
         )
@@ -4855,18 +4914,30 @@ def _run_ui():
             with st.container(border=True):
                 h1, h2 = st.columns([3, 1])
                 with h1:
-                    curr.title = st.text_input("Title", curr.title, label_visibility="collapsed", help="Rename this chapter.")
+                    curr.title = st.text_input(
+                        "Chapter Title",
+                        curr.title,
+                        label_visibility="collapsed",
+                        help="Edit the title of this chapter"
+                    )
                 with h2:
                     curr.target_words = st.number_input(
-                        "Target",
-                        100,
-                        10000,
-                        int(curr.target_words),
+                        "Target Word Count",
+                        min_value=100,
+                        max_value=10000,
+                        value=int(curr.target_words),
                         label_visibility="collapsed",
-                        help="Target word count for this chapter.",
+                        help="Set a target word count goal for this chapter",
                     )
 
-                val = st.text_area("Manuscript", curr.content, height=680, label_visibility="collapsed", key=f"ed_{curr.id}")
+                val = st.text_area(
+                    "Chapter Content",
+                    curr.content,
+                    height=680,
+                    label_visibility="collapsed",
+                    key=f"ed_{curr.id}",
+                    help="Write your chapter content here. Changes are auto-saved."
+                )
                 if val != curr.content:
                     curr.update_content(val, "manual")
                     save_p()
