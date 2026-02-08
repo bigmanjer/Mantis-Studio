@@ -41,13 +41,29 @@ class TestCriticalImports:
     def test_editor_chapter_buttons_have_keys(self):
         mod = importlib.import_module("app.main")
         source = Path(mod.__file__).read_text(encoding="utf-8")
-        assert re.search(r'key\s*=\s*["\']editor_create_chapter_1["\']', source)
-        assert re.search(r'key\s*=\s*["\']editor_new_chapter["\']', source)
+        assert re.search(
+            r"st\.button\([\s\S]*?['\"]➕ Create Chapter 1['\"][\s\S]*?"
+            r"key\s*=\s*['\"]editor_create_chapter_1['\"]",
+            source,
+        )
+        assert re.search(
+            r"st\.button\([\s\S]*?['\"]➕ New Chapter['\"][\s\S]*?"
+            r"key\s*=\s*['\"]editor_new_chapter['\"]",
+            source,
+        )
 
         ctx = importlib.import_module("app.app_context")
         ctx_source = Path(ctx.__file__).read_text(encoding="utf-8")
-        assert re.search(r'key\s*=\s*["\']editor_create_chapter_1["\']', ctx_source)
-        assert re.search(r'key\s*=\s*["\']editor_new_chapter["\']', ctx_source)
+        assert re.search(
+            r"st\.button\([\s\S]*?['\"]➕ Create Chapter 1['\"][\s\S]*?"
+            r"key\s*=\s*['\"]editor_create_chapter_1['\"]",
+            ctx_source,
+        )
+        assert re.search(
+            r"st\.button\([\s\S]*?['\"]➕ New Chapter['\"][\s\S]*?"
+            r"key\s*=\s*['\"]editor_new_chapter['\"]",
+            ctx_source,
+        )
 
     def test_import_difflib(self):
         """difflib is required for the editor diff view."""
