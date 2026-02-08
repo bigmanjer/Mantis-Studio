@@ -21,7 +21,6 @@ If you're looking to understand how the app works, refer to:
 # Requirements:
 #   streamlit>=1.42.0
 #   requests
-#   Authlib>=1.3.2
 #   python-dotenv (optional)
 #   pandas
 #   plotly
@@ -60,7 +59,7 @@ if str(ROOT) not in sys.path:
 from app.config.settings import AppConfig, ensure_storage_dirs, load_app_config, logger, save_app_config
 from app.services.export import project_to_markdown
 from app.services.projects import Chapter, Entity, Project, sanitize_chapter_title
-# User accounts removed - get_user_projects_dir function no longer available
+# Local-first architecture: projects stored in default directory
 from app.services.world_bible import queue_world_bible_suggestion
 from app.services.ai import AIEngine, AnalysisEngine, REWRITE_PRESETS, StoryEngine, rewrite_prompt
 from app.state import initialize_session_state, install_key_helpers, ui_key
@@ -2971,7 +2970,7 @@ def run_selftest() -> int:
     print("[MANTIS SELFTEST]")
     try:
         os.makedirs(AppConfig.PROJECTS_DIR, exist_ok=True)
-        # User accounts removed - use default projects directory
+        # Local-first architecture: all projects stored in default directory
         selftest_dir = os.path.join(AppConfig.PROJECTS_DIR, f"selftest_{uuid.uuid4().hex[:8]}")
         os.makedirs(selftest_dir, exist_ok=True)
 
