@@ -2150,7 +2150,10 @@ def _run_ui():
         config_data.get("openai_base_url", AppConfig.OPENAI_API_URL),
     )
     init_state("ai_provider", config_data.get("ai_provider", "groq"))
-    init_state("ai_session_keys", {"openai": "", "groq": ""})
+    init_state("ai_session_keys", {
+        "openai": config_data.get("openai_api_key", ""),
+        "groq": config_data.get("groq_api_key", ""),
+    })
     init_state("openai_key_input", "")
     init_state("openai_model", config_data.get("openai_model", AppConfig.OPENAI_MODEL))
     init_state("openai_model_list", [])
