@@ -36,7 +36,7 @@ def bump_version(current_version: str) -> str:
         major = int(parts[0])
         minor = int(parts[1])
         if len(parts) == 3:
-            patch_component = int(parts[2])  # validate patch component if present
+            _ = int(parts[2])  # validate patch component if present
 
         # Increment minor by 1 (e.g., version x.y becomes x.(y+1)).
         minor += 1
