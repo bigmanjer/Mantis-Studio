@@ -3638,12 +3638,12 @@ def _run_ui():
             """,
         )
         quick_action_script = Template(
-            """
+            r"""
             <div style="display:none" aria-hidden="true">
                 <script>
                 (() => {
                     const labels = new Set($quick_action_labels);
-                    const normalize = (text) => (text || "").replace(/\\s+/g, " ").trim();
+                    const normalize = (text) => (text || "").replace(/\s+/g, " ").trim();
                     const apply = () => {
                         let found = 0;
                         document.querySelectorAll("button").forEach((button) => {
@@ -3656,7 +3656,7 @@ def _run_ui():
                         return found;
                     };
                     let attempts = 0;
-                    const maxAttempts = 12; // Up to 720ms total retries at 60ms intervals.
+                    const maxAttempts = 12; // Up to 720ms total wait time at 60ms intervals (excluding execution time).
                     const tick = () => {
                         const found = apply();
                         if (found < labels.size && attempts < maxAttempts) {
