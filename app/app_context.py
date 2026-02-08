@@ -903,6 +903,7 @@ def _run_ui():
                         st.session_state.groq_api_key,
                     )
                     if ok:
+                        st.session_state.groq_connection_tested = True
                         st.success("Groq connection OK.")
                     else:
                         st.error("Groq connection failed. Check your base URL and key.")
@@ -991,6 +992,7 @@ def _run_ui():
                         st.session_state.openai_api_key,
                     )
                     if ok:
+                        st.session_state.openai_connection_tested = True
                         st.success("OpenAI connection OK.")
                     else:
                         st.error("OpenAI connection failed. Check your base URL and key.")

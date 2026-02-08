@@ -773,6 +773,26 @@ class TestHelpers:
         assert not fake_st.warned, "Warning should NOT be shown when connected"
         assert not fake_st.info_shown, "Info should NOT be shown when models are fetched"
 
+    def test_ai_no_prompt_when_groq_connection_tested(self):
+        from app.utils.helpers import ai_connection_warning
+        fake_st = self._make_fake_st({
+            "groq_api_key": "sk-test",
+            "groq_connection_tested": True,
+        })
+        ai_connection_warning(fake_st)
+        assert not fake_st.warned, "Warning should NOT be shown when connected"
+        assert not fake_st.info_shown, "Info should NOT be shown when connection was tested"
+
+    def test_ai_no_prompt_when_openai_connection_tested(self):
+        from app.utils.helpers import ai_connection_warning
+        fake_st = self._make_fake_st({
+            "openai_api_key": "sk-test",
+            "openai_connection_tested": True,
+        })
+        ai_connection_warning(fake_st)
+        assert not fake_st.warned, "Warning should NOT be shown when connected"
+        assert not fake_st.info_shown, "Info should NOT be shown when connection was tested"
+
 
 # ---------------------------------------------------------------------------
 # 17) Layout duplicate removal – styles.py must no longer exist

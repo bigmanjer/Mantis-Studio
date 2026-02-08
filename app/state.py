@@ -162,6 +162,8 @@ def initialize_session_state(st, config_data: Dict[str, str]) -> None:
     st.session_state.setdefault("openai_model_tests", {})
     st.session_state.setdefault("groq_model_list", [])
     st.session_state.setdefault("groq_model_tests", {})
+    st.session_state.setdefault("groq_connection_tested", False)
+    st.session_state.setdefault("openai_connection_tested", False)
 
     # ---- World Bible structured database layer ----
     from app.services.world_bible_db import ensure_world_bible_db
