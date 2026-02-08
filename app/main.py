@@ -44,6 +44,7 @@ import uuid
 from collections.abc import Generator
 from dataclasses import asdict, dataclass, field, fields
 from pathlib import Path
+from string import Template
 from typing import Any, Callable, Dict, List, Optional
 
 import requests
@@ -3595,33 +3596,121 @@ def _run_ui():
                 st.caption(f"Canon health: {canon_icon} {canon_label}.")
 
         section_title("Quick Actions", "Jump straight into your most-used tools.")
+        # Static labels used for button text and JS styling hook (not user-controlled).
+        quick_action_labels = [
+            "Open Editor",
+            "Open Outline",
+            "Open World Bible",
+            "Open Memory",
+            "Open Insights",
+            "Go to Export",
+        ]
+        # Shared labels for button text and the JS styling hook.
+        quick_action_label_json = json.dumps(quick_action_labels)
+        st.html(
+            """
+            <style>
+            .quick-action-btn {
+                border-radius: 16px !important;
+                font-family: 'Inter', sans-serif !important;
+                font-weight: 600 !important;
+                font-size: 14px !important;
+                letter-spacing: 0.01em !important;
+                padding: 0.7rem 1.1rem !important;
+                border: 1px solid var(--mantis-button-border) !important;
+                background: var(--mantis-button-bg) !important;
+                color: var(--mantis-text) !important;
+                cursor: pointer;
+                position: relative;
+                transition: transform 0.18s cubic-bezier(0.22, 1, 0.36, 1),
+                            border-color 0.18s ease,
+                            box-shadow 0.18s ease,
+                            background 0.18s ease !important;
+            }
+
+            .quick-action-btn:hover {
+                transform: translateY(-1px);
+                border-color: var(--mantis-button-hover-border) !important;
+                box-shadow: var(--mantis-shadow-button),
+                            0 0 12px var(--mantis-accent-glow, rgba(34, 197, 94, 0.18));
+                background: var(--mantis-button-bg) !important;
+            }
+            </style>
+            """,
+        )
+        quick_action_script = Template(
+            r"""
+            <div style="display:none" aria-hidden="true">
+                <script>
+                (() => {
+                    const labels = new Set($quick_action_labels);
+                    const normalize = (text) => (text || "").replace(/\s+/g, " ").trim();
+                    const RETRY_INTERVAL_MS = 60;
+                    const MAX_STYLE_ATTEMPTS = 12; // 12 attempts x 60ms = 720ms total wait time.
+                    const apply = () => {
+                        let found = 0;
+                        document.querySelectorAll("button").forEach((button) => {
+                            const label = normalize(button.textContent);
+                            if (labels.has(label)) {
+                                button.classList.add("quick-action-btn");
+                                found += 1;
+                            }
+                        });
+                        return found;
+                    };
+                    let attempts = 0;
+                    const tick = () => {
+                        const found = apply();
+                        // Polling keeps the hook lightweight for Streamlit-rendered buttons.
+                        if (found < labels.size && attempts < MAX_STYLE_ATTEMPTS) {
+                            attempts += 1;
+                            setTimeout(tick, RETRY_INTERVAL_MS);
+                        } else if (found < labels.size && attempts >= MAX_STYLE_ATTEMPTS) {
+                            console.warn(
+                                "Failed to style all quick action buttons: " +
+                                    found +
+                                    "/" +
+                                    labels.size +
+                                    " found after " +
+                                    MAX_STYLE_ATTEMPTS +
+                                    " attempts.",
+                            );
+                        }
+                    };
+                    tick();
+                })();
+                </script>
+            </div>
+            """,
+        ).substitute(quick_action_labels=quick_action_label_json)
+        st.html(quick_action_script, unsafe_allow_javascript=True)
         quick_grid = st.container()
         with quick_grid:
             qcols = st.columns(3)
             with qcols[0]:
                 cta_tile("✍️ Editor", "Draft chapters and summaries.")
                 if st.button(
-                    "Open Editor",
+                    quick_action_labels[0],
                     use_container_width=True,
-                    type="primary",
+                    type="secondary",
                     help="Start writing or editing your chapters"
                 ):
                     open_recent_project("chapters")
             with qcols[1]:
                 cta_tile("📝 Outline", "Plan beats, arcs, and chapter flow.")
                 if st.button(
-                    "Open Outline",
+                    quick_action_labels[1],
                     use_container_width=True,
-                    type="primary",
+                    type="secondary",
                     help="Create or edit your story structure and plot outline"
                 ):
                     open_recent_project("outline")
             with qcols[2]:
                 cta_tile("🌍 World Bible", "Characters, places, factions, lore.")
                 if st.button(
-                    "Open World Bible",
+                    quick_action_labels[2],
                     use_container_width=True,
-                    type="primary",
+                    type="secondary",
                     help="Manage your story's canonical characters, locations, and lore"
                 ):
                     open_recent_project("world")
@@ -3631,23 +3720,23 @@ def _run_ui():
             qcols = st.columns(3)
             with qcols[0]:
                 cta_tile("🧠 Memory", "Hard canon rules and guidelines.")
-                if st.button("Open Memory", use_container_width=True, type="primary"):
+                if st.button(quick_action_labels[3], use_container_width=True, type="secondary"):
                     open_recent_project("world", focus_tab="Memory")
             with qcols[1]:
                 cta_tile("📊 Insights", "Canon health and analytics.")
                 if st.button(
-                    "Open Insights",
+                    quick_action_labels[4],
                     use_container_width=True,
-                    type="primary",
+                    type="secondary",
                     help="View analytics and consistency insights for your story world"
                 ):
                     open_recent_project("world", focus_tab="Insights")
             with qcols[2]:
                 cta_tile("⬇️ Export", "Download your project.")
                 if st.button(
-                    "Go to Export",
+                    quick_action_labels[5],
                     use_container_width=True,
-                    type="primary",
+                    type="secondary",
                     help="Export your project as markdown for sharing or publishing"
                 ):
                     open_export()

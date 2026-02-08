@@ -904,8 +904,8 @@ class TestButtonHierarchyCSS:
         assert "--mantis-surface-alt" in css
 
 
-class TestQuickActionButtonsPrimary:
-    """Quick action buttons must use the primary button theme."""
+class TestActionCardButtonsPrimary:
+    """Action cards must use the primary button theme."""
 
     def test_action_card_uses_primary_type(self):
         import inspect
@@ -914,20 +914,25 @@ class TestQuickActionButtonsPrimary:
         src = inspect.getsource(action_card)
         assert 'type="primary"' in src, "action_card button should use type='primary'"
 
-    def test_main_quick_action_buttons_use_primary(self):
+
+class TestQuickActionButtonsStyled:
+    """Quick action buttons must use the navigation button theme."""
+
+    def test_main_quick_action_buttons_use_secondary(self):
         src = (ROOT / "app" / "main.py").read_text(encoding="utf-8")
-        # Find the Quick Actions section and verify all st.button calls use type="primary"
+        # Find the Quick Actions section and verify all st.button calls use type="secondary"
         start = src.index("Quick Actions")
         # The quick action section ends before "Recent Projects"
         end = src.index("Recent Projects", start)
         section = src[start:end]
-        # Count st.button calls vs type="primary" occurrences in the section
+        # Count st.button calls vs type="secondary" occurrences in the section
         button_count = section.count("st.button(")
-        primary_count = section.count('type="primary"')
+        secondary_count = section.count('type="secondary"')
+        assert ".quick-action-btn" in section, "Quick action CSS class should be defined in the section"
         assert button_count == 6, f"Expected 6 quick action buttons, found {button_count}"
-        assert primary_count == button_count, (
-            f"All {button_count} quick action buttons should use type='primary', "
-            f"but only {primary_count} do"
+        assert secondary_count == button_count, (
+            f"All {button_count} quick action buttons should use type='secondary', "
+            f"but only {secondary_count} do"
         )
 
 
