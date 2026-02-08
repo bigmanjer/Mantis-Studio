@@ -2540,7 +2540,7 @@ def _run_ui():
                         st.warning(f"Delete **{st.session_state.get('delete_chapter_title') or curr.title}**?")
                         cdel1, cdel2 = st.columns(2)
                         with cdel1:
-                            if st.button("Confirm", type="primary", use_container_width=True, key="editor_del_ch_confirm"):
+                            if st.button("Yes", type="primary", use_container_width=True, key="editor_del_ch_confirm"):
                                 p.delete_chapter(curr.id)
                                 chaps = p.get_ordered_chapters()
                                 st.session_state.curr_chap_id = chaps[0].id if chaps else None
@@ -2550,7 +2550,7 @@ def _run_ui():
                                 st.toast("Chapter deleted.")
                                 st.rerun()
                         with cdel2:
-                            if st.button("Cancel", use_container_width=True, key="editor_del_ch_cancel"):
+                            if st.button("No", use_container_width=True, key="editor_del_ch_cancel"):
                                 st.session_state.delete_chapter_id = None
                                 st.session_state.delete_chapter_title = None
                                 st.rerun()
