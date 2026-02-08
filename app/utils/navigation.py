@@ -26,7 +26,7 @@ NAV_ITEMS: List[Tuple[str, str, str]] = [
 
 # Extended map includes entries that don't appear in the main nav bar
 # (e.g. Memory and Insights route to the World Bible page with a focus tab).
-_EXTENDED_MAP: Dict[str, str] = {
+EXTENDED_MAP: Dict[str, str] = {
     "Memory": "memory",
     "Insights": "insights",
 }
@@ -38,7 +38,7 @@ _EXTENDED_MAP: Dict[str, str] = {
 _DEFAULT_NAV_LABELS: List[str] = [label for label, _, _ in NAV_ITEMS]
 
 _DEFAULT_MAP: Dict[str, str] = {label: key for label, key, _ in NAV_ITEMS}
-_DEFAULT_MAP.update(_EXTENDED_MAP)
+_DEFAULT_MAP.update(EXTENDED_MAP)
 
 
 def get_nav_config(has_project: bool) -> Tuple[List[str], Dict[str, str]]:
@@ -59,4 +59,4 @@ def get_nav_items() -> List[Tuple[str, str, str]]:
     return list(NAV_ITEMS)
 
 
-__all__ = ["NAV_ITEMS", "get_nav_config", "get_nav_items"]
+__all__ = ["NAV_ITEMS", "EXTENDED_MAP", "get_nav_config", "get_nav_items"]
