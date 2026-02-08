@@ -105,7 +105,7 @@ def initialize_session_state(st, config_data: Dict[str, str]) -> None:
         return default_value or ""
 
     # ---- simple defaults (setdefault avoids overwriting) ----
-    _defaults: Dict[str, object] = {
+    defaults: Dict[str, object] = {
         "ui_theme": config_data.get("ui_theme", "Dark"),
         "daily_word_goal": int(config_data.get("daily_word_goal", 500)),
         "weekly_sessions_goal": int(config_data.get("weekly_sessions_goal", 4)),
@@ -144,7 +144,7 @@ def initialize_session_state(st, config_data: Dict[str, str]) -> None:
         "_force_nav": False,
         "editor_improve__copy_buffer": "",
     }
-    for key, default in _defaults.items():
+    for key, default in defaults.items():
         st.session_state.setdefault(key, default)
 
     # ---- mutable defaults (must not share references) ----
