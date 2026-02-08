@@ -83,7 +83,7 @@ def get_theme_tokens(theme: str) -> Dict[str, Dict[str, str]]:
 
 
 def apply_theme(tokens: Dict[str, str]) -> None:
-    st.markdown(
+    st.html(
         f"""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@400;600&family=Inter:wght@400;600&family=Space+Grotesk:wght@500;700&display=swap');
@@ -526,7 +526,6 @@ def apply_theme(tokens: Dict[str, str]) -> None:
     }}
 </style>
     """,
-        unsafe_allow_html=True,
     )
 
 
@@ -536,7 +535,7 @@ def render_header(version: str, logo_b64: str) -> None:
         if logo_b64
         else '<span class="mantis-logo-fallback">M</span>'
     )
-    st.markdown(
+    st.html(
         f"""
         <div class="mantis-header">
             <div class="mantis-header-left">
@@ -557,7 +556,6 @@ def render_header(version: str, logo_b64: str) -> None:
             </div>
         </div>
         """,
-        unsafe_allow_html=True,
     )
 
 
@@ -590,7 +588,7 @@ def render_footer(
     contact_email: str = "support@mantis-studio.example",
 ) -> None:
     nav_links_html = _build_footer_nav_links()
-    st.markdown(
+    st.html(
         f"""
     <style>
     /* ── Footer container ── */
@@ -801,5 +799,4 @@ def render_footer(
       </div>
     </footer>
     """,
-        unsafe_allow_html=True,
     )

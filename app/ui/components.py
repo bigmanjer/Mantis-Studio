@@ -8,11 +8,11 @@ import streamlit as st
 def section_title(title: str, subtitle: Optional[str] = None) -> None:
     st.markdown(f"## {title}")
     if subtitle:
-        st.markdown(f"<div class='mantis-muted'>{subtitle}</div>", unsafe_allow_html=True)
+        st.html(f"<div class='mantis-muted'>{subtitle}</div>")
 
 
 def card_start(title: Optional[str] = None, subtitle: Optional[str] = None) -> None:
-    st.markdown("<div class='mantis-card'>", unsafe_allow_html=True)
+    st.html("<div class='mantis-card'>")
     if title:
         st.markdown(f"### {title}")
     if subtitle:
@@ -20,7 +20,7 @@ def card_start(title: Optional[str] = None, subtitle: Optional[str] = None) -> N
 
 
 def card_end() -> None:
-    st.markdown("</div>", unsafe_allow_html=True)
+    st.html("</div>")
 
 
 def cta_tile(title: str, body: str, *, icon: Optional[str] = None, subtitle: Optional[str] = None) -> None:
@@ -41,7 +41,7 @@ def cta_tile(title: str, body: str, *, icon: Optional[str] = None, subtitle: Opt
         if subtitle
         else ""
     )
-    st.markdown(
+    st.html(
         f"""
         <div class="mantis-cta-tile">
             {icon_html}
@@ -50,7 +50,6 @@ def cta_tile(title: str, body: str, *, icon: Optional[str] = None, subtitle: Opt
             {subtitle_html}
         </div>
         """,
-        unsafe_allow_html=True,
     )
 
 
@@ -63,7 +62,7 @@ def header_bar(
 ) -> None:
     pill_html = f"<span class='mantis-pill'>{pill}</span>" if pill else ""
     right_html = f"<div>{right_slot}</div>" if right_slot else ""
-    st.markdown(
+    st.html(
         f"""
         <div class="mantis-header">
             <div>
@@ -76,23 +75,21 @@ def header_bar(
             </div>
         </div>
         """,
-        unsafe_allow_html=True,
     )
 
 
 def empty_state(title: str, body: str) -> None:
-    st.markdown(
+    st.html(
         f"""
         <div class="mantis-card-soft">
             <div style="font-weight:600;">{title}</div>
             <div class="mantis-muted" style="margin-top:6px;">{body}</div>
         </div>
         """,
-        unsafe_allow_html=True,
     )
 
 
 def render_tag_list(tags: Iterable[str]) -> None:
     pills = "".join(f"<span class='mantis-pill'>{tag}</span>" for tag in tags if tag)
     if pills:
-        st.markdown(f"<div style='display:flex; gap:6px; flex-wrap:wrap;'>{pills}</div>", unsafe_allow_html=True)
+        st.html(f"<div style='display:flex; gap:6px; flex-wrap:wrap;'>{pills}</div>")

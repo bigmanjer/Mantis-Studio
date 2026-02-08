@@ -328,7 +328,7 @@ def _run_ui():
             left, right = st.columns([2.4, 1])
             with left:
                 tag_html = f"<span class='mantis-tag'>{tag}</span>" if tag else ""
-                st.markdown(
+                st.html(
                     f"""
                     <div class="mantis-page-header">
                         <div>
@@ -337,7 +337,6 @@ def _run_ui():
                         </div>
                     </div>
                     """,
-                    unsafe_allow_html=True,
                 )
             with right:
                 if primary_label and primary_action:
@@ -1029,7 +1028,7 @@ def _run_ui():
                 if sidebar_logo_b64
                 else '<span class="mantis-logo-fallback">MANTIS</span>'
             )
-            st.markdown(
+            st.html(
                 f"""
             <div class="mantis-sidebar-brand">
                 <div class="mantis-sidebar-logo">
@@ -1041,7 +1040,6 @@ def _run_ui():
                 </div>
             </div>
             """,
-                unsafe_allow_html=True,
             )
 
             st.markdown("---")
@@ -1117,12 +1115,12 @@ def _run_ui():
 
 
         banner_bytes = load_asset_bytes("mantis_banner_dark.png")
-        st.markdown('<div class="mantis-banner">', unsafe_allow_html=True)
+        st.html('<div class="mantis-banner">')
         if banner_bytes:
             st.image(banner_bytes, use_container_width=True)
         else:
             st.markdown("## MANTIS Studio")
-        st.markdown("</div>", unsafe_allow_html=True)
+        st.html("</div>")
 
         has_outline = any((p["meta"].get("outline") or "").strip() for p in recent_projects)
         has_chapter = any(
@@ -1250,14 +1248,13 @@ def _run_ui():
                     if st.button("Learn more", key="dashboard__about_learn_more"):
                         open_legal_page()
             with hero_cols[1]:
-                st.markdown(
+                st.html(
                     f"""
                     <div style="display:flex; gap:8px; justify-content:flex-end; flex-wrap:wrap;">
                         <span class="mantis-pill">Workspace</span>
                         <span class="mantis-pill">v{AppConfig.VERSION}</span>
                     </div>
                     """,
-                    unsafe_allow_html=True,
                 )
 
         header_cols = st.columns([2.2, 1])
@@ -1728,7 +1725,7 @@ def _run_ui():
             key_prefix="world_header",
         )
 
-        st.markdown(
+        st.html(
             """
             <style>
             .world-overview-card {
@@ -1813,7 +1810,6 @@ def _run_ui():
             }
             </style>
             """,
-            unsafe_allow_html=True,
         )
 
         entries = list(p.world_db.values())
@@ -2048,7 +2044,7 @@ def _run_ui():
                     highlight = "highlight" if e.id in flagged_entity_ids or e.id == focus_entity else ""
 
                     with st.container(border=True):
-                        st.markdown(
+                        st.html(
                             f"""
                             <div class="world-card {highlight}">
                                 <div class="world-card-header">
@@ -2060,7 +2056,6 @@ def _run_ui():
                                 </div>
                             </div>
                             """,
-                            unsafe_allow_html=True,
                         )
 
                         issues = []

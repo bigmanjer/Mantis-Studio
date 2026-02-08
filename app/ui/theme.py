@@ -37,7 +37,7 @@ def inject_theme() -> None:
     # Load the centralized button system CSS
     button_css = _load_button_css()
 
-    st.markdown(
+    st.html(
         f"""
         <style>
         :root {{
@@ -154,5 +154,4 @@ def inject_theme() -> None:
         {button_css}
         </style>
         """,
-        unsafe_allow_html=True,
     )
