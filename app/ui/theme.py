@@ -46,7 +46,7 @@ def inject_theme() -> None:
     # This block only injects structural / typographic rules and the
     # unified button system CSS.
 
-    st.markdown(
+    st.html(
         f"""
         <style>
         .stApp {{

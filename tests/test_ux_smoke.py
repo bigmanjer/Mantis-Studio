@@ -861,3 +861,40 @@ class TestHtmlRendering:
         path = ROOT / "app" / "ui" / "theme.py"
         source = path.read_text(encoding="utf-8")
         assert "st.html(" in source, "app/ui/theme.py should use st.html()"
+
+
+# ---------------------------------------------------------------------------
+# 24) Button hierarchy CSS classes
+# ---------------------------------------------------------------------------
+
+
+class TestButtonHierarchyCSS:
+    """Verify that assets/styles.css defines the four button hierarchy classes."""
+
+    _STYLES_PATH = ROOT / "assets" / "styles.css"
+
+    def _css(self) -> str:
+        return self._STYLES_PATH.read_text(encoding="utf-8")
+
+    def test_primary_class_exists(self):
+        assert ".mantis-btn-primary" in self._css()
+
+    def test_secondary_class_exists(self):
+        assert ".mantis-btn-secondary" in self._css()
+
+    def test_ghost_class_exists(self):
+        assert ".mantis-btn-ghost" in self._css()
+
+    def test_danger_class_exists(self):
+        assert ".mantis-btn-danger" in self._css()
+
+    def test_primary_has_green_bg(self):
+        assert "#2e7d32" in self._css()
+
+    def test_danger_has_red_bg(self):
+        assert "#e53935" in self._css()
+
+    def test_ghost_has_transparent_bg(self):
+        css = self._css()
+        assert ".mantis-btn-ghost > button" in css
+        assert "transparent" in css
