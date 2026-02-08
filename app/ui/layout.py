@@ -1,6 +1,8 @@
+import datetime
+
 import streamlit as st
 
-_CURRENT_YEAR = 2025
+_CURRENT_YEAR = datetime.datetime.now(datetime.timezone.utc).year
 
 
 def render_footer(

@@ -560,7 +560,9 @@ def render_header(version: str, logo_b64: str) -> None:
     )
 
 
-_CURRENT_YEAR = 2025
+import datetime as _dt
+
+_CURRENT_YEAR = _dt.datetime.now(_dt.timezone.utc).year
 
 
 def render_footer(
