@@ -1,5 +1,7 @@
 # 🐜 Mantis Studio
 
+> **MANTIS** — **M**odular **A**I **N**arrative **T**ext **I**ntelligence **S**ystem
+
 **Mantis Studio** is an all‑in‑one AI‑assisted writing and story‑development environment built with **Streamlit**. It is designed to take a project from *idea → outline → chapters → world‑building → export*, while maintaining persistent memory and structured data across sessions.
 
 

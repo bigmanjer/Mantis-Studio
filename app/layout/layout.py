@@ -547,7 +547,7 @@ def render_header(version: str, logo_b64: str) -> None:
                         MANTIS Studio — v{version}
                     </div>
                     <div class="mantis-header-sub">
-                        Modular narrative workspace
+                        Modular AI Narrative Text Intelligence System
                     </div>
                 </div>
             </div>
@@ -766,7 +766,7 @@ def render_footer(
       <div class="mantis-footer-grid">
         <div class="mantis-footer-section mantis-footer-brand">
           <strong>MANTIS Studio</strong>
-          <span class="mantis-footer-tagline">Modular narrative workspace</span>
+          <span class="mantis-footer-tagline">Modular AI Narrative Text Intelligence System</span>
         </div>
         <nav class="mantis-footer-section" aria-label="Navigation">
           <h4>Navigation</h4>
