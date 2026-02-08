@@ -1635,7 +1635,7 @@ def _run_ui():
     }
     tokens = theme_tokens[theme]
 
-    st.markdown(
+    st.html(
         f"""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@400;600&family=Inter:wght@400;600&family=Space+Grotesk:wght@500;700&display=swap');
@@ -2048,7 +2048,6 @@ def _run_ui():
     }}
 </style>
     """,
-        unsafe_allow_html=True,
     )
 
     # --- BRAND HEADER (UI only) ---
@@ -2058,7 +2057,7 @@ def _run_ui():
         if header_logo_b64
         else '<span class="mantis-logo-fallback">M</span>'
     )
-    st.markdown(
+    st.html(
         f"""
         <div class="mantis-header">
             <div class="mantis-header-left">
@@ -2079,7 +2078,6 @@ def _run_ui():
             </div>
         </div>
         """,
-        unsafe_allow_html=True,
     )
 
     init_state("user_id", None)
@@ -3398,20 +3396,20 @@ def _run_ui():
         with key_scope("sidebar"):
             st.markdown("### MANTIS Studio")
             st.caption(f"Version {AppConfig.VERSION}")
-            st.markdown("<div class='mantis-nav-section'>Appearance</div>", unsafe_allow_html=True)
+            st.html("<div class='mantis-nav-section'>Appearance</div>")
             st.selectbox("Theme", ["Dark", "Light"], key="ui_theme")
             st.divider()
 
             if st.session_state.project:
                 p = st.session_state.project
-                st.markdown("<div class='mantis-nav-section'>Current Project</div>", unsafe_allow_html=True)
+                st.html("<div class='mantis-nav-section'>Current Project</div>")
                 st.caption(p.title)
                 st.caption(f"📚 {p.get_total_word_count()} words")
             else:
                 st.info("No project loaded.")
 
             st.divider()
-            st.markdown("<div class='mantis-nav-section'>Navigation</div>", unsafe_allow_html=True)
+            st.html("<div class='mantis-nav-section'>Navigation</div>")
 
             # Sidebar navigation items are defined in app/utils/navigation.py.
             # Edit NAV_ITEMS there to add, remove, or reorder entries — the
@@ -4141,7 +4139,7 @@ def _run_ui():
         if not get_active_key_status()[1]:
             show_api_key_notice("run scans")
 
-        st.markdown(
+        st.html(
             """
             <style>
             .world-overview-card {
@@ -4226,7 +4224,6 @@ def _run_ui():
             }
             </style>
             """,
-            unsafe_allow_html=True,
         )
 
         entries = list(p.world_db.values())
@@ -4461,7 +4458,7 @@ def _run_ui():
                     highlight = "highlight" if e.id in flagged_entity_ids or e.id == focus_entity else ""
 
                     with st.container(border=True):
-                        st.markdown(
+                        st.html(
                             f"""
                             <div class="world-card {highlight}">
                                 <div class="world-card-header">
@@ -4473,7 +4470,6 @@ def _run_ui():
                                 </div>
                             </div>
                             """,
-                            unsafe_allow_html=True,
                         )
 
                         issues = []

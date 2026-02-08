@@ -29,7 +29,7 @@ def render_footer(
     contact_email: str = "support@mantis-studio.example",
 ) -> None:
     nav_links_html = _build_footer_nav_links()
-    st.markdown(
+    st.html(
         f"""
         <style>
         /* ── Footer container ── */
@@ -240,5 +240,4 @@ def render_footer(
           </div>
         </footer>
         """,
-        unsafe_allow_html=True,
     )

@@ -149,5 +149,4 @@ def inject_theme() -> None:
         {button_css}
         </style>
         """,
-        unsafe_allow_html=True,
     )

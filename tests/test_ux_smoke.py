@@ -804,3 +804,60 @@ class TestAPIKeyValidation:
     def test_very_long_key_rejected(self):
         from app.main import _validate_api_key_format
         assert _validate_api_key_format("x" * 300) is False
+
+
+# ---------------------------------------------------------------------------
+# 23) HTML rendering – st.html() migration
+# ---------------------------------------------------------------------------
+
+
+class TestHtmlRendering:
+    """Verify that UI modules use st.html() instead of st.markdown(unsafe_allow_html=True).
+
+    Streamlit 1.54 sanitizes block-level HTML in st.markdown(), even with
+    unsafe_allow_html=True. All custom HTML rendering must use st.html()
+    to avoid raw-tag display.
+    """
+
+    _UI_MODULES = [
+        "app/ui/components.py",
+        "app/ui/theme.py",
+        "app/ui/layout.py",
+        "app/components/buttons.py",
+        "app/layout/layout.py",
+        "app/main.py",
+        "app/app_context.py",
+    ]
+
+    def test_no_unsafe_allow_html_in_ui_modules(self):
+        """No UI module should contain unsafe_allow_html=True."""
+        violations = []
+        for rel_path in self._UI_MODULES:
+            path = ROOT / rel_path
+            if not path.exists():
+                continue
+            source = path.read_text(encoding="utf-8")
+            if "unsafe_allow_html" in source:
+                violations.append(rel_path)
+        assert not violations, (
+            f"unsafe_allow_html still present in: {', '.join(violations)}. "
+            "Use st.html() for block-level HTML rendering."
+        )
+
+    def test_ui_components_use_st_html(self):
+        """Core UI component files should use st.html() for HTML rendering."""
+        path = ROOT / "app" / "ui" / "components.py"
+        source = path.read_text(encoding="utf-8")
+        assert "st.html(" in source, "app/ui/components.py should use st.html()"
+
+    def test_buttons_use_st_html(self):
+        """Button components should use st.html() for HTML rendering."""
+        path = ROOT / "app" / "components" / "buttons.py"
+        source = path.read_text(encoding="utf-8")
+        assert "st.html(" in source, "app/components/buttons.py should use st.html()"
+
+    def test_theme_uses_st_html(self):
+        """Theme injection should use st.html() for CSS."""
+        path = ROOT / "app" / "ui" / "theme.py"
+        source = path.read_text(encoding="utf-8")
+        assert "st.html(" in source, "app/ui/theme.py should use st.html()"
