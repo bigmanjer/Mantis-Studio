@@ -2546,6 +2546,29 @@ def _run_ui():
                     p.add_chapter(sanitize_chapter_title(title))
                     _persist_chapter_update()
 
+                if len(chaps) > 0:
+                    if st.session_state.get("delete_chapter_id") == curr.id:
+                        st.warning(f"Delete **{st.session_state.get('delete_chapter_title') or curr.title}**?")
+                        cdel1, cdel2 = st.columns(2)
+                        with cdel1:
+                            if st.button("Confirm", type="primary", use_container_width=True, key="editor_del_ch_confirm"):
+                                p.delete_chapter(curr.id)
+                                chaps = p.get_ordered_chapters()
+                                st.session_state.curr_chap_id = chaps[0].id if chaps else None
+                                st.session_state.delete_chapter_id = None
+                                st.session_state.delete_chapter_title = None
+                                persist_project(p)
+                                st.toast("Chapter deleted.")
+                                st.rerun()
+                        with cdel2:
+                            if st.button("Cancel", use_container_width=True, key="editor_del_ch_cancel"):
+                                st.session_state.delete_chapter_id = None
+                                st.session_state.delete_chapter_title = None
+                                st.rerun()
+                    elif st.button("🗑 Delete Chapter", use_container_width=True, key=f"editor_del_{curr.id}"):
+                        st.session_state.delete_chapter_id = curr.id
+                        st.session_state.delete_chapter_title = curr.title
+
         stream_ph = st.empty()
 
         with col_editor:

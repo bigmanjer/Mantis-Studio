@@ -361,6 +361,13 @@ class Project:
             del self.world_db[eid]
             self.last_modified = time.time()
 
+    def delete_chapter(self, cid: str):
+        if cid in self.chapters:
+            del self.chapters[cid]
+            for new_idx, ch in enumerate(self.get_ordered_chapters(), start=1):
+                ch.index = new_idx
+            self.last_modified = time.time()
+
     def add_chapter(self, title: str = "Untitled", content: str = "") -> Chapter:
         existing = [c.index for c in self.chapters.values()]
         index = (max(existing) + 1) if existing else 1
