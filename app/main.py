@@ -2094,6 +2094,9 @@ def _run_ui():
     init_state("pending_improvement_meta", {})
     init_state("chapter_text_prev", {})
     init_state("chapter_drafts", [])
+    init_state("chapters", [])
+    init_state("chapters_project_id", None)
+    init_state("active_chapter_id", None)
     init_state("editor_improve__copy_buffer", "")
     init_state("first_run", True)
     init_state("is_premium", True)
@@ -3552,6 +3555,7 @@ def _run_ui():
         def open_primary_cta() -> None:
             if primary_target == "chapters" and latest_chapter_id:
                 st.session_state.curr_chap_id = latest_chapter_id
+                st.session_state.active_chapter_id = latest_chapter_id
             open_recent_project(primary_target)
 
         def open_new_project() -> None:
@@ -3572,6 +3576,7 @@ def _run_ui():
                 if st.button(primary_label, type="primary", use_container_width=True):
                     if primary_target == "chapters" and latest_chapter_id:
                         st.session_state.curr_chap_id = latest_chapter_id
+                        st.session_state.active_chapter_id = latest_chapter_id
                     open_recent_project(primary_target)
                 action_row = st.columns(2)
                 with action_row[0]:
@@ -4614,6 +4619,7 @@ def _run_ui():
                                 if st.button("📖 Jump to Chapter", key=f"jump_{e.id}", use_container_width=True):
                                     st.session_state.page = "chapters"
                                     st.session_state.curr_chap_id = options[sel]
+                                    st.session_state.active_chapter_id = options[sel]
                                     st.session_state._force_nav = True
                                     st.rerun()
                             else:
@@ -4945,7 +4951,8 @@ def _run_ui():
                 if st.button(
                     "📁 Go to Projects",
                     use_container_width=True,
-                    help="Open or create a project to start writing your story"
+                    help="Open or create a project to start writing your story",
+                    key="editor_no_project_go_projects"
                 ):
                     st.session_state.page = "projects"
                     st.rerun()
@@ -4957,10 +4964,55 @@ def _run_ui():
             _bump_projects_refresh()
             st.rerun()
 
-        chaps = p.get_ordered_chapters()
+        def _serialize_chapter(chapter: Chapter) -> Dict[str, Any]:
+            return {
+                "id": chapter.id,
+                "index": chapter.index,
+                "title": chapter.title,
+                "content": chapter.content,
+                "summary": chapter.summary,
+                "word_count": chapter.word_count,
+                "target_words": chapter.target_words,
+                "created_at": chapter.created_at,
+                "modified_at": chapter.modified_at,
+            }
+
+        def _set_active_chapter(chapter_id: Optional[str]) -> None:
+            st.session_state.active_chapter_id = chapter_id
+            st.session_state.curr_chap_id = chapter_id
+
+        def _sync_session_chapters(force: bool = False) -> None:
+            if (
+                force
+                or st.session_state.get("chapters_project_id") != p.id
+                or not isinstance(st.session_state.get("chapters"), list)
+            ):
+                st.session_state.chapters = [_serialize_chapter(c) for c in p.get_ordered_chapters()]
+                st.session_state.chapters_project_id = p.id
+            chapter_ids = [c.get("id") for c in st.session_state.get("chapters", []) if c.get("id")]
+            if st.session_state.get("active_chapter_id") not in chapter_ids:
+                _set_active_chapter(chapter_ids[0] if chapter_ids else None)
+            elif st.session_state.get("active_chapter_id"):
+                st.session_state.curr_chap_id = st.session_state.active_chapter_id
+
+        def _update_session_chapter(chapter: Chapter) -> None:
+            chapters = st.session_state.get("chapters", [])
+            for idx, item in enumerate(chapters):
+                if item.get("id") == chapter.id:
+                    chapters[idx] = {**item, **_serialize_chapter(chapter)}
+                    st.session_state.chapters = chapters
+                    return
+
+        def _append_session_chapter(chapter: Chapter) -> None:
+            chapters = st.session_state.get("chapters", [])
+            chapters.append(_serialize_chapter(chapter))
+            st.session_state.chapters = chapters
+
+        _sync_session_chapters()
+        chapters = st.session_state.get("chapters", [])
 
         def create_next_chapter() -> None:
-            next_idx = len(chaps) + 1 if chaps else 1
+            next_idx = len(chapters) + 1 if chapters else 1
             title = f"Chapter {next_idx}"
             if p.outline:
                 pat = re.compile(rf"Chapter {next_idx}[:\\s]+(.*?)(?=\\n|$)", re.IGNORECASE)
@@ -4968,7 +5020,9 @@ def _run_ui():
                 if match:
                     raw = match.group(1).strip()
                     title = sanitize_chapter_title(re.split(r" [-–:] ", raw, 1)[0].strip()) or title
-            p.add_chapter(title)
+            new_chapter = p.add_chapter(title)
+            _append_session_chapter(new_chapter)
+            _set_active_chapter(new_chapter.id)
             _persist_chapter_update()
 
         def go_to_outline() -> None:
@@ -4989,7 +5043,7 @@ def _run_ui():
             key_prefix="editor_header",
         )
 
-        if not chaps:
+        if not chapters:
             with st.container(border=True):
                 st.info("📭 No chapters yet.\n\nCreate your first chapter — or let MANTIS write one from your outline.")
                 c1, c2 = st.columns([1, 1])
@@ -5001,23 +5055,36 @@ def _run_ui():
                         help="Start your story by creating the first chapter",
                         key="editor_create_chapter_1"
                     ):
-                        p.add_chapter("Chapter 1")
-                        _persist_chapter_update()
+                        create_next_chapter()
                 with c2:
                     if st.button(
                         "🧩 Go to Outline",
                         use_container_width=True,
-                        help="Plan your story structure before writing chapters"
+                        help="Plan your story structure before writing chapters",
+                        key="editor_empty_go_outline"
                     ):
                         st.session_state.page = "outline"
                         st.session_state._force_nav = True
                         st.rerun()
             return
 
-        if "curr_chap_id" not in st.session_state or st.session_state.curr_chap_id not in p.chapters:
-            st.session_state.curr_chap_id = chaps[0].id
+        chapter_map = {c["id"]: c for c in chapters if c.get("id")}
+        active_id = st.session_state.get("active_chapter_id")
+        if active_id not in chapter_map:
+            _set_active_chapter(chapters[0]["id"] if chapters else None)
+            active_id = st.session_state.get("active_chapter_id")
 
-        curr = p.chapters[st.session_state.curr_chap_id]
+        curr = p.chapters.get(active_id) if active_id else None
+        if curr is None and active_id:
+            _sync_session_chapters(force=True)
+            chapters = st.session_state.get("chapters", [])
+            chapter_map = {c["id"]: c for c in chapters if c.get("id")}
+            active_id = st.session_state.get("active_chapter_id")
+            curr = p.chapters.get(active_id) if active_id else None
+        if curr is None:
+            st.warning("Select a chapter to begin editing.")
+            return
+        curr_entry = chapter_map.get(curr.id, _serialize_chapter(curr))
         locked_chapters = st.session_state.get("locked_chapters", set())
         # --- SAFELY sync programmatic chapter updates into the editor widget (before widget exists)
         ed_key = f"ed_{curr.id}"
@@ -5037,6 +5104,7 @@ def _run_ui():
                 clean = re.split(r" [-–:] ", raw, 1)[0].strip()
                 if len(clean) > 2:
                     curr.title = sanitize_chapter_title(clean)
+                    _update_session_chapter(curr)
                     persist_project(p)
 
         col_nav, col_editor, col_ai = st.columns([1.05, 3.2, 1.25])
@@ -5044,10 +5112,16 @@ def _run_ui():
         with col_nav:
             with st.container(border=True):
                 st.markdown("### 📍 Chapters")
-                for c in chaps:
-                    lbl = f"{c.index}. {(c.title or 'Untitled')[:18]}"
-                    if st.button(lbl, key=f"n_{c.id}", type="primary" if c.id == curr.id else "secondary", use_container_width=True):
-                        st.session_state.curr_chap_id = c.id
+                for c in chapters:
+                    chapter_id = c.get("id")
+                    lbl = f"{c.get('index', 0)}. {(c.get('title') or 'Untitled')[:18]}"
+                    if st.button(
+                        lbl,
+                        key=f"n_{chapter_id}",
+                        type="primary" if chapter_id == curr.id else "secondary",
+                        use_container_width=True,
+                    ):
+                        _set_active_chapter(chapter_id)
                         st.rerun()
 
                 st.divider()
@@ -5057,16 +5131,7 @@ def _run_ui():
                     help="Create a new chapter in this project.",
                     key="editor_new_chapter"
                 ):
-                    next_idx = len(chaps) + 1
-                    pat = re.compile(rf"Chapter {next_idx}[:\s]+(.*?)(?=\n|$)", re.IGNORECASE)
-                    match = pat.search(p.outline or "")
-                    if match:
-                        raw = match.group(1).strip()
-                        title = sanitize_chapter_title(re.split(r" [-–:] ", raw, 1)[0].strip())
-                    else:
-                        title = f"Chapter {next_idx}"
-                    p.add_chapter(sanitize_chapter_title(title))
-                    _persist_chapter_update()
+                    create_next_chapter()
 
         stream_ph = st.empty()
         provider, active_key, _ = get_active_key_status()
@@ -5075,25 +5140,37 @@ def _run_ui():
             with st.container(border=True):
                 h1, h2 = st.columns([3, 1])
                 with h1:
-                    curr.title = st.text_input(
+                    title_key = f"editor_title_{curr.id}"
+                    title_val = st.text_input(
                         "Chapter Title",
-                        curr.title,
+                        curr_entry.get("title", curr.title),
                         label_visibility="collapsed",
-                        help="Edit the title of this chapter"
+                        help="Edit the title of this chapter",
+                        key=title_key,
                     )
+                    if title_val != curr.title:
+                        curr.title = title_val
+                        _update_session_chapter(curr)
+                        save_p()
                 with h2:
-                    curr.target_words = st.number_input(
+                    target_key = f"editor_target_{curr.id}"
+                    target_val = st.number_input(
                         "Target Word Count",
                         min_value=100,
                         max_value=10000,
-                        value=int(curr.target_words),
+                        value=int(curr_entry.get("target_words", curr.target_words)),
                         label_visibility="collapsed",
                         help="Set a target word count goal for this chapter",
+                        key=target_key,
                     )
+                    if int(target_val) != int(curr.target_words):
+                        curr.target_words = int(target_val)
+                        _update_session_chapter(curr)
+                        save_p()
 
                 val = st.text_area(
                     "Chapter Content",
-                    curr.content,
+                    curr_entry.get("content", curr.content),
                     height=680,
                     label_visibility="collapsed",
                     key=f"ed_{curr.id}",
@@ -5101,14 +5178,21 @@ def _run_ui():
                 )
                 if val != curr.content:
                     curr.update_content(val, "manual")
+                    _update_session_chapter(curr)
                     save_p()
 
                 st.caption(f"📝 Chapter: {curr.word_count} words • 📚 Total: {p.get_total_word_count()} words")
 
                 c1, c2 = st.columns([1, 1])
                 with c1:
-                    if st.button("💾 Save Chapter", type="primary", use_container_width=True):
+                    if st.button(
+                        "💾 Save Chapter",
+                        type="primary",
+                        use_container_width=True,
+                        key=f"editor_save_{curr.id}",
+                    ):
                         curr.update_content(val, "manual")
+                        _update_session_chapter(curr)
                         if persist_project(p, action="save"):
                             # Automatically scan entities from this chapter when the user explicitly saves it.
                             extract_entities_ui(curr.content or "", f"Ch {curr.index}")
@@ -5128,6 +5212,7 @@ def _run_ui():
                         summary_label,
                         use_container_width=True,
                         disabled=bool(summary_cooldown) or not active_key,
+                        key=f"editor_summary_{curr.id}",
                     ):
                         _mark_action(f"summary_{curr.id}")
                         summary = StoryEngine.summarize(curr.content or "", get_ai_model())
@@ -5135,6 +5220,7 @@ def _run_ui():
                             st.error("Canon violation detected. Resolve issues before generating AI content.")
                         else:
                             curr.summary = summary
+                            _update_session_chapter(curr)
                             persist_project(p)
                             st.rerun()
 
@@ -5211,6 +5297,7 @@ def _run_ui():
                     prev = st.session_state.get("chapter_text_prev", {})
                     if prev.get("chapter_id") == curr.id and prev.get("text") is not None:
                         curr.update_content(prev.get("text") or "", "Undo Apply")
+                        _update_session_chapter(curr)
                         persist_project(p)
                         st.session_state._chapter_sync_id = curr.id
                         st.session_state._chapter_sync_text = prev.get("text") or ""
@@ -5246,6 +5333,7 @@ def _run_ui():
                                     "text": curr.content or "",
                                 }
                                 curr.update_content(draft.get("text", ""), "Draft Applied")
+                                _update_session_chapter(curr)
                                 persist_project(p)
                                 st.session_state._chapter_sync_id = curr.id
                                 st.session_state._chapter_sync_text = draft.get("text", "")
@@ -5265,6 +5353,7 @@ def _run_ui():
                         disabled=True,
                         use_container_width=True,
                         help="Resolve canon issues in World Bible → Memory before generating.",
+                        key=f"editor_autowrite_blocked_{curr.id}",
                     )
                 else:
                     if not active_key:
@@ -5282,6 +5371,7 @@ def _run_ui():
                         type="primary",
                         use_container_width=True,
                         disabled=bool(auto_cooldown) or not active_key,
+                        key=f"editor_autowrite_{curr.id}",
                     ):
                         _mark_action(f"auto_write_{curr.id}")
                         prompt = StoryEngine.generate_chapter_prompt(p, curr.index, int(curr.target_words))
@@ -5304,6 +5394,7 @@ def _run_ui():
                                 return
                             new_text = ((curr.content or "") + "\n" + full.strip()).strip()
                             curr.update_content(new_text, "AI Auto-Write")
+                            _update_session_chapter(curr)
                             persist_project(p)
 
                             # Queue sync into editor widget on next run (do NOT set ed_key here!)
@@ -5396,6 +5487,7 @@ def _run_ui():
                             }
                             new_text = pending_text or ""
                             curr.update_content(new_text, "AI Improve")
+                            _update_session_chapter(curr)
                             persist_project(p)
                             st.session_state._chapter_sync_id = curr.id
                             st.session_state._chapter_sync_text = new_text
@@ -5418,6 +5510,7 @@ def _run_ui():
                             }
                             new_text = ((curr.content or "") + "\n" + (pending_text or "")).strip()
                             curr.update_content(new_text, "AI Improve Append")
+                            _update_session_chapter(curr)
                             persist_project(p)
                             st.session_state._chapter_sync_id = curr.id
                             st.session_state._chapter_sync_text = new_text
