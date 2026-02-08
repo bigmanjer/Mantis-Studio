@@ -81,7 +81,8 @@ class TestCriticalImports:
         importlib.import_module("app.ui.layout")
 
     def test_import_ui_components_file(self):
-        importlib.import_module("app.ui.components")
+        mod = importlib.import_module("app.ui.components")
+        assert hasattr(mod, "card_block"), "card_block context manager should exist"
 
     def test_import_services_projects(self):
         importlib.import_module("app.services.projects")

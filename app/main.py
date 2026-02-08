@@ -100,7 +100,7 @@ class AppConfig:
     VERSION = get_app_version()
     PROJECTS_DIR = os.getenv("MANTIS_PROJECTS_DIR", "projects")
     BACKUPS_DIR = os.path.join(PROJECTS_DIR, ".backups")
-    # USERS_DIR = os.getenv("MANTIS_USERS_DIR", os.path.join(PROJECTS_DIR, "users"))  # Temporarily disabled
+
     GROQ_API_URL = os.getenv("GROQ_API_URL", "https://api.groq.com/openai/v1")
     GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
     GROQ_TIMEOUT = int(os.getenv("GROQ_TIMEOUT", "300"))
@@ -125,7 +125,7 @@ class AppConfig:
 
 os.makedirs(AppConfig.PROJECTS_DIR, exist_ok=True)
 os.makedirs(AppConfig.BACKUPS_DIR, exist_ok=True)
-# os.makedirs(AppConfig.USERS_DIR, exist_ok=True)  # Temporarily disabled
+
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("MANTIS")
@@ -205,13 +205,6 @@ def _release_lock(lock_path: str) -> None:
         pass
 
 
-# Temporarily disabled - user accounts removed
-# def get_user_projects_dir(user_id: str) -> str:
-#     user_dir = os.path.join(AppConfig.USERS_DIR, user_id)
-#     os.makedirs(user_dir, exist_ok=True)
-#     return user_dir
-
-
 def _get_streamlit():
     if "streamlit" not in sys.modules:
         return None
@@ -231,62 +224,12 @@ def _provider_label(provider: str) -> str:
     return "OpenAI" if _normalize_provider(provider) == "openai" else "Groq"
 
 
-# Temporarily disabled - user accounts removed
-# def _get_user_keys_path(user_id: str) -> Optional[str]:
-#     if not user_id:
-#         return None
-#     user_dir = get_user_projects_dir(user_id)
-#     return os.path.join(user_dir, ".mantis_ai_keys.json")
-
-
-# Temporarily disabled - user accounts removed
-# def _load_user_keys(user_id: str) -> Dict[str, str]:
-#     path = _get_user_keys_path(user_id)
-#     if not path or not os.path.exists(path):
-#         return {}
-#     try:
-#         with open(path, "r", encoding="utf-8") as fh:
-#             data = json.load(fh)
-#         if isinstance(data, dict):
-#             return {
-#                 key: str(value)
-#                 for key, value in data.items()
-#                 if key in {"openai", "groq"} and value
-#             }
-#     except Exception:
-#         logger.warning("Failed to load user AI keys", exc_info=True)
-#     return {}
-
-
-# Temporarily disabled - user accounts removed
-# def _save_user_keys(user_id: str, keys: Dict[str, str]) -> bool:
-#     path = _get_user_keys_path(user_id)
-#     if not path:
-#         return False
-#     try:
-#         with open(path, "w", encoding="utf-8") as fh:
-#             json.dump(keys, fh, indent=2)
-#         return True
-#     except Exception:
-#         logger.warning("Failed to save user AI keys", exc_info=True)
-#         return False
-
-
 def _ensure_session_keys(st) -> Dict[str, str]:
     keys = st.session_state.setdefault("ai_session_keys", {})
     for provider in ("openai", "groq"):
         keys.setdefault(provider, "")
     st.session_state["ai_session_keys"] = keys
     return keys
-
-
-# Temporarily disabled - user accounts removed
-# def _get_saved_keys(st, user_id: str) -> Dict[str, str]:
-#     cached_user = st.session_state.get("ai_saved_keys_user_id")
-#     if user_id and cached_user != user_id:
-#         st.session_state["ai_saved_keys_user_id"] = user_id
-#         st.session_state["ai_saved_keys_cache"] = _load_user_keys(user_id)
-#     return st.session_state.get("ai_saved_keys_cache", {})
 
 
 def _validate_api_key_format(key: str) -> bool:
@@ -327,23 +270,6 @@ def clear_session_key(provider: str) -> None:
     keys = _ensure_session_keys(st)
     keys[provider] = ""
     st.session_state["ai_session_keys"] = keys
-
-
-# Temporarily disabled - user accounts removed
-# def save_user_key(provider: str, key: str, user_id: Optional[str]) -> bool:
-#     st = _get_streamlit()
-#     if not st or not user_id:
-#         return False
-#     provider = _normalize_provider(provider)
-#     normalized = (key or "").strip()
-#     if not normalized:
-#         return False
-#     saved = dict(_get_saved_keys(st, user_id))
-#     saved[provider] = normalized
-#     if not _save_user_keys(user_id, saved):
-#         return False
-#     st.session_state["ai_saved_keys_cache"] = saved
-#     return True
 
 
 def _get_secret_key(st, provider: str) -> str:
@@ -387,18 +313,6 @@ def get_effective_key(provider: str, user_id: Optional[str] = None) -> tuple[str
         session_key = _ensure_session_keys(st).get(provider, "")
         if session_key:
             return session_key, "session"
-        # Temporarily disabled - user accounts removed
-        # try:
-        #     from app.utils import auth
-        # 
-        #     if auth.is_authenticated():
-        #         user_id = user_id or st.session_state.get("user_id")
-        #         if user_id:
-        #             saved_key = _get_saved_keys(st, user_id).get(provider, "")
-        #             if saved_key:
-        #                 return saved_key, "saved"
-        # except Exception:
-        #     pass
     default_key = _get_server_default_key(provider)
     if default_key:
         return default_key, "default"
@@ -1381,10 +1295,9 @@ def _run_ui():
     from contextlib import contextmanager
     from pathlib import Path
     from app.components.ui import action_card, card, primary_button, section_header, stat_tile
-    from app.ui.components import card_end, card_start, cta_tile, empty_state, header_bar, render_tag_list, section_title
+    from app.ui.components import card_block, cta_tile, empty_state, header_bar, render_tag_list, section_title
     from app.ui.layout import render_footer
     from app.ui.theme import inject_theme
-    from app.utils import auth
     from app.utils.keys import ui_key
 
     widget_counters: Dict[tuple, int] = {}
@@ -1611,14 +1524,7 @@ def _run_ui():
     st.set_page_config(page_title=AppConfig.APP_NAME, page_icon=page_icon, layout="wide")
     inject_theme()
 
-    user = auth.get_current_user()
     config_data = load_app_config()
-
-    logged_in = auth.is_authenticated()
-    is_guest = not logged_in
-    st.session_state["guest_mode"] = is_guest
-    if is_guest:
-        st.session_state.setdefault("guest_session_id", uuid.uuid4().hex[:8])
 
     init_state("ui_theme", config_data.get("ui_theme", "Dark"))
     init_state("daily_word_goal", int(config_data.get("daily_word_goal", 500)))
@@ -2174,14 +2080,11 @@ def _run_ui():
         """,
     )
 
-    guest_mode = st.session_state.get("guest_mode", is_guest)
-
-    # User accounts removed - user_id kept at None since get_effective_key() accepts optional user_id parameter
     init_state("user_id", None)
     init_state("projects_dir", None)
     init_state("project", None)
     init_state("page", "home")
-    init_state("auto_save", not is_guest)
+    init_state("auto_save", True)
     init_state("ghost_text", "")
     init_state("pending_improvement_text", "")
     init_state("pending_improvement_meta", {})
@@ -2190,19 +2093,16 @@ def _run_ui():
     init_state("editor_improve__copy_buffer", "")
     init_state("first_run", True)
     init_state("is_premium", True)
-    init_state("guest_mode", is_guest)
     init_state("pending_action", None)
-    init_state("guest_project", None)
     st.session_state.setdefault("ai_keys", {})
 
     def _resolve_api_key(provider: str, default_value: str) -> str:
         session_key = (st.session_state.get("ai_keys") or {}).get(provider, "")
         if session_key:
             return session_key
-        if not guest_mode:
-            config_key = config_data.get(f"{provider}_api_key", "")
-            if config_key:
-                return config_key
+        config_key = config_data.get(f"{provider}_api_key", "")
+        if config_key:
+            return config_key
         return default_value or ""
     init_state(
         "openai_base_url",
@@ -2210,9 +2110,6 @@ def _run_ui():
     )
     init_state("ai_provider", config_data.get("ai_provider", "groq"))
     init_state("ai_session_keys", {"openai": "", "groq": ""})
-    # User accounts removed - saved keys feature disabled
-    # init_state("ai_saved_keys_cache", {})
-    # init_state("ai_saved_keys_user_id", "")
     init_state("openai_key_input", "")
     init_state("openai_model", config_data.get("openai_model", AppConfig.OPENAI_MODEL))
     init_state("openai_model_list", [])
@@ -2246,46 +2143,13 @@ def _run_ui():
         st.session_state.page = "legal"
         st.rerun()
 
-    GUEST_BANNER_TEXT = (
-        "Guest mode: your work saves locally in this session. Create an account to sync and export."
-    )
-
-    # Temporarily disabled - user accounts removed
-    def request_account_access(
-        action: str,
-        reason: str,
-        *,
-        payload: Optional[Dict[str, Any]] = None,
-        return_to: Optional[str] = None,
-    ) -> None:
-        # Disabled - no account functionality
-        pass
-
-    # Temporarily disabled - user accounts removed
-    def open_account_settings(
-        *,
-        action: str = "profile",
-        reason: Optional[str] = None,
-        return_to: Optional[str] = None,
-    ) -> None:
-        # Disabled - no account functionality
-        pass
-
-    def persist_project(
-        project: "Project",
-        *,
-        prompt_on_guest: bool = False,
-        action: str = "save",
-    ) -> bool:
+    def persist_project(project: "Project", *, action: str = "save") -> bool:
+        """Save project to local storage."""
         project.save()
-        if is_guest and prompt_on_guest:
-            st.toast("Saved locally. Create an account to sync and export.")
         return True
 
-    # Temporarily disabled - user accounts removed
-    def render_guest_banner(context: str) -> None:
-        """Show helpful context-aware guidance for users, especially first-timers."""
-        # Show first-time welcome on home page only
+    def render_welcome_banner(context: str) -> None:
+        """Show helpful context-aware guidance for first-time users."""
         if context == "home" and st.session_state.get("first_run", True):
             with st.container(border=True):
                 st.markdown("### 👋 Welcome to Mantis Studio!")
@@ -2295,7 +2159,7 @@ def _run_ui():
                 **Getting Started:**
                 - 📁 Click **Projects** in the sidebar to create your first story
                 - 📖 Check out the [Getting Started Guide]({AppConfig.GETTING_STARTED_URL}) for a complete walkthrough
-                - 💡 Everything auto-saves locally—no account needed to start writing!
+                - 💡 Everything auto-saves locally
                 
                 **Quick Tips:**
                 - Use **Outline** to plan your story structure
@@ -2313,8 +2177,6 @@ def _run_ui():
                     if st.button("✅ Got it, don't show again", use_container_width=True):
                         st.session_state.first_run = False
                         st.rerun()
-        
-        # Show context-specific tips for first-time users on other pages
         elif st.session_state.get("first_run", True) and context != "home":
             st.info(f"💡 **Tip**: Check out the [Getting Started Guide]({AppConfig.GETTING_STARTED_URL}) for help using this section.", icon="💡")
 
@@ -2358,51 +2220,13 @@ def _run_ui():
 
         with right_col:
             tags = []
-            if st.session_state.get("guest_mode"):
-                tags.append("Guest")
             if st.session_state.project:
                 tags.append("Project active")
             render_tag_list(tags)
 
-            # Temporarily disabled - user accounts removed
-            # user = auth.get_current_user() or {}
-            # initials = auth.get_user_initials(user)
-            # with st.expander(f"Account {initials}", expanded=False):
-            #     if st.button("Profile & settings", use_container_width=True):
-            #         open_account_settings()
-            #     st.caption("Billing (coming soon)")
-            #     if auth.is_authenticated():
-            #         auth.logout_button(label="Log out", key="header_logout")
-
-    # Temporarily disabled - user accounts removed
-    # if is_guest:
-    #     user_id = f"guest_{st.session_state['guest_session_id']}"
-    # else:
-    #     user_id = auth.get_user_id_with_fallback(user)
-    #     if not user_id:
-    #         st.warning("We couldn't read a user identifier. Please sign in again.")
-    #         auth.logout_button(key="auth_missing_user_id_logout")
-    #         st.stop()
-    # 
-    # if st.session_state.user_id != user_id:
-    #     st.session_state.user_id = user_id
-    #     st.session_state.projects_dir = get_user_projects_dir(user_id)
-    #     st.session_state.project = None
-    #     st.session_state.page = "home"
-    # elif not st.session_state.projects_dir:
-    #     st.session_state.projects_dir = get_user_projects_dir(user_id)
-
-    # Set default projects directory (no user-specific directories)
+    # Local-first: use the default projects directory
     if not st.session_state.get("projects_dir"):
         st.session_state.projects_dir = AppConfig.PROJECTS_DIR
-
-    if is_guest:
-        st.session_state.auto_save = False
-
-    guest_continue_action = st.session_state.get("guest_continue_action")
-    if guest_continue_action and guest_continue_action != "create_project":
-        st.session_state["guest_continue_action"] = None
-        st.toast("You're still in Guest mode. Saves stay local until you create an account.")
 
     # Reliable navigation rerun (avoids Streamlit edge cases when returning early)
     if st.session_state.get("_force_nav"):
@@ -2425,57 +2249,12 @@ def _run_ui():
             persist_project(st.session_state.project)
 
     def get_active_projects_dir() -> Optional[str]:
-        if st.session_state.get("guest_mode"):
-            return st.session_state.get("projects_dir") or AppConfig.PROJECTS_DIR
+        """Return the active projects directory (local-first, single user)."""
         return st.session_state.get("projects_dir") or AppConfig.PROJECTS_DIR
-
-    # Temporarily disabled - user accounts removed
-    def queue_pending_action(
-        action: str,
-        payload: Optional[Dict[str, Any]] = None,
-        return_to: str = "home",
-        reason: Optional[str] = None,
-    ) -> None:
-        # Disabled - no account functionality
-        pass
-
-    # Temporarily disabled - user accounts removed
-    def is_authenticated() -> bool:
-        # Always return False - no authentication
-        return False
-
-    # Temporarily disabled - user accounts removed
-    def require_login(
-        action: Optional[str] = None,
-        payload: Optional[Dict[str, Any]] = None,
-        return_to: str = "home",
-        *,
-        feature: Optional[str] = None,
-    ) -> bool:
-        # Always return True - no login required
-        return True
-
-    # Temporarily disabled - user accounts removed
-    def require_account(
-        action: Optional[str] = None,
-        payload: Optional[Dict[str, Any]] = None,
-        return_to: str = "home",
-        *,
-        feature: Optional[str] = None,
-    ) -> bool:
-        # Always return True - no account required
-        return True
-
-    def create_guest_project(title: str = "Guest Sandbox") -> Project:
-        storage_dir = st.session_state.get("projects_dir") or AppConfig.PROJECTS_DIR
-        p = Project.create(title, storage_dir=storage_dir)
-        p.filepath = None
-        st.session_state.guest_project = p
-        return p
 
     def resume_pending_action() -> None:
         pending = st.session_state.get("pending_action")
-        if not pending or st.session_state.get("guest_mode"):
+        if not pending:
             return
         action = pending.get("action")
         payload = pending.get("payload") or {}
@@ -2528,7 +2307,7 @@ def _run_ui():
         st.session_state.page = return_to
         st.rerun()
 
-    if logged_in and st.session_state.get("pending_action"):
+    if st.session_state.get("pending_action"):
         resume_pending_action()
 
 
@@ -3218,8 +2997,7 @@ def _run_ui():
             st.toast("Model list refreshed")
 
         def save_settings_action() -> None:
-            if require_account("save_app_settings", return_to="ai"):
-                save_app_settings()
+            save_app_settings()
 
         header_bar(
             "AI Configuration",
@@ -3234,17 +3012,16 @@ def _run_ui():
         groq_key, groq_source = get_effective_key("groq", st.session_state.get("user_id"))
         openai_key, openai_source = get_effective_key("openai", st.session_state.get("user_id"))
         
-        card_start("📊 Connection Status")
-        st.caption("Current status of your AI provider connections")
-        status_cols = st.columns(3)
-        with status_cols[0]:
-            st.metric("Groq", "✓ Connected" if groq_key else "⚠ Not configured")
-        with status_cols[1]:
-            st.metric("OpenAI", "✓ Connected" if openai_key else "⚠ Not configured")
-        with status_cols[2]:
-            current_model = get_ai_model() or "None"
-            st.metric("Active Model", current_model)
-        card_end()
+        with card_block("📊 Connection Status"):
+            st.caption("Current status of your AI provider connections")
+            status_cols = st.columns(3)
+            with status_cols[0]:
+                st.metric("Groq", "✓ Connected" if groq_key else "⚠ Not configured")
+            with status_cols[1]:
+                st.metric("OpenAI", "✓ Connected" if openai_key else "⚠ Not configured")
+            with status_cols[2]:
+                current_model = get_ai_model() or "None"
+                st.metric("Active Model", current_model)
 
         # Provider Selection
         st.markdown("### Choose Your AI Provider")
@@ -3319,260 +3096,258 @@ def _run_ui():
                     st.rerun()
 
         with tabs[1]:
-            card_start("✨ OpenAI Configuration")
-            st.caption("OpenAI provides advanced models like GPT-4. Requires a paid API account.")
-            
-            _render_key_controls("openai")
-            
-            openai_key, _ = get_effective_key("openai", st.session_state.get("user_id"))
-            if not openai_key:
-                st.info("💡 **Getting Started:** [Create an OpenAI account](https://platform.openai.com/api-keys) to get your API key.")
-            
-            st.markdown("#### Model Selection")
-            if st.session_state.openai_model_list:
-                models = st.session_state.openai_model_list
-                idx = 0
-                if st.session_state.openai_model in models:
-                    idx = models.index(st.session_state.openai_model)
-                openai_model = st.selectbox(
-                    "Choose a model",
-                    models,
-                    index=idx,
-                    help="Select which OpenAI model to use for AI features",
-                    label_visibility="collapsed"
-                )
-            else:
-                openai_model = st.text_input(
-                    "Model name",
-                    value=st.session_state.openai_model,
-                    help="Enter the model name manually, or fetch available models below",
-                    label_visibility="collapsed"
-                )
-
-            if openai_model != st.session_state.openai_model:
-                st.session_state.openai_model = openai_model
-                AppConfig.OPENAI_MODEL = openai_model
-            
-            with st.expander("⚙️ Advanced Settings", expanded=False):
-                openai_url = st.text_input(
-                    "API Base URL",
-                    value=st.session_state.openai_base_url,
-                    help="Change this only if using a custom OpenAI-compatible endpoint"
-                )
-                if openai_url != st.session_state.openai_base_url:
-                    st.session_state.openai_base_url = openai_url
-                    AppConfig.OPENAI_API_URL = openai_url
-
-            st.markdown("#### Connection Tools")
-            test_cols = st.columns(2)
-            with test_cols[0]:
-                openai_fetch_cooldown = _cooldown_remaining("openai_fetch_models", 10)
-                if st.button(
-                    "↻ Fetch Models",
-                    use_container_width=True,
-                    disabled=bool(openai_fetch_cooldown) or not openai_key,
-                    help="Load available models from OpenAI"
-                ):
-                    _mark_action("openai_fetch_models")
-                    models, error_message = fetch_openai_models(
-                        st.session_state.openai_base_url,
-                        openai_key,
+            with card_block("✨ OpenAI Configuration"):
+                st.caption("OpenAI provides advanced models like GPT-4. Requires a paid API account.")
+                
+                _render_key_controls("openai")
+                
+                openai_key, _ = get_effective_key("openai", st.session_state.get("user_id"))
+                if not openai_key:
+                    st.info("💡 **Getting Started:** [Create an OpenAI account](https://platform.openai.com/api-keys) to get your API key.")
+                
+                st.markdown("#### Model Selection")
+                if st.session_state.openai_model_list:
+                    models = st.session_state.openai_model_list
+                    idx = 0
+                    if st.session_state.openai_model in models:
+                        idx = models.index(st.session_state.openai_model)
+                    openai_model = st.selectbox(
+                        "Choose a model",
+                        models,
+                        index=idx,
+                        help="Select which OpenAI model to use for AI features",
+                        label_visibility="collapsed"
                     )
-                    if models:
-                        st.session_state.openai_model_list = models
-                        st.session_state.openai_model_tests = {}
-                        st.toast(f"Loaded {len(models)} models.")
-                        st.rerun()
-                    else:
-                        st.session_state.openai_model_list = []
-                        st.session_state.openai_model_tests = {}
-                        st.error(f"Failed to fetch models. {error_message or 'Check your API key and base URL.'}")
-
-            with test_cols[1]:
-                openai_test_cooldown = _cooldown_remaining("openai_test_connection", 10)
-                if st.button(
-                    "🔌 Test Connection",
-                    use_container_width=True,
-                    disabled=bool(openai_test_cooldown) or not openai_key,
-                    help="Verify your API key and connection"
-                ):
-                    _mark_action("openai_test_connection")
-                    ok = test_openai_connection(
-                        st.session_state.openai_base_url,
-                        openai_key,
+                else:
+                    openai_model = st.text_input(
+                        "Model name",
+                        value=st.session_state.openai_model,
+                        help="Enter the model name manually, or fetch available models below",
+                        label_visibility="collapsed"
                     )
-                    if ok:
-                        st.success("✓ Connection successful!")
-                    else:
-                        st.error("✗ Connection failed. Check your API key and base URL.")
 
-            if st.session_state.openai_model_list:
-                with st.expander("🧪 Advanced: Test All Models", expanded=False):
-                    st.warning("⚠️ This will test each model individually. It may take time and consume API credits.")
-                    openai_test_all_cooldown = _cooldown_remaining("openai_test_models", 20)
+                if openai_model != st.session_state.openai_model:
+                    st.session_state.openai_model = openai_model
+                    AppConfig.OPENAI_MODEL = openai_model
+                
+                with st.expander("⚙️ Advanced Settings", expanded=False):
+                    openai_url = st.text_input(
+                        "API Base URL",
+                        value=st.session_state.openai_base_url,
+                        help="Change this only if using a custom OpenAI-compatible endpoint"
+                    )
+                    if openai_url != st.session_state.openai_base_url:
+                        st.session_state.openai_base_url = openai_url
+                        AppConfig.OPENAI_API_URL = openai_url
+
+                st.markdown("#### Connection Tools")
+                test_cols = st.columns(2)
+                with test_cols[0]:
+                    openai_fetch_cooldown = _cooldown_remaining("openai_fetch_models", 10)
                     if st.button(
-                        "Run Full Model Test",
+                        "↻ Fetch Models",
                         use_container_width=True,
-                        disabled=bool(openai_test_all_cooldown) or not openai_key,
-                        key="openai_test_all_models_btn"
+                        disabled=bool(openai_fetch_cooldown) or not openai_key,
+                        help="Load available models from OpenAI"
                     ):
-                        _mark_action("openai_test_models")
-                        results = {}
-                        total = len(st.session_state.openai_model_list)
-                        progress = st.progress(0)
-                        for i, model_name in enumerate(st.session_state.openai_model_list, start=1):
-                            ok, error_message = test_openai_model(
-                                st.session_state.openai_base_url,
-                                openai_key,
-                                model_name,
-                            )
-                            results[model_name] = "" if ok else error_message
-                            progress.progress(i / total)
-                        st.session_state.openai_model_tests = results
-                        failures = [m for m, err in results.items() if err]
-                        if failures:
-                            st.warning(f"{len(failures)} models failed. Check details below.")
+                        _mark_action("openai_fetch_models")
+                        models, error_message = fetch_openai_models(
+                            st.session_state.openai_base_url,
+                            openai_key,
+                        )
+                        if models:
+                            st.session_state.openai_model_list = models
+                            st.session_state.openai_model_tests = {}
+                            st.toast(f"Loaded {len(models)} models.")
+                            st.rerun()
                         else:
-                            st.success("✓ All models working correctly!")
+                            st.session_state.openai_model_list = []
+                            st.session_state.openai_model_tests = {}
+                            st.error(f"Failed to fetch models. {error_message or 'Check your API key and base URL.'}")
 
-                    if st.session_state.openai_model_tests:
-                        st.markdown("**Test Results:**")
-                        for model_name, error_message in sorted(
-                            st.session_state.openai_model_tests.items()
+                with test_cols[1]:
+                    openai_test_cooldown = _cooldown_remaining("openai_test_connection", 10)
+                    if st.button(
+                        "🔌 Test Connection",
+                        use_container_width=True,
+                        disabled=bool(openai_test_cooldown) or not openai_key,
+                        help="Verify your API key and connection"
+                    ):
+                        _mark_action("openai_test_connection")
+                        ok = test_openai_connection(
+                            st.session_state.openai_base_url,
+                            openai_key,
+                        )
+                        if ok:
+                            st.success("✓ Connection successful!")
+                        else:
+                            st.error("✗ Connection failed. Check your API key and base URL.")
+
+                if st.session_state.openai_model_list:
+                    with st.expander("🧪 Advanced: Test All Models", expanded=False):
+                        st.warning("⚠️ This will test each model individually. It may take time and consume API credits.")
+                        openai_test_all_cooldown = _cooldown_remaining("openai_test_models", 20)
+                        if st.button(
+                            "Run Full Model Test",
+                            use_container_width=True,
+                            disabled=bool(openai_test_all_cooldown) or not openai_key,
+                            key="openai_test_all_models_btn"
                         ):
-                            if error_message:
-                                st.error(f"✗ {model_name}: {error_message}")
+                            _mark_action("openai_test_models")
+                            results = {}
+                            total = len(st.session_state.openai_model_list)
+                            progress = st.progress(0)
+                            for i, model_name in enumerate(st.session_state.openai_model_list, start=1):
+                                ok, error_message = test_openai_model(
+                                    st.session_state.openai_base_url,
+                                    openai_key,
+                                    model_name,
+                                )
+                                results[model_name] = "" if ok else error_message
+                                progress.progress(i / total)
+                            st.session_state.openai_model_tests = results
+                            failures = [m for m, err in results.items() if err]
+                            if failures:
+                                st.warning(f"{len(failures)} models failed. Check details below.")
                             else:
-                                st.success(f"✓ {model_name}")
-            card_end()
+                                st.success("✓ All models working correctly!")
+
+                        if st.session_state.openai_model_tests:
+                            st.markdown("**Test Results:**")
+                            for model_name, error_message in sorted(
+                                st.session_state.openai_model_tests.items()
+                            ):
+                                if error_message:
+                                    st.error(f"✗ {model_name}: {error_message}")
+                                else:
+                                    st.success(f"✓ {model_name}")
 
         with tabs[0]:
-            card_start("🤖 Groq Configuration")
-            st.caption("Groq offers fast, free AI models. Great for getting started quickly.")
-            
-            _render_key_controls("groq")
-            
-            groq_key, _ = get_effective_key("groq", st.session_state.get("user_id"))
-            if not groq_key:
-                st.info("💡 **Getting Started:** [Get a free Groq API key](https://console.groq.com/keys) to begin.")
-            
-            st.markdown("#### Model Selection")
-            if st.session_state.groq_model_list:
-                models = st.session_state.groq_model_list
-                idx = 0
-                if st.session_state.groq_model in models:
-                    idx = models.index(st.session_state.groq_model)
-                groq_model = st.selectbox(
-                    "Choose a model",
-                    models,
-                    index=idx,
-                    help="Select which Groq model to use for AI features",
-                    label_visibility="collapsed"
-                )
-            else:
-                groq_model = st.text_input(
-                    "Model name",
-                    value=st.session_state.groq_model,
-                    help="Enter the model name manually, or fetch available models below",
-                    label_visibility="collapsed"
-                )
-
-            if groq_model != st.session_state.groq_model:
-                st.session_state.groq_model = groq_model
-                AppConfig.DEFAULT_MODEL = groq_model
-            
-            with st.expander("⚙️ Advanced Settings", expanded=False):
-                groq_url = st.text_input(
-                    "API Base URL",
-                    value=st.session_state.groq_base_url,
-                    help="Change this only if using a custom Groq-compatible endpoint"
-                )
-                if groq_url != st.session_state.groq_base_url:
-                    st.session_state.groq_base_url = groq_url
-                    AppConfig.GROQ_API_URL = groq_url
-
-            st.markdown("#### Connection Tools")
-            test_cols = st.columns(2)
-            with test_cols[0]:
-                groq_fetch_cooldown = _cooldown_remaining("groq_fetch_models", 10)
-                if st.button(
-                    "↻ Fetch Models",
-                    use_container_width=True,
-                    disabled=bool(groq_fetch_cooldown) or not groq_key,
-                    help="Load available models from Groq"
-                ):
-                    _mark_action("groq_fetch_models")
-                    models, error_message = fetch_groq_models(
-                        st.session_state.groq_base_url,
-                        groq_key,
+            with card_block("🤖 Groq Configuration"):
+                st.caption("Groq offers fast, free AI models. Great for getting started quickly.")
+                
+                _render_key_controls("groq")
+                
+                groq_key, _ = get_effective_key("groq", st.session_state.get("user_id"))
+                if not groq_key:
+                    st.info("💡 **Getting Started:** [Get a free Groq API key](https://console.groq.com/keys) to begin.")
+                
+                st.markdown("#### Model Selection")
+                if st.session_state.groq_model_list:
+                    models = st.session_state.groq_model_list
+                    idx = 0
+                    if st.session_state.groq_model in models:
+                        idx = models.index(st.session_state.groq_model)
+                    groq_model = st.selectbox(
+                        "Choose a model",
+                        models,
+                        index=idx,
+                        help="Select which Groq model to use for AI features",
+                        label_visibility="collapsed"
                     )
-                    if models:
-                        st.session_state.groq_model_list = models
-                        st.session_state.groq_model_tests = {}
-                        st.toast(f"Loaded {len(models)} models.")
-                        st.rerun()
-                    else:
-                        st.session_state.groq_model_list = []
-                        st.session_state.groq_model_tests = {}
-                        st.error(f"Failed to fetch models. {error_message or 'Check your API key.'}")
-
-            with test_cols[1]:
-                groq_test_cooldown = _cooldown_remaining("groq_test_connection", 10)
-                if st.button(
-                    "🔌 Test Connection",
-                    use_container_width=True,
-                    disabled=bool(groq_test_cooldown) or not groq_key,
-                    help="Verify your API key and connection"
-                ):
-                    _mark_action("groq_test_connection")
-                    ok = test_groq_connection(
-                        st.session_state.groq_base_url,
-                        groq_key,
+                else:
+                    groq_model = st.text_input(
+                        "Model name",
+                        value=st.session_state.groq_model,
+                        help="Enter the model name manually, or fetch available models below",
+                        label_visibility="collapsed"
                     )
-                    if ok:
-                        st.success("✓ Connection successful!")
-                    else:
-                        st.error("✗ Connection failed. Check your API key.")
 
-            if st.session_state.groq_model_list:
-                with st.expander("🧪 Advanced: Test All Models", expanded=False):
-                    st.warning("⚠️ This will test each model individually and may take some time.")
-                    groq_test_all_cooldown = _cooldown_remaining("groq_test_models", 20)
+                if groq_model != st.session_state.groq_model:
+                    st.session_state.groq_model = groq_model
+                    AppConfig.DEFAULT_MODEL = groq_model
+                
+                with st.expander("⚙️ Advanced Settings", expanded=False):
+                    groq_url = st.text_input(
+                        "API Base URL",
+                        value=st.session_state.groq_base_url,
+                        help="Change this only if using a custom Groq-compatible endpoint"
+                    )
+                    if groq_url != st.session_state.groq_base_url:
+                        st.session_state.groq_base_url = groq_url
+                        AppConfig.GROQ_API_URL = groq_url
+
+                st.markdown("#### Connection Tools")
+                test_cols = st.columns(2)
+                with test_cols[0]:
+                    groq_fetch_cooldown = _cooldown_remaining("groq_fetch_models", 10)
                     if st.button(
-                        "Run Full Model Test",
+                        "↻ Fetch Models",
                         use_container_width=True,
-                        disabled=bool(groq_test_all_cooldown) or not groq_key,
-                        key="groq_test_all_models_btn"
+                        disabled=bool(groq_fetch_cooldown) or not groq_key,
+                        help="Load available models from Groq"
                     ):
-                        _mark_action("groq_test_models")
-                        results = {}
-                        total = len(st.session_state.groq_model_list)
-                        progress = st.progress(0)
-                        for i, model_name in enumerate(st.session_state.groq_model_list, start=1):
-                            ok, error_message = test_groq_model(
-                                st.session_state.groq_base_url,
-                                groq_key,
-                                model_name,
-                            )
-                            results[model_name] = "" if ok else error_message
-                            progress.progress(i / total)
-                        st.session_state.groq_model_tests = results
-                        failures = [m for m, err in results.items() if err]
-                        if failures:
-                            st.warning(f"{len(failures)} models failed. Check details below.")
+                        _mark_action("groq_fetch_models")
+                        models, error_message = fetch_groq_models(
+                            st.session_state.groq_base_url,
+                            groq_key,
+                        )
+                        if models:
+                            st.session_state.groq_model_list = models
+                            st.session_state.groq_model_tests = {}
+                            st.toast(f"Loaded {len(models)} models.")
+                            st.rerun()
                         else:
-                            st.success("✓ All models working correctly!")
+                            st.session_state.groq_model_list = []
+                            st.session_state.groq_model_tests = {}
+                            st.error(f"Failed to fetch models. {error_message or 'Check your API key.'}")
 
-                    if st.session_state.groq_model_tests:
-                        st.markdown("**Test Results:**")
-                        for model_name, error_message in sorted(
-                            st.session_state.groq_model_tests.items()
+                with test_cols[1]:
+                    groq_test_cooldown = _cooldown_remaining("groq_test_connection", 10)
+                    if st.button(
+                        "🔌 Test Connection",
+                        use_container_width=True,
+                        disabled=bool(groq_test_cooldown) or not groq_key,
+                        help="Verify your API key and connection"
+                    ):
+                        _mark_action("groq_test_connection")
+                        ok = test_groq_connection(
+                            st.session_state.groq_base_url,
+                            groq_key,
+                        )
+                        if ok:
+                            st.success("✓ Connection successful!")
+                        else:
+                            st.error("✗ Connection failed. Check your API key.")
+
+                if st.session_state.groq_model_list:
+                    with st.expander("🧪 Advanced: Test All Models", expanded=False):
+                        st.warning("⚠️ This will test each model individually and may take some time.")
+                        groq_test_all_cooldown = _cooldown_remaining("groq_test_models", 20)
+                        if st.button(
+                            "Run Full Model Test",
+                            use_container_width=True,
+                            disabled=bool(groq_test_all_cooldown) or not groq_key,
+                            key="groq_test_all_models_btn"
                         ):
-                            if error_message:
-                                st.error(f"✗ {model_name}: {error_message}")
+                            _mark_action("groq_test_models")
+                            results = {}
+                            total = len(st.session_state.groq_model_list)
+                            progress = st.progress(0)
+                            for i, model_name in enumerate(st.session_state.groq_model_list, start=1):
+                                ok, error_message = test_groq_model(
+                                    st.session_state.groq_base_url,
+                                    groq_key,
+                                    model_name,
+                                )
+                                results[model_name] = "" if ok else error_message
+                                progress.progress(i / total)
+                            st.session_state.groq_model_tests = results
+                            failures = [m for m, err in results.items() if err]
+                            if failures:
+                                st.warning(f"{len(failures)} models failed. Check details below.")
                             else:
-                                st.success(f"✓ {model_name}")
-            card_end()
+                                st.success("✓ All models working correctly!")
+
+                        if st.session_state.groq_model_tests:
+                            st.markdown("**Test Results:**")
+                            for model_name, error_message in sorted(
+                                st.session_state.groq_model_tests.items()
+                            ):
+                                if error_message:
+                                    st.error(f"✗ {model_name}: {error_message}")
+                                else:
+                                    st.success(f"✓ {model_name}")
 
         # Save Settings Action
         st.markdown("---")
@@ -3588,14 +3363,6 @@ def _run_ui():
                 help="Save your AI provider configuration"
             ):
                 save_settings_action()
-
-    # Temporarily disabled - user accounts removed
-    def render_account():
-        # Account page is disabled
-        st.info("Account functionality is temporarily disabled.")
-        if st.button("⬅ Back to Studio", use_container_width=True):
-            st.session_state.page = "home"
-            st.rerun()
 
     def render_legal_redirect():
         render_page_header(
@@ -3669,7 +3436,7 @@ def _run_ui():
                         use_container_width=True,
                         help="Save all changes to this project"
                     ):
-                        if persist_project(p, prompt_on_guest=True, action="save"):
+                        if persist_project(p, action="save"):
                             st.toast("Project saved successfully")
                 with action_cols[1]:
                     if st.button(
@@ -3696,7 +3463,7 @@ def _run_ui():
                 st.caption(f"Last exception: {last_exception}")
 
     def render_home():
-        render_guest_banner("home")
+        render_welcome_banner("home")
         active_dir = get_active_projects_dir()
         recent_projects = _load_recent_projects(active_dir, st.session_state.projects_refresh_token)
 
@@ -3745,12 +3512,9 @@ def _run_ui():
 
         def open_recent_project(target: str, focus_tab: Optional[str] = None) -> None:
             if not recent_projects and not st.session_state.project:
-                if st.session_state.get("guest_mode"):
-                    st.session_state.project = st.session_state.guest_project or create_guest_project()
-                else:
-                    st.session_state.page = "projects"
-                    st.toast("Create or import a project to unlock this module.")
-                    st.rerun()
+                st.session_state.page = "projects"
+                st.toast("Create or import a project to unlock this module.")
+                st.rerun()
             if recent_projects and not st.session_state.project:
                 loaded = load_project_safe(recent_projects[0]["path"], context="recent project")
                 if not loaded:
@@ -3762,9 +3526,6 @@ def _run_ui():
             st.rerun()
 
         def open_export() -> None:
-            if st.session_state.get("guest_mode"):
-                queue_pending_action("export_project", return_to="export")
-                return
             export_path = None
             if st.session_state.project and st.session_state.project.filepath:
                 export_path = st.session_state.project.filepath
@@ -3790,9 +3551,6 @@ def _run_ui():
             open_recent_project(primary_target)
 
         def open_new_project() -> None:
-            if st.session_state.get("guest_mode"):
-                queue_pending_action("create_project", return_to="projects")
-                return
             st.session_state.page = "projects"
             st.rerun()
 
@@ -3804,36 +3562,34 @@ def _run_ui():
 
         top_cols = st.columns([2.2, 1])
         with top_cols[0]:
-            card_start("Current project", "Pick up where you left off or start fresh.")
-            st.markdown(f"### {project_title}")
-            st.caption(latest_chapter_label)
-            if st.button(primary_label, type="primary", use_container_width=True):
-                if primary_target == "chapters" and latest_chapter_id:
-                    st.session_state.curr_chap_id = latest_chapter_id
-                open_recent_project(primary_target)
-            action_row = st.columns(2)
-            with action_row[0]:
-                if st.button("📂 Resume project", use_container_width=True, disabled=not recent_projects):
-                    open_recent_project("chapters")
-            with action_row[1]:
-                if st.button("🧭 New project", use_container_width=True):
-                    open_new_project()
-            card_end()
+            with card_block("Current project", "Pick up where you left off or start fresh."):
+                st.markdown(f"### {project_title}")
+                st.caption(latest_chapter_label)
+                if st.button(primary_label, type="primary", use_container_width=True):
+                    if primary_target == "chapters" and latest_chapter_id:
+                        st.session_state.curr_chap_id = latest_chapter_id
+                    open_recent_project(primary_target)
+                action_row = st.columns(2)
+                with action_row[0]:
+                    if st.button("📂 Resume project", use_container_width=True, disabled=not recent_projects):
+                        open_recent_project("chapters")
+                with action_row[1]:
+                    if st.button("🧭 New project", use_container_width=True):
+                        open_new_project()
 
         with top_cols[1]:
-            card_start("Workspace snapshot")
-            k1, k2 = st.columns(2)
-            with k1:
-                stat_tile("Active projects", str(len(recent_projects)), icon="📁")
-            with k2:
-                stat_tile("Latest genre", (recent_snapshot or {}).get("genre", "—"), icon="🏷️")
-            k3, k4 = st.columns(2)
-            with k3:
-                stat_tile("Weekly sessions", f"{weekly_count}/{weekly_goal}", icon="🗓️")
-            with k4:
-                stat_tile("Writing streak", f"{_activity_streak()} days", icon="🔥")
-            st.caption(f"Canon health: {canon_icon} {canon_label}.")
-            card_end()
+            with card_block("Workspace snapshot"):
+                k1, k2 = st.columns(2)
+                with k1:
+                    stat_tile("Active projects", str(len(recent_projects)), icon="📁")
+                with k2:
+                    stat_tile("Latest genre", (recent_snapshot or {}).get("genre", "—"), icon="🏷️")
+                k3, k4 = st.columns(2)
+                with k3:
+                    stat_tile("Weekly sessions", f"{weekly_count}/{weekly_goal}", icon="🗓️")
+                with k4:
+                    stat_tile("Writing streak", f"{_activity_streak()} days", icon="🔥")
+                st.caption(f"Canon health: {canon_icon} {canon_label}.")
 
         section_title("Quick Actions", "Jump straight into your most-used tools.")
         quick_grid = st.container()
@@ -3888,118 +3644,76 @@ def _run_ui():
                 ):
                     open_export()
 
-        card_start("Recent Projects", "Select a project to open and pick up where you left off.")
-        if not recent_projects:
-            empty_state("No projects yet", "Create one to start writing.")
-        else:
-            for project_entry in recent_projects[:5]:
-                meta = project_entry.get("meta", {})
-                title = meta.get("title") or os.path.basename(project_entry.get("path", "Untitled"))
-                genre = meta.get("genre") or "—"
-                row = st.columns([2.2, 1, 1])
-                with row[0]:
-                    if st.button(
-                        f"📂 {title}",
-                        use_container_width=True,
-                        help=f"Open '{title}' in the editor"
-                    ):
-                        loaded = load_project_safe(project_entry["path"], context="project")
-                        if loaded:
-                            st.session_state.project = loaded
-                            st.session_state.page = "chapters"
-                            st.rerun()
-                with row[1]:
-                    st.caption(genre)
-                with row[2]:
-                    if st.button(
-                        "Open",
-                        use_container_width=True,
-                        help=f"Load this project and start editing",
-                        key=f"open_{project_entry.get('path', '')}"
-                    ):
-                        loaded = load_project_safe(project_entry["path"], context="project")
-                        if loaded:
-                            st.session_state.project = loaded
-                            st.session_state.page = "chapters"
-                            st.rerun()
-        card_end()
+        with card_block("Recent Projects", "Select a project to open and pick up where you left off."):
+            if not recent_projects:
+                empty_state("No projects yet", "Create one to start writing.")
+            else:
+                for project_entry in recent_projects[:5]:
+                    meta = project_entry.get("meta", {})
+                    title = meta.get("title") or os.path.basename(project_entry.get("path", "Untitled"))
+                    genre = meta.get("genre") or "—"
+                    row = st.columns([2.2, 1, 1])
+                    with row[0]:
+                        if st.button(
+                            f"📂 {title}",
+                            use_container_width=True,
+                            help=f"Open '{title}' in the editor"
+                        ):
+                            loaded = load_project_safe(project_entry["path"], context="project")
+                            if loaded:
+                                st.session_state.project = loaded
+                                st.session_state.page = "chapters"
+                                st.rerun()
+                    with row[1]:
+                        st.caption(genre)
+                    with row[2]:
+                        if st.button(
+                            "Open",
+                            use_container_width=True,
+                            help=f"Load this project and start editing",
+                            key=f"open_{project_entry.get('path', '')}"
+                        ):
+                            loaded = load_project_safe(project_entry["path"], context="project")
+                            if loaded:
+                                st.session_state.project = loaded
+                                st.session_state.page = "chapters"
+                                st.rerun()
 
-        card_start("Utilities")
-        util_cols = st.columns(2)
-        with util_cols[0]:
-            st.markdown("**AI Settings**")
-            st.caption("Manage providers, models, and API access.")
-            if st.button("⚙️ AI Settings", use_container_width=True):
-                open_ai_settings()
-        with util_cols[1]:
-            st.markdown("**Help Docs**")
-            st.caption("Guides, README notes, and updates.")
-            st.link_button(
-                "📖 Help Docs",
-                "https://github.com/bigmanjer/Mantis-Studio",
-                use_container_width=True,
-            )
-        card_end()
+        with card_block("Utilities"):
+            util_cols = st.columns(2)
+            with util_cols[0]:
+                st.markdown("**AI Settings**")
+                st.caption("Manage providers, models, and API access.")
+                if st.button("⚙️ AI Settings", use_container_width=True):
+                    open_ai_settings()
+            with util_cols[1]:
+                st.markdown("**Help Docs**")
+                st.caption("Guides, README notes, and updates.")
+                st.link_button(
+                    "📖 Help Docs",
+                    "https://github.com/bigmanjer/Mantis-Studio",
+                    use_container_width=True,
+                )
 
         groq_key, _ = get_effective_key("groq", st.session_state.get("user_id"))
         openai_key, _ = get_effective_key("openai", st.session_state.get("user_id"))
         if not groq_key or not openai_key:
-            card_start("🔑 Connect your AI providers", "Unlock generation, summaries, and entity tools with API access.")
-            cta_left, cta_right = st.columns(2)
-            with cta_left:
-                st.link_button("Create Groq Account", "https://console.groq.com/keys", use_container_width=True)
-            with cta_right:
-                st.link_button(
-                    "Create OpenAI Account",
-                    "https://platform.openai.com/api-keys",
-                    use_container_width=True,
-                )
-            card_end()
+            with card_block("🔑 Connect your AI providers", "Unlock generation, summaries, and entity tools with API access."):
+                cta_left, cta_right = st.columns(2)
+                with cta_left:
+                    st.link_button("Create Groq Account", "https://console.groq.com/keys", use_container_width=True)
+                with cta_right:
+                    st.link_button(
+                        "Create OpenAI Account",
+                        "https://platform.openai.com/api-keys",
+                        use_container_width=True,
+                    )
 
 
     def render_projects():
-        render_guest_banner("projects")
+        render_welcome_banner("projects")
         active_dir = get_active_projects_dir()
         recent_projects = _load_recent_projects(active_dir, st.session_state.projects_refresh_token)
-
-        if is_guest and st.session_state.get("guest_continue_action") == "create_project":
-            pending_project = st.session_state.pop("guest_pending_project", None)
-            pending_import = st.session_state.pop("guest_pending_import", None)
-            if pending_project or pending_import:
-                st.session_state["guest_continue_action"] = None
-                title_input = (pending_project or {}).get("title") or ""
-                genre_input = (pending_project or {}).get("genre") or ""
-                author = (pending_project or {}).get("author") or ""
-                context = (pending_project or {}).get("context") or ""
-                title, genre, genre_list, ai_used = _resolve_project_seed(
-                    title_input,
-                    genre_input,
-                    author,
-                    context=context,
-                    draft_excerpt=pending_import or "",
-                )
-                st.session_state["project_seed_output"] = {
-                    "title": title,
-                    "genres": genre_list,
-                    "ai_used": ai_used,
-                }
-                p = Project.create(title, author=author, genre=genre, storage_dir=get_active_projects_dir())
-                if pending_import:
-                    p.import_text_file(pending_import)
-                    active_provider = _normalize_provider(st.session_state.get("ai_provider", "groq"))
-                    active_key, _ = get_effective_key(active_provider, st.session_state.get("user_id"))
-                    if active_key and get_ai_model():
-                        with st.spinner("Reviewing document and generating outline..."):
-                            p.outline = StoryEngine.reverse_engineer_outline(p, get_ai_model())
-                    else:
-                        st.warning(
-                            f"Add a {_provider_label(active_provider)} API key and model to auto-generate an outline."
-                        )
-                st.session_state.project = p
-                st.session_state.page = "outline"
-                st.session_state.first_run = False
-                st.toast("Guest project ready. Saved locally for this session.")
-                st.rerun()
 
         def open_latest_project() -> None:
             if not recent_projects:
@@ -4024,15 +3738,6 @@ def _run_ui():
             tag="Workspace",
             key_prefix="projects_header",
         )
-
-        if st.session_state.get("guest_mode"):
-            with st.container(border=True):
-                st.markdown("### Guest sandbox")
-                st.caption("Explore MANTIS Studio with local saves. Create an account to sync and export.")
-                if st.button("Start guest sandbox", use_container_width=True):
-                    st.session_state.project = st.session_state.guest_project or create_guest_project()
-                    st.session_state.page = "outline"
-                    st.rerun()
 
         section_header(
             "Start a new project",
@@ -4066,19 +3771,13 @@ def _run_ui():
                         "genres": genre_list,
                         "ai_used": ai_used,
                     }
-                    if not is_guest and not require_account(
-                        "create_project",
-                        payload={"title": title, "author": a, "genre": genre},
-                        return_to="projects",
-                    ):
-                        return
                     p = Project.create(
                         title,
                         author=a,
                         genre=genre,
                         storage_dir=get_active_projects_dir(),
                     )
-                    persist_project(p, prompt_on_guest=True, action="create_project")
+                    persist_project(p, action="create_project")
                     _bump_projects_refresh()
                     st.session_state.project = p
                     st.session_state.page = "outline"
@@ -4113,7 +3812,7 @@ def _run_ui():
                                 st.warning(
                                     f"Add a {_provider_label(active_provider)} API key and model to auto-generate an outline."
                                 )
-                            persist_project(p, prompt_on_guest=True, action="create_project")
+                            persist_project(p, action="create_project")
                         except Exception:
                             logger.warning("Import failed for uploaded draft", exc_info=True)
                             st.error("Import failed. Please check the file and try again.")
@@ -4152,18 +3851,12 @@ def _run_ui():
                             st.caption(genre)
                         with row3:
                             if st.button("⬇️ Export", key=f"export_{full}", use_container_width=True):
-                                if require_account("export_project", return_to="export"):
-                                    st.session_state.export_project_path = full
-                                    st.rerun()
+                                st.session_state.export_project_path = full
+                                st.rerun()
                         with row4:
                             if st.button("🗑", key=f"del_{full}", use_container_width=True):
-                                if require_account(
-                                    "delete_project",
-                                    payload={"path": full},
-                                    return_to="projects",
-                                ):
-                                    st.session_state.delete_project_path = full
-                                    st.session_state.delete_project_title = title
+                                st.session_state.delete_project_path = full
+                                st.session_state.delete_project_title = title
                     except Exception:
                         logger.warning("Failed to load project metadata: %s", full, exc_info=True)
 
@@ -4221,8 +3914,6 @@ def _run_ui():
             tag="Export",
             key_prefix="export_header",
         )
-        if not require_login(feature="export", return_to="export"):
-            return
 
         export_project = None
         export_path = st.session_state.get("export_project_path")
@@ -4258,27 +3949,16 @@ def _run_ui():
         if not p:
             with st.container(border=True):
                 st.info("📭 No project loaded. Create or open a project to edit an outline.")
-                cols = st.columns(2)
-                with cols[0]:
-                    if st.button(
-                        "📁 Go to Projects",
-                        use_container_width=True,
-                        help="Open or create a project to start planning your story"
-                    ):
-                        st.session_state.page = "projects"
-                        st.rerun()
-                with cols[1]:
-                    if st.session_state.get("guest_mode") and st.button(
-                        "🎭 Start Guest Sandbox",
-                        use_container_width=True,
-                        help="Try MANTIS Studio with a temporary project (no account needed)"
-                    ):
-                        st.session_state.project = st.session_state.guest_project or create_guest_project()
-                        st.session_state.page = "outline"
-                        st.rerun()
+                if st.button(
+                    "📁 Go to Projects",
+                    use_container_width=True,
+                    help="Open or create a project to start planning your story"
+                ):
+                    st.session_state.page = "projects"
+                    st.rerun()
             return
         def save_outline_action() -> None:
-            if persist_project(p, prompt_on_guest=True, action="save"):
+            if persist_project(p, action="save"):
                 st.toast("Outline saved.")
 
         def scan_outline_action() -> None:
@@ -4324,7 +4004,7 @@ def _run_ui():
                     save_p()
             with top3:
                 if st.button("💾 Save Project", type="primary", use_container_width=True):
-                    if persist_project(p, prompt_on_guest=True, action="save"):
+                    if persist_project(p, action="save"):
                         st.toast("Saved")
 
         left, right = st.columns([2.1, 1])
@@ -4352,7 +4032,7 @@ def _run_ui():
                     use_container_width=True,
                     help="Save and automatically scan for characters, locations, and other entities"
                 ):
-                    if persist_project(p, prompt_on_guest=True, action="save"):
+                    if persist_project(p, action="save"):
                         # Automatically scan entities on save so World Bible stays in sync.
                         extract_entities_ui(p.outline or "", "Outline")
                         st.toast("Outline Saved & Entities Scanned")
@@ -4423,24 +4103,13 @@ def _run_ui():
         if not p:
             with st.container(border=True):
                 st.info("📭 No project loaded. Open or create a project to access the World Bible.")
-                cols = st.columns(2)
-                with cols[0]:
-                    if st.button(
-                        "📁 Go to Projects",
-                        use_container_width=True,
-                        help="Open or create a project to manage your story world"
-                    ):
-                        st.session_state.page = "projects"
-                        st.rerun()
-                with cols[1]:
-                    if st.session_state.get("guest_mode") and st.button(
-                        "🎭 Start Guest Sandbox",
-                        use_container_width=True,
-                        help="Try MANTIS Studio with a temporary project (no account needed)"
-                    ):
-                        st.session_state.project = st.session_state.guest_project or create_guest_project()
-                        st.session_state.page = "world"
-                        st.rerun()
+                if st.button(
+                    "📁 Go to Projects",
+                    use_container_width=True,
+                    help="Open or create a project to manage your story world"
+                ):
+                    st.session_state.page = "projects"
+                    st.rerun()
             return
         def open_add_entity() -> None:
             tab_label = st.session_state.get("world_tabs") or "Characters"
@@ -4907,7 +4576,7 @@ def _run_ui():
                 p.memory = memory_val
                 save_p()
             if st.button("💾 Save Memory", use_container_width=True):
-                if persist_project(p, prompt_on_guest=True, action="save"):
+                if persist_project(p, action="save"):
                     st.toast("Memory saved")
 
             st.divider()
@@ -5167,30 +4836,19 @@ def _run_ui():
             st.metric("AI Readiness", f"{readiness}%")
 
     def render_chapters():
-        # Single guest banner for the editor page (avoid duplicate widgets / duplicate keys).
-        render_guest_banner("editor")
+        # Single welcome banner for the editor page (avoid duplicate widgets / duplicate keys).
+        render_welcome_banner("editor")
         p = st.session_state.project
         if not p:
             with st.container(border=True):
                 st.info("📭 No project loaded. Create or open a project to start writing.")
-                cols = st.columns(2)
-                with cols[0]:
-                    if st.button(
-                        "📁 Go to Projects",
-                        use_container_width=True,
-                        help="Open or create a project to start writing your story"
-                    ):
-                        st.session_state.page = "projects"
-                        st.rerun()
-                with cols[1]:
-                    if st.session_state.get("guest_mode") and st.button(
-                        "🎭 Start Guest Sandbox",
-                        use_container_width=True,
-                        help="Try MANTIS Studio with a temporary project (no account needed)"
-                    ):
-                        st.session_state.project = st.session_state.guest_project or create_guest_project()
-                        st.session_state.page = "chapters"
-                        st.rerun()
+                if st.button(
+                    "📁 Go to Projects",
+                    use_container_width=True,
+                    help="Open or create a project to start writing your story"
+                ):
+                    st.session_state.page = "projects"
+                    st.rerun()
             return
         chaps = p.get_ordered_chapters()
 
@@ -5341,7 +4999,7 @@ def _run_ui():
                 with c1:
                     if st.button("💾 Save Chapter", type="primary", use_container_width=True):
                         curr.update_content(val, "manual")
-                        if persist_project(p, prompt_on_guest=True, action="save"):
+                        if persist_project(p, action="save"):
                             # Automatically scan entities from this chapter when the user explicitly saves it.
                             extract_entities_ui(curr.content or "", f"Ch {curr.index}")
                             st.toast("Chapter Saved & Entities Scanned")
@@ -5714,10 +5372,6 @@ def _run_ui():
             with key_scope("settings"):
                 render_ai_settings()
             rendered_page = True
-        elif st.session_state.page == "account":
-            with key_scope("account"):
-                render_account()
-            rendered_page = True
         elif st.session_state.page == "legal":
             with key_scope("legal"):
                 render_legal_redirect()
@@ -5784,7 +5438,7 @@ def run_selftest() -> int:
     print("[MANTIS SELFTEST]")
     try:
         os.makedirs(AppConfig.PROJECTS_DIR, exist_ok=True)
-        # Use default projects directory - user accounts removed
+        # Local-first architecture: all projects stored in default directory
         user_projects_dir = AppConfig.PROJECTS_DIR
 
         p = Project.create("SELFTEST_PROJECT", author="MANTIS", genre="Test", storage_dir=user_projects_dir)
