@@ -708,7 +708,8 @@ def _run_ui():
                             "aliases": aliases,
                             "confidence": confidence,
                             "source": label,
-                        }
+                        },
+                        project=p,
                     )
                 else:
                     queue_world_bible_suggestion(
@@ -720,7 +721,8 @@ def _run_ui():
                             "aliases": aliases,
                             "confidence": confidence,
                             "source": label,
-                        }
+                        },
+                        project=p,
                     )
                 flagged += 1
                 continue
@@ -751,7 +753,8 @@ def _run_ui():
                             "aliases": aliases,
                             "confidence": confidence,
                             "source": label,
-                        }
+                        },
+                        project=p,
                     )
                     suggested += 1
 

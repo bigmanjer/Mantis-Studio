@@ -1484,3 +1484,57 @@ class TestWorldBibleMerge:
         ent, _ = apply_suggestion(self.project, classified)
         assert "Treaty of Dawn" in ent.description
         assert "500 years ago" in ent.description
+
+    def test_apply_unclassified_update_with_description(self):
+        """apply_suggestion should work even when novel_bullets is not pre-computed."""
+        from app.services.world_bible_merge import apply_suggestion
+        ent_orig, _ = self.project.upsert_entity("Elena", "Character", "A brave warrior.")
+        classified = {
+            "type": "update",
+            "entity_id": ent_orig.id,
+            "name": "Elena",
+            "category": "Character",
+            "description": "She has black hair. She is the captain of the guard.",
+            "aliases": ["Lena"],
+            # novel_bullets and novel_aliases intentionally omitted
+        }
+        ent, action = apply_suggestion(self.project, classified)
+        assert action == "updated"
+        assert "black hair" in ent.description
+        assert "captain of the guard" in ent.description
+        assert "brave warrior" in ent.description
+        assert any(a.lower() == "lena" for a in ent.aliases)
+
+    def test_apply_unclassified_update_aliases_only(self):
+        """apply_suggestion should add aliases even without novel_aliases key."""
+        from app.services.world_bible_merge import apply_suggestion
+        ent_orig, _ = self.project.upsert_entity("Elena", "Character", "A brave warrior.")
+        classified = {
+            "type": "alias_only",
+            "entity_id": ent_orig.id,
+            "name": "Elena",
+            "category": "Character",
+            "description": "A brave warrior.",
+            "aliases": ["The Iron Lady", "Lena"],
+            # novel_aliases intentionally omitted
+        }
+        ent, action = apply_suggestion(self.project, classified)
+        assert any(a == "The Iron Lady" for a in ent.aliases)
+        assert any(a.lower() == "lena" for a in ent.aliases)
+
+    def test_apply_update_without_entity_id_finds_match(self):
+        """apply_suggestion should find the entity by name when entity_id is missing."""
+        from app.services.world_bible_merge import apply_suggestion
+        self.project.upsert_entity("Elena", "Character", "A brave warrior.")
+        classified = {
+            "type": "update",
+            "name": "Elena",
+            "category": "Character",
+            "description": "She has black hair.",
+            "aliases": [],
+            # entity_id intentionally omitted
+        }
+        ent, action = apply_suggestion(self.project, classified)
+        assert action == "updated"
+        assert "black hair" in ent.description
+        assert "brave warrior" in ent.description
