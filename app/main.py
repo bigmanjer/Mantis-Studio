@@ -1874,38 +1874,8 @@ def _run_ui():
         color: var(--mantis-muted);
     }}
 
-    .stButton>button {{
-        border-radius: 16px !important;
-        font-weight: 600 !important;
-        padding: 0.7rem 1.1rem !important;
-        transition: all 0.15s ease-in-out;
-        border: 1px solid var(--mantis-button-border) !important;
-        background: var(--mantis-button-bg) !important;
-        color: var(--mantis-text) !important;
-    }}
-    .stButton>button:hover {{
-        transform: translateY(-1px);
-        border-color: var(--mantis-button-hover-border) !important;
-        box-shadow: var(--mantis-shadow-button);
-    }}
-    .stButton>button:active {{ transform: translateY(0); }}
-    .stButton>button:focus {{ outline: none !important; box-shadow: none !important; }}
-
-    /* --- BUTTON HIERARCHY --- */
-    .stButton>button[kind="primary"] {{
-        background: var(--mantis-primary-bg) !important;
-        border-color: var(--mantis-primary-border) !important;
-        box-shadow: var(--mantis-shadow-button);
-        color: #ffffff !important;
-    }}
-    .stButton>button[kind="primary"]:hover {{
-        border-color: var(--mantis-primary-hover-border) !important;
-        box-shadow: var(--mantis-shadow-strong);
-    }}
-    .stButton>button[kind="secondary"] {{
-        background: var(--mantis-button-bg) !important;
-    }}
-
+    /* Button styles are defined centrally in assets/styles.css
+       and injected via app/ui/theme.py — see the Unified Button System. */
 
     [data-testid="stVerticalBlock"] [data-testid="stContainer"] {{ border-radius: 16px !important; }}
     .stExpander {{ border: 1px solid var(--mantis-expander-border) !important; border-radius: 16px !important; }}
