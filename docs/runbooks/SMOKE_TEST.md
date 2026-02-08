@@ -34,7 +34,7 @@
 - Legal footer
   - Terms link opens Terms of Service page
   - Privacy link opens Privacy Policy page
-  - Legal link opens Legal Center with all policies
+  - Legal link opens All Policies with all policies
   - Support link opens GitHub Issues
   - Contact link opens email
 

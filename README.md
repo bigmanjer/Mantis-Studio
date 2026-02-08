@@ -235,7 +235,7 @@ These tools should operate on **selected text or context**, not blindly.
 
 ### 5.9 Legal
 
-The Legal Center provides access to all policy documents:
+The All Policies page provides access to all policy documents:
 
 * Terms of Service
 * Privacy Policy
@@ -245,7 +245,7 @@ The Legal Center provides access to all policy documents:
 * Trademark Path
 * Contact
 
-Accessible via footer links or the Legal Center page.
+Accessible via footer links or the All Policies page.
 
 ---
 
