@@ -426,7 +426,11 @@ class Project:
         safe_title = re.sub(r'[<>:"/\\|?*]', "_", self.title)[:60]
         filename = f"{self.id}_{safe_title.replace(' ', '_')}.json"
         storage_dir = self.storage_dir or AppConfig.PROJECTS_DIR
-        os.makedirs(storage_dir, exist_ok=True)
+        try:
+            os.makedirs(storage_dir, exist_ok=True)
+        except OSError:
+            logger.error("Cannot create storage directory %s", storage_dir, exc_info=True)
+            return ""
         path = os.path.join(storage_dir, filename)
         lock_path = path + ".lock"
         tmp = path + ".tmp"
@@ -437,8 +441,9 @@ class Project:
             AppConfig.SAVE_LOCK_RETRY_SLEEP,
         ):
             logger.error("Save lock timeout for %s", path)
-            return path
+            return ""
         try:
+            saved = False
             for attempt in range(1, 4):
                 try:
                     if os.path.exists(path):
@@ -453,6 +458,7 @@ class Project:
                     with open(tmp, "w", encoding="utf-8") as f:
                         json.dump(self.to_dict(), f, indent=2, ensure_ascii=False)
                     os.replace(tmp, path)
+                    saved = True
                     break
                 except Exception as exc:
                     last_error = exc
@@ -462,6 +468,9 @@ class Project:
                 logger.error("Save failed after retries for %s: %s", path, last_error)
         finally:
             _release_lock(lock_path)
+
+        if not saved:
+            return ""
 
         self.filepath = path
         self.storage_dir = storage_dir

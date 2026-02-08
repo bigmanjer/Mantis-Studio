@@ -147,8 +147,11 @@ def load_app_config() -> Dict[str, str]:
 
 def save_app_config(data: Dict[str, str]) -> None:
     try:
-        with open(AppConfig.CONFIG_PATH, "w", encoding="utf-8") as fh:
+        os.makedirs(os.path.dirname(AppConfig.CONFIG_PATH) or ".", exist_ok=True)
+        tmp = AppConfig.CONFIG_PATH + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as fh:
             json.dump(data, fh, indent=2)
+        os.replace(tmp, AppConfig.CONFIG_PATH)
     except Exception:
         logger.warning("Failed to save app config", exc_info=True)
 
@@ -739,7 +742,11 @@ class Project:
         safe_title = re.sub(r'[<>:"/\\|?*]', "_", self.title)[:60]
         filename = f"{self.id}_{safe_title.replace(' ', '_')}.json"
         storage_dir = self.storage_dir or AppConfig.PROJECTS_DIR
-        os.makedirs(storage_dir, exist_ok=True)
+        try:
+            os.makedirs(storage_dir, exist_ok=True)
+        except OSError:
+            logger.error("Cannot create storage directory %s", storage_dir, exc_info=True)
+            return ""
         path = os.path.join(storage_dir, filename)
         lock_path = path + ".lock"
         tmp = path + ".tmp"
@@ -750,8 +757,9 @@ class Project:
             AppConfig.SAVE_LOCK_RETRY_SLEEP,
         ):
             logger.error("Save lock timeout for %s", path)
-            return path
+            return ""
         try:
+            saved = False
             for attempt in range(1, 4):
                 try:
                     if os.path.exists(path):
@@ -766,6 +774,7 @@ class Project:
                     with open(tmp, "w", encoding="utf-8") as f:
                         json.dump(self.to_dict(), f, indent=2, ensure_ascii=False)
                     os.replace(tmp, path)
+                    saved = True
                     break
                 except Exception as exc:
                     last_error = exc
@@ -775,6 +784,9 @@ class Project:
                 logger.error("Save failed after retries for %s: %s", path, last_error)
         finally:
             _release_lock(lock_path)
+
+        if not saved:
+            return ""
 
         self.filepath = path
         self.storage_dir = storage_dir
@@ -2152,7 +2164,14 @@ def _run_ui():
 
     def persist_project(project: "Project", *, action: str = "save") -> bool:
         """Save project to local storage."""
-        project.save()
+        path = project.save()
+        if not path:
+            logger.error("persist_project failed for '%s' (action=%s)", project.title, action)
+            try:
+                st.toast("⚠️ Save failed. Please try again.", icon="⚠️")
+            except Exception:
+                pass
+            return False
         return True
 
     def render_welcome_banner(context: str) -> None:

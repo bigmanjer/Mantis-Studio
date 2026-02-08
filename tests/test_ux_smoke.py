@@ -223,6 +223,68 @@ class TestProjectCRUD:
         assert "chapters" in d
         assert "world_db" in d
 
+    def test_save_returns_nonempty_path_on_success(self):
+        p = self._make_project("Save Path Test")
+        path = p.save()
+        assert path, "save() must return a non-empty path on success"
+        assert os.path.exists(path)
+
+    def test_save_returns_empty_on_unwritable_dir(self):
+        p = self._make_project("Unwritable")
+        p.storage_dir = "/proc/nonexistent_dir"
+        path = p.save()
+        assert path == "", "save() must return empty string on failure"
+
+    def test_save_updates_filepath_on_success(self):
+        p = self._make_project("Filepath Check")
+        assert p.filepath is None
+        path = p.save()
+        assert p.filepath == path
+        assert path != ""
+
+    def test_save_preserves_filepath_on_failure(self):
+        p = self._make_project("Fail Test")
+        old_fp = p.filepath
+        p.storage_dir = "/proc/nonexistent_dir"
+        path = p.save()
+        assert path == ""
+        assert p.filepath == old_fp
+
+
+# ---------------------------------------------------------------------------
+# 2b) Save – app config atomic write
+# ---------------------------------------------------------------------------
+
+class TestAppConfigSave:
+    """Verify save_app_config writes atomically."""
+
+    @pytest.fixture(autouse=True)
+    def _tmpdir(self, tmp_path):
+        self.config_path = str(tmp_path / "test_config.json")
+
+    def test_save_and_load_config(self):
+        from app.config.settings import AppConfig, load_app_config, save_app_config
+        original = AppConfig.CONFIG_PATH
+        try:
+            AppConfig.CONFIG_PATH = self.config_path
+            save_app_config({"ui_theme": "Light", "daily_word_goal": "1000"})
+            loaded = load_app_config()
+            assert loaded["ui_theme"] == "Light"
+            assert loaded["daily_word_goal"] == "1000"
+        finally:
+            AppConfig.CONFIG_PATH = original
+
+    def test_save_config_no_tmp_left(self):
+        from app.config.settings import AppConfig, save_app_config
+        original = AppConfig.CONFIG_PATH
+        try:
+            AppConfig.CONFIG_PATH = self.config_path
+            save_app_config({"key": "value"})
+            assert not os.path.exists(self.config_path + ".tmp"), \
+                "Temporary file should be removed after atomic save"
+        finally:
+            AppConfig.CONFIG_PATH = original
+
 
 # ---------------------------------------------------------------------------
 # 3) Export – verify markdown generation (Export page logic)
