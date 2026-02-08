@@ -3009,7 +3009,10 @@ def _run_ui():
                 st.toast("No entities detected in this text.", icon="🤷")
 
     query = st.query_params.get("page")
-    if query in {"privacy", "terms", "copyright", "cookie", "legal"}:
+    if query in {
+        "home", "projects", "outline", "chapters", "world", "export", "ai",
+        "privacy", "terms", "copyright", "cookie", "legal", "help",
+    }:
         st.session_state.page = query
         st.query_params.clear()
         st.rerun()
