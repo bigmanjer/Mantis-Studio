@@ -164,8 +164,10 @@ def initialize_session_state(st, config_data: Dict[str, str]) -> None:
     st.session_state.setdefault("openai_model_tests", {})
     st.session_state.setdefault("groq_model_list", [])
     st.session_state.setdefault("groq_model_tests", {})
-    st.session_state.setdefault("groq_connection_tested", False)
-    st.session_state.setdefault("openai_connection_tested", False)
+    st.session_state.setdefault("groq_connection_tested",
+                                bool(config_data.get("groq_connection_tested")))
+    st.session_state.setdefault("openai_connection_tested",
+                                bool(config_data.get("openai_connection_tested")))
 
     # ---- Populate ai_session_keys from saved config so the warning check works ----
     if "ai_session_keys" not in st.session_state:

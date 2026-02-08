@@ -388,6 +388,11 @@ def _run_ui():
             val = (getattr(st.session_state, attr, "") or "").strip()
             if val:
                 data[f"{provider}_api_key"] = val
+        # Persist connection-tested flags so the warning stays dismissed
+        # after a page refresh.
+        for flag in ("groq_connection_tested", "openai_connection_tested"):
+            if st.session_state.get(flag):
+                data[flag] = True
         save_app_config(data)
         st.toast("Settings saved.")
 
