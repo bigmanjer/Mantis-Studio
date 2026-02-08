@@ -6,10 +6,9 @@ on:
       bump_type:
         description: 'Version bump type'
         required: true
-        default: 'minor'
+        default: 'major'
         type: choice
         options:
-          - minor
           - major
   pull_request:
     types: [closed]
