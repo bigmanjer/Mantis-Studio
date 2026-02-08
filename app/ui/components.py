@@ -36,7 +36,7 @@ def card_start(title: Optional[str] = None, subtitle: Optional[str] = None) -> N
     delegates to ``st.container(border=True)`` so the opening markup
     is no longer an orphaned ``<div>`` tag.
     """
-    st.markdown("<div class='mantis-card'>", unsafe_allow_html=True)
+    st.html("<div class='mantis-card'>")
     if title:
         st.markdown(f"### {title}")
     if subtitle:
@@ -45,7 +45,7 @@ def card_start(title: Optional[str] = None, subtitle: Optional[str] = None) -> N
 
 def card_end() -> None:
     """Deprecated — kept for backward compatibility."""
-    st.markdown("</div>", unsafe_allow_html=True)
+    st.html("</div>")
 
 
 def cta_tile(title: str, body: str, *, icon: Optional[str] = None, subtitle: Optional[str] = None) -> None:
