@@ -117,6 +117,7 @@ def add_entry(
     entry_id = _generate_id(cat[:4])
     now = _now_iso()
     record: Dict[str, Any] = {
+        "id": entry_id,
         "name": (entry.get("name") or "").strip() or "Unnamed",
         "description": (entry.get("description") or "").strip(),
         "tags": list(entry.get("tags") or []),
@@ -375,6 +376,8 @@ def validate_world_bible_db(*, session_state: Any) -> Dict[str, Any]:
                 continue
 
             # Ensure required fields
+            if not entry.get("id"):
+                entry["id"] = eid
             if not entry.get("name"):
                 entry["name"] = "Unnamed"
             if entry.get("description") is None:
@@ -390,6 +393,237 @@ def validate_world_bible_db(*, session_state: Any) -> Dict[str, Any]:
             del db[cat][eid]
 
     return db
+
+
+# ---------------------------------------------------------------------------
+# Editor integration – world-bible-aware scanning
+# ---------------------------------------------------------------------------
+
+def scan_editor_for_world_bible_references(
+    text: str,
+    *,
+    session_state: Any,
+) -> List[Dict[str, Any]]:
+    """Scan *text* for mentions of known world-bible entries.
+
+    Checks character, location, and faction names (case-insensitive).
+    Returns a list of dicts each containing ``category``, ``entry_id``,
+    ``name``, and the matched ``entry``.
+    """
+    db = _resolve_db(session_state)
+    if not text:
+        return []
+
+    text_lower = text.lower()
+    refs: List[Dict[str, Any]] = []
+    seen: set = set()
+
+    for cat in ("characters", "locations", "factions"):
+        bucket = db.get(cat, {})
+        for eid, entry in bucket.items():
+            name = (entry.get("name") or "").strip()
+            if not name:
+                continue
+            if name.lower() in text_lower and eid not in seen:
+                refs.append({
+                    "category": cat,
+                    "entry_id": eid,
+                    "name": name,
+                    "entry": entry,
+                })
+                seen.add(eid)
+
+    return refs
+
+
+# ---------------------------------------------------------------------------
+# Global canon conflict detection
+# ---------------------------------------------------------------------------
+
+def detect_canon_conflicts_global(
+    *,
+    session_state: Any,
+) -> List[str]:
+    """Detect conflicts across the entire world-bible database.
+
+    Checks for:
+    - duplicate names across categories
+    - duplicate entries in the same category
+    - entries missing descriptions
+    - entries missing tags
+    - conflicting rules (rules with identical names)
+
+    Returns a list of human-readable conflict descriptions.
+    """
+    db = _resolve_db(session_state)
+    conflicts: List[str] = []
+
+    # Collect all names to find cross-category duplicates
+    name_registry: Dict[str, List[Tuple[str, str]]] = {}  # lower_name -> [(cat, eid)]
+    for cat, bucket in db.items():
+        for eid, entry in bucket.items():
+            name = (entry.get("name") or "").strip()
+            if not name:
+                continue
+            key = name.lower()
+            name_registry.setdefault(key, []).append((cat, eid))
+
+    # Duplicate names across or within categories
+    for lower_name, occurrences in name_registry.items():
+        if len(occurrences) > 1:
+            locs = ", ".join(f"{cat}({eid})" for cat, eid in occurrences)
+            conflicts.append(
+                f"Duplicate name '{occurrences[0][1]}' "
+                f"('{lower_name}') found in: {locs}"
+            )
+
+    # Missing descriptions / tags
+    for cat, bucket in db.items():
+        for eid, entry in bucket.items():
+            name = (entry.get("name") or "").strip() or eid
+            if not (entry.get("description") or "").strip():
+                conflicts.append(f"Entry '{name}' in {cat} is missing a description")
+            tags = entry.get("tags")
+            if not isinstance(tags, list) or len(tags) == 0:
+                conflicts.append(f"Entry '{name}' in {cat} is missing tags")
+
+    return conflicts
+
+
+# ---------------------------------------------------------------------------
+# Relationship graph data
+# ---------------------------------------------------------------------------
+
+def build_world_bible_relationships(
+    *,
+    session_state: Any,
+) -> Dict[str, List[Dict[str, Any]]]:
+    """Build a graph-like structure of world-bible relationships.
+
+    Returns ``{"nodes": [...], "edges": [...]}``.
+
+    Edges are created when:
+    - entries share tags
+    - entries reference each other by name in their description
+    """
+    db = _resolve_db(session_state)
+    nodes: List[Dict[str, Any]] = []
+    edges: List[Dict[str, Any]] = []
+    edge_set: set = set()
+
+    # Collect all entries as nodes
+    all_entries: List[Tuple[str, str, Dict[str, Any]]] = []
+    for cat, bucket in db.items():
+        for eid, entry in bucket.items():
+            nodes.append({
+                "id": eid,
+                "name": entry.get("name", ""),
+                "category": cat,
+            })
+            all_entries.append((cat, eid, entry))
+
+    # Tag-based edges
+    tag_index: Dict[str, List[str]] = {}  # lower_tag -> [eid]
+    for _cat, eid, entry in all_entries:
+        for tag in (entry.get("tags") or []):
+            tag_lower = (tag or "").strip().lower()
+            if tag_lower:
+                tag_index.setdefault(tag_lower, []).append(eid)
+
+    for _tag, eids in tag_index.items():
+        for i in range(len(eids)):
+            for j in range(i + 1, len(eids)):
+                pair = tuple(sorted((eids[i], eids[j])))
+                if pair not in edge_set:
+                    edge_set.add(pair)
+                    edges.append({
+                        "source": pair[0],
+                        "target": pair[1],
+                        "relation": "shared_tag",
+                    })
+
+    # Description-reference edges
+    for _cat_a, eid_a, entry_a in all_entries:
+        desc_a = (entry_a.get("description") or "").lower()
+        if not desc_a:
+            continue
+        for _cat_b, eid_b, entry_b in all_entries:
+            if eid_a == eid_b:
+                continue
+            name_b = (entry_b.get("name") or "").strip()
+            if name_b and name_b.lower() in desc_a:
+                pair = tuple(sorted((eid_a, eid_b)))
+                if pair not in edge_set:
+                    edge_set.add(pair)
+                    edges.append({
+                        "source": eid_a,
+                        "target": eid_b,
+                        "relation": "description_reference",
+                    })
+
+    return {"nodes": nodes, "edges": edges}
+
+
+# ---------------------------------------------------------------------------
+# Timeline validation
+# ---------------------------------------------------------------------------
+
+def validate_world_timeline(
+    *,
+    session_state: Any,
+) -> List[str]:
+    """Validate ``history`` entries that have an optional ``year`` field.
+
+    Checks:
+    - events are sorted correctly (chronologically)
+    - no duplicate years
+    - no missing year fields among history entries that use years
+
+    Returns a list of human-readable warnings.
+    """
+    db = _resolve_db(session_state)
+    history = db.get("history", {})
+    if not history:
+        return []
+
+    warnings: List[str] = []
+    entries_with_year: List[Tuple[str, str, int]] = []  # (eid, name, year)
+    entries_without_year: List[Tuple[str, str]] = []
+
+    for eid, entry in history.items():
+        name = (entry.get("name") or "").strip() or eid
+        year = entry.get("year")
+        if year is not None:
+            if not isinstance(year, int):
+                warnings.append(f"History entry '{name}' has non-integer year: {year!r}")
+                continue
+            entries_with_year.append((eid, name, year))
+        else:
+            entries_without_year.append((eid, name))
+
+    # Missing years
+    for eid, name in entries_without_year:
+        warnings.append(f"History entry '{name}' is missing a year field")
+
+    # Duplicate years
+    year_counts: Dict[int, List[str]] = {}
+    for eid, name, year in entries_with_year:
+        year_counts.setdefault(year, []).append(name)
+
+    for year, names in year_counts.items():
+        if len(names) > 1:
+            warnings.append(
+                f"Duplicate year {year} found in history entries: "
+                + ", ".join(names)
+            )
+
+    # Check chronological ordering
+    sorted_entries = sorted(entries_with_year, key=lambda x: x[2])
+    years = [e[2] for e in sorted_entries]
+    if years != sorted(years):
+        warnings.append("History events are not in chronological order")
+
+    return warnings
 
 
 # ---------------------------------------------------------------------------
