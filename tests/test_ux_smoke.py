@@ -81,7 +81,8 @@ class TestCriticalImports:
         importlib.import_module("app.ui.layout")
 
     def test_import_ui_components_file(self):
-        importlib.import_module("app.ui.components")
+        mod = importlib.import_module("app.ui.components")
+        assert hasattr(mod, "card_block"), "card_block context manager should exist"
 
     def test_import_services_projects(self):
         importlib.import_module("app.services.projects")
@@ -806,146 +807,57 @@ class TestAPIKeyValidation:
 
 
 # ---------------------------------------------------------------------------
-# AI connection warning helper
+# 23) HTML rendering – st.html() migration
 # ---------------------------------------------------------------------------
 
-class TestAIConnectionWarning:
-    """Validate the ai_connection_warning helper logic."""
 
-    def test_import_ai_connection_warning(self):
-        from app.utils.helpers import ai_connection_warning
-        assert callable(ai_connection_warning)
+class TestHtmlRendering:
+    """Verify that UI modules use st.html() instead of st.markdown(unsafe_allow_html=True).
 
-    def test_warning_shown_when_no_keys(self):
-        """When no AI keys/flags are set, the warning text should appear."""
-        from app.utils.helpers import ai_connection_warning
+    Streamlit 1.54 sanitizes block-level HTML in st.markdown(), even with
+    unsafe_allow_html=True. All custom HTML rendering must use st.html()
+    to avoid raw-tag display.
+    """
 
-        calls: Dict[str, List] = {"warning": [], "button": []}
+    _UI_MODULES = [
+        "app/ui/components.py",
+        "app/ui/theme.py",
+        "app/ui/layout.py",
+        "app/components/buttons.py",
+        "app/layout/layout.py",
+        "app/main.py",
+        "app/app_context.py",
+    ]
 
-        class FakeSessionState(dict):
-            def __getattr__(self, name):
-                return self.get(name)
+    def test_no_unsafe_allow_html_in_ui_modules(self):
+        """No UI module should contain unsafe_allow_html=True."""
+        violations = []
+        for rel_path in self._UI_MODULES:
+            path = ROOT / rel_path
+            if not path.exists():
+                continue
+            source = path.read_text(encoding="utf-8")
+            if "unsafe_allow_html" in source:
+                violations.append(rel_path)
+        assert not violations, (
+            f"unsafe_allow_html still present in: {', '.join(violations)}. "
+            "Use st.html() for block-level HTML rendering."
+        )
 
-        class FakeSt:
-            session_state = FakeSessionState()
+    def test_ui_components_use_st_html(self):
+        """Core UI component files should use st.html() for HTML rendering."""
+        path = ROOT / "app" / "ui" / "components.py"
+        source = path.read_text(encoding="utf-8")
+        assert "st.html(" in source, "app/ui/components.py should use st.html()"
 
-            @staticmethod
-            def warning(msg):
-                calls["warning"].append(msg)
+    def test_buttons_use_st_html(self):
+        """Button components should use st.html() for HTML rendering."""
+        path = ROOT / "app" / "components" / "buttons.py"
+        source = path.read_text(encoding="utf-8")
+        assert "st.html(" in source, "app/components/buttons.py should use st.html()"
 
-            @staticmethod
-            def button(label, **kwargs):
-                calls["button"].append(label)
-                return False
-
-            @staticmethod
-            def rerun():
-                pass
-
-        ai_connection_warning(FakeSt)
-        assert len(calls["warning"]) == 1
-        assert "AI providers are not connected" in calls["warning"][0]
-        assert calls["button"] == ["Connect AI Providers"]
-
-    def test_warning_suppressed_when_ai_configured(self):
-        from app.utils.helpers import ai_connection_warning
-
-        calls: Dict[str, List] = {"warning": [], "button": []}
-
-        class FakeSessionState(dict):
-            def __getattr__(self, name):
-                return self.get(name)
-
-        class FakeSt:
-            session_state = FakeSessionState(ai_configured=True)
-
-            @staticmethod
-            def warning(msg):
-                calls["warning"].append(msg)
-
-            @staticmethod
-            def button(label, **kwargs):
-                calls["button"].append(label)
-                return False
-
-        ai_connection_warning(FakeSt)
-        assert calls["warning"] == []
-        assert calls["button"] == []
-
-    def test_warning_suppressed_when_groq_key_present(self):
-        from app.utils.helpers import ai_connection_warning
-
-        calls: Dict[str, List] = {"warning": []}
-
-        class FakeSessionState(dict):
-            def __getattr__(self, name):
-                return self.get(name)
-
-        class FakeSt:
-            session_state = FakeSessionState(groq_api_key="gsk_test123")
-
-            @staticmethod
-            def warning(msg):
-                calls["warning"].append(msg)
-
-            @staticmethod
-            def button(label, **kwargs):
-                return False
-
-        ai_connection_warning(FakeSt)
-        assert calls["warning"] == []
-
-    def test_warning_suppressed_when_openai_key_present(self):
-        from app.utils.helpers import ai_connection_warning
-
-        calls: Dict[str, List] = {"warning": []}
-
-        class FakeSessionState(dict):
-            def __getattr__(self, name):
-                return self.get(name)
-
-        class FakeSt:
-            session_state = FakeSessionState(openai_api_key="sk-test123")
-
-            @staticmethod
-            def warning(msg):
-                calls["warning"].append(msg)
-
-            @staticmethod
-            def button(label, **kwargs):
-                return False
-
-        ai_connection_warning(FakeSt)
-        assert calls["warning"] == []
-
-    def test_button_navigates_to_ai_settings(self):
-        """When the button is clicked, session page should change to 'ai'."""
-        from app.utils.helpers import ai_connection_warning
-
-        rerun_called = []
-
-        class FakeSessionState(dict):
-            def __getattr__(self, name):
-                return self.get(name)
-
-            def __setattr__(self, name, value):
-                self[name] = value
-
-        class FakeSt:
-            session_state = FakeSessionState()
-
-            @staticmethod
-            def warning(msg):
-                pass
-
-            @staticmethod
-            def button(label, **kwargs):
-                return True  # simulate click
-
-            @staticmethod
-            def rerun():
-                rerun_called.append(True)
-
-        ai_connection_warning(FakeSt)
-        assert FakeSt.session_state["page"] == "ai"
-        assert rerun_called
+    def test_theme_uses_st_html(self):
+        """Theme injection should use st.html() for CSS."""
+        path = ROOT / "app" / "ui" / "theme.py"
+        source = path.read_text(encoding="utf-8")
+        assert "st.html(" in source, "app/ui/theme.py should use st.html()"

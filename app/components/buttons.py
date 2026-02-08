@@ -17,6 +17,9 @@ except ImportError:
         def markdown(*args, **kwargs):
             pass
         @staticmethod
+        def html(*args, **kwargs):
+            pass
+        @staticmethod
         def caption(*args, **kwargs):
             pass
         @staticmethod
@@ -38,7 +41,7 @@ def card(title: Optional[str] = None, caption: Optional[str] = None) -> Generato
 def section_header(title: str, caption: Optional[str] = None, tag: Optional[str] = None) -> None:
     caption_html = f"<div class='mantis-section-caption'>{caption}</div>" if caption else ""
     tag_html = f"<span class='mantis-tag'>{tag}</span>" if tag else ""
-    st.markdown(
+    st.html(
         f"""
         <div class="mantis-section-header">
             <div>
@@ -48,7 +51,6 @@ def section_header(title: str, caption: Optional[str] = None, tag: Optional[str]
             {tag_html}
         </div>
         """,
-        unsafe_allow_html=True,
     )
 
 
@@ -61,7 +63,7 @@ def primary_button(label: str, key: Optional[str] = None, **kwargs) -> bool:
 def stat_tile(label: str, value: str, helper: Optional[str] = None, icon: Optional[str] = None) -> None:
     icon_html = f"<div class='mantis-stat-icon'>{icon}</div>" if icon else ""
     helper_html = f"<div class='mantis-stat-help'>{helper}</div>" if helper else ""
-    st.markdown(
+    st.html(
         f"""
         <div class="mantis-stat-tile">
             {icon_html}
@@ -70,7 +72,6 @@ def stat_tile(label: str, value: str, helper: Optional[str] = None, icon: Option
             {helper_html}
         </div>
         """,
-        unsafe_allow_html=True,
     )
 
 
@@ -96,14 +97,13 @@ def action_card(
         icon: Optional emoji/icon prepended to *title*.
     """
     display_title = f"{icon} {title}" if icon else title
-    st.markdown(
+    st.html(
         f"""
         <div class="mantis-action-card">
             <div class="mantis-action-card-title">{display_title}</div>
             <div class="mantis-action-card-desc">{caption}</div>
         </div>
         """,
-        unsafe_allow_html=True,
     )
     return st.button(
         button_label, key=key, use_container_width=True, help=help_text

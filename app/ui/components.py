@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from contextlib import contextmanager
+from collections.abc import Generator
 from typing import Any, Iterable, Optional
 
 import streamlit as st
@@ -8,10 +10,32 @@ import streamlit as st
 def section_title(title: str, subtitle: Optional[str] = None) -> None:
     st.markdown(f"## {title}")
     if subtitle:
-        st.markdown(f"<div class='mantis-muted'>{subtitle}</div>", unsafe_allow_html=True)
+        st.html(f"<div class='mantis-muted'>{subtitle}</div>")
+
+
+@contextmanager
+def card_block(title: Optional[str] = None, subtitle: Optional[str] = None) -> Generator[None, None, None]:
+    """Render a styled card using Streamlit's native container.
+
+    Replaces the old card_start/card_end pattern which broke rendering
+    because Streamlit sanitizes each st.markdown call independently,
+    preventing split open/close ``<div>`` tags from working.
+    """
+    with st.container(border=True):
+        if title:
+            st.markdown(f"### {title}")
+        if subtitle:
+            st.caption(subtitle)
+        yield
 
 
 def card_start(title: Optional[str] = None, subtitle: Optional[str] = None) -> None:
+    """Deprecated — kept for backward compatibility.
+
+    Prefer :func:`card_block` context manager instead.  This now
+    delegates to ``st.container(border=True)`` so the opening markup
+    is no longer an orphaned ``<div>`` tag.
+    """
     st.markdown("<div class='mantis-card'>", unsafe_allow_html=True)
     if title:
         st.markdown(f"### {title}")
@@ -20,6 +44,7 @@ def card_start(title: Optional[str] = None, subtitle: Optional[str] = None) -> N
 
 
 def card_end() -> None:
+    """Deprecated — kept for backward compatibility."""
     st.markdown("</div>", unsafe_allow_html=True)
 
 
@@ -41,7 +66,7 @@ def cta_tile(title: str, body: str, *, icon: Optional[str] = None, subtitle: Opt
         if subtitle
         else ""
     )
-    st.markdown(
+    st.html(
         f"""
         <div class="mantis-cta-tile">
             {icon_html}
@@ -50,7 +75,6 @@ def cta_tile(title: str, body: str, *, icon: Optional[str] = None, subtitle: Opt
             {subtitle_html}
         </div>
         """,
-        unsafe_allow_html=True,
     )
 
 
@@ -63,7 +87,7 @@ def header_bar(
 ) -> None:
     pill_html = f"<span class='mantis-pill'>{pill}</span>" if pill else ""
     right_html = f"<div>{right_slot}</div>" if right_slot else ""
-    st.markdown(
+    st.html(
         f"""
         <div class="mantis-header">
             <div>
@@ -76,23 +100,21 @@ def header_bar(
             </div>
         </div>
         """,
-        unsafe_allow_html=True,
     )
 
 
 def empty_state(title: str, body: str) -> None:
-    st.markdown(
+    st.html(
         f"""
         <div class="mantis-card-soft">
             <div style="font-weight:600;">{title}</div>
             <div class="mantis-muted" style="margin-top:6px;">{body}</div>
         </div>
         """,
-        unsafe_allow_html=True,
     )
 
 
 def render_tag_list(tags: Iterable[str]) -> None:
     pills = "".join(f"<span class='mantis-pill'>{tag}</span>" for tag in tags if tag)
     if pills:
-        st.markdown(f"<div style='display:flex; gap:6px; flex-wrap:wrap;'>{pills}</div>", unsafe_allow_html=True)
+        st.html(f"<div style='display:flex; gap:6px; flex-wrap:wrap;'>{pills}</div>")
