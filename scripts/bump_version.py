@@ -37,6 +37,7 @@ def bump_version(current_version: str) -> str:
         minor = int(parts[1])
         if len(parts) == 3:
             _ = int(parts[2])  # validate patch component if present
+            print("Note: patch component is ignored for minor-only versioning.", file=sys.stderr)
 
         # Increment minor by 1 (e.g., version x.y becomes x.(y+1))
         minor += 1
