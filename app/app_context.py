@@ -1405,6 +1405,9 @@ def _run_ui():
             key_prefix="projects_header",
         )
 
+        from app.utils.helpers import ai_connection_warning
+        ai_connection_warning(st)
+
         section_header(
             "Start a new project",
             "Set a title, genre, and author details to build your base.",
