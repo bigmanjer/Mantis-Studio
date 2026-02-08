@@ -301,7 +301,7 @@ def check_world_bible_consistency(
             # Only warn if the candidate looks like a proper noun
             if len(candidate) > 1:
                 warnings.append(
-                    f"Character referenced but not in World Bible: {candidate}"
+                    f"Referenced but not in World Bible: {candidate}"
                 )
 
     return warnings
