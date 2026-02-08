@@ -60,6 +60,10 @@ def _has_tested_connection(ss) -> bool:
     openai_models = ss.get("openai_model_list")
     if isinstance(openai_models, list) and openai_models:
         return True
+    if ss.get("groq_connection_tested"):
+        return True
+    if ss.get("openai_connection_tested"):
+        return True
     return False
 
 
