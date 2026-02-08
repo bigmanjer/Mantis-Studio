@@ -4998,7 +4998,8 @@ def _run_ui():
                         "➕ Create Chapter 1",
                         type="primary",
                         use_container_width=True,
-                        help="Start your story by creating the first chapter"
+                        help="Start your story by creating the first chapter",
+                        key="editor_create_chapter_1"
                     ):
                         p.add_chapter("Chapter 1")
                         _persist_chapter_update()
@@ -5050,7 +5051,12 @@ def _run_ui():
                         st.rerun()
 
                 st.divider()
-                if st.button("➕ New Chapter", use_container_width=True, help="Create a new chapter in this project."):
+                if st.button(
+                    "➕ New Chapter",
+                    use_container_width=True,
+                    help="Create a new chapter in this project.",
+                    key="editor_new_chapter"
+                ):
                     next_idx = len(chaps) + 1
                     pat = re.compile(rf"Chapter {next_idx}[:\s]+(.*?)(?=\n|$)", re.IGNORECASE)
                     match = pat.search(p.outline or "")
