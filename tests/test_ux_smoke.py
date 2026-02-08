@@ -898,3 +898,330 @@ class TestButtonHierarchyCSS:
         css = self._css()
         assert ".mantis-btn-ghost > button" in css
         assert "transparent" in css
+
+
+# ---------------------------------------------------------------------------
+# 25) World Bible database layer
+# ---------------------------------------------------------------------------
+
+
+class _FakeSessionState(dict):
+    """Minimal dict-like stand-in for ``st.session_state`` in tests."""
+
+    def setdefault(self, key, default=None):
+        if key not in self:
+            self[key] = default
+        return self[key]
+
+
+class TestWorldBibleDBImport:
+    """Verify that the world_bible_db module is importable and well-formed."""
+
+    def test_import_module(self):
+        mod = importlib.import_module("app.services.world_bible_db")
+        required = (
+            "ensure_world_bible_db",
+            "add_entry",
+            "update_entry",
+            "delete_entry",
+            "get_entry",
+            "list_entries",
+            "search_world_bible",
+            "get_entries_by_tag",
+            "check_world_bible_consistency",
+            "detect_canon_conflicts",
+            "validate_world_bible_db",
+            "save_world_bible",
+            "CATEGORIES",
+        )
+        missing = [n for n in required if not hasattr(mod, n)]
+        assert not missing, f"Missing exports: {', '.join(missing)}"
+
+
+class TestWorldBibleDBInit:
+    """Ensure the DB initialises safely and idempotently."""
+
+    def test_ensure_creates_structure(self):
+        from app.services.world_bible_db import ensure_world_bible_db, CATEGORIES
+        ss = _FakeSessionState()
+        db = ensure_world_bible_db(ss)
+        for cat in CATEGORIES:
+            assert cat in db
+            assert isinstance(db[cat], dict)
+        assert "world_bible_versions" in ss
+        assert "world_bible_last_saved" in ss
+
+    def test_ensure_is_idempotent(self):
+        from app.services.world_bible_db import ensure_world_bible_db, add_entry
+        ss = _FakeSessionState()
+        ensure_world_bible_db(ss)
+        add_entry("characters", {"name": "Alice"}, session_state=ss)
+        ensure_world_bible_db(ss)
+        # Data should survive re-init
+        assert len(ss["world_bible_db"]["characters"]) == 1
+
+
+class TestWorldBibleCRUD:
+    """Test add / get / update / delete operations."""
+
+    @pytest.fixture(autouse=True)
+    def _setup(self):
+        from app.services.world_bible_db import ensure_world_bible_db
+        self.ss = _FakeSessionState()
+        ensure_world_bible_db(self.ss)
+
+    def test_add_entry(self):
+        from app.services.world_bible_db import add_entry
+        eid, entry = add_entry("characters", {"name": "Alice", "description": "Hero"}, session_state=self.ss)
+        assert eid
+        assert entry["name"] == "Alice"
+        assert entry["description"] == "Hero"
+        assert isinstance(entry["tags"], list)
+        assert entry["created_at"]
+        assert entry["updated_at"]
+
+    def test_get_entry(self):
+        from app.services.world_bible_db import add_entry, get_entry
+        eid, _ = add_entry("locations", {"name": "Castle"}, session_state=self.ss)
+        result = get_entry("locations", eid, session_state=self.ss)
+        assert result is not None
+        assert result["name"] == "Castle"
+
+    def test_get_entry_missing(self):
+        from app.services.world_bible_db import get_entry
+        assert get_entry("characters", "nonexistent", session_state=self.ss) is None
+
+    def test_update_entry(self):
+        from app.services.world_bible_db import add_entry, update_entry
+        eid, _ = add_entry("characters", {"name": "Bob"}, session_state=self.ss)
+        updated = update_entry("characters", eid, {"description": "Updated"}, session_state=self.ss)
+        assert updated is not None
+        assert updated["description"] == "Updated"
+        assert updated["updated_at"]
+
+    def test_update_nonexistent_returns_none(self):
+        from app.services.world_bible_db import update_entry
+        assert update_entry("characters", "bad_id", {"name": "X"}, session_state=self.ss) is None
+
+    def test_delete_entry(self):
+        from app.services.world_bible_db import add_entry, delete_entry, get_entry
+        eid, _ = add_entry("factions", {"name": "Order"}, session_state=self.ss)
+        assert delete_entry("factions", eid, session_state=self.ss) is True
+        assert get_entry("factions", eid, session_state=self.ss) is None
+
+    def test_delete_nonexistent_returns_false(self):
+        from app.services.world_bible_db import delete_entry
+        assert delete_entry("characters", "bad_id", session_state=self.ss) is False
+
+    def test_list_entries(self):
+        from app.services.world_bible_db import add_entry, list_entries
+        add_entry("characters", {"name": "A"}, session_state=self.ss)
+        add_entry("characters", {"name": "B"}, session_state=self.ss)
+        entries = list_entries("characters", session_state=self.ss)
+        assert len(entries) == 2
+
+    def test_category_normalisation(self):
+        from app.services.world_bible_db import add_entry, list_entries
+        add_entry("Character", {"name": "X"}, session_state=self.ss)
+        add_entry("character", {"name": "Y"}, session_state=self.ss)
+        entries = list_entries("characters", session_state=self.ss)
+        assert len(entries) == 2
+
+
+class TestWorldBibleSearch:
+    """Test search across name, description, and tags."""
+
+    @pytest.fixture(autouse=True)
+    def _setup(self):
+        from app.services.world_bible_db import ensure_world_bible_db, add_entry
+        self.ss = _FakeSessionState()
+        ensure_world_bible_db(self.ss)
+        add_entry("characters", {"name": "Alice", "description": "Brave hero", "tags": ["protagonist"]}, session_state=self.ss)
+        add_entry("locations", {"name": "Dark Forest", "description": "Dangerous area"}, session_state=self.ss)
+
+    def test_search_by_name(self):
+        from app.services.world_bible_db import search_world_bible
+        results = search_world_bible("alice", session_state=self.ss)
+        assert len(results) == 1
+        assert results[0]["entry"]["name"] == "Alice"
+
+    def test_search_by_description(self):
+        from app.services.world_bible_db import search_world_bible
+        results = search_world_bible("dangerous", session_state=self.ss)
+        assert len(results) == 1
+        assert results[0]["category"] == "locations"
+
+    def test_search_by_tag(self):
+        from app.services.world_bible_db import search_world_bible
+        results = search_world_bible("protagonist", session_state=self.ss)
+        assert len(results) == 1
+
+    def test_search_case_insensitive(self):
+        from app.services.world_bible_db import search_world_bible
+        results = search_world_bible("ALICE", session_state=self.ss)
+        assert len(results) == 1
+
+    def test_search_empty_query(self):
+        from app.services.world_bible_db import search_world_bible
+        assert search_world_bible("", session_state=self.ss) == []
+
+
+class TestWorldBibleTagging:
+    """Test tag-based retrieval."""
+
+    @pytest.fixture(autouse=True)
+    def _setup(self):
+        from app.services.world_bible_db import ensure_world_bible_db, add_entry
+        self.ss = _FakeSessionState()
+        ensure_world_bible_db(self.ss)
+        add_entry("characters", {"name": "A", "tags": ["hero", "warrior"]}, session_state=self.ss)
+        add_entry("characters", {"name": "B", "tags": ["villain"]}, session_state=self.ss)
+        add_entry("locations", {"name": "C", "tags": ["hero"]}, session_state=self.ss)
+
+    def test_get_entries_by_tag(self):
+        from app.services.world_bible_db import get_entries_by_tag
+        results = get_entries_by_tag("hero", session_state=self.ss)
+        assert len(results) == 2
+
+    def test_tag_case_insensitive(self):
+        from app.services.world_bible_db import get_entries_by_tag
+        results = get_entries_by_tag("HERO", session_state=self.ss)
+        assert len(results) == 2
+
+    def test_tag_not_found(self):
+        from app.services.world_bible_db import get_entries_by_tag
+        assert get_entries_by_tag("nonexistent", session_state=self.ss) == []
+
+
+class TestWorldBibleConsistency:
+    """Test the AI-free consistency checker."""
+
+    @pytest.fixture(autouse=True)
+    def _setup(self):
+        from app.services.world_bible_db import ensure_world_bible_db, add_entry
+        self.ss = _FakeSessionState()
+        ensure_world_bible_db(self.ss)
+        add_entry("characters", {"name": "Alice"}, session_state=self.ss)
+        add_entry("locations", {"name": "Dark Forest"}, session_state=self.ss)
+
+    def test_detects_unknown_references(self):
+        from app.services.world_bible_db import check_world_bible_consistency
+        warnings = check_world_bible_consistency(
+            "Marcus went to the Dark Forest with Alice",
+            session_state=self.ss,
+        )
+        # Marcus is not in world bible, should warn
+        assert any("Marcus" in w for w in warnings)
+
+    def test_no_warnings_for_known_names(self):
+        from app.services.world_bible_db import check_world_bible_consistency
+        warnings = check_world_bible_consistency(
+            "alice walked through the dark forest",
+            session_state=self.ss,
+        )
+        # All lowercase — no proper-noun candidates
+        assert len(warnings) == 0
+
+    def test_empty_text(self):
+        from app.services.world_bible_db import check_world_bible_consistency
+        assert check_world_bible_consistency("", session_state=self.ss) == []
+
+
+class TestWorldBibleConflicts:
+    """Test canon conflict detection."""
+
+    @pytest.fixture(autouse=True)
+    def _setup(self):
+        from app.services.world_bible_db import ensure_world_bible_db, add_entry
+        self.ss = _FakeSessionState()
+        ensure_world_bible_db(self.ss)
+        add_entry("characters", {"name": "Alice"}, session_state=self.ss)
+
+    def test_detects_duplicate_name(self):
+        from app.services.world_bible_db import detect_canon_conflicts
+        conflicts = detect_canon_conflicts({"name": "Alice"}, session_state=self.ss)
+        assert len(conflicts) >= 1
+        assert any("Alice" in c for c in conflicts)
+
+    def test_no_conflict_for_unique_name(self):
+        from app.services.world_bible_db import detect_canon_conflicts
+        conflicts = detect_canon_conflicts({"name": "Zephyr"}, session_state=self.ss)
+        assert len(conflicts) == 0
+
+
+class TestWorldBibleValidation:
+    """Test the validation / repair function."""
+
+    @pytest.fixture(autouse=True)
+    def _setup(self):
+        from app.services.world_bible_db import ensure_world_bible_db
+        self.ss = _FakeSessionState()
+        ensure_world_bible_db(self.ss)
+
+    def test_validates_clean_db(self):
+        from app.services.world_bible_db import validate_world_bible_db, add_entry
+        add_entry("characters", {"name": "Test"}, session_state=self.ss)
+        db = validate_world_bible_db(session_state=self.ss)
+        assert "characters" in db
+
+    def test_repairs_missing_fields(self):
+        from app.services.world_bible_db import validate_world_bible_db
+        # Inject a broken entry
+        self.ss["world_bible_db"]["characters"]["bad"] = {"name": None, "tags": "not_a_list"}
+        db = validate_world_bible_db(session_state=self.ss)
+        entry = db["characters"]["bad"]
+        assert entry["name"] == "Unnamed"
+        assert isinstance(entry["tags"], list)
+        assert entry["created_at"]
+
+    def test_repairs_missing_category(self):
+        from app.services.world_bible_db import validate_world_bible_db
+        del self.ss["world_bible_db"]["history"]
+        db = validate_world_bible_db(session_state=self.ss)
+        assert "history" in db
+
+
+class TestWorldBibleVersioning:
+    """Test version history snapshots."""
+
+    def test_version_created_on_add(self):
+        from app.services.world_bible_db import ensure_world_bible_db, add_entry
+        ss = _FakeSessionState()
+        ensure_world_bible_db(ss)
+        add_entry("characters", {"name": "A"}, session_state=ss)
+        versions = ss.get("world_bible_versions", [])
+        assert len(versions) >= 1
+        assert "timestamp" in versions[-1]
+        assert "data" in versions[-1]
+
+    def test_versions_capped(self):
+        from app.services.world_bible_db import ensure_world_bible_db, add_entry
+        ss = _FakeSessionState()
+        ensure_world_bible_db(ss)
+        for i in range(25):
+            add_entry("characters", {"name": f"Entry_{i}"}, session_state=ss)
+        assert len(ss["world_bible_versions"]) <= 20
+
+
+class TestWorldBibleAutoSave:
+    """Test the save_world_bible helper."""
+
+    def test_save_marks_flag(self):
+        from app.services.world_bible_db import ensure_world_bible_db, save_world_bible
+        ss = _FakeSessionState()
+        ensure_world_bible_db(ss)
+        ss["world_bible_last_saved"] = False
+        save_world_bible(session_state=ss)
+        assert ss["world_bible_last_saved"] is True
+
+
+class TestStateInitWorldBible:
+    """Verify that state.py initializes world_bible_db keys."""
+
+    def test_state_module_calls_ensure(self):
+        source = Path(ROOT / "app" / "state.py").read_text(encoding="utf-8")
+        assert "ensure_world_bible_db" in source
+
+    def test_main_module_calls_ensure(self):
+        source = Path(ROOT / "app" / "main.py").read_text(encoding="utf-8")
+        assert "ensure_world_bible_db" in source

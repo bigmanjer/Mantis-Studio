@@ -1544,6 +1544,9 @@ def _run_ui():
     init_state("world_tabs", "Characters")
     init_state("world_bible_review", [])
     init_state("last_entity_scan", None)
+    # ---- World Bible structured database layer ----
+    from app.services.world_bible_db import ensure_world_bible_db
+    ensure_world_bible_db(st.session_state)
     init_state("locked_chapters", set())
     init_state("_chapter_sync_id", None)
     init_state("_chapter_sync_text", None)
