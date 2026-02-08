@@ -35,7 +35,6 @@ from app.services.projects import Entity, Project
 # ---------------------------------------------------------------------------
 
 HIGH_CONFIDENCE_THRESHOLD = 0.80   # auto-classify as update
-LOW_CONFIDENCE_THRESHOLD = 0.40    # below this → needs manual review
 DESCRIPTION_OVERLAP_THRESHOLD = 0.85  # descriptions are "same enough"
 
 
@@ -152,7 +151,7 @@ def classify_suggestion(
 
     Returns a *new* dict (does not mutate the input) with these extra keys:
 
-    - ``type``       — ``"update"`` | ``"alias_only"`` | ``"new"``
+    - ``type``       — ``"update"`` | ``"alias_only"`` | ``"new"`` | ``"duplicate"``
     - ``entity_id``  — the matched entity's id (if any)
     - ``match_name`` — the matched entity's canonical name (if any)
     - ``reason``     — human-readable explanation

@@ -1297,7 +1297,7 @@ class TestWorldBibleMerge:
         ent, action = apply_suggestion(self.project, classified)
         assert action == "updated"
         assert "magic sword" in ent.description
-        assert "Al" in ent.aliases or "al" in [a.lower() for a in ent.aliases]
+        assert any(a.lower() == "al" for a in ent.aliases)
 
     def test_apply_new_creates_entity(self):
         """apply_suggestion with type 'new' should create the entity."""
