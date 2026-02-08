@@ -3644,6 +3644,8 @@ def _run_ui():
                 (() => {
                     const labels = new Set($quick_action_labels);
                     const normalize = (text) => (text || "").replace(/\s+/g, " ").trim();
+                    const RETRY_INTERVAL_MS = 60;
+                    const MAX_STYLE_ATTEMPTS = 12; // 12 attempts × 60ms = 720ms total wait time.
                     const apply = () => {
                         let found = 0;
                         document.querySelectorAll("button").forEach((button) => {
@@ -3656,20 +3658,19 @@ def _run_ui():
                         return found;
                     };
                     let attempts = 0;
-                    const maxAttempts = 12; // Up to 720ms total wait time (12 attempts × 60ms).
                     const tick = () => {
                         const found = apply();
-                        if (found < labels.size && attempts < maxAttempts) {
+                        if (found < labels.size && attempts < MAX_STYLE_ATTEMPTS) {
                             attempts += 1;
-                            setTimeout(tick, 60);
-                        } else if (found < labels.size && attempts >= maxAttempts) {
+                            setTimeout(tick, RETRY_INTERVAL_MS);
+                        } else if (found < labels.size && attempts >= MAX_STYLE_ATTEMPTS) {
                             console.warn(
                                 "Failed to style all quick action buttons: " +
                                     found +
                                     "/" +
                                     labels.size +
                                     " found after " +
-                                    maxAttempts +
+                                    MAX_STYLE_ATTEMPTS +
                                     " attempts.",
                             );
                         }
