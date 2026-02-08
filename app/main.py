@@ -3595,6 +3595,23 @@ def _run_ui():
                 st.caption(f"Canon health: {canon_icon} {canon_label}.")
 
         section_title("Quick Actions", "Jump straight into your most-used tools.")
+        quick_action_labels = [
+            "Open Editor",
+            "Open Outline",
+            "Open World Bible",
+            "Open Memory",
+            "Open Insights",
+            "Go to Export",
+        ]
+        (
+            open_editor_label,
+            open_outline_label,
+            open_world_bible_label,
+            open_memory_label,
+            open_insights_label,
+            open_export_label,
+        ) = quick_action_labels
+        quick_action_label_json = json.dumps(quick_action_labels)
         st.html(
             """
             <style>
@@ -3631,14 +3648,7 @@ def _run_ui():
             <div style="display:none" aria-hidden="true">
                 <script>
                 (() => {
-                    const labels = new Set([
-                        "Open Editor",
-                        "Open Outline",
-                        "Open World Bible",
-                        "Open Memory",
-                        "Open Insights",
-                        "Go to Export",
-                    ]);
+                    const labels = new Set(__QUICK_ACTION_LABELS__);
                     const normalize = (text) => (text || "").replace(/\\s+/g, " ").trim();
                     const apply = () => {
                         let found = 0;
@@ -3658,13 +3668,17 @@ def _run_ui():
                         if (found < labels.size && attempts < maxAttempts) {
                             attempts += 1;
                             setTimeout(tick, 60);
+                        } else if (found < labels.size && attempts >= maxAttempts) {
+                            console.warn(
+                                `Quick action buttons styled: ${found}/${labels.size} found.`,
+                            );
                         }
                     };
                     tick();
                 })();
                 </script>
             </div>
-            """,
+            """.replace("__QUICK_ACTION_LABELS__", quick_action_label_json),
             unsafe_allow_javascript=True,
         )
         quick_grid = st.container()
@@ -3673,7 +3687,7 @@ def _run_ui():
             with qcols[0]:
                 cta_tile("✍️ Editor", "Draft chapters and summaries.")
                 if st.button(
-                    "Open Editor",
+                    open_editor_label,
                     use_container_width=True,
                     type="secondary",
                     help="Start writing or editing your chapters"
@@ -3682,7 +3696,7 @@ def _run_ui():
             with qcols[1]:
                 cta_tile("📝 Outline", "Plan beats, arcs, and chapter flow.")
                 if st.button(
-                    "Open Outline",
+                    open_outline_label,
                     use_container_width=True,
                     type="secondary",
                     help="Create or edit your story structure and plot outline"
@@ -3691,7 +3705,7 @@ def _run_ui():
             with qcols[2]:
                 cta_tile("🌍 World Bible", "Characters, places, factions, lore.")
                 if st.button(
-                    "Open World Bible",
+                    open_world_bible_label,
                     use_container_width=True,
                     type="secondary",
                     help="Manage your story's canonical characters, locations, and lore"
@@ -3703,12 +3717,12 @@ def _run_ui():
             qcols = st.columns(3)
             with qcols[0]:
                 cta_tile("🧠 Memory", "Hard canon rules and guidelines.")
-                if st.button("Open Memory", use_container_width=True, type="secondary"):
+                if st.button(open_memory_label, use_container_width=True, type="secondary"):
                     open_recent_project("world", focus_tab="Memory")
             with qcols[1]:
                 cta_tile("📊 Insights", "Canon health and analytics.")
                 if st.button(
-                    "Open Insights",
+                    open_insights_label,
                     use_container_width=True,
                     type="secondary",
                     help="View analytics and consistency insights for your story world"
@@ -3717,7 +3731,7 @@ def _run_ui():
             with qcols[2]:
                 cta_tile("⬇️ Export", "Download your project.")
                 if st.button(
-                    "Go to Export",
+                    open_export_label,
                     use_container_width=True,
                     type="secondary",
                     help="Export your project as markdown for sharing or publishing"
