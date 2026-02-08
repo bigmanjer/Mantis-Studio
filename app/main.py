@@ -264,6 +264,10 @@ def set_session_key(provider: str, key: str) -> None:
     keys = _ensure_session_keys(st)
     keys[provider] = cleaned
     st.session_state["ai_session_keys"] = keys
+    # Persist to config file so the key survives a page refresh
+    config = load_app_config()
+    config[f"{provider}_api_key"] = cleaned
+    save_app_config(config)
 
 
 def clear_session_key(provider: str) -> None:
@@ -274,6 +278,10 @@ def clear_session_key(provider: str) -> None:
     keys = _ensure_session_keys(st)
     keys[provider] = ""
     st.session_state["ai_session_keys"] = keys
+    # Remove from config file as well
+    config = load_app_config()
+    config.pop(f"{provider}_api_key", None)
+    save_app_config(config)
 
 
 def _get_secret_key(st, provider: str) -> str:
@@ -317,6 +325,11 @@ def get_effective_key(provider: str, user_id: Optional[str] = None) -> tuple[str
         session_key = _ensure_session_keys(st).get(provider, "")
         if session_key:
             return session_key, "session"
+    # Check config file for a previously saved key
+    config = load_app_config()
+    saved_key = (config.get(f"{provider}_api_key") or "").strip()
+    if saved_key:
+        return saved_key, "saved"
     default_key = _get_server_default_key(provider)
     if default_key:
         return default_key, "default"
@@ -2181,6 +2194,10 @@ def _run_ui():
             except Exception:
                 pass
             return False
+        # Remember the last active project so it can be restored after refresh
+        config = load_app_config()
+        config["last_project_path"] = path
+        save_app_config(config)
         return True
 
     def render_welcome_banner(context: str) -> None:
@@ -2262,6 +2279,15 @@ def _run_ui():
     # Local-first: use the default projects directory
     if not st.session_state.get("projects_dir"):
         st.session_state.projects_dir = AppConfig.PROJECTS_DIR
+
+    # Restore the last active project from config if none is loaded
+    if not st.session_state.get("project"):
+        _last_path = config_data.get("last_project_path", "")
+        if _last_path and os.path.isfile(_last_path):
+            try:
+                st.session_state.project = Project.load(_last_path)
+            except Exception:
+                logger.warning("Failed to restore last project: %s", _last_path, exc_info=True)
 
     # Reliable navigation rerun (avoids Streamlit edge cases when returning early)
     if st.session_state.get("_force_nav"):
@@ -2443,7 +2469,9 @@ def _run_ui():
         ) or []
 
     def save_app_settings():
-        data = {
+        # Merge with existing config to preserve saved API keys
+        data = load_app_config()
+        data.update({
             "ai_provider": st.session_state.ai_provider,
             "groq_base_url": st.session_state.groq_base_url,
             "groq_model": st.session_state.groq_model,
@@ -2454,7 +2482,7 @@ def _run_ui():
             "weekly_sessions_goal": int(st.session_state.weekly_sessions_goal),
             "focus_minutes": int(st.session_state.focus_minutes),
             "activity_log": list(st.session_state.activity_log),
-        }
+        })
         save_app_config(data)
         st.toast("Settings saved.")
 

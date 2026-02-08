@@ -1023,6 +1023,80 @@ class TestAPIKeyValidation:
 
 
 # ---------------------------------------------------------------------------
+# 22b) API key persistence – keys survive refresh via config file
+# ---------------------------------------------------------------------------
+
+
+class TestAPIKeyPersistence:
+    """Verify that API keys are saved to and loaded from the config file."""
+
+    @pytest.fixture(autouse=True)
+    def _tmpdir(self, tmp_path):
+        self.config_path = str(tmp_path / "test_config.json")
+
+    def _make_mock_st(self, state_dict):
+        import unittest.mock as mock
+        mock_st = mock.MagicMock()
+        mock_st.session_state = state_dict
+        return mock_st
+
+    def test_set_session_key_persists_to_config(self):
+        from app.main import AppConfig as MainAppConfig, set_session_key, load_app_config
+        import unittest.mock as mock
+
+        original = MainAppConfig.CONFIG_PATH
+        try:
+            MainAppConfig.CONFIG_PATH = self.config_path
+            mock_st = self._make_mock_st({"ai_session_keys": {"openai": "", "groq": ""}})
+
+            with mock.patch("app.main._get_streamlit", return_value=mock_st):
+                set_session_key("groq", "sk-test-persist-key")
+
+            config = load_app_config()
+            assert config.get("groq_api_key") == "sk-test-persist-key"
+        finally:
+            MainAppConfig.CONFIG_PATH = original
+
+    def test_clear_session_key_removes_from_config(self):
+        from app.main import AppConfig as MainAppConfig, clear_session_key, save_app_config, load_app_config
+        import unittest.mock as mock
+
+        original = MainAppConfig.CONFIG_PATH
+        try:
+            MainAppConfig.CONFIG_PATH = self.config_path
+            save_app_config({"groq_api_key": "sk-old-key"})
+
+            mock_st = self._make_mock_st({"ai_session_keys": {"openai": "", "groq": "sk-old-key"}})
+
+            with mock.patch("app.main._get_streamlit", return_value=mock_st):
+                clear_session_key("groq")
+
+            config = load_app_config()
+            assert "groq_api_key" not in config
+        finally:
+            MainAppConfig.CONFIG_PATH = original
+
+    def test_get_effective_key_finds_saved_key(self):
+        from app.main import AppConfig as MainAppConfig, get_effective_key, save_app_config
+        import unittest.mock as mock
+
+        original = MainAppConfig.CONFIG_PATH
+        try:
+            MainAppConfig.CONFIG_PATH = self.config_path
+            save_app_config({"openai_api_key": "sk-saved-key"})
+
+            mock_st = self._make_mock_st({"ai_session_keys": {"openai": "", "groq": ""}})
+
+            with mock.patch("app.main._get_streamlit", return_value=mock_st):
+                key, source = get_effective_key("openai")
+
+            assert key == "sk-saved-key"
+            assert source == "saved"
+        finally:
+            MainAppConfig.CONFIG_PATH = original
+
+
+# ---------------------------------------------------------------------------
 # 23) HTML rendering – st.html() migration
 # ---------------------------------------------------------------------------
 
