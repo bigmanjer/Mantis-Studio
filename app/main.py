@@ -3596,6 +3596,7 @@ def _run_ui():
                 st.caption(f"Canon health: {canon_icon} {canon_label}.")
 
         section_title("Quick Actions", "Jump straight into your most-used tools.")
+        # Static labels used for button text and JS styling hook (not user-controlled).
         quick_action_labels = [
             "Open Editor",
             "Open Outline",
@@ -3645,7 +3646,7 @@ def _run_ui():
                     const labels = new Set($quick_action_labels);
                     const normalize = (text) => (text || "").replace(/\s+/g, " ").trim();
                     const RETRY_INTERVAL_MS = 60;
-                    const MAX_STYLE_ATTEMPTS = 12; // 12 attempts × 60ms = 720ms total wait time.
+                    const MAX_STYLE_ATTEMPTS = 12; // 12 attempts x 60ms = 720ms total wait time.
                     const apply = () => {
                         let found = 0;
                         document.querySelectorAll("button").forEach((button) => {
@@ -3660,6 +3661,7 @@ def _run_ui():
                     let attempts = 0;
                     const tick = () => {
                         const found = apply();
+                        // Polling keeps the hook lightweight for Streamlit-rendered buttons.
                         if (found < labels.size && attempts < MAX_STYLE_ATTEMPTS) {
                             attempts += 1;
                             setTimeout(tick, RETRY_INTERVAL_MS);
