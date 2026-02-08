@@ -307,7 +307,7 @@ Accessible via footer links or the Legal Center page.
 
 ## 8. Versioning System
 
-* **Current Version**: 84.7.1 (stored in `VERSION.txt`)
+* **Current Version**: 84.7 (stored in `VERSION.txt`; patch omitted for this release)
 * **Version Format**: `MAJOR.MINOR.PATCH` (e.g., 84.7.1, 84.7.2, 84.8.0)
 
 ### Versioning Rules
