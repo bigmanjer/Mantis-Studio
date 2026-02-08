@@ -2546,7 +2546,7 @@ def _run_ui():
                     p.add_chapter(sanitize_chapter_title(title))
                     _persist_chapter_update()
 
-                if len(chaps) > 0:
+                if chaps:
                     if st.session_state.get("delete_chapter_id") == curr.id:
                         st.warning(f"Delete **{st.session_state.get('delete_chapter_title') or curr.title}**?")
                         cdel1, cdel2 = st.columns(2)

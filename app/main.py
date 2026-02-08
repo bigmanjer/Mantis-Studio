@@ -5177,7 +5177,7 @@ def _run_ui():
                 ):
                     create_next_chapter()
 
-                if len(chapters) > 0:
+                if chapters:
                     if st.session_state.get("delete_chapter_id") == curr.id:
                         st.warning(f"Delete **{st.session_state.get('delete_chapter_title') or curr.title}**?")
                         cdel1, cdel2 = st.columns(2)
