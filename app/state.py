@@ -160,6 +160,10 @@ def initialize_session_state(st, config_data: Dict[str, str]) -> None:
     st.session_state.setdefault("groq_model_list", [])
     st.session_state.setdefault("groq_model_tests", {})
 
+    # ---- World Bible structured database layer ----
+    from app.services.world_bible_db import ensure_world_bible_db
+    ensure_world_bible_db(st.session_state)
+
     # ---- always-overwritten keys (API keys refresh every run) ----
     st.session_state.openai_api_key = _resolve_api_key("openai", AppConfig.OPENAI_API_KEY)
     st.session_state.groq_api_key = _resolve_api_key("groq", AppConfig.GROQ_API_KEY)
