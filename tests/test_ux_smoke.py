@@ -695,8 +695,11 @@ class TestHelpers:
             def __init__(self, d):
                 self.session_state = dict(d)
                 self.warned = False
+                self.info_shown = False
             def warning(self, msg):
                 self.warned = True
+            def info(self, msg):
+                self.info_shown = True
             def button(self, *a, **kw):
                 return False
         return _FakeSt(state_dict)
@@ -709,19 +712,19 @@ class TestHelpers:
 
     def test_ai_warning_hidden_when_ai_keys_set(self):
         from app.utils.helpers import ai_connection_warning
-        fake_st = self._make_fake_st({"ai_keys": {"groq": "sk-test-key"}})
+        fake_st = self._make_fake_st({"ai_keys": {"groq": "sk-test-key"}, "groq_model_list": ["m1"]})
         ai_connection_warning(fake_st)
         assert not fake_st.warned, "Warning should NOT be shown when ai_keys dict has a provider key"
 
     def test_ai_warning_hidden_when_groq_api_key_set(self):
         from app.utils.helpers import ai_connection_warning
-        fake_st = self._make_fake_st({"groq_api_key": "sk-test"})
+        fake_st = self._make_fake_st({"groq_api_key": "sk-test", "groq_model_list": ["m1"]})
         ai_connection_warning(fake_st)
         assert not fake_st.warned, "Warning should NOT be shown when groq_api_key is set"
 
     def test_ai_warning_hidden_when_openai_api_key_set(self):
         from app.utils.helpers import ai_connection_warning
-        fake_st = self._make_fake_st({"openai_api_key": "sk-test"})
+        fake_st = self._make_fake_st({"openai_api_key": "sk-test", "openai_model_list": ["m1"]})
         ai_connection_warning(fake_st)
         assert not fake_st.warned, "Warning should NOT be shown when openai_api_key is set"
 
@@ -736,6 +739,39 @@ class TestHelpers:
         fake_st = self._make_fake_st({"ai_keys": {}})
         ai_connection_warning(fake_st)
         assert fake_st.warned, "Warning should be shown when ai_keys dict is empty"
+
+    def test_ai_warning_hidden_when_session_keys_set(self):
+        from app.utils.helpers import ai_connection_warning
+        fake_st = self._make_fake_st({"ai_session_keys": {"groq": "sk-test", "openai": ""}, "groq_model_list": ["m1"]})
+        ai_connection_warning(fake_st)
+        assert not fake_st.warned, "Warning should NOT be shown when ai_session_keys has a provider key"
+
+    def test_ai_info_shown_when_key_added_but_not_tested(self):
+        from app.utils.helpers import ai_connection_warning
+        fake_st = self._make_fake_st({"ai_session_keys": {"groq": "sk-test", "openai": ""}})
+        ai_connection_warning(fake_st)
+        assert not fake_st.warned, "Warning should NOT be shown when keys exist"
+        assert fake_st.info_shown, "Info prompt should be shown when keys exist but models not tested"
+
+    def test_ai_no_prompt_when_key_added_and_models_tested(self):
+        from app.utils.helpers import ai_connection_warning
+        fake_st = self._make_fake_st({
+            "ai_session_keys": {"groq": "sk-test", "openai": ""},
+            "groq_model_tests": {"llama3-8b-8192": ""},
+        })
+        ai_connection_warning(fake_st)
+        assert not fake_st.warned, "Warning should NOT be shown when connected and tested"
+        assert not fake_st.info_shown, "Info should NOT be shown when models are tested"
+
+    def test_ai_no_prompt_when_key_added_and_models_fetched(self):
+        from app.utils.helpers import ai_connection_warning
+        fake_st = self._make_fake_st({
+            "groq_api_key": "sk-test",
+            "groq_model_list": ["llama3-8b-8192"],
+        })
+        ai_connection_warning(fake_st)
+        assert not fake_st.warned, "Warning should NOT be shown when connected"
+        assert not fake_st.info_shown, "Info should NOT be shown when models are fetched"
 
 
 # ---------------------------------------------------------------------------
