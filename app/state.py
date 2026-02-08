@@ -167,6 +167,13 @@ def initialize_session_state(st, config_data: Dict[str, str]) -> None:
     st.session_state.setdefault("groq_connection_tested", False)
     st.session_state.setdefault("openai_connection_tested", False)
 
+    # ---- Populate ai_session_keys from saved config so the warning check works ----
+    if "ai_session_keys" not in st.session_state:
+        st.session_state["ai_session_keys"] = {
+            "groq": config_data.get("groq_api_key", ""),
+            "openai": config_data.get("openai_api_key", ""),
+        }
+
     # ---- World Bible structured database layer ----
     from app.services.world_bible_db import ensure_world_bible_db
     ensure_world_bible_db(st.session_state)

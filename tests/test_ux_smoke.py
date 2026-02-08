@@ -813,6 +813,39 @@ class TestHelpers:
         assert not fake_st.warned, "Warning should NOT be shown when connected"
         assert not fake_st.info_shown, "Info should NOT be shown when connection was tested"
 
+    def test_ai_warning_hidden_when_config_has_saved_keys(self):
+        """Warning should be suppressed when ai_session_keys are populated from config."""
+        from app.utils.helpers import ai_connection_warning
+        fake_st = self._make_fake_st({
+            "ai_session_keys": {"groq": "sk-saved-key", "openai": ""},
+            "groq_connection_tested": True,
+        })
+        ai_connection_warning(fake_st)
+        assert not fake_st.warned, "Warning should NOT be shown when config has saved keys"
+
+    def test_initialize_populates_ai_session_keys_from_config(self):
+        """initialize_session_state should populate ai_session_keys from config data."""
+        from app.state import initialize_session_state
+        from types import SimpleNamespace
+
+        fake_state = {}
+
+        class FakeSessionState(dict):
+            def __getattr__(self, name):
+                try:
+                    return self[name]
+                except KeyError:
+                    raise AttributeError(name)
+            def __setattr__(self, name, value):
+                self[name] = value
+
+        fake_st = SimpleNamespace(session_state=FakeSessionState())
+        config_data = {"groq_api_key": "sk-from-config", "openai_api_key": ""}
+        initialize_session_state(fake_st, config_data)
+        keys = fake_st.session_state.get("ai_session_keys", {})
+        assert keys.get("groq") == "sk-from-config", \
+            "ai_session_keys should be populated from config data"
+
 
 # ---------------------------------------------------------------------------
 # 17) Layout duplicate removal – styles.py must no longer exist
