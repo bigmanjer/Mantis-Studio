@@ -2073,7 +2073,7 @@ def _run_ui():
                         MANTIS Studio — v{AppConfig.VERSION}
                     </div>
                     <div class="mantis-header-sub">
-                        Modular narrative workspace
+                        Modular AI Narrative Text Intelligence System
                     </div>
                 </div>
             </div>
@@ -2194,7 +2194,7 @@ def _run_ui():
             if logo_bytes:
                 st.image(logo_bytes, width=42)
             st.markdown("### MANTIS Studio")
-            st.caption("Modular narrative workspace")
+            st.caption("Modular AI Narrative Text Intelligence System")
 
         with mid_col:
             options = ["No project selected"]

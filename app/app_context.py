@@ -1035,7 +1035,7 @@ def _run_ui():
                 </div>
                 <div>
                     <div class="mantis-sidebar-title">MANTIS Studio — v{AppConfig.VERSION}</div>
-                    <div class="mantis-sidebar-sub">Modular narrative workspace</div>
+                    <div class="mantis-sidebar-sub">Modular AI Narrative Text Intelligence System</div>
                 </div>
             </div>
             """,
