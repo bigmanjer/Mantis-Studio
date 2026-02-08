@@ -391,8 +391,7 @@ def _run_ui():
         # Persist connection-tested flags so the warning stays dismissed
         # after a page refresh.
         for flag in ("groq_connection_tested", "openai_connection_tested"):
-            if st.session_state.get(flag):
-                data[flag] = True
+            data[flag] = bool(st.session_state.get(flag))
         save_app_config(data)
         st.toast("Settings saved.")
 
