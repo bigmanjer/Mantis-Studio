@@ -1658,9 +1658,9 @@ class TestApplySuggestionClearsWidgetCache:
 
         # Must capture return value from apply_suggestion
         assert re.search(
-            r"apply_suggestion.*\(.*p.*,.*item.*\)",
+            r"=\s*_?apply_suggestion.*\(.*p.*,.*item.*\)",
             source,
-        ), "apply_suggestion call not found"
+        ), "apply_suggestion return value not captured"
 
         # Must clear the widget key for description
         assert re.search(
