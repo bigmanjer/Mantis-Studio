@@ -3640,7 +3640,7 @@ def _run_ui():
             <div style="display:none" aria-hidden="true">
                 <script>
                 (() => {
-                    const labels = new Set(__QUICK_ACTION_LABELS__);
+                    const labels = new Set(%QUICK_ACTION_LABELS%);
                     const normalize = (text) => (text || "").replace(/\\s+/g, " ").trim();
                     const apply = () => {
                         let found = 0;
@@ -3654,7 +3654,7 @@ def _run_ui():
                         return found;
                     };
                     let attempts = 0;
-                    const maxAttempts = 12; // Up to ~780ms total including the initial attempt.
+                    const maxAttempts = 12; // Up to ~720ms total retries at 60ms intervals.
                     const tick = () => {
                         const found = apply();
                         if (found < labels.size && attempts < maxAttempts) {
@@ -3662,7 +3662,7 @@ def _run_ui():
                             setTimeout(tick, 60);
                         } else if (found < labels.size && attempts >= maxAttempts) {
                             console.warn(
-                                `Quick action buttons styled: ${found}/${labels.size} found.`,
+                                `Failed to style all quick action buttons: ${found}/${labels.size} found after ${maxAttempts} attempts.`,
                             );
                         }
                     };
@@ -3670,7 +3670,7 @@ def _run_ui():
                 })();
                 </script>
             </div>
-            """.replace("__QUICK_ACTION_LABELS__", quick_action_label_json),
+            """.replace("%QUICK_ACTION_LABELS%", quick_action_label_json),
             unsafe_allow_javascript=True,
         )
         quick_grid = st.container()
