@@ -247,7 +247,7 @@ Accessible via footer links or the Legal Center page.
 
 ---
 
-## 6. Recent Improvements (Version 84.7)
+## 6. Recent Improvements (Version 84.8)
 
 ### ✅ User Experience Enhancements
 
@@ -307,17 +307,18 @@ Accessible via footer links or the Legal Center page.
 
 ## 8. Versioning System
 
-* **Current Version**: 84.7.1 (stored in `VERSION.txt`)
-* **Version Format**: `MAJOR.MINOR.PATCH` (e.g., 84.7.1, 84.7.2, 84.8.0)
+* **Current Version**: 84.8 (stored in `VERSION.txt`)
+* **Version Format**: `MAJOR.MINOR` (e.g., 84.8, 84.9, 85.0)
 
 ### Versioning Rules
 
 The version increments with each merge following these rules:
 
-1. **Patch version** increments by 1 on each merged pull request to `main`
-   - Example: 84.7.1 → 84.7.2 → 84.7.3
+1. **Minor version** increments by 1 on each merged pull request to `main`
+   - Example: 84.8 → 84.9
 
-2. **Minor/major bumps** are handled via the Version Bump workflow dispatch inputs
+2. **Major bump** happens when minor reaches 9 on the next bump
+   - Example: 84.9 → 85.0
 
 3. **Manual updates** to VERSION.txt are reflected immediately in the UI
 
@@ -326,18 +327,18 @@ The version increments with each merge following these rules:
 * Version is read from `VERSION.txt` at startup
 * Can be overridden with `MANTIS_APP_VERSION` environment variable
 * Displayed in UI header for transparency
-* The Version Bump GitHub Action bumps patch versions on merge
-* Use `python scripts/bump_version.py` to increment the patch version locally
+* The Version Bump GitHub Action bumps minor versions on merge
+* Use `python scripts/bump_version.py` to increment the minor version locally
 
 ### Manual Version Bump
 
-To bump the patch version for the next release:
+To bump the minor version for the next release:
 
 ```bash
 python scripts/bump_version.py
 ```
 
-For minor or major bumps, use the Version Bump workflow dispatch inputs.
+For major bumps, use the Version Bump workflow dispatch inputs.
 
 ---
 

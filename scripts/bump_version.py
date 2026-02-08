@@ -3,8 +3,8 @@
 Version Bumping Script for Mantis Studio
 
 This script increments the version following the project's versioning rules:
-- Increments patch version by 1 (e.g., 84.7.1 -> 84.7.2)
-- Versions can be MAJOR.MINOR or MAJOR.MINOR.PATCH; patch defaults to 0
+- Increments minor version by 1 (e.g., 84.8 -> 84.9)
+- When minor reaches 9, the next bump becomes a major release (e.g., 84.9 -> 85.0)
 
 Usage:
     python scripts/bump_version.py
@@ -19,27 +19,28 @@ def bump_version(current_version: str) -> str:
     Bump version according to Mantis Studio rules.
     
     Args:
-        current_version: Current version string (e.g., "84.7.1")
+        current_version: Current version string (e.g., "84.8")
     
     Returns:
-        New version string (e.g., "84.7.2")
+        New version string (e.g., "84.9")
     """
     try:
         parts = current_version.strip().split('.')
-        if len(parts) not in (2, 3):
+        if len(parts) != 2:
             raise ValueError(
                 f"Invalid version format: {current_version} "
-                "(expected MAJOR.MINOR or MAJOR.MINOR.PATCH)"
+                "(expected MAJOR.MINOR)"
             )
 
         major = int(parts[0])
         minor = int(parts[1])
-        patch = int(parts[2]) if len(parts) == 3 else 0
+        if minor >= 9:
+            major += 1
+            minor = 0
+        else:
+            minor += 1
 
-        # Increment patch by 1 (e.g., version x.y.1 becomes x.y.2)
-        patch += 1
-
-        return f"{major}.{minor}.{patch}"
+        return f"{major}.{minor}"
     
     except (ValueError, IndexError) as e:
         print(f"Error parsing version '{current_version}': {e}", file=sys.stderr)
