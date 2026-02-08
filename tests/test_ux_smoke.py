@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import importlib
 import json
+import re
 import os
 import shutil
 import sys
@@ -40,13 +41,13 @@ class TestCriticalImports:
     def test_editor_chapter_buttons_have_keys(self):
         mod = importlib.import_module("app.main")
         source = Path(mod.__file__).read_text(encoding="utf-8")
-        assert 'key="editor_create_chapter_1"' in source
-        assert 'key="editor_new_chapter"' in source
+        assert re.search(r'key\s*=\s*["\']editor_create_chapter_1["\']', source)
+        assert re.search(r'key\s*=\s*["\']editor_new_chapter["\']', source)
 
         ctx = importlib.import_module("app.app_context")
         ctx_source = Path(ctx.__file__).read_text(encoding="utf-8")
-        assert 'key="editor_create_chapter_1"' in ctx_source
-        assert 'key="editor_new_chapter"' in ctx_source
+        assert re.search(r'key\s*=\s*["\']editor_create_chapter_1["\']', ctx_source)
+        assert re.search(r'key\s*=\s*["\']editor_new_chapter["\']', ctx_source)
 
     def test_import_difflib(self):
         """difflib is required for the editor diff view."""
