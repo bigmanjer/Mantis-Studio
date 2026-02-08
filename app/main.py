@@ -1691,40 +1691,40 @@ def _run_ui():
             "warning": "#f59e0b",
         },
         "Light": {
-            "bg": "#f8fafc",
-            "bg_glow": "radial-gradient(circle at 20% 20%, rgba(34,197,94,0.18), transparent 45%), radial-gradient(circle at 80% 0%, rgba(74,222,128,0.18), transparent 40%)",
-            "text": "#0f172a",
-            "muted": "#6b7280",
-            "input_bg": "#ffffff",
-            "input_border": "#cce5d6",
-            "button_bg": "linear-gradient(180deg, #ffffff, #ecfdf3)",
-            "button_border": "#cdebd9",
-            "button_hover_border": "#22c55e",
-            "primary_bg": "linear-gradient(135deg, #34d399, #22c55e)",
-            "primary_border": "rgba(34,197,94,0.25)",
-            "primary_hover_border": "#16a34a",
-            "card_bg": "#ffffff",
-            "card_border": "#e1efe6",
-            "sidebar_bg": "linear-gradient(180deg, #f3f4f6, #e5e7eb)",
-            "sidebar_border": "#d1d5db",
-            "sidebar_title": "#166534",
-            "divider": "#deeee3",
-            "expander_border": "#d7e9df",
-            "header_gradient": "linear-gradient(135deg, #e6f9ef, #c7f4dc)",
-            "header_logo_bg": "#e7fdf1",
-            "header_sub": "#2f6f43",
-            "shadow_strong": "0 12px 24px rgba(12,26,18,0.08)",
-            "shadow_button": "0 8px 16px rgba(12,26,18,0.12)",
-            "sidebar_brand_bg": "linear-gradient(180deg, rgba(255,255,255,0.9), rgba(243,244,246,0.95))",
-            "sidebar_brand_border": "rgba(15,23,42,0.08)",
-            "sidebar_logo_bg": "rgba(15,23,42,0.08)",
-            "accent": "#22c55e",
-            "accent_soft": "rgba(34,197,94,0.18)",
-            "accent_glow": "rgba(34,197,94,0.35)",
-            "surface": "rgba(255,255,255,0.9)",
-            "surface_alt": "rgba(241,245,249,0.95)",
-            "success": "#16a34a",
-            "warning": "#d97706",
+            "bg": "#f4f6f5",
+            "bg_glow": "radial-gradient(circle at 20% 20%, rgba(34,197,94,0.08), transparent 45%), radial-gradient(circle at 80% 0%, rgba(74,222,128,0.06), transparent 40%)",
+            "text": "#1a2e23",
+            "muted": "#4b5c54",
+            "input_bg": "#f7f9f8",
+            "input_border": "#c2d9cc",
+            "button_bg": "linear-gradient(180deg, #f7f9f8, #edf5f0)",
+            "button_border": "#c2d9cc",
+            "button_hover_border": "#16a34a",
+            "primary_bg": "linear-gradient(135deg, #16a34a, #15803d)",
+            "primary_border": "rgba(22,163,74,0.4)",
+            "primary_hover_border": "#15803d",
+            "card_bg": "#f9faf9",
+            "card_border": "#d5e4da",
+            "sidebar_bg": "linear-gradient(180deg, #eef1ef, #e4e9e6)",
+            "sidebar_border": "#cdd5d0",
+            "sidebar_title": "#15803d",
+            "divider": "#d5e0da",
+            "expander_border": "#cfdad4",
+            "header_gradient": "linear-gradient(135deg, #e2f3e8, #d0eddb)",
+            "header_logo_bg": "#ddf0e4",
+            "header_sub": "#276740",
+            "shadow_strong": "0 12px 24px rgba(20,40,30,0.10)",
+            "shadow_button": "0 6px 14px rgba(20,40,30,0.08)",
+            "sidebar_brand_bg": "linear-gradient(180deg, rgba(249,250,249,0.95), rgba(238,241,239,0.95))",
+            "sidebar_brand_border": "rgba(20,40,30,0.10)",
+            "sidebar_logo_bg": "rgba(22,163,74,0.08)",
+            "accent": "#16a34a",
+            "accent_soft": "rgba(22,163,74,0.10)",
+            "accent_glow": "rgba(22,163,74,0.22)",
+            "surface": "rgba(249,250,249,0.95)",
+            "surface_alt": "rgba(238,243,240,0.95)",
+            "success": "#15803d",
+            "warning": "#b45309",
         },
     }
     tokens = theme_tokens[theme]
@@ -1840,14 +1840,14 @@ def _run_ui():
         width:88px;
         height:88px;
         border-radius:18px;
-        background: rgba(0,0,0,0.35);
+        background: var(--mantis-header-logo-bg);
         display:flex;
         align-items:center;
         justify-content:center;
         overflow:hidden;
         box-shadow:
-            inset 0 0 0 1px rgba(255,255,255,0.15),
-            0 0 18px rgba(34,197,94,0.45);
+            inset 0 0 0 1px rgba(0,0,0,0.06),
+            0 0 18px var(--mantis-accent-glow);
     }}
     .mantis-header-logo img {{
         height:60px;
