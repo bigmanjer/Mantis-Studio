@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
-import uuid
 from collections.abc import Generator
 from typing import Dict, List, Optional, Tuple
 
@@ -93,23 +92,16 @@ def install_key_helpers(st) -> Tuple[contextmanager, Dict[Tuple[str, str, str], 
     return key_scope, widget_counters
 
 
-def initialize_session_state(st, auth, config_data: Dict[str, str]) -> Dict[str, str]:
-    user = auth.get_current_user()
-    logged_in = auth.is_authenticated()
-    is_guest = not logged_in
-    st.session_state["guest_mode"] = is_guest
-    if is_guest:
-        st.session_state.setdefault("guest_session_id", uuid.uuid4().hex[:8])
+def initialize_session_state(st, config_data: Dict[str, str]) -> None:
     st.session_state.setdefault("ai_keys", {})
 
     def _resolve_api_key(provider: str, default_value: str) -> str:
         session_key = (st.session_state.get("ai_keys") or {}).get(provider, "")
         if session_key:
             return session_key
-        if logged_in:
-            config_key = config_data.get(f"{provider}_api_key", "")
-            if config_key:
-                return config_key
+        config_key = config_data.get(f"{provider}_api_key", "")
+        if config_key:
+            return config_key
         return default_value or ""
 
 
@@ -172,7 +164,7 @@ def initialize_session_state(st, auth, config_data: Dict[str, str]) -> Dict[str,
     if "page" not in st.session_state:
         st.session_state.page = "home"
     if "auto_save" not in st.session_state:
-        st.session_state.auto_save = not is_guest
+        st.session_state.auto_save = True
     if "ghost_text" not in st.session_state:
         st.session_state.ghost_text = ""
     if "pending_improvement_text" not in st.session_state:
@@ -189,12 +181,8 @@ def initialize_session_state(st, auth, config_data: Dict[str, str]) -> Dict[str,
         st.session_state.first_run = True
     if "is_premium" not in st.session_state:
         st.session_state.is_premium = True
-    if "guest_mode" not in st.session_state:
-        st.session_state.guest_mode = is_guest
     if "pending_action" not in st.session_state:
         st.session_state.pending_action = None
-    if "guest_project" not in st.session_state:
-        st.session_state.guest_project = None
     if "openai_base_url" not in st.session_state:
         st.session_state.openai_base_url = config_data.get(
             "openai_base_url",
@@ -228,9 +216,3 @@ def initialize_session_state(st, auth, config_data: Dict[str, str]) -> Dict[str,
     AppConfig.OPENAI_API_URL = st.session_state.openai_base_url
     AppConfig.OPENAI_API_KEY = _resolve_api_key("openai", AppConfig.OPENAI_API_KEY)
     AppConfig.OPENAI_MODEL = st.session_state.openai_model
-
-    return {
-        "user": user,
-        "logged_in": logged_in,
-        "is_guest": is_guest,
-    }

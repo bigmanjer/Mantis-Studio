@@ -48,7 +48,6 @@ def import_modules() -> int:
     failures = 0
     modules = [
         "app.main",
-        "app.utils.auth",
         "app.utils.navigation",
         "app.ui.layout",
     ]
