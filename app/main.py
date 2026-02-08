@@ -3255,6 +3255,7 @@ def _run_ui():
                             openai_key,
                         )
                         if ok:
+                            st.session_state.openai_connection_tested = True
                             st.success("✓ Connection successful!")
                         else:
                             st.error("✗ Connection failed. Check your API key and base URL.")
@@ -3382,6 +3383,7 @@ def _run_ui():
                             groq_key,
                         )
                         if ok:
+                            st.session_state.groq_connection_tested = True
                             st.success("✓ Connection successful!")
                         else:
                             st.error("✗ Connection failed. Check your API key.")

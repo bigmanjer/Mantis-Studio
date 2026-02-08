@@ -846,6 +846,31 @@ class TestHelpers:
         assert keys.get("groq") == "sk-from-config", \
             "ai_session_keys should be populated from config data"
 
+    def test_initialize_restores_connection_tested_from_config(self):
+        """initialize_session_state should restore connection_tested flags from config."""
+        from app.state import initialize_session_state
+        from types import SimpleNamespace
+
+        class FakeSessionState(dict):
+            def __getattr__(self, name):
+                try:
+                    return self[name]
+                except KeyError:
+                    raise AttributeError(name)
+            def __setattr__(self, name, value):
+                self[name] = value
+
+        fake_st = SimpleNamespace(session_state=FakeSessionState())
+        config_data = {
+            "groq_api_key": "sk-test",
+            "groq_connection_tested": True,
+        }
+        initialize_session_state(fake_st, config_data)
+        assert fake_st.session_state.get("groq_connection_tested") is True, \
+            "groq_connection_tested should be restored from config"
+        assert fake_st.session_state.get("openai_connection_tested") is False, \
+            "openai_connection_tested should default to False when not in config"
+
 
 # ---------------------------------------------------------------------------
 # 17) Layout duplicate removal – styles.py must no longer exist
