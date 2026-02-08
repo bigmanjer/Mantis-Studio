@@ -309,17 +309,18 @@ Accessible via footer links or the All Policies page.
 
 ## 8. Versioning System
 
-* **Current Version**: 84.7.1 (stored in `VERSION.txt`)
-* **Version Format**: `MAJOR.MINOR.PATCH` (e.g., 84.7.1, 84.7.2, 84.8.0)
+* **Current Version**: 85.4 (stored in `VERSION.txt`)
+* **Version Format**: `MAJOR.MINOR` (e.g., 85.4, 85.5, 86.0)
 
 ### Versioning Rules
 
 The version increments with each merge following these rules:
 
-1. **Patch version** increments by 1 on each merged pull request to `main`
-   - Example: 84.7.1 → 84.7.2 → 84.7.3
+1. **Minor version** increments by 1 on each merged pull request to `main`
+   - Example: 85.4 → 85.5 → 85.6
+   - Rolls over at 10: 85.9 → 86.0
 
-2. **Minor/major bumps** are handled via the Version Bump workflow dispatch inputs
+2. **Major bumps** are handled via the Version Bump workflow dispatch inputs
 
 3. **Manual updates** to VERSION.txt are reflected immediately in the UI
 
