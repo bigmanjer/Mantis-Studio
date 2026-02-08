@@ -565,11 +565,30 @@ import datetime as _dt
 _CURRENT_YEAR = _dt.datetime.now(_dt.timezone.utc).year
 
 
+def _build_footer_nav_links() -> str:
+    """Generate footer navigation ``<li>`` items from the centralized config.
+
+    The links mirror the sidebar navigation defined in
+    ``app/utils/navigation.py → NAV_ITEMS``.  To add or remove a nav entry
+    edit **only** that list — the footer updates automatically.
+    """
+    from app.utils.navigation import get_nav_items
+
+    lines = []
+    for label, page_key, icon in get_nav_items():
+        lines.append(
+            f'<li><a href="?page={page_key}">'
+            f'<span class="mantis-footer-icon">{icon}</span> {label}</a></li>'
+        )
+    return "\n            ".join(lines)
+
+
 def render_footer(
     version: str,
     support_url: str = "https://github.com/bigmanjer/Mantis-Studio/issues",
     contact_email: str = "support@mantis-studio.example",
 ) -> None:
+    nav_links_html = _build_footer_nav_links()
     st.markdown(
         f"""
     <style>
@@ -753,10 +772,7 @@ def render_footer(
         <nav class="mantis-footer-section" aria-label="Navigation">
           <h4>Navigation</h4>
           <ul>
-            <li><a href="?page=home">Dashboard</a></li>
-            <li><a href="?page=projects">Projects</a></li>
-            <li><a href="?page=outline">Outline</a></li>
-            <li><a href="?page=export">Export</a></li>
+            {nav_links_html}
           </ul>
         </nav>
         <nav class="mantis-footer-section" aria-label="Legal Center">

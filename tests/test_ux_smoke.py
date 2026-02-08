@@ -244,6 +244,69 @@ class TestNavigation:
 
 
 # ---------------------------------------------------------------------------
+# 4b) Navigation parity – sidebar and footer must stay in sync
+# ---------------------------------------------------------------------------
+
+
+class TestNavigationParity:
+    """Ensure the footer navigation is generated from the same centralized
+    config as the sidebar so they can never drift apart."""
+
+    def test_nav_items_has_all_sidebar_pages(self):
+        from app.utils.navigation import NAV_ITEMS
+        labels = [label for label, _, _ in NAV_ITEMS]
+        assert "Dashboard" in labels
+        assert "Projects" in labels
+        assert "Editor" in labels
+        assert "World Bible" in labels
+        assert "Export" in labels
+        assert "AI Settings" in labels
+
+    def test_get_nav_items_returns_list_of_tuples(self):
+        from app.utils.navigation import get_nav_items
+        items = get_nav_items()
+        assert isinstance(items, list)
+        assert len(items) >= 7
+        for item in items:
+            assert len(item) == 3, "Each item must be (label, page_key, icon)"
+
+    def test_footer_nav_links_match_nav_items(self):
+        """The footer link builder must produce one link per NAV_ITEMS entry."""
+        from app.utils.navigation import get_nav_items
+        from app.ui.layout import _build_footer_nav_links
+
+        html = _build_footer_nav_links()
+        for label, page_key, icon in get_nav_items():
+            assert f'href="?page={page_key}"' in html, (
+                f"Footer missing link for {label} (?page={page_key})"
+            )
+            assert label in html, f"Footer missing label text '{label}'"
+
+    def test_layout_footer_nav_links_match_nav_items(self):
+        """The layout/layout.py footer builder must also match NAV_ITEMS."""
+        from app.utils.navigation import get_nav_items
+        from app.layout.layout import _build_footer_nav_links
+
+        html = _build_footer_nav_links()
+        for label, page_key, icon in get_nav_items():
+            assert f'href="?page={page_key}"' in html, (
+                f"Layout footer missing link for {label} (?page={page_key})"
+            )
+
+    def test_router_labels_match_nav_items(self):
+        """router.get_nav_config must return labels that match NAV_ITEMS."""
+        from app.utils.navigation import NAV_ITEMS
+        from app.router import get_nav_config
+
+        labels, pmap = get_nav_config(True)
+        expected_labels = [label for label, _, _ in NAV_ITEMS]
+        assert labels == expected_labels
+
+        for label, page_key, _ in NAV_ITEMS:
+            assert pmap[label] == page_key
+
+
+# ---------------------------------------------------------------------------
 # 5) Auth stub – must not crash the app
 # ---------------------------------------------------------------------------
 

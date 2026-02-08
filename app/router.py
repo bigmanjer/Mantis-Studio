@@ -16,26 +16,14 @@ PageRenderer = Callable[[object], None]
 
 
 def get_nav_config(has_project: bool) -> Tuple[List[str], Dict[str, str]]:
-    nav_labels = [
-        "Dashboard",
-        "Projects",
-        "Outline",
-        "Editor",
-        "World Bible",
-        "Export",
-        "AI Tools",
-    ]
-    pmap = {
-        "Dashboard": "home",
-        "Projects": "projects",
-        "Outline": "outline",
-        "Editor": "chapters",
-        "World Bible": "world",
-        "Memory": "memory",
-        "Insights": "insights",
-        "Export": "export",
-        "AI Tools": "ai",
-    }
+    # Delegate to the centralized navigation configuration so that
+    # sidebar, footer, and router all stay in sync automatically.
+    # To add or remove nav items edit NAV_ITEMS in app/utils/navigation.py.
+    from app.utils.navigation import NAV_ITEMS, _EXTENDED_MAP
+
+    nav_labels = [label for label, _, _ in NAV_ITEMS]
+    pmap = {label: key for label, key, _ in NAV_ITEMS}
+    pmap.update(_EXTENDED_MAP)
     return nav_labels, pmap
 
 

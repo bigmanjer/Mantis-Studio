@@ -3676,15 +3676,11 @@ def _run_ui():
             st.divider()
             st.markdown("<div class='mantis-nav-section'>Navigation</div>", unsafe_allow_html=True)
 
-            nav_groups = [
-                ("Dashboard", "home", "🏠"),
-                ("Projects", "projects", "📁"),
-                ("Write", "outline", "✍️"),
-                ("Editor", "chapters", "🧩"),
-                ("World Bible", "world", "🌍"),
-                ("Export", "export", "⬇️"),
-                ("AI Settings", "ai", "🤖"),
-            ]
+            # Sidebar navigation items are defined in app/utils/navigation.py.
+            # Edit NAV_ITEMS there to add, remove, or reorder entries — the
+            # footer navigation is generated from the same list.
+            from app.utils.navigation import get_nav_items
+            nav_groups = get_nav_items()
 
             for label, target, icon in nav_groups:
                 is_active = st.session_state.page == target or (
