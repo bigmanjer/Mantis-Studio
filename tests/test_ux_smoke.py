@@ -691,12 +691,9 @@ class TestHelpers:
 
     def _make_fake_st(self, state_dict):
         """Return a minimal mock of the Streamlit module for ai_connection_warning."""
-        class _SessionState(dict):
-            def get(self, key, default=None):
-                return super().get(key, default)
         class _FakeSt:
             def __init__(self, d):
-                self.session_state = _SessionState(d)
+                self.session_state = dict(d)
                 self.warned = False
             def warning(self, msg):
                 self.warned = True
