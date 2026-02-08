@@ -289,13 +289,33 @@ def _ensure_session_keys(st) -> Dict[str, str]:
 #     return st.session_state.get("ai_saved_keys_cache", {})
 
 
+def _validate_api_key_format(key: str) -> bool:
+    """Basic sanity check for API key format.
+
+    Returns ``True`` when the key looks plausible (only printable ASCII,
+    reasonable length).  This is not authoritative – the real validation
+    happens server-side – but it catches obvious mistakes like pasting
+    HTML or binary content into the key field.
+    """
+    if not key:
+        return False
+    if len(key) < 8 or len(key) > 256:
+        return False
+    # Only printable ASCII characters (no control chars or non-ASCII)
+    return all(32 <= ord(ch) < 127 for ch in key)
+
+
 def set_session_key(provider: str, key: str) -> None:
     st = _get_streamlit()
     if not st:
         return
     provider = _normalize_provider(provider)
+    cleaned = (key or "").strip()
+    if cleaned and not _validate_api_key_format(cleaned):
+        logger.warning("Rejected API key for %s: invalid format", provider)
+        return
     keys = _ensure_session_keys(st)
-    keys[provider] = (key or "").strip()
+    keys[provider] = cleaned
     st.session_state["ai_session_keys"] = keys
 
 

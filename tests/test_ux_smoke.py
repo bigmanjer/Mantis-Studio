@@ -658,3 +658,36 @@ class TestServiceModuleSync:
         entity, status = result
         assert entity is not None
         assert status in ("created", "matched", "skipped")
+
+
+# ---------------------------------------------------------------------------
+# 21) API key format validation
+# ---------------------------------------------------------------------------
+
+
+class TestAPIKeyValidation:
+    """Verify the API key format validator."""
+
+    def test_valid_key(self):
+        from app.main import _validate_api_key_format
+        assert _validate_api_key_format("sk-abc123def456") is True
+
+    def test_empty_key_rejected(self):
+        from app.main import _validate_api_key_format
+        assert _validate_api_key_format("") is False
+
+    def test_short_key_rejected(self):
+        from app.main import _validate_api_key_format
+        assert _validate_api_key_format("short") is False
+
+    def test_key_with_null_byte_rejected(self):
+        from app.main import _validate_api_key_format
+        assert _validate_api_key_format("sk-abc\x00def") is False
+
+    def test_key_with_non_ascii_rejected(self):
+        from app.main import _validate_api_key_format
+        assert _validate_api_key_format("sk-abc™def456") is False
+
+    def test_very_long_key_rejected(self):
+        from app.main import _validate_api_key_format
+        assert _validate_api_key_format("x" * 300) is False
