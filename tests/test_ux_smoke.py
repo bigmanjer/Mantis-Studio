@@ -803,3 +803,149 @@ class TestAPIKeyValidation:
     def test_very_long_key_rejected(self):
         from app.main import _validate_api_key_format
         assert _validate_api_key_format("x" * 300) is False
+
+
+# ---------------------------------------------------------------------------
+# AI connection warning helper
+# ---------------------------------------------------------------------------
+
+class TestAIConnectionWarning:
+    """Validate the ai_connection_warning helper logic."""
+
+    def test_import_ai_connection_warning(self):
+        from app.utils.helpers import ai_connection_warning
+        assert callable(ai_connection_warning)
+
+    def test_warning_shown_when_no_keys(self):
+        """When no AI keys/flags are set, the warning text should appear."""
+        from app.utils.helpers import ai_connection_warning
+
+        calls: Dict[str, List] = {"warning": [], "button": []}
+
+        class FakeSessionState(dict):
+            def __getattr__(self, name):
+                return self.get(name)
+
+        class FakeSt:
+            session_state = FakeSessionState()
+
+            @staticmethod
+            def warning(msg):
+                calls["warning"].append(msg)
+
+            @staticmethod
+            def button(label, **kwargs):
+                calls["button"].append(label)
+                return False
+
+            @staticmethod
+            def rerun():
+                pass
+
+        ai_connection_warning(FakeSt)
+        assert len(calls["warning"]) == 1
+        assert "AI providers are not connected" in calls["warning"][0]
+        assert calls["button"] == ["Connect AI Providers"]
+
+    def test_warning_suppressed_when_ai_configured(self):
+        from app.utils.helpers import ai_connection_warning
+
+        calls: Dict[str, List] = {"warning": [], "button": []}
+
+        class FakeSessionState(dict):
+            def __getattr__(self, name):
+                return self.get(name)
+
+        class FakeSt:
+            session_state = FakeSessionState(ai_configured=True)
+
+            @staticmethod
+            def warning(msg):
+                calls["warning"].append(msg)
+
+            @staticmethod
+            def button(label, **kwargs):
+                calls["button"].append(label)
+                return False
+
+        ai_connection_warning(FakeSt)
+        assert calls["warning"] == []
+        assert calls["button"] == []
+
+    def test_warning_suppressed_when_groq_key_present(self):
+        from app.utils.helpers import ai_connection_warning
+
+        calls: Dict[str, List] = {"warning": []}
+
+        class FakeSessionState(dict):
+            def __getattr__(self, name):
+                return self.get(name)
+
+        class FakeSt:
+            session_state = FakeSessionState(groq_api_key="gsk_test123")
+
+            @staticmethod
+            def warning(msg):
+                calls["warning"].append(msg)
+
+            @staticmethod
+            def button(label, **kwargs):
+                return False
+
+        ai_connection_warning(FakeSt)
+        assert calls["warning"] == []
+
+    def test_warning_suppressed_when_openai_key_present(self):
+        from app.utils.helpers import ai_connection_warning
+
+        calls: Dict[str, List] = {"warning": []}
+
+        class FakeSessionState(dict):
+            def __getattr__(self, name):
+                return self.get(name)
+
+        class FakeSt:
+            session_state = FakeSessionState(openai_api_key="sk-test123")
+
+            @staticmethod
+            def warning(msg):
+                calls["warning"].append(msg)
+
+            @staticmethod
+            def button(label, **kwargs):
+                return False
+
+        ai_connection_warning(FakeSt)
+        assert calls["warning"] == []
+
+    def test_button_navigates_to_ai_settings(self):
+        """When the button is clicked, session page should change to 'ai'."""
+        from app.utils.helpers import ai_connection_warning
+
+        rerun_called = []
+
+        class FakeSessionState(dict):
+            def __getattr__(self, name):
+                return self.get(name)
+
+            def __setattr__(self, name, value):
+                self[name] = value
+
+        class FakeSt:
+            session_state = FakeSessionState()
+
+            @staticmethod
+            def warning(msg):
+                pass
+
+            @staticmethod
+            def button(label, **kwargs):
+                return True  # simulate click
+
+            @staticmethod
+            def rerun():
+                rerun_called.append(True)
+
+        ai_connection_warning(FakeSt)
+        assert FakeSt.session_state["page"] == "ai"
+        assert rerun_called
