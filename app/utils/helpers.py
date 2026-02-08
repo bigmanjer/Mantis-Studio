@@ -71,8 +71,9 @@ def ai_connection_warning(st) -> None:
     """Show a warning when no AI provider API keys are configured.
 
     Displays a ``st.warning`` banner and a navigation button so users
-    know that automatic title/genre generation is unavailable and can
-    quickly navigate to the AI Settings page to connect a provider.
+    know that automatic title/genre generation and all AI features are
+    unavailable and can quickly navigate to the AI Settings page to
+    connect a provider.
 
     When keys *are* present but the connection has not been tested yet,
     displays an ``st.info`` banner prompting the user to test their
@@ -88,8 +89,8 @@ def ai_connection_warning(st) -> None:
     if not _has_any_api_key(ss):
         st.warning(
             "AI providers are not connected. "
-            "Automatic title and genre generation will be disabled "
-            "until an AI provider is configured."
+            "Automatic title and genre generation along with all AI "
+            "features will be disabled until an AI provider is configured."
         )
         if st.button("Connect AI Providers", key="ai_connection_warning_btn"):
             ss["page"] = "ai"
