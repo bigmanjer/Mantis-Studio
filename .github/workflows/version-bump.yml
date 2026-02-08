@@ -6,7 +6,6 @@ on:
       bump_type:
         description: 'Version bump type'
         required: true
-        default: 'major'
         type: choice
         options:
           - major
@@ -56,7 +55,6 @@ jobs:
           IFS='.' read -ra VERSION_PARTS <<< "$CURRENT_VERSION"
           MAJOR="${VERSION_PARTS[0]}"
           MINOR="${VERSION_PARTS[1]}"
-          PATCH="${VERSION_PARTS[2]:-0}"
           
           case "${BUMP_TYPE}" in
             major)
