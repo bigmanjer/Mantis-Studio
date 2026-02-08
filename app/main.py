@@ -2282,12 +2282,12 @@ def _run_ui():
 
     # Restore the last active project from config if none is loaded
     if not st.session_state.get("project"):
-        _last_path = config_data.get("last_project_path", "")
-        if _last_path and os.path.isfile(_last_path):
+        last_path = config_data.get("last_project_path", "")
+        if last_path and os.path.isfile(last_path):
             try:
-                st.session_state.project = Project.load(_last_path)
+                st.session_state.project = Project.load(last_path)
             except Exception:
-                logger.warning("Failed to restore last project: %s", _last_path, exc_info=True)
+                logger.warning("Failed to restore last project: %s", last_path, exc_info=True)
 
     # Reliable navigation rerun (avoids Streamlit edge cases when returning early)
     if st.session_state.get("_force_nav"):
