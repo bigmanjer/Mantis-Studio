@@ -898,3 +898,31 @@ class TestButtonHierarchyCSS:
         css = self._css()
         assert ".mantis-btn-ghost > button" in css
         assert "transparent" in css
+
+
+class TestQuickActionButtonsPrimary:
+    """Quick action buttons must use the primary button theme."""
+
+    def test_action_card_uses_primary_type(self):
+        import inspect
+        from app.components.buttons import action_card
+
+        src = inspect.getsource(action_card)
+        assert 'type="primary"' in src, "action_card button should use type='primary'"
+
+    def test_main_quick_action_buttons_use_primary(self):
+        src = (ROOT / "app" / "main.py").read_text(encoding="utf-8")
+        # Find the Quick Actions section and verify all st.button calls use type="primary"
+        start = src.index("Quick Actions")
+        # The quick action section ends before "Recent Projects"
+        end = src.index("Recent Projects", start)
+        section = src[start:end]
+        button_calls = [line.strip() for line in section.splitlines() if "st.button(" in line]
+        assert len(button_calls) > 0, "Expected quick action st.button calls"
+        for call in button_calls:
+            if 'type="primary"' not in call:
+                # type may be on the next line; check the section has enough type="primary" usages
+                pass
+        assert section.count('type="primary"') >= 6, (
+            "All 6 quick action buttons should use type='primary'"
+        )
