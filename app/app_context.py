@@ -2455,16 +2455,9 @@ def _run_ui():
             p.add_chapter(title)
             _persist_chapter_update()
 
-        def go_to_outline() -> None:
-            st.session_state.page = "outline"
-            st.session_state._force_nav = True
-            st.rerun()
-
         render_page_header(
             "Editor",
             "Write chapters, update summaries, and apply AI improvements.",
-            primary_label="🧩 Go to Outline",
-            primary_action=go_to_outline,
             tag="Drafting",
             key_prefix="editor_header",
         )
@@ -2472,21 +2465,14 @@ def _run_ui():
         if not chaps:
             with st.container(border=True):
                 st.info("📭 No chapters yet.\n\nCreate your first chapter — or let MANTIS write one from your outline.")
-                c1, c2 = st.columns([1, 1])
-                with c1:
-                    if st.button(
-                        "➕ Create Chapter 1",
-                        type="primary",
-                        use_container_width=True,
-                        key="editor_create_chapter_1"
-                    ):
-                        p.add_chapter("Chapter 1")
-                        _persist_chapter_update()
-                with c2:
-                    if st.button("🧩 Go to Outline", use_container_width=True):
-                        st.session_state.page = "outline"
-                        st.session_state._force_nav = True
-                        st.rerun()
+                if st.button(
+                    "➕ Create Chapter 1",
+                    type="primary",
+                    use_container_width=True,
+                    key="editor_create_chapter_1"
+                ):
+                    p.add_chapter("Chapter 1")
+                    _persist_chapter_update()
             return
 
         if "curr_chap_id" not in st.session_state or st.session_state.curr_chap_id not in p.chapters:
