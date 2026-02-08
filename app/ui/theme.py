@@ -148,5 +148,11 @@ def inject_theme() -> None:
         /* --- Unified button system (from assets/styles.css) --- */
         {button_css}
         </style>
+        <script>
+            // Scroll to the top of the page on every Streamlit rerun so that
+            // navigating between pages always starts at the top.
+            var mainSection = window.parent.document.querySelector('section.main');
+            if (mainSection) mainSection.scrollTo(0, 0);
+        </script>
         """,
     )
