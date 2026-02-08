@@ -2168,7 +2168,7 @@ def _run_ui():
         if not path:
             logger.error("persist_project failed for '%s' (action=%s)", project.title, action)
             try:
-                st.toast("⚠️ Save failed. Please try again.", icon="⚠️")
+                st.toast("⚠️ Save failed — check file permissions and disk space.", icon="⚠️")
             except Exception:
                 pass
             return False
