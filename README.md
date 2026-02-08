@@ -338,7 +338,7 @@ To bump the minor version for the next release:
 python scripts/bump_version.py
 ```
 
-To force a major bump early, use the Version Bump workflow dispatch inputs.
+To force a major bump early, use the Version Bump workflow dispatch input.
 
 ---
 
