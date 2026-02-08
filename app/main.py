@@ -44,6 +44,7 @@ import uuid
 from collections.abc import Generator
 from dataclasses import asdict, dataclass, field, fields
 from pathlib import Path
+from string import Template
 from typing import Any, Callable, Dict, List, Optional
 
 import requests
@@ -3603,6 +3604,7 @@ def _run_ui():
             "Open Insights",
             "Go to Export",
         ]
+        # Shared labels for button text and the JS styling hook.
         quick_action_label_json = json.dumps(quick_action_labels)
         st.html(
             """
@@ -3635,12 +3637,12 @@ def _run_ui():
             </style>
             """,
         )
-        st.html(
+        quick_action_script = Template(
             """
             <div style="display:none" aria-hidden="true">
                 <script>
                 (() => {
-                    const labels = new Set(%QUICK_ACTION_LABELS%);
+                    const labels = new Set($quick_action_labels);
                     const normalize = (text) => (text || "").replace(/\\s+/g, " ").trim();
                     const apply = () => {
                         let found = 0;
@@ -3654,7 +3656,7 @@ def _run_ui():
                         return found;
                     };
                     let attempts = 0;
-                    const maxAttempts = 12; // Up to ~720ms total retries at 60ms intervals.
+                    const maxAttempts = 12; // Up to 720ms total retries at 60ms intervals.
                     const tick = () => {
                         const found = apply();
                         if (found < labels.size && attempts < maxAttempts) {
@@ -3662,7 +3664,13 @@ def _run_ui():
                             setTimeout(tick, 60);
                         } else if (found < labels.size && attempts >= maxAttempts) {
                             console.warn(
-                                `Failed to style all quick action buttons: ${found}/${labels.size} found after ${maxAttempts} attempts.`,
+                                "Failed to style all quick action buttons: " +
+                                    found +
+                                    "/" +
+                                    labels.size +
+                                    " found after " +
+                                    maxAttempts +
+                                    " attempts.",
                             );
                         }
                     };
@@ -3670,9 +3678,9 @@ def _run_ui():
                 })();
                 </script>
             </div>
-            """.replace("%QUICK_ACTION_LABELS%", quick_action_label_json),
-            unsafe_allow_javascript=True,
-        )
+            """,
+        ).substitute(quick_action_labels=quick_action_label_json)
+        st.html(quick_action_script, unsafe_allow_javascript=True)
         quick_grid = st.container()
         with quick_grid:
             qcols = st.columns(3)
