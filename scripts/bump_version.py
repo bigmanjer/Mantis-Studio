@@ -34,7 +34,7 @@ def bump_version(current_version: str) -> str:
 
         major = int(parts[0])
         minor = int(parts[1])
-        if minor >= 9:
+        if minor == 9:
             major += 1
             minor = 0
         else:

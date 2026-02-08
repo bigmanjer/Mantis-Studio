@@ -64,7 +64,7 @@ jobs:
               MINOR=0
               ;;
             minor)
-              if [ "${MINOR}" -ge 9 ]; then
+              if [ "${MINOR}" -eq 9 ]; then
                 MAJOR=$((MAJOR + 1))
                 MINOR=0
               else
