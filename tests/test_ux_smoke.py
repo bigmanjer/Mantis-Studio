@@ -1538,3 +1538,22 @@ class TestWorldBibleMerge:
         assert action == "updated"
         assert "black hair" in ent.description
         assert "brave warrior" in ent.description
+
+    def test_apply_alias_only_also_merges_notes(self):
+        """apply_suggestion with alias_only should also merge description/notes."""
+        from app.services.world_bible_merge import apply_suggestion
+        ent_orig, _ = self.project.upsert_entity("Elena", "Character", "A brave warrior.")
+        classified = {
+            "type": "alias_only",
+            "entity_id": ent_orig.id,
+            "name": "Elena",
+            "category": "Character",
+            "description": "She commands the northern garrison.",
+            "aliases": ["The Iron Lady"],
+            "novel_bullets": [],
+            "novel_aliases": ["The Iron Lady"],
+        }
+        ent, action = apply_suggestion(self.project, classified)
+        assert any(a == "The Iron Lady" for a in ent.aliases)
+        assert "northern garrison" in ent.description
+        assert "brave warrior" in ent.description
