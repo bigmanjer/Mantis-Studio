@@ -2463,10 +2463,8 @@ def _run_ui():
         render_page_header(
             "Editor",
             "Write chapters, update summaries, and apply AI improvements.",
-            primary_label="➕ New chapter",
-            primary_action=create_next_chapter,
-            secondary_label="🧩 Go to outline",
-            secondary_action=go_to_outline,
+            primary_label="🧩 Go to Outline",
+            primary_action=go_to_outline,
             tag="Drafting",
             key_prefix="editor_header",
         )
