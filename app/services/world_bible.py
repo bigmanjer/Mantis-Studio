@@ -1,14 +1,35 @@
 from __future__ import annotations
 
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 import streamlit as st
 
 from app.services.projects import Project
+from app.services.world_bible_merge import classify_suggestion
 
 
-def queue_world_bible_suggestion(item: Dict[str, Any]) -> None:
+def queue_world_bible_suggestion(
+    item: Dict[str, Any],
+    project: Optional[Project] = None,
+) -> None:
+    """Add an AI suggestion to the review queue.
+
+    When *project* is provided the suggestion is first classified by the
+    merge engine so that the review UI can show whether the entry will
+    update an existing entity, add aliases only, or create something new.
+    Duplicate suggestions (where all information is already present) are
+    silently dropped.
+    """
     queue = st.session_state.setdefault("world_bible_review", [])
+
+    # --- Classify against the live project when available ---
+    if project is not None:
+        item = classify_suggestion(project, item)
+        # Drop suggestions that contribute nothing new
+        if item.get("type") == "duplicate":
+            return
+
+    # --- Build dedup key ---
     key = (
         f"{Project._normalize_category(item.get('category'))}|"
         f"{Project._normalize_entity_name(item.get('name'))}|"

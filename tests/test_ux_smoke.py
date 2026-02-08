@@ -1218,3 +1218,193 @@ class TestWorldBibleDB:
         assert isinstance(entry["description"], str)
         assert entry["created_at"]
         assert entry["updated_at"]
+
+
+# ---------------------------------------------------------------------------
+# World Bible merge engine tests
+# ---------------------------------------------------------------------------
+
+class TestWorldBibleMerge:
+    """Tests for the intelligent merge engine in world_bible_merge.py."""
+
+    @pytest.fixture(autouse=True)
+    def _setup(self, tmp_path):
+        from app.services.projects import Project
+        self.project = Project.create("Merge Test", storage_dir=str(tmp_path))
+
+    def test_classify_new_entity(self):
+        """When no match exists, type should be 'new'."""
+        from app.services.world_bible_merge import classify_suggestion
+        result = classify_suggestion(self.project, {
+            "name": "Alice",
+            "category": "Character",
+            "description": "A brave hero.",
+            "aliases": ["Al"],
+        })
+        assert result["type"] == "new"
+        assert result["entity_id"] is None
+
+    def test_classify_update_existing(self):
+        """When a match exists and there is new info, type should be 'update'."""
+        from app.services.world_bible_merge import classify_suggestion
+        self.project.upsert_entity("Alice", "Character", "A brave hero.")
+        result = classify_suggestion(self.project, {
+            "name": "Alice",
+            "category": "Character",
+            "description": "She wields a magic sword.",
+            "aliases": [],
+        })
+        assert result["type"] == "update"
+        assert result["entity_id"] is not None
+        assert result["match_name"] == "Alice"
+        assert len(result["novel_bullets"]) >= 1
+
+    def test_classify_alias_only(self):
+        """When description is already covered but aliases are new."""
+        from app.services.world_bible_merge import classify_suggestion
+        self.project.upsert_entity("Alice", "Character", "A brave hero.")
+        result = classify_suggestion(self.project, {
+            "name": "Alice",
+            "category": "Character",
+            "description": "A brave hero.",
+            "aliases": ["The Heroine"],
+        })
+        assert result["type"] == "alias_only"
+        assert "The Heroine" in result["novel_aliases"]
+
+    def test_classify_duplicate(self):
+        """When everything is already present, type should be 'duplicate'."""
+        from app.services.world_bible_merge import classify_suggestion
+        self.project.upsert_entity("Alice", "Character", "A brave hero.", aliases=["Al"])
+        result = classify_suggestion(self.project, {
+            "name": "Alice",
+            "category": "Character",
+            "description": "A brave hero.",
+            "aliases": ["Al"],
+        })
+        assert result["type"] == "duplicate"
+
+    def test_apply_update_merges_bullets(self):
+        """apply_suggestion should append novel bullets to the entity."""
+        from app.services.world_bible_merge import classify_suggestion, apply_suggestion
+        self.project.upsert_entity("Alice", "Character", "A brave hero.")
+        classified = classify_suggestion(self.project, {
+            "name": "Alice",
+            "category": "Character",
+            "description": "She wields a magic sword. She is 25 years old.",
+            "aliases": ["Al"],
+        })
+        ent, action = apply_suggestion(self.project, classified)
+        assert action == "updated"
+        assert "magic sword" in ent.description
+        assert "Al" in ent.aliases or "al" in [a.lower() for a in ent.aliases]
+
+    def test_apply_new_creates_entity(self):
+        """apply_suggestion with type 'new' should create the entity."""
+        from app.services.world_bible_merge import apply_suggestion
+        classified = {
+            "type": "new",
+            "name": "Bob",
+            "category": "Character",
+            "description": "A mysterious stranger.",
+            "aliases": ["Bobby"],
+        }
+        ent, action = apply_suggestion(self.project, classified)
+        assert action == "created"
+        assert ent is not None
+        assert ent.name == "Bob"
+
+    def test_apply_duplicate_is_noop(self):
+        """apply_suggestion with type 'duplicate' should not modify the entity."""
+        from app.services.world_bible_merge import apply_suggestion
+        self.project.upsert_entity("Alice", "Character", "A brave hero.")
+        ent_id = list(self.project.world_db.keys())[0]
+        classified = {
+            "type": "duplicate",
+            "entity_id": ent_id,
+            "name": "Alice",
+        }
+        ent, action = apply_suggestion(self.project, classified)
+        assert action == "duplicate"
+
+    def test_novel_bullets_skips_duplicates(self):
+        """_novel_bullets should not return bullets already in description."""
+        from app.services.world_bible_merge import _novel_bullets
+        existing = "- A brave hero.\n- She is strong."
+        incoming = "A brave hero. She can fly."
+        result = _novel_bullets(existing, incoming)
+        assert any("fly" in b.lower() for b in result)
+        assert not any("brave hero" in b.lower() for b in result)
+
+    def test_novel_aliases_skips_existing(self):
+        """_novel_aliases should not return aliases already on the entity."""
+        from app.services.world_bible_merge import _novel_aliases
+        from app.services.projects import Entity
+        ent = Entity(id="1", name="Alice", category="Character", aliases=["Al"])
+        result = _novel_aliases(ent, ["Al", "The Heroine", "alice"], "Alice")
+        assert "The Heroine" in result
+        assert "Al" not in result
+        assert "alice" not in result
+
+    def test_merge_description_bullets_formats_correctly(self):
+        """merge_description_bullets should format as bullet points."""
+        from app.services.world_bible_merge import merge_description_bullets
+        from app.services.projects import Entity
+        ent = Entity(id="1", name="Sword", category="Item", description="A magic blade.")
+        merge_description_bullets(ent, ["Glows in the dark", "Forged by elves"])
+        assert "- A magic blade." in ent.description
+        assert "- Glows in the dark" in ent.description
+        assert "- Forged by elves" in ent.description
+
+    def test_classify_fuzzy_name_match(self):
+        """Fuzzy name matching should detect near-identical names."""
+        from app.services.world_bible_merge import classify_suggestion
+        self.project.upsert_entity("Alice Smith", "Character", "A hero.")
+        result = classify_suggestion(self.project, {
+            "name": "alice smith",
+            "category": "Character",
+            "description": "She can fly.",
+        })
+        assert result["type"] == "update"
+        assert result["match_name"] == "Alice Smith"
+
+    def test_classify_cross_category_no_match(self):
+        """Same name in a different category should not match."""
+        from app.services.world_bible_merge import classify_suggestion
+        self.project.upsert_entity("Phoenix", "Character", "A hero.")
+        result = classify_suggestion(self.project, {
+            "name": "Phoenix",
+            "category": "Location",
+            "description": "A burning city.",
+        })
+        assert result["type"] == "new"
+
+    def test_item_description_expansion(self):
+        """Items should gain bullet points when new attributes are found."""
+        from app.services.world_bible_merge import classify_suggestion, apply_suggestion
+        self.project.upsert_entity("Excalibur", "Item", "A legendary sword.")
+        classified = classify_suggestion(self.project, {
+            "name": "Excalibur",
+            "category": "Item",
+            "description": "Grants wielder invincibility. Forged by the Lady of the Lake.",
+        })
+        assert classified["type"] == "update"
+        ent, _ = apply_suggestion(self.project, classified)
+        assert "invincibility" in ent.description
+        assert "Lady of the Lake" in ent.description
+        # Original preserved
+        assert "legendary sword" in ent.description
+
+    def test_lore_history_update(self):
+        """Lore/history entries should also be updatable."""
+        from app.services.world_bible_merge import classify_suggestion, apply_suggestion
+        self.project.upsert_entity("The Great War", "Lore", "A conflict 500 years ago.")
+        classified = classify_suggestion(self.project, {
+            "name": "The Great War",
+            "category": "Lore",
+            "description": "Ended with the Treaty of Dawn.",
+        })
+        assert classified["type"] == "update"
+        ent, _ = apply_suggestion(self.project, classified)
+        assert "Treaty of Dawn" in ent.description
+        assert "500 years ago" in ent.description
