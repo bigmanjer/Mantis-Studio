@@ -104,111 +104,65 @@ def initialize_session_state(st, config_data: Dict[str, str]) -> None:
             return config_key
         return default_value or ""
 
+    # ---- simple defaults (setdefault avoids overwriting) ----
+    defaults: Dict[str, object] = {
+        "ui_theme": config_data.get("ui_theme", "Dark"),
+        "daily_word_goal": int(config_data.get("daily_word_goal", 500)),
+        "weekly_sessions_goal": int(config_data.get("weekly_sessions_goal", 4)),
+        "focus_minutes": int(config_data.get("focus_minutes", 25)),
+        "projects_refresh_token": 0,
+        "delete_project_path": None,
+        "delete_project_title": None,
+        "delete_entity_id": None,
+        "delete_entity_name": None,
+        "export_project_path": None,
+        "world_search": "",
+        "world_search_pending": None,
+        "world_focus_entity": None,
+        "world_focus_tab": None,
+        "world_tabs": "Characters",
+        "last_entity_scan": None,
+        "_chapter_sync_id": None,
+        "_chapter_sync_text": None,
+        "curr_chap_id": None,
+        "out_txt_project_id": None,
+        "_outline_sync": None,
+        "user_id": None,
+        "projects_dir": None,
+        "project": None,
+        "page": "home",
+        "auto_save": True,
+        "ghost_text": "",
+        "pending_improvement_text": "",
+        "first_run": True,
+        "is_premium": True,
+        "pending_action": None,
+        "openai_base_url": config_data.get("openai_base_url", AppConfig.OPENAI_API_URL),
+        "openai_model": config_data.get("openai_model", AppConfig.OPENAI_MODEL),
+        "groq_base_url": config_data.get("groq_base_url", AppConfig.GROQ_API_URL),
+        "groq_model": config_data.get("groq_model", AppConfig.DEFAULT_MODEL),
+        "_force_nav": False,
+        "editor_improve__copy_buffer": "",
+    }
+    for key, default in defaults.items():
+        st.session_state.setdefault(key, default)
 
-    if "ui_theme" not in st.session_state:
-        st.session_state.ui_theme = config_data.get("ui_theme", "Dark")
-    if "daily_word_goal" not in st.session_state:
-        st.session_state.daily_word_goal = int(config_data.get("daily_word_goal", 500))
-    if "weekly_sessions_goal" not in st.session_state:
-        st.session_state.weekly_sessions_goal = int(config_data.get("weekly_sessions_goal", 4))
-    if "focus_minutes" not in st.session_state:
-        st.session_state.focus_minutes = int(config_data.get("focus_minutes", 25))
-    if "activity_log" not in st.session_state:
-        st.session_state.activity_log = list(config_data.get("activity_log", []))
-    if "projects_refresh_token" not in st.session_state:
-        st.session_state.projects_refresh_token = 0
-    if "delete_project_path" not in st.session_state:
-        st.session_state.delete_project_path = None
-    if "delete_project_title" not in st.session_state:
-        st.session_state.delete_project_title = None
-    if "delete_entity_id" not in st.session_state:
-        st.session_state.delete_entity_id = None
-    if "delete_entity_name" not in st.session_state:
-        st.session_state.delete_entity_name = None
-    if "export_project_path" not in st.session_state:
-        st.session_state.export_project_path = None
-    if "world_search" not in st.session_state:
-        st.session_state.world_search = ""
-    if "world_search_pending" not in st.session_state:
-        st.session_state.world_search_pending = None
-    if "world_focus_entity" not in st.session_state:
-        st.session_state.world_focus_entity = None
-    if "world_focus_tab" not in st.session_state:
-        st.session_state.world_focus_tab = None
-    if "world_tabs" not in st.session_state:
-        st.session_state.world_tabs = "Characters"
-    if "world_bible_review" not in st.session_state:
-        st.session_state.world_bible_review = []
-    if "last_entity_scan" not in st.session_state:
-        st.session_state.last_entity_scan = None
-    if "locked_chapters" not in st.session_state:
-        st.session_state.locked_chapters = set()
-    if "_chapter_sync_id" not in st.session_state:
-        st.session_state._chapter_sync_id = None
-    if "_chapter_sync_text" not in st.session_state:
-        st.session_state._chapter_sync_text = None
-    if "curr_chap_id" not in st.session_state:
-        st.session_state.curr_chap_id = None
-    if "out_txt_project_id" not in st.session_state:
-        st.session_state.out_txt_project_id = None
-    if "_outline_sync" not in st.session_state:
-        st.session_state._outline_sync = None
+    # ---- mutable defaults (must not share references) ----
+    st.session_state.setdefault("activity_log", list(config_data.get("activity_log", [])))
+    st.session_state.setdefault("world_bible_review", [])
+    st.session_state.setdefault("locked_chapters", set())
     st.session_state.setdefault("canon_health_log", [])
+    st.session_state.setdefault("pending_improvement_meta", {})
+    st.session_state.setdefault("chapter_text_prev", {})
+    st.session_state.setdefault("chapter_drafts", [])
+    st.session_state.setdefault("openai_model_list", [])
+    st.session_state.setdefault("openai_model_tests", {})
+    st.session_state.setdefault("groq_model_list", [])
+    st.session_state.setdefault("groq_model_tests", {})
 
-    if "user_id" not in st.session_state:
-        st.session_state.user_id = None
-    if "projects_dir" not in st.session_state:
-        st.session_state.projects_dir = None
-    if "project" not in st.session_state:
-        st.session_state.project = None
-    if "page" not in st.session_state:
-        st.session_state.page = "home"
-    if "auto_save" not in st.session_state:
-        st.session_state.auto_save = True
-    if "ghost_text" not in st.session_state:
-        st.session_state.ghost_text = ""
-    if "pending_improvement_text" not in st.session_state:
-        st.session_state.pending_improvement_text = ""
-    if "pending_improvement_meta" not in st.session_state:
-        st.session_state.pending_improvement_meta = {}
-    if "chapter_text_prev" not in st.session_state:
-        st.session_state.chapter_text_prev = {}
-    if "chapter_drafts" not in st.session_state:
-        st.session_state.chapter_drafts = []
-    if "editor_improve__copy_buffer" not in st.session_state:
-        st.session_state.editor_improve__copy_buffer = ""
-    if "first_run" not in st.session_state:
-        st.session_state.first_run = True
-    if "is_premium" not in st.session_state:
-        st.session_state.is_premium = True
-    if "pending_action" not in st.session_state:
-        st.session_state.pending_action = None
-    if "openai_base_url" not in st.session_state:
-        st.session_state.openai_base_url = config_data.get(
-            "openai_base_url",
-            AppConfig.OPENAI_API_URL,
-        )
+    # ---- always-overwritten keys (API keys refresh every run) ----
     st.session_state.openai_api_key = _resolve_api_key("openai", AppConfig.OPENAI_API_KEY)
-    if "openai_model" not in st.session_state:
-        st.session_state.openai_model = config_data.get(
-            "openai_model",
-            AppConfig.OPENAI_MODEL,
-        )
-    if "openai_model_list" not in st.session_state:
-        st.session_state.openai_model_list = []
-    if "openai_model_tests" not in st.session_state:
-        st.session_state.openai_model_tests = {}
-    if "groq_base_url" not in st.session_state:
-        st.session_state.groq_base_url = config_data.get("groq_base_url", AppConfig.GROQ_API_URL)
     st.session_state.groq_api_key = _resolve_api_key("groq", AppConfig.GROQ_API_KEY)
-    if "groq_model" not in st.session_state:
-        st.session_state.groq_model = config_data.get("groq_model", AppConfig.DEFAULT_MODEL)
-    if "groq_model_list" not in st.session_state:
-        st.session_state.groq_model_list = []
-    if "groq_model_tests" not in st.session_state:
-        st.session_state.groq_model_tests = {}
-    if "_force_nav" not in st.session_state:
-        st.session_state._force_nav = False
 
     AppConfig.GROQ_API_URL = st.session_state.groq_base_url
     AppConfig.GROQ_API_KEY = _resolve_api_key("groq", AppConfig.GROQ_API_KEY)

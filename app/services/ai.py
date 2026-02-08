@@ -27,6 +27,20 @@ def _truncate_prompt(prompt: str, limit: int) -> str:
     return prompt[:limit]
 
 
+def sanitize_ai_input(text: str, max_length: int = 0) -> str:
+    """Sanitize user-provided text before sending to AI APIs.
+
+    Strips leading/trailing whitespace and removes null bytes.
+    When *max_length* is positive the text is truncated to that limit.
+    """
+    if not text:
+        return ""
+    cleaned = text.strip().replace("\x00", "")
+    if max_length > 0 and len(cleaned) > max_length:
+        cleaned = cleaned[:max_length]
+    return cleaned
+
+
 class AIEngine:
     def __init__(self, timeout: int = AppConfig.GROQ_TIMEOUT, base_url: Optional[str] = None):
         self.base_url = (base_url or AppConfig.GROQ_API_URL).rstrip("/")
@@ -74,6 +88,7 @@ class AIEngine:
             yield "Groq API key not configured."
             return
 
+        prompt = sanitize_ai_input(prompt)
         prompt = _truncate_prompt(prompt, AppConfig.MAX_PROMPT_CHARS)
         headers = {"Content-Type": "application/json"}
         headers["Authorization"] = f"Bearer {api_key}"
@@ -375,5 +390,7 @@ REWRITE_PRESETS = {
 
 
 def rewrite_prompt(text: str, preset: str, custom: str = "") -> str:
+    text = sanitize_ai_input(text, AppConfig.MAX_PROMPT_CHARS)
+    custom = sanitize_ai_input(custom, 2000)
     instr = custom if preset == "Custom" else REWRITE_PRESETS.get(preset, "")
     return f"Act as an editor.\nTASK: {preset}\nDETAILS: {instr}\n\nINPUT TEXT:\n{text}"

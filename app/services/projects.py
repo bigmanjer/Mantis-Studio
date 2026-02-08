@@ -263,52 +263,43 @@ class Project:
             if not clean:
                 continue
             normalized = cls._normalize_entity_name(clean)
-            if normalized and normalized not in normalized_existing:
-                entity.aliases.append(clean)
-                normalized_existing.add(normalized)
-        if primary and entity.name != primary:
-            if cls._normalize_entity_name(primary) not in normalized_existing:
-                entity.aliases.append(primary)
+            if not normalized or normalized in normalized_existing:
+                continue
+            if cls._normalize_entity_name(primary) == normalized:
+                continue
+            entity.aliases.append(clean)
+            normalized_existing.add(normalized)
 
     def _build_match_aliases(self, name: str, aliases: Optional[List[str]] = None) -> List[str]:
-        matches = []
-        if name:
-            matches.append(name)
-        if aliases:
-            matches.extend(aliases)
-        if name:
-            matches.extend(self._entity_aliases(name))
-        if not matches:
-            return []
-        cleaned = []
-        seen = set()
-        for item in matches:
-            normalized = self._normalize_entity_name(item)
-            if normalized and normalized not in seen:
-                cleaned.append(item)
-                seen.add(normalized)
-        return cleaned
+        incoming_match_aliases = self._entity_aliases(name)
+        for alias in (aliases or []):
+            incoming_match_aliases.extend(self._entity_aliases(alias))
+        return incoming_match_aliases
 
     def find_entity_match(
         self,
         name: str,
-        category: Optional[str] = None,
+        category: str,
         aliases: Optional[List[str]] = None,
     ) -> Optional[Entity]:
-        if not name:
+        clean_name = (name or "").strip()
+        if not clean_name:
             return None
-        search = self._build_match_aliases(name, aliases)
-        if not search:
-            return None
-        for entity in self.world_db.values():
-            if category and entity.category != category:
+
+        normalized_category = self._normalize_category(category)
+        incoming_match_aliases = self._build_match_aliases(clean_name, aliases)
+
+        for ent in self.world_db.values():
+            if self._normalize_category(ent.category) != normalized_category:
                 continue
-            for candidate in search:
-                if self._names_match(candidate, entity.name):
-                    return entity
-                for alias in entity.aliases:
-                    if self._names_match(candidate, alias):
-                        return entity
+            candidates = [ent.name] + (ent.aliases or [])
+            matched = any(
+                self._names_match(candidate, incoming)
+                for candidate in candidates
+                for incoming in incoming_match_aliases
+            )
+            if matched:
+                return ent
         return None
 
     def upsert_entity(
@@ -317,42 +308,52 @@ class Project:
         category: str,
         desc: str = "",
         aliases: Optional[List[str]] = None,
-    ) -> Optional[Entity]:
-        if not name:
-            return None
-        category = self._normalize_category(category)
-        match = self.find_entity_match(name, category=category, aliases=aliases)
-        if match:
-            match.merge(desc)
-            if aliases:
-                self._merge_aliases(match, aliases, name)
-            return match
+        allow_merge: bool = True,
+        allow_alias: bool = True,
+    ) -> tuple[Optional[Entity], str]:
+        clean_name = (name or "").strip()
+        if not clean_name:
+            return None, "skipped"
 
-        clean_aliases = self._entity_aliases(name)
-        if aliases:
-            clean_aliases += [a for a in aliases if a and a not in clean_aliases]
-        ent = Entity(
+        normalized_category = self._normalize_category(category)
+        incoming_aliases = [a for a in (aliases or []) if (a or "").strip()]
+        incoming_aliases = list(dict.fromkeys([a.strip() for a in incoming_aliases if a.strip()]))
+        incoming_match_aliases = self._build_match_aliases(clean_name, incoming_aliases)
+
+        for ent in self.world_db.values():
+            if self._normalize_category(ent.category) != normalized_category:
+                continue
+
+            candidates = [ent.name] + (ent.aliases or [])
+            matched = any(
+                self._names_match(candidate, incoming)
+                for candidate in candidates
+                for incoming in incoming_match_aliases
+            )
+            if matched:
+                if allow_alias:
+                    self._merge_aliases(ent, [clean_name] + incoming_aliases, ent.name)
+                if allow_merge:
+                    ent.merge(desc)
+                self.last_modified = time.time()
+                return ent, "matched"
+
+        e = Entity(
             id=str(uuid.uuid4()),
-            name=name.strip(),
-            category=category,
-            description=desc.strip() if desc else "",
-            aliases=clean_aliases,
+            name=clean_name,
+            category=normalized_category,
+            description=(desc or "").strip(),
+            aliases=[],
         )
-        self.world_db[ent.id] = ent
+        if allow_alias:
+            self._merge_aliases(e, incoming_aliases, clean_name)
+        self.world_db[e.id] = e
         self.last_modified = time.time()
-        return ent
+        return e, "created"
 
     def add_entity(self, name: str, category: str, desc: str = "") -> Optional[Entity]:
-        if not name:
-            return None
-        ent = Entity(
-            id=str(uuid.uuid4()),
-            name=name.strip(),
-            category=self._normalize_category(category),
-            description=desc.strip() if desc else "",
-        )
-        self.world_db[ent.id] = ent
-        self.last_modified = time.time()
+        """Smart Add with Fuzzy Matching."""
+        ent, _ = self.upsert_entity(name, category, desc, allow_merge=True, allow_alias=True)
         return ent
 
     def delete_entity(self, eid: str):
@@ -470,7 +471,13 @@ class Project:
     @classmethod
     def load(cls, path: str) -> "Project":
         with open(path, "r", encoding="utf-8") as fh:
-            data = json.load(fh)
+            try:
+                data = json.load(fh)
+            except json.JSONDecodeError as exc:
+                logger.error("Corrupt project file %s: %s", path, exc)
+                raise ValueError(f"Cannot load project: file is not valid JSON ({path})") from exc
+        if not isinstance(data, dict):
+            raise ValueError(f"Cannot load project: expected JSON object ({path})")
 
         proj = cls(
             id=data.get("id") or str(uuid.uuid4()),
