@@ -369,19 +369,25 @@ def _run_ui():
         ) or []
 
     def save_app_settings():
-        data = {
+        # Merge with existing config to preserve saved data
+        data = load_app_config()
+        data.update({
             "groq_base_url": st.session_state.groq_base_url,
-            "groq_api_key": st.session_state.groq_api_key,
             "groq_model": st.session_state.groq_model,
             "openai_base_url": st.session_state.openai_base_url,
-            "openai_api_key": st.session_state.openai_api_key,
             "openai_model": st.session_state.openai_model,
             "ui_theme": st.session_state.ui_theme,
             "daily_word_goal": int(st.session_state.daily_word_goal),
             "weekly_sessions_goal": int(st.session_state.weekly_sessions_goal),
             "focus_minutes": int(st.session_state.focus_minutes),
             "activity_log": list(st.session_state.activity_log),
-        }
+        })
+        # Only overwrite API keys when they have a value to avoid
+        # clearing previously saved keys.
+        for provider, attr in (("groq", "groq_api_key"), ("openai", "openai_api_key")):
+            val = (getattr(st.session_state, attr, "") or "").strip()
+            if val:
+                data[f"{provider}_api_key"] = val
         save_app_config(data)
         st.toast("Settings saved.")
 
