@@ -96,7 +96,6 @@ def action_card(
         icon: Optional emoji/icon prepended to *title*.
     """
     display_title = f"{icon} {title}" if icon else title
-    icon_html = f'<span style="margin-right:4px;">{icon}</span>' if icon else ""
     st.markdown(
         f"""
         <div class="mantis-action-card">

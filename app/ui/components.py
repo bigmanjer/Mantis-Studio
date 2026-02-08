@@ -37,7 +37,7 @@ def cta_tile(title: str, body: str, *, icon: Optional[str] = None, subtitle: Opt
     """
     icon_html = f'<div class="mantis-cta-icon">{icon}</div>' if icon else ""
     subtitle_html = (
-        f'<div class="mantis-cta-body" style="margin-top:2px;font-size:12px;">{subtitle}</div>'
+        f'<div class="mantis-cta-subtitle">{subtitle}</div>'
         if subtitle
         else ""
     )

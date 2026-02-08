@@ -192,6 +192,13 @@
     line-height: 1.4;
 }
 
+.mantis-cta-tile .mantis-cta-subtitle {
+    font-size: 12px;
+    color: var(--mantis-muted, var(--mantis-text-muted));
+    margin-top: 2px;
+    line-height: 1.4;
+}
+
 /* --------------------------------------------------------------------------
    §5  ACTION CARD — enhanced card with title, description, and action button
    -------------------------------------------------------------------------- */
