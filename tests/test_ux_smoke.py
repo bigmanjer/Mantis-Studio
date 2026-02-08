@@ -1078,6 +1078,15 @@ class TestHtmlRendering:
         source = path.read_text(encoding="utf-8")
         assert "st.html(" in source, "app/ui/theme.py should use st.html()"
 
+    def test_theme_injects_scroll_to_top(self):
+        """Theme injection should include a scroll-to-top script so that
+        every page navigation starts at the top of the viewport."""
+        path = ROOT / "app" / "ui" / "theme.py"
+        source = path.read_text(encoding="utf-8")
+        assert "scrollTo" in source, (
+            "app/ui/theme.py should inject a scrollTo script for page navigation"
+        )
+
 
 # ---------------------------------------------------------------------------
 # 24) Button hierarchy CSS classes
