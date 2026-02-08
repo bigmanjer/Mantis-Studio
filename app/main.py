@@ -3595,6 +3595,78 @@ def _run_ui():
                 st.caption(f"Canon health: {canon_icon} {canon_label}.")
 
         section_title("Quick Actions", "Jump straight into your most-used tools.")
+        st.html(
+            """
+            <style>
+            .quick-action-btn {
+                border-radius: 16px !important;
+                font-family: 'Inter', sans-serif !important;
+                font-weight: 600 !important;
+                font-size: 14px !important;
+                letter-spacing: 0.01em !important;
+                padding: 0.7rem 1.1rem !important;
+                border: 1px solid var(--mantis-button-border) !important;
+                background: var(--mantis-button-bg) !important;
+                color: var(--mantis-text) !important;
+                cursor: pointer;
+                position: relative;
+                transition: transform 0.18s cubic-bezier(0.22, 1, 0.36, 1),
+                            border-color 0.18s ease,
+                            box-shadow 0.18s ease,
+                            background 0.18s ease !important;
+            }
+
+            .quick-action-btn:hover {
+                transform: translateY(-1px);
+                border-color: var(--mantis-button-hover-border) !important;
+                box-shadow: var(--mantis-shadow-button),
+                            0 0 12px var(--mantis-accent-glow, rgba(34, 197, 94, 0.18));
+                background: var(--mantis-button-bg) !important;
+            }
+            </style>
+            """,
+        )
+        st.html(
+            """
+            <div style="display:none" aria-hidden="true">
+                <script>
+                (() => {
+                    const labels = new Set([
+                        "Open Editor",
+                        "Open Outline",
+                        "Open World Bible",
+                        "Open Memory",
+                        "Open Insights",
+                        "Go to Export",
+                    ]);
+                    const normalize = (text) => (text || "").replace(/\\s+/g, " ").trim();
+                    const apply = () => {
+                        let found = 0;
+                        document.querySelectorAll("button").forEach((button) => {
+                            const label = normalize(button.textContent);
+                            if (labels.has(label)) {
+                                button.classList.add("quick-action-btn");
+                                found += 1;
+                            }
+                        });
+                        return found;
+                    };
+                    let attempts = 0;
+                    const maxAttempts = 12;
+                    const tick = () => {
+                        const found = apply();
+                        if (found < labels.size && attempts < maxAttempts) {
+                            attempts += 1;
+                            setTimeout(tick, 60);
+                        }
+                    };
+                    tick();
+                })();
+                </script>
+            </div>
+            """,
+            unsafe_allow_javascript=True,
+        )
         quick_grid = st.container()
         with quick_grid:
             qcols = st.columns(3)
@@ -3603,7 +3675,7 @@ def _run_ui():
                 if st.button(
                     "Open Editor",
                     use_container_width=True,
-                    type="primary",
+                    type="secondary",
                     help="Start writing or editing your chapters"
                 ):
                     open_recent_project("chapters")
@@ -3612,7 +3684,7 @@ def _run_ui():
                 if st.button(
                     "Open Outline",
                     use_container_width=True,
-                    type="primary",
+                    type="secondary",
                     help="Create or edit your story structure and plot outline"
                 ):
                     open_recent_project("outline")
@@ -3621,7 +3693,7 @@ def _run_ui():
                 if st.button(
                     "Open World Bible",
                     use_container_width=True,
-                    type="primary",
+                    type="secondary",
                     help="Manage your story's canonical characters, locations, and lore"
                 ):
                     open_recent_project("world")
@@ -3631,14 +3703,14 @@ def _run_ui():
             qcols = st.columns(3)
             with qcols[0]:
                 cta_tile("🧠 Memory", "Hard canon rules and guidelines.")
-                if st.button("Open Memory", use_container_width=True, type="primary"):
+                if st.button("Open Memory", use_container_width=True, type="secondary"):
                     open_recent_project("world", focus_tab="Memory")
             with qcols[1]:
                 cta_tile("📊 Insights", "Canon health and analytics.")
                 if st.button(
                     "Open Insights",
                     use_container_width=True,
-                    type="primary",
+                    type="secondary",
                     help="View analytics and consistency insights for your story world"
                 ):
                     open_recent_project("world", focus_tab="Insights")
@@ -3647,7 +3719,7 @@ def _run_ui():
                 if st.button(
                     "Go to Export",
                     use_container_width=True,
-                    type="primary",
+                    type="secondary",
                     help="Export your project as markdown for sharing or publishing"
                 ):
                     open_export()
