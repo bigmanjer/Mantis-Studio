@@ -1070,5 +1070,6 @@ class TestWorldBibleDB:
         assert entry["name"] == "Unnamed"
         assert isinstance(entry["tags"], list)
         assert entry["id"] == "broken"
+        assert isinstance(entry["description"], str)
         assert entry["created_at"]
         assert entry["updated_at"]

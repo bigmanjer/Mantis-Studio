@@ -459,22 +459,22 @@ def detect_canon_conflicts_global(
     conflicts: List[str] = []
 
     # Collect all names to find cross-category duplicates
-    name_registry: Dict[str, List[Tuple[str, str]]] = {}  # lower_name -> [(cat, eid)]
+    name_registry: Dict[str, List[Tuple[str, str, str]]] = {}  # lower_name -> [(cat, eid, name)]
     for cat, bucket in db.items():
         for eid, entry in bucket.items():
             name = (entry.get("name") or "").strip()
             if not name:
                 continue
             key = name.lower()
-            name_registry.setdefault(key, []).append((cat, eid))
+            name_registry.setdefault(key, []).append((cat, eid, name))
 
     # Duplicate names across or within categories
     for lower_name, occurrences in name_registry.items():
         if len(occurrences) > 1:
-            locs = ", ".join(f"{cat}({eid})" for cat, eid in occurrences)
+            locs = ", ".join(f"{cat}({eid})" for cat, eid, _name in occurrences)
             conflicts.append(
-                f"Duplicate name '{occurrences[0][1]}' "
-                f"('{lower_name}') found in: {locs}"
+                f"Duplicate name '{occurrences[0][2]}' "
+                f"found in: {locs}"
             )
 
     # Missing descriptions / tags
@@ -617,10 +617,10 @@ def validate_world_timeline(
                 + ", ".join(names)
             )
 
-    # Check chronological ordering
-    sorted_entries = sorted(entries_with_year, key=lambda x: x[2])
-    years = [e[2] for e in sorted_entries]
-    if years != sorted(years):
+    # Check chronological ordering (compare insertion order vs sorted)
+    original_years = [e[2] for e in entries_with_year]
+    sorted_years = sorted(original_years)
+    if original_years != sorted_years:
         warnings.append("History events are not in chronological order")
 
     return warnings
