@@ -3656,7 +3656,7 @@ def _run_ui():
                         return found;
                     };
                     let attempts = 0;
-                    const maxAttempts = 12; // Up to 720ms total wait time at 60ms intervals (excluding execution time).
+                    const maxAttempts = 12; // Up to 720ms total wait time (12 attempts × 60ms).
                     const tick = () => {
                         const found = apply();
                         if (found < labels.size && attempts < maxAttempts) {
