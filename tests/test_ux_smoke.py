@@ -191,6 +191,26 @@ class TestProjectCRUD:
         p.delete_entity(ent.id)
         assert ent.id not in p.world_db
 
+    def test_delete_chapter(self):
+        p = self._make_project()
+        ch1 = p.add_chapter("One", "a")
+        ch2 = p.add_chapter("Two", "b")
+        ch3 = p.add_chapter("Three", "c")
+        assert len(p.chapters) == 3
+        p.delete_chapter(ch2.id)
+        assert len(p.chapters) == 2
+        assert ch2.id not in p.chapters
+        ordered = p.get_ordered_chapters()
+        assert [c.index for c in ordered] == [1, 2]
+        assert ordered[0].title == "One"
+        assert ordered[1].title == "Three"
+
+    def test_delete_chapter_nonexistent(self):
+        p = self._make_project()
+        p.add_chapter("One", "a")
+        p.delete_chapter("nonexistent-id")
+        assert len(p.chapters) == 1
+
     def test_upsert_entity_merge(self):
         p = self._make_project()
         p.upsert_entity("Alice", "Character", "Hero", allow_merge=True)

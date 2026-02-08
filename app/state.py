@@ -115,6 +115,8 @@ def initialize_session_state(st, config_data: Dict[str, str]) -> None:
         "delete_project_title": None,
         "delete_entity_id": None,
         "delete_entity_name": None,
+        "delete_chapter_id": None,
+        "delete_chapter_title": None,
         "export_project_path": None,
         "world_search": "",
         "world_search_pending": None,

@@ -677,6 +677,13 @@ class Project:
             del self.world_db[eid]
             self.last_modified = time.time()
 
+    def delete_chapter(self, cid: str):
+        if cid in self.chapters:
+            del self.chapters[cid]
+            for new_idx, ch in enumerate(self.get_ordered_chapters(), start=1):
+                ch.index = new_idx
+            self.last_modified = time.time()
+
     def add_chapter(self, title: str = "Untitled", content: str = "") -> Chapter:
         existing = [c.index for c in self.chapters.values()]
         index = (max(existing) + 1) if existing else 1
@@ -1549,6 +1556,8 @@ def _run_ui():
     init_state("delete_project_title", None)
     init_state("delete_entity_id", None)
     init_state("delete_entity_name", None)
+    init_state("delete_chapter_id", None)
+    init_state("delete_chapter_title", None)
     init_state("export_project_path", None)
     init_state("world_search", "")
     init_state("world_search_pending", None)
@@ -5167,6 +5176,30 @@ def _run_ui():
                     key="editor_new_chapter"
                 ):
                     create_next_chapter()
+
+                if chapters:
+                    if st.session_state.get("delete_chapter_id") == curr.id:
+                        st.warning(f"Delete **{st.session_state.get('delete_chapter_title') or curr.title}**?")
+                        cdel1, cdel2 = st.columns(2)
+                        with cdel1:
+                            if st.button("Confirm", type="primary", use_container_width=True, key="editor_del_ch_confirm"):
+                                p.delete_chapter(curr.id)
+                                _sync_session_chapters(force=True)
+                                chapters = st.session_state.get("chapters", [])
+                                _set_active_chapter(chapters[0]["id"] if chapters else None)
+                                st.session_state.delete_chapter_id = None
+                                st.session_state.delete_chapter_title = None
+                                persist_project(p)
+                                st.toast("Chapter deleted.")
+                                st.rerun()
+                        with cdel2:
+                            if st.button("Cancel", use_container_width=True, key="editor_del_ch_cancel"):
+                                st.session_state.delete_chapter_id = None
+                                st.session_state.delete_chapter_title = None
+                                st.rerun()
+                    elif st.button("🗑 Delete Chapter", use_container_width=True, key=f"editor_del_{curr.id}"):
+                        st.session_state.delete_chapter_id = curr.id
+                        st.session_state.delete_chapter_title = curr.title
 
         stream_ph = st.empty()
         provider, active_key, _ = get_active_key_status()
