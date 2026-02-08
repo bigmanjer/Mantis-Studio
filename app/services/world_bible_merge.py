@@ -287,22 +287,39 @@ def apply_suggestion(project: Project, classified: Dict[str, Any]) -> Tuple[Opti
     if stype in ("update", "alias_only"):
         eid = classified.get("entity_id")
         if not eid:
-            # Fallback: treat as new
-            return _create_new(project, classified)
+            # Fallback: try to find the entity by name/category
+            match = project.find_entity_match(
+                classified.get("name", ""),
+                classified.get("category", ""),
+                aliases=classified.get("aliases") or [],
+            )
+            if match:
+                eid = match.id
+            else:
+                return _create_new(project, classified)
 
         ent = project.world_db.get(eid)
         if not ent:
             return _create_new(project, classified)
 
+        # Compute novel bullets/aliases on the fly when not pre-classified
+        novel_bullets = classified.get("novel_bullets")
+        if novel_bullets is None:
+            incoming_desc = (classified.get("description") or "").strip()
+            novel_bullets = _novel_bullets(ent.description, incoming_desc) if incoming_desc else []
+
+        novel_aliases_list = classified.get("novel_aliases")
+        if novel_aliases_list is None:
+            incoming_aliases = classified.get("aliases") or []
+            novel_aliases_list = _novel_aliases(ent, incoming_aliases, ent.name) if incoming_aliases else []
+
         # Merge novel description bullets
-        novel_bullets = classified.get("novel_bullets") or []
         if novel_bullets:
             merge_description_bullets(ent, novel_bullets)
 
         # Merge novel aliases
-        novel_aliases = classified.get("novel_aliases") or []
-        if novel_aliases:
-            Project._merge_aliases(ent, novel_aliases, ent.name)
+        if novel_aliases_list:
+            Project._merge_aliases(ent, novel_aliases_list, ent.name)
 
         action = "updated" if novel_bullets else "alias_added"
         return ent, action
