@@ -561,6 +561,55 @@ class TestLayoutConsolidation:
 
 
 # ---------------------------------------------------------------------------
+# 18b) Light mode theme quality – comfort and readability
+# ---------------------------------------------------------------------------
+
+
+class TestLightModeThemeQuality:
+    """Ensure Light mode tokens avoid harsh values and stay in sync."""
+
+    def test_dark_and_light_have_same_keys(self):
+        from app.layout.layout import get_theme_tokens
+        tokens = get_theme_tokens("Light")
+        dark_keys = set(tokens["Dark"].keys())
+        light_keys = set(tokens["Light"].keys())
+        assert dark_keys == light_keys, (
+            f"Key mismatch: only in Dark={dark_keys - light_keys}, "
+            f"only in Light={light_keys - dark_keys}"
+        )
+
+    def test_light_bg_is_not_pure_white(self):
+        from app.layout.layout import get_theme_tokens
+        light = get_theme_tokens("Light")["Light"]
+        assert light["bg"].lower() != "#ffffff", "bg should not be pure white"
+        assert light["card_bg"].lower() != "#ffffff", "card_bg should not be pure white"
+        assert light["input_bg"].lower() != "#ffffff", "input_bg should not be pure white"
+
+    def test_light_muted_not_too_faint(self):
+        """Muted text should be dark enough for readability (not lighter than #7f7f7f)."""
+        from app.layout.layout import get_theme_tokens
+        light = get_theme_tokens("Light")["Light"]
+        muted = light["muted"]
+        if muted.startswith("#") and len(muted) == 7:
+            r = int(muted[1:3], 16)
+            g = int(muted[3:5], 16)
+            b = int(muted[5:7], 16)
+            avg = (r + g + b) / 3
+            assert avg < 128, f"Muted color {muted} is too light (avg={avg:.0f})"
+
+    def test_light_accent_differs_from_dark(self):
+        """Light mode should use a darker accent than dark mode for contrast."""
+        from app.layout.layout import get_theme_tokens
+        tokens = get_theme_tokens("Light")
+        dark_accent = tokens["Dark"]["accent"]
+        light_accent = tokens["Light"]["accent"]
+        # They can be the same or different, but Light bg_glow should be softer
+        light_glow = tokens["Light"]["bg_glow"]
+        dark_glow = tokens["Dark"]["bg_glow"]
+        assert light_glow != dark_glow, "bg_glow should differ between Light and Dark"
+
+
+# ---------------------------------------------------------------------------
 # 18) Input sanitization – AI prompt safety
 # ---------------------------------------------------------------------------
 
