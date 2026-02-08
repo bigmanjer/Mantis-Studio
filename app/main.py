@@ -1874,39 +1874,8 @@ def _run_ui():
         color: var(--mantis-muted);
     }}
 
-    .stButton>button {{
-        border-radius: 16px !important;
-        font-weight: 600 !important;
-        padding: 0.7rem 1.1rem !important;
-        transition: all 0.15s ease-in-out;
-        border: 1px solid var(--mantis-button-border) !important;
-        background: var(--mantis-button-bg) !important;
-        color: var(--mantis-text) !important;
-    }}
-    .stButton>button:hover {{
-        transform: translateY(-1px);
-        border-color: var(--mantis-button-hover-border) !important;
-        box-shadow: var(--mantis-shadow-button);
-    }}
-    .stButton>button:active {{ transform: translateY(0); }}
-    .stButton>button:focus:not(:focus-visible) {{ outline: none !important; box-shadow: none !important; }}
-    .stButton>button:focus-visible {{ outline: 2px solid var(--mantis-accent) !important; outline-offset: 2px; }}
-
-    /* --- BUTTON HIERARCHY --- */
-    .stButton>button[kind="primary"] {{
-        background: var(--mantis-primary-bg) !important;
-        border-color: var(--mantis-primary-border) !important;
-        box-shadow: var(--mantis-shadow-button);
-        color: #ffffff !important;
-    }}
-    .stButton>button[kind="primary"]:hover {{
-        border-color: var(--mantis-primary-hover-border) !important;
-        box-shadow: var(--mantis-shadow-strong);
-    }}
-    .stButton>button[kind="secondary"] {{
-        background: var(--mantis-button-bg) !important;
-    }}
-
+    /* Button styles are defined centrally in assets/styles.css
+       and injected via app/ui/theme.py — see the Unified Button System. */
 
     [data-testid="stVerticalBlock"] [data-testid="stContainer"] {{ border-radius: 16px !important; }}
     .stExpander {{ border: 1px solid var(--mantis-expander-border) !important; border-radius: 16px !important; }}
@@ -3677,15 +3646,11 @@ def _run_ui():
             st.divider()
             st.markdown("<div class='mantis-nav-section'>Navigation</div>", unsafe_allow_html=True)
 
-            nav_groups = [
-                ("Dashboard", "home", "🏠"),
-                ("Projects", "projects", "📁"),
-                ("Write", "outline", "✍️"),
-                ("Editor", "chapters", "🧩"),
-                ("World Bible", "world", "🌍"),
-                ("Export", "export", "⬇️"),
-                ("AI Settings", "ai", "🤖"),
-            ]
+            # Sidebar navigation items are defined in app/utils/navigation.py.
+            # Edit NAV_ITEMS there to add, remove, or reorder entries — the
+            # footer navigation is generated from the same list.
+            from app.utils.navigation import get_nav_items
+            nav_groups = get_nav_items()
 
             for label, target, icon in nav_groups:
                 is_active = st.session_state.page == target or (

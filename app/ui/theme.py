@@ -1,7 +1,15 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import streamlit as st
 
+# --------------------------------------------------------------------------
+# Path to the centralized button / component CSS.
+# All button styles live in assets/styles.css so that one file controls
+# the visual language of every button and button-like element app-wide.
+# --------------------------------------------------------------------------
+_STYLES_CSS_PATH = Path(__file__).resolve().parents[2] / "assets" / "styles.css"
 
 MANTIS_TOKENS = {
     "mantis_green": "#22c55e",
@@ -17,7 +25,18 @@ MANTIS_TOKENS = {
 }
 
 
+def _load_button_css() -> str:
+    """Read the unified button CSS from assets/styles.css."""
+    try:
+        return _STYLES_CSS_PATH.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return ""
+
+
 def inject_theme() -> None:
+    # Load the centralized button system CSS
+    button_css = _load_button_css()
+
     st.markdown(
         f"""
         <style>
@@ -127,16 +146,12 @@ def inject_theme() -> None:
             gap: 12px;
         }}
 
-        .mantis-cta-tile {{
-            padding: 14px 16px;
-            border-radius: 16px;
-            border: 1px solid var(--mantis-border);
-            background: var(--mantis-surface);
-        }}
-
         .mantis-muted {{
             color: var(--mantis-text-muted);
         }}
+
+        /* --- Unified button system (from assets/styles.css) --- */
+        {button_css}
         </style>
         """,
         unsafe_allow_html=True,

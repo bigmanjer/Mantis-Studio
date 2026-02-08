@@ -80,8 +80,31 @@ def action_card(
     button_label: str = "Open",
     key: Optional[str] = None,
     help_text: Optional[str] = None,
+    *,
+    icon: Optional[str] = None,
 ) -> bool:
-    with st.container(border=True):
-        st.markdown(f"### {title}")
-        st.caption(caption)
-        return st.button(button_label, key=key, use_container_width=True, help=help_text)
+    """Render a card with title, description, and an action button.
+
+    Uses the unified button system classes (assets/styles.css).
+
+    Args:
+        title: Card heading.
+        caption: Short description below the heading.
+        button_label: Text on the action button.
+        key: Streamlit widget key.
+        help_text: Tooltip for the button.
+        icon: Optional emoji/icon prepended to *title*.
+    """
+    display_title = f"{icon} {title}" if icon else title
+    st.markdown(
+        f"""
+        <div class="mantis-action-card">
+            <div class="mantis-action-card-title">{display_title}</div>
+            <div class="mantis-action-card-desc">{caption}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    return st.button(
+        button_label, key=key, use_container_width=True, help=help_text
+    )
