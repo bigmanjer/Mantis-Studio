@@ -313,15 +313,22 @@ def apply_suggestion(project: Project, classified: Dict[str, Any]) -> Tuple[Opti
             incoming_aliases = classified.get("aliases") or []
             novel_aliases_list = _novel_aliases(ent, incoming_aliases, ent.name) if incoming_aliases else []
 
+        raw_desc = (classified.get("description") or "").strip()
+
         # Merge novel description bullets
         if novel_bullets:
             merge_description_bullets(ent, novel_bullets)
+        elif raw_desc:
+            # Even when pre-classified as "alias_only", merge the raw
+            # description so that user-visible "Suggested Notes" are applied.
+            # Entity.merge() handles its own dedup to avoid duplicates.
+            ent.merge(raw_desc)
 
         # Merge novel aliases
         if novel_aliases_list:
             Project._merge_aliases(ent, novel_aliases_list, ent.name)
 
-        action = "updated" if novel_bullets else "alias_added"
+        action = "updated" if novel_bullets or raw_desc else "alias_added"
         return ent, action
 
     # type == "new"
