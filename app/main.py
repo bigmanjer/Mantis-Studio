@@ -4541,7 +4541,13 @@ def _run_ui():
                         with c1:
                             if st.button("✅ Apply", key=f"apply_suggestion_{idx}", use_container_width=True):
                                 from app.services.world_bible_merge import apply_suggestion as _apply_suggestion
-                                _apply_suggestion(p, item)
+                                applied_ent, _action = _apply_suggestion(p, item)
+                                # Clear cached widget values so the UI
+                                # reflects the updated description/aliases
+                                # on the next rerun.
+                                if applied_ent is not None:
+                                    st.session_state.pop(f"desc_{applied_ent.id}", None)
+                                    st.session_state.pop(f"aliases_{applied_ent.id}", None)
                                 review_queue.pop(idx)
                                 st.session_state["world_bible_review"] = review_queue
                                 persist_project(p)

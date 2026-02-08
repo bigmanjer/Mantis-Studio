@@ -1706,3 +1706,29 @@ class TestApplySuggestionClearsWidgetCache:
             r'session_state\.pop\(\s*f["\']aliases_',
             source,
         ), "session_state.pop for aliases_ key not found"
+
+    def test_main_clears_desc_and_aliases_keys(self):
+        """The apply-suggestion code in main.py must pop desc_ and aliases_
+        keys from session_state so the Notes text area picks up the updated
+        value."""
+        import importlib
+        main = importlib.import_module("app.main")
+        source = Path(main.__file__).read_text(encoding="utf-8")
+
+        # Must capture return value from apply_suggestion
+        assert re.search(
+            r"=\s*_?apply_suggestion.*\(.*p.*,.*item.*\)",
+            source,
+        ), "apply_suggestion return value not captured in main.py"
+
+        # Must clear the widget key for description
+        assert re.search(
+            r'session_state\.pop\(\s*f["\']desc_',
+            source,
+        ), "session_state.pop for desc_ key not found in main.py"
+
+        # Must clear the widget key for aliases
+        assert re.search(
+            r'session_state\.pop\(\s*f["\']aliases_',
+            source,
+        ), "session_state.pop for aliases_ key not found in main.py"
