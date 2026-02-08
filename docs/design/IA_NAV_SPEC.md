@@ -18,7 +18,7 @@
 ## Footer Navigation
 - **Terms** → `page="terms"` (renders `legal/terms.md`)
 - **Privacy** → `page="privacy"` (renders `legal/privacy.md`)
-- **Legal** → `page="legal"` (Legal Center with all policies)
+- **Legal** → `page="legal"` (All Policies)
 - **Support** → external link to GitHub Issues
 - **Contact** → mailto link
 - **Version** → displays current app version
@@ -31,7 +31,7 @@
 - `world` → World Bible
 - `export` → Export
 - `ai` → AI Settings
-- `legal` → Legal Center (all policies)
+- `legal` → All Policies
 - `terms` → Terms of Service
 - `privacy` → Privacy Policy
 - `copyright` → Copyright Notice

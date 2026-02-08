@@ -774,8 +774,8 @@ def render_footer(
             {nav_links_html}
           </ul>
         </nav>
-        <nav class="mantis-footer-section" aria-label="Legal Center">
-          <h4>Legal Center</h4>
+        <nav class="mantis-footer-section" aria-label="All Policies">
+          <h4>All Policies</h4>
           <ul>
             <li><a href="?page=terms">Terms of Service</a></li>
             <li><a href="?page=privacy">Privacy Policy</a></li>

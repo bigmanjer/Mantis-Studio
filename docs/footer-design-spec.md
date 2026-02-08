@@ -9,7 +9,7 @@ a "Back to top" pill, and a separated bottom bar for copyright and social links:
 ┌──────────────────────────────────────────────────────────────────┐
 │                                            ↑ Back to top        │
 │                                                                  │
-│  MANTIS Studio          Navigation      Legal Center   Support  │
+│  MANTIS Studio          Navigation      All Policies   Support  │
 │  Modular narrative      Dashboard       Terms of       ℹ Help   │
 │  workspace              Projects        Service        Report   │
 │                         Outline         Privacy         an Issue│
@@ -27,7 +27,7 @@ a "Back to top" pill, and a separated bottom bar for copyright and social links:
 |---|-----------------|------------------------------------------------|
 | 1 | Brand/Copyright | App name, tagline (copyright moved to bottom)  |
 | 2 | Navigation      | Dashboard, Projects, Outline, Export            |
-| 3 | Legal Center    | Terms of Service, Privacy Policy, All Policies  |
+| 3 | All Policies    | Terms of Service, Privacy Policy, All Policies  |
 | 4 | Support         | Help, Report an Issue (GitHub), Contact (email) |
 
 ## Responsive Behavior

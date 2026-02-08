@@ -1500,28 +1500,28 @@ def _run_ui():
     def render_privacy():
         content = _read_legal_file("privacy.md", "## Privacy Policy\n\nLocal-only storage. No analytics.")
         st.markdown(content)
-        if st.button("← Back to Legal Center", key=ui_key("privacy", "back")):
+        if st.button("← Back to All Policies", key=ui_key("privacy", "back")):
             st.session_state.page = "legal"
             st.rerun()
 
     def render_terms():
         content = _read_legal_file("terms.md", "## Terms of Service\n\nProvided as-is for creative use.")
         st.markdown(content)
-        if st.button("← Back to Legal Center", key=ui_key("terms", "back")):
+        if st.button("← Back to All Policies", key=ui_key("terms", "back")):
             st.session_state.page = "legal"
             st.rerun()
 
     def render_copyright():
         content = _read_legal_file("copyright.md", "## Copyright\n\n© MANTIS Studio")
         st.markdown(content)
-        if st.button("← Back to Legal Center", key=ui_key("copyright", "back")):
+        if st.button("← Back to All Policies", key=ui_key("copyright", "back")):
             st.session_state.page = "legal"
             st.rerun()
 
     def render_cookie():
         content = _read_legal_file("cookie.md", "## Cookie Policy\n\nEssential cookies only.")
         st.markdown(content)
-        if st.button("← Back to Legal Center", key=ui_key("cookie", "back")):
+        if st.button("← Back to All Policies", key=ui_key("cookie", "back")):
             st.session_state.page = "legal"
             st.rerun()
 
@@ -3395,7 +3395,7 @@ def _run_ui():
 
     def render_legal_redirect():
         render_page_header(
-            "Legal Center",
+            "All Policies",
             "Review policies, IP guidance, and acceptable use.",
             tag="Policies",
             key_prefix="legal_header",
