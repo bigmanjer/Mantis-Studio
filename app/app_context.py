@@ -1932,38 +1932,44 @@ def _run_ui():
         if review_queue:
             with card("🔍 Review AI Suggestions", "AI suggestions are queued for review. Apply to update canon."):
                 for idx, item in enumerate(list(review_queue)):
+                    stype = item.get("type", "new")
                     label = f"{item.get('name', 'Unnamed')} • {item.get('category', 'Lore')}"
+                    if stype == "update":
+                        label = f"🔄 {label}"
+                    elif stype == "alias_only":
+                        label = f"🏷️ {label}"
+                    else:
+                        label = f"🆕 {label}"
                     expander_label = build_expander_label(label, str(idx))
                     with st.expander(expander_label):
-                        st.markdown(f"**Type:** {item.get('type', 'new').title()}")
+                        type_labels = {"update": "Update Existing", "alias_only": "Add Aliases", "new": "New Entry"}
+                        st.markdown(f"**Action:** {type_labels.get(stype, stype.title())}")
+                        if item.get("match_name"):
+                            st.markdown(f"**Matches:** {item['match_name']}")
                         confidence = item.get("confidence")
                         if confidence is not None:
                             st.markdown(f"**Confidence:** {confidence:.2f}")
-                        if item.get("description"):
+                        if item.get("reason"):
+                            st.info(item["reason"])
+                        novel_bullets = item.get("novel_bullets") or []
+                        if novel_bullets:
+                            st.markdown("**New details to add:**")
+                            for b in novel_bullets:
+                                st.markdown(f"- {b}")
+                        elif item.get("description"):
                             st.markdown("**Suggested Notes**")
                             st.write(item.get("description"))
-                        if item.get("aliases"):
-                            st.markdown("**Aliases**")
-                            st.write(", ".join(item.get("aliases") or []))
+                        novel_aliases = item.get("novel_aliases") or []
+                        if novel_aliases:
+                            st.markdown(f"**New aliases:** {', '.join(novel_aliases)}")
+                        elif item.get("aliases"):
+                            st.markdown(f"**Aliases:** {', '.join(item.get('aliases') or [])}")
 
                         c1, c2 = st.columns(2)
                         with c1:
                             if st.button("✅ Apply", key=f"apply_suggestion_{idx}", use_container_width=True):
-                                if item.get("type") == "update" and item.get("entity_id"):
-                                    ent = p.world_db.get(item.get("entity_id"))
-                                    if ent:
-                                        ent.merge(item.get("description", ""))
-                                        incoming_aliases = item.get("aliases") or []
-                                        p._merge_aliases(ent, incoming_aliases, ent.name)
-                                else:
-                                    p.upsert_entity(
-                                        item.get("name", ""),
-                                        item.get("category", "Lore"),
-                                        item.get("description", ""),
-                                        aliases=item.get("aliases") or [],
-                                        allow_merge=True,
-                                        allow_alias=True,
-                                    )
+                                from app.services.world_bible_merge import apply_suggestion as _apply_suggestion
+                                _apply_suggestion(p, item)
                                 review_queue.pop(idx)
                                 st.session_state["world_bible_review"] = review_queue
                                 persist_project(p)
