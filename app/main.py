@@ -3603,6 +3603,7 @@ def _run_ui():
                 if st.button(
                     "Open Editor",
                     use_container_width=True,
+                    type="primary",
                     help="Start writing or editing your chapters"
                 ):
                     open_recent_project("chapters")
@@ -3611,6 +3612,7 @@ def _run_ui():
                 if st.button(
                     "Open Outline",
                     use_container_width=True,
+                    type="primary",
                     help="Create or edit your story structure and plot outline"
                 ):
                     open_recent_project("outline")
@@ -3619,6 +3621,7 @@ def _run_ui():
                 if st.button(
                     "Open World Bible",
                     use_container_width=True,
+                    type="primary",
                     help="Manage your story's canonical characters, locations, and lore"
                 ):
                     open_recent_project("world")
@@ -3628,13 +3631,14 @@ def _run_ui():
             qcols = st.columns(3)
             with qcols[0]:
                 cta_tile("🧠 Memory", "Hard canon rules and guidelines.")
-                if st.button("Open Memory", use_container_width=True):
+                if st.button("Open Memory", use_container_width=True, type="primary"):
                     open_recent_project("world", focus_tab="Memory")
             with qcols[1]:
                 cta_tile("📊 Insights", "Canon health and analytics.")
                 if st.button(
                     "Open Insights",
                     use_container_width=True,
+                    type="primary",
                     help="View analytics and consistency insights for your story world"
                 ):
                     open_recent_project("world", focus_tab="Insights")
@@ -3643,6 +3647,7 @@ def _run_ui():
                 if st.button(
                     "Go to Export",
                     use_container_width=True,
+                    type="primary",
                     help="Export your project as markdown for sharing or publishing"
                 ):
                     open_export()

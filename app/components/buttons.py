@@ -106,5 +106,5 @@ def action_card(
         """,
     )
     return st.button(
-        button_label, key=key, use_container_width=True, help=help_text
+        button_label, key=key, use_container_width=True, type="primary", help=help_text
     )
