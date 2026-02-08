@@ -3654,7 +3654,7 @@ def _run_ui():
                         return found;
                     };
                     let attempts = 0;
-                    const maxAttempts = 12; // ~720ms total retries at 60ms intervals.
+                    const maxAttempts = 12; // Up to ~780ms total including the initial attempt.
                     const tick = () => {
                         const found = apply();
                         if (found < labels.size && attempts < maxAttempts) {

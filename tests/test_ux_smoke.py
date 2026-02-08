@@ -904,8 +904,8 @@ class TestButtonHierarchyCSS:
         assert "--mantis-surface-alt" in css
 
 
-class TestQuickActionButtonsStyled:
-    """Quick action buttons must use the navigation button theme."""
+class TestActionCardButtonsPrimary:
+    """Action cards must use the primary button theme."""
 
     def test_action_card_uses_primary_type(self):
         import inspect
@@ -913,6 +913,10 @@ class TestQuickActionButtonsStyled:
 
         src = inspect.getsource(action_card)
         assert 'type="primary"' in src, "action_card button should use type='primary'"
+
+
+class TestQuickActionButtonsStyled:
+    """Quick action buttons must use the navigation button theme."""
 
     def test_main_quick_action_buttons_use_secondary(self):
         src = (ROOT / "app" / "main.py").read_text(encoding="utf-8")
