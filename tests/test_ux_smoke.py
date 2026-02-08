@@ -888,16 +888,20 @@ class TestButtonHierarchyCSS:
     def test_danger_class_exists(self):
         assert ".mantis-btn-danger" in self._css()
 
-    def test_primary_has_green_bg(self):
-        assert "#2e7d32" in self._css()
+    def test_primary_uses_theme_bg(self):
+        css = self._css()
+        assert ".mantis-btn-primary > button" in css
+        assert "--mantis-primary-bg" in css
 
-    def test_danger_has_red_bg(self):
-        assert "#e53935" in self._css()
+    def test_danger_uses_theme_vars(self):
+        css = self._css()
+        assert ".mantis-btn-danger > button" in css
+        assert "--mantis-warning" in css
 
-    def test_ghost_has_transparent_bg(self):
+    def test_ghost_uses_theme_surface(self):
         css = self._css()
         assert ".mantis-btn-ghost > button" in css
-        assert "transparent" in css
+        assert "--mantis-surface-alt" in css
 
 
 class TestQuickActionButtonsPrimary:
