@@ -2416,6 +2416,13 @@ def _run_ui():
                     st.session_state.page = "projects"
                     st.rerun()
             return
+
+        def _persist_chapter_update() -> None:
+            st.session_state.project = p
+            persist_project(p)
+            _bump_projects_refresh()
+            st.rerun()
+
         chaps = p.get_ordered_chapters()
 
         def create_next_chapter() -> None:
@@ -2428,8 +2435,7 @@ def _run_ui():
                     raw = match.group(1).strip()
                     title = sanitize_chapter_title(re.split(r" [-–:] ", raw, 1)[0].strip()) or title
             p.add_chapter(title)
-            persist_project(p)
-            st.rerun()
+            _persist_chapter_update()
 
         def go_to_outline() -> None:
             st.session_state.page = "outline"
@@ -2454,8 +2460,7 @@ def _run_ui():
                 with c1:
                     if st.button("➕ Create Chapter 1", type="primary", use_container_width=True):
                         p.add_chapter("Chapter 1")
-                        persist_project(p)
-                        st.rerun()
+                        _persist_chapter_update()
                 with c2:
                     if st.button("🧩 Go to Outline", use_container_width=True):
                         st.session_state.page = "outline"
@@ -2516,8 +2521,7 @@ def _run_ui():
                     else:
                         title = f"Chapter {next_idx}"
                     p.add_chapter(sanitize_chapter_title(title))
-                    persist_project(p)
-                    st.rerun()
+                    _persist_chapter_update()
 
         stream_ph = st.empty()
 
