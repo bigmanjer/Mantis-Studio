@@ -195,7 +195,14 @@ def _run_ui():
         *,
         action: str = "save",
     ) -> bool:
-        project.save()
+        path = project.save()
+        if not path:
+            logger.error("persist_project failed for '%s' (action=%s)", project.title, action)
+            try:
+                st.toast("⚠️ Save failed — check file permissions and disk space.", icon="⚠️")
+            except Exception:
+                pass
+            return False
         return True
 
     def render_app_footer() -> None:

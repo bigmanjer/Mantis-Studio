@@ -84,7 +84,10 @@ def load_app_config() -> Dict[str, str]:
 
 def save_app_config(data: Dict[str, str]) -> None:
     try:
-        with open(AppConfig.CONFIG_PATH, "w", encoding="utf-8") as fh:
+        os.makedirs(os.path.dirname(AppConfig.CONFIG_PATH) or ".", exist_ok=True)
+        tmp = AppConfig.CONFIG_PATH + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as fh:
             json.dump(data, fh, indent=2)
+        os.replace(tmp, AppConfig.CONFIG_PATH)
     except Exception:
         logger.warning("Failed to save app config", exc_info=True)
