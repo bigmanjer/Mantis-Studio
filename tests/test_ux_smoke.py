@@ -495,3 +495,66 @@ class TestAutoWriteScoping:
                             f"scoped inside the st.button block at line {j+1}"
                         )
                         break
+
+
+# ---------------------------------------------------------------------------
+# 16) Helpers module
+# ---------------------------------------------------------------------------
+
+
+class TestHelpers:
+    """Tests for app.utils.helpers utility functions."""
+
+    def test_word_count_basic(self):
+        from app.utils.helpers import word_count
+        assert word_count("hello world") == 2
+
+    def test_word_count_empty(self):
+        from app.utils.helpers import word_count
+        assert word_count("") == 0
+
+    def test_word_count_none(self):
+        from app.utils.helpers import word_count
+        assert word_count(None) == 0
+
+    def test_clamp_in_range(self):
+        from app.utils.helpers import clamp
+        assert clamp(5, 0, 10) == 5
+
+    def test_clamp_below(self):
+        from app.utils.helpers import clamp
+        assert clamp(-1, 0, 10) == 0
+
+    def test_clamp_above(self):
+        from app.utils.helpers import clamp
+        assert clamp(15, 0, 10) == 10
+
+    def test_current_year(self):
+        from app.utils.helpers import current_year
+        assert current_year() >= 2026
+
+
+# ---------------------------------------------------------------------------
+# 17) Layout duplicate removal – styles.py must no longer exist
+# ---------------------------------------------------------------------------
+
+
+class TestLayoutConsolidation:
+    """Verify that the duplicate styles.py was removed."""
+
+    def test_styles_py_removed(self):
+        styles_path = ROOT / "app" / "layout" / "styles.py"
+        assert not styles_path.exists(), "app/layout/styles.py should be removed"
+
+    def test_layout_module_still_importable(self):
+        mod = importlib.import_module("app.layout.layout")
+        assert hasattr(mod, "get_theme_tokens")
+        assert hasattr(mod, "apply_theme")
+
+    def test_footer_year_is_dynamic(self):
+        from app.layout.layout import _CURRENT_YEAR
+        assert _CURRENT_YEAR >= 2026
+
+    def test_ui_footer_year_is_dynamic(self):
+        from app.ui.layout import _CURRENT_YEAR
+        assert _CURRENT_YEAR >= 2026

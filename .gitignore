@@ -43,6 +43,9 @@ data/projects/
 .mantis_config.json
 logs/*.log
 
+# Testing
+.pytest_cache/
+
 # Temporary files
 *.tmp
 *.bak
