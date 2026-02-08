@@ -917,12 +917,11 @@ class TestQuickActionButtonsPrimary:
         # The quick action section ends before "Recent Projects"
         end = src.index("Recent Projects", start)
         section = src[start:end]
-        button_calls = [line.strip() for line in section.splitlines() if "st.button(" in line]
-        assert len(button_calls) > 0, "Expected quick action st.button calls"
-        for call in button_calls:
-            if 'type="primary"' not in call:
-                # type may be on the next line; check the section has enough type="primary" usages
-                pass
-        assert section.count('type="primary"') >= 6, (
-            "All 6 quick action buttons should use type='primary'"
+        # Count st.button calls vs type="primary" occurrences in the section
+        button_count = section.count("st.button(")
+        primary_count = section.count('type="primary"')
+        assert button_count == 6, f"Expected 6 quick action buttons, found {button_count}"
+        assert primary_count == button_count, (
+            f"All {button_count} quick action buttons should use type='primary', "
+            f"but only {primary_count} do"
         )
