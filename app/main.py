@@ -4297,13 +4297,6 @@ def _run_ui():
         render_page_header(
             "World Bible",
             "Your story's encyclopedia: Track characters, locations, factions, and lore. Mantis uses this to keep your writing consistent.",
-            primary_label="➕ Add Entity",
-            primary_action=open_add_entity,
-            primary_help="Add a new character, location, faction, or lore entry",
-            secondary_label="🔍 Scan for Entities",
-            secondary_action=lambda: extract_entities_ui(p.outline or "", "Outline"),
-            secondary_disabled=not get_active_key_status()[1],
-            secondary_help="AI will scan your outline for characters, locations, and more" if get_active_key_status()[1] else "Configure AI provider in AI Settings to use this feature",
             tag="Canon",
             key_prefix="world_header",
         )
