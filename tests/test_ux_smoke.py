@@ -695,11 +695,11 @@ class TestHelpers:
             def __init__(self, d):
                 self.session_state = dict(d)
                 self.warned = False
-                self.infoed = False
+                self.info_shown = False
             def warning(self, msg):
                 self.warned = True
             def info(self, msg):
-                self.infoed = True
+                self.info_shown = True
             def button(self, *a, **kw):
                 return False
         return _FakeSt(state_dict)
@@ -751,7 +751,7 @@ class TestHelpers:
         fake_st = self._make_fake_st({"ai_session_keys": {"groq": "sk-test", "openai": ""}})
         ai_connection_warning(fake_st)
         assert not fake_st.warned, "Warning should NOT be shown when keys exist"
-        assert fake_st.infoed, "Info prompt should be shown when keys exist but models not tested"
+        assert fake_st.info_shown, "Info prompt should be shown when keys exist but models not tested"
 
     def test_ai_no_prompt_when_key_added_and_models_tested(self):
         from app.utils.helpers import ai_connection_warning
@@ -761,7 +761,7 @@ class TestHelpers:
         })
         ai_connection_warning(fake_st)
         assert not fake_st.warned, "Warning should NOT be shown when connected and tested"
-        assert not fake_st.infoed, "Info should NOT be shown when models are tested"
+        assert not fake_st.info_shown, "Info should NOT be shown when models are tested"
 
     def test_ai_no_prompt_when_key_added_and_models_fetched(self):
         from app.utils.helpers import ai_connection_warning
@@ -771,7 +771,7 @@ class TestHelpers:
         })
         ai_connection_warning(fake_st)
         assert not fake_st.warned, "Warning should NOT be shown when connected"
-        assert not fake_st.infoed, "Info should NOT be shown when models are fetched"
+        assert not fake_st.info_shown, "Info should NOT be shown when models are fetched"
 
 
 # ---------------------------------------------------------------------------
