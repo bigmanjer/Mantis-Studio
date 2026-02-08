@@ -23,12 +23,31 @@ def card_end() -> None:
     st.markdown("</div>", unsafe_allow_html=True)
 
 
-def cta_tile(title: str, body: str) -> None:
+def cta_tile(title: str, body: str, *, icon: Optional[str] = None, subtitle: Optional[str] = None) -> None:
+    """Render a card-style CTA tile (Quick Actions style).
+
+    Uses CSS classes from the unified button system (assets/styles.css).
+    Supports optional icon and subtitle for enhanced card layouts.
+
+    Args:
+        title: Primary label, may include an emoji prefix (e.g. "✍️ Editor").
+        body: Short description shown below the title.
+        icon: Optional standalone icon rendered above the title.
+        subtitle: Optional secondary text below *body*.
+    """
+    icon_html = f'<div class="mantis-cta-icon">{icon}</div>' if icon else ""
+    subtitle_html = (
+        f'<div class="mantis-cta-body" style="margin-top:2px;font-size:12px;">{subtitle}</div>'
+        if subtitle
+        else ""
+    )
     st.markdown(
         f"""
         <div class="mantis-cta-tile">
-            <div style="font-weight:600;">{title}</div>
-            <div class="mantis-muted" style="margin-top:6px;">{body}</div>
+            {icon_html}
+            <div class="mantis-cta-title">{title}</div>
+            <div class="mantis-cta-body">{body}</div>
+            {subtitle_html}
         </div>
         """,
         unsafe_allow_html=True,
