@@ -18,7 +18,7 @@ def card_block(title: Optional[str] = None, subtitle: Optional[str] = None) -> G
     """Render a styled card using Streamlit's native container.
 
     Replaces the old card_start/card_end pattern which broke rendering
-    because Streamlit sanitises each st.markdown call independently,
+    because Streamlit sanitizes each st.markdown call independently,
     preventing split open/close ``<div>`` tags from working.
     """
     with st.container(border=True):
