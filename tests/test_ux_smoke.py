@@ -1673,3 +1673,36 @@ class TestWorldBibleMerge:
         assert any(a == "The Iron Lady" for a in ent.aliases)
         assert "northern garrison" in ent.description
         assert "brave warrior" in ent.description
+
+
+# ---------------------------------------------------------------------------
+# Widget cache clearing after apply_suggestion
+# ---------------------------------------------------------------------------
+
+class TestApplySuggestionClearsWidgetCache:
+    """Verify that the apply-suggestion UI clears stale widget keys."""
+
+    def test_app_context_clears_desc_and_aliases_keys(self):
+        """The apply-suggestion code must pop desc_ and aliases_ keys from
+        session_state so the Notes text area picks up the updated value."""
+        import importlib
+        ctx = importlib.import_module("app.app_context")
+        source = Path(ctx.__file__).read_text(encoding="utf-8")
+
+        # Must capture return value from apply_suggestion
+        assert re.search(
+            r"=\s*_?apply_suggestion.*\(.*p.*,.*item.*\)",
+            source,
+        ), "apply_suggestion return value not captured"
+
+        # Must clear the widget key for description
+        assert re.search(
+            r'session_state\.pop\(\s*f["\']desc_',
+            source,
+        ), "session_state.pop for desc_ key not found"
+
+        # Must clear the widget key for aliases
+        assert re.search(
+            r'session_state\.pop\(\s*f["\']aliases_',
+            source,
+        ), "session_state.pop for aliases_ key not found"
