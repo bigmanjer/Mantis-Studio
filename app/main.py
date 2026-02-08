@@ -161,6 +161,20 @@ def _truncate_prompt(prompt: str, limit: int) -> str:
     return prompt[:limit]
 
 
+def sanitize_ai_input(text: str, max_length: int = 0) -> str:
+    """Sanitize user-provided text before sending to AI APIs.
+
+    Strips leading/trailing whitespace and removes null bytes.
+    When *max_length* is positive the text is truncated to that limit.
+    """
+    if not text:
+        return ""
+    cleaned = text.strip().replace("\x00", "")
+    if max_length > 0 and len(cleaned) > max_length:
+        cleaned = cleaned[:max_length]
+    return cleaned
+
+
 def _acquire_lock(lock_path: str, timeout: int, retry_sleep: float) -> bool:
     start = time.time()
     while True:
@@ -835,7 +849,13 @@ class Project:
     @classmethod
     def load(cls, path: str) -> "Project":
         with open(path, "r", encoding="utf-8") as fh:
-            data = json.load(fh)
+            try:
+                data = json.load(fh)
+            except json.JSONDecodeError as exc:
+                logger.error("Corrupt project file %s: %s", path, exc)
+                raise ValueError(f"Cannot load project: file is not valid JSON ({path})") from exc
+        if not isinstance(data, dict):
+            raise ValueError(f"Cannot load project: expected JSON object ({path})")
 
         proj = cls(
             id=data.get("id") or str(uuid.uuid4()),
@@ -980,6 +1000,7 @@ class AIEngine:
             yield f"{_provider_label(self.provider)} API key not configured."
             return
 
+        prompt = sanitize_ai_input(prompt)
         prompt = _truncate_prompt(prompt, AppConfig.MAX_PROMPT_CHARS)
         headers = {"Content-Type": "application/json"}
         headers["Authorization"] = f"Bearer {api_key}"
@@ -1289,6 +1310,8 @@ REWRITE_PRESETS = {
 }
 
 def rewrite_prompt(text: str, preset: str, custom: str = "") -> str:
+    text = sanitize_ai_input(text, AppConfig.MAX_PROMPT_CHARS)
+    custom = sanitize_ai_input(custom, 2000)
     instr = custom if preset == "Custom" else REWRITE_PRESETS.get(preset, "")
     return f"Act as an editor.\nTASK: {preset}\nDETAILS: {instr}\n\nINPUT TEXT:\n{text}"
 

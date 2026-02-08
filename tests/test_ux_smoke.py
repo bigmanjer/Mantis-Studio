@@ -558,3 +558,103 @@ class TestLayoutConsolidation:
     def test_ui_footer_year_is_dynamic(self):
         from app.ui.layout import _CURRENT_YEAR
         assert _CURRENT_YEAR >= 2026
+
+
+# ---------------------------------------------------------------------------
+# 18) Input sanitization – AI prompt safety
+# ---------------------------------------------------------------------------
+
+
+class TestSanitizeAIInput:
+    """Verify that sanitize_ai_input strips dangerous characters and enforces limits."""
+
+    def test_strips_whitespace(self):
+        from app.main import sanitize_ai_input
+        assert sanitize_ai_input("  hello  ") == "hello"
+
+    def test_removes_null_bytes(self):
+        from app.main import sanitize_ai_input
+        assert sanitize_ai_input("hello\x00world") == "helloworld"
+
+    def test_empty_input(self):
+        from app.main import sanitize_ai_input
+        assert sanitize_ai_input("") == ""
+        assert sanitize_ai_input(None) == ""
+
+    def test_max_length_enforced(self):
+        from app.main import sanitize_ai_input
+        result = sanitize_ai_input("a" * 100, max_length=50)
+        assert len(result) == 50
+
+    def test_no_limit_when_zero(self):
+        from app.main import sanitize_ai_input
+        text = "a" * 200
+        result = sanitize_ai_input(text, max_length=0)
+        assert len(result) == 200
+
+    def test_service_module_has_sanitize(self):
+        from app.services.ai import sanitize_ai_input
+        assert sanitize_ai_input("  test\x00  ") == "test"
+
+
+# ---------------------------------------------------------------------------
+# 19) Improved error handling – Project.load with corrupt JSON
+# ---------------------------------------------------------------------------
+
+
+class TestProjectLoadErrorHandling:
+    """Verify that Project.load raises clear errors for corrupt files."""
+
+    def test_corrupt_json_raises_value_error(self, tmp_path):
+        corrupt_file = tmp_path / "corrupt.json"
+        corrupt_file.write_text("not valid json {{{", encoding="utf-8")
+        from app.main import Project
+        with pytest.raises(ValueError, match="not valid JSON"):
+            Project.load(str(corrupt_file))
+
+    def test_non_dict_json_raises_value_error(self, tmp_path):
+        bad_file = tmp_path / "array.json"
+        bad_file.write_text('["not", "a", "dict"]', encoding="utf-8")
+        from app.main import Project
+        with pytest.raises(ValueError, match="expected JSON object"):
+            Project.load(str(bad_file))
+
+    def test_services_project_load_corrupt(self, tmp_path):
+        corrupt_file = tmp_path / "corrupt2.json"
+        corrupt_file.write_text("{invalid", encoding="utf-8")
+        from app.services.projects import Project
+        with pytest.raises(ValueError, match="not valid JSON"):
+            Project.load(str(corrupt_file))
+
+
+# ---------------------------------------------------------------------------
+# 20) Service module sync – verify service modules match main.py
+# ---------------------------------------------------------------------------
+
+
+class TestServiceModuleSync:
+    """Verify that service modules are consistent with main.py."""
+
+    def test_rewrite_presets_match(self):
+        from app.main import REWRITE_PRESETS as main_presets
+        from app.services.ai import REWRITE_PRESETS as svc_presets
+        assert main_presets == svc_presets
+
+    def test_sanitize_chapter_title_match(self):
+        from app.main import sanitize_chapter_title as main_fn
+        from app.services.projects import sanitize_chapter_title as svc_fn
+        test_cases = ["  Hello World  ", "", "**Bold**", '"Quoted"']
+        for tc in test_cases:
+            assert main_fn(tc) == svc_fn(tc), f"Mismatch on: {tc!r}"
+
+    def test_upsert_entity_returns_tuple(self):
+        """Verify upsert_entity returns (entity, status) tuple."""
+        from app.services.projects import Project
+        import tempfile
+        p = Project.create("Test", storage_dir=tempfile.mkdtemp())
+        result = p.upsert_entity("Alice", "Character", "Hero")
+        assert isinstance(result, tuple)
+        assert len(result) == 2
+        entity, status = result
+        assert entity is not None
+        assert status in ("created", "matched", "skipped")
