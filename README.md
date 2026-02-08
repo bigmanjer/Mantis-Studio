@@ -42,12 +42,18 @@ The app is **state‑driven**, not page‑driven. All navigation feeds a single 
 
 ## 2. Technology Stack
 
-* **Python 3.10+**
-* **Streamlit** (UI + state)
-* **Session State** for routing and persistence
-* **Local JSON / serialized storage** (project data)
-* **OIDC Auth (optional)**: Google / Microsoft / Apple (if configured)
-* **GitHub Actions** for version bumping
+| Layer | Technology |
+| ----- | ---------- |
+| **Language** | Python 3.10+ |
+| **UI Framework** | Streamlit ≥ 1.30.0 |
+| **State Management** | Streamlit Session State for routing and persistence |
+| **Data & Visualization** | Pandas, Plotly, Pillow |
+| **HTTP** | Requests |
+| **Backend (optional)** | Supabase ≥ 2.5.0 |
+| **Configuration** | python‑dotenv |
+| **Storage** | Local JSON / serialized storage (project data) |
+| **Auth (optional)** | OIDC — Google / Microsoft / Apple (if configured) |
+| **CI/CD** | GitHub Actions for version bumping |
 
 ---
 
@@ -65,8 +71,6 @@ This file:
 * Handles authentication gating
 * Renders the global layout (sidebar + main panel)
 * Routes all navigation internally (NOT Streamlit multipage routing)
-
-> Files under `/pages` are legacy or transitional and should not be relied on for core state.
 
 ---
 
@@ -89,16 +93,15 @@ This file:
 
 ### B. Sidebar Navigation (Expected Behavior)
 
-| Button                | Purpose                                       |
-| --------------------- | --------------------------------------------- |
-| **Dashboard**         | Overview of the current project status        |
-| **Projects**          | Create, load, rename, or delete projects      |
-| **Outline**           | High‑level story structure                    |
-| **Chapters / Editor** | Scene‑level writing & drafting                |
-| **World Bible**       | Structured lore & entities                    |
-| **AI Tools**          | Utilities like rewrite, summarize, brainstorm |
-| **Export**            | Generate files (DOCX / PDF / TXT)             |
-| **Legal**             | Terms, privacy, copyright (via footer)        |
+| Button                | Purpose                                           |
+| --------------------- | ------------------------------------------------- |
+| 🏠 **Dashboard**      | Overview of the current project status             |
+| 📁 **Projects**       | Create, load, rename, or delete projects           |
+| ✍️ **Write**          | High‑level story outlining and beat planning       |
+| 🧩 **Editor**         | Scene‑level writing & chapter drafting             |
+| 🌍 **World Bible**    | Structured lore & entities (characters, locations) |
+| ⬇️ **Export**         | Generate files (DOCX / PDF / TXT)                  |
+| 🤖 **AI Settings**    | Configure AI provider, model, and preferences      |
 
 ---
 
@@ -200,18 +203,18 @@ This section is critical for **consistency across chapters**.
 
 ---
 
-### 5.6 AI Tools
+### 5.6 AI Settings
 
-**Purpose:** Utility layer, not the core workflow.
+**Purpose:** Configure AI integration for the workspace.
 
-**Examples:**
+**Features:**
 
-* Rewrite text
-* Tone adjustment
-* Brainstorm ideas
-* Summaries
+* Select AI provider and model
+* Adjust generation parameters (temperature, length)
+* Manage API keys and connection settings
+* Access AI utilities: rewrite, summarize, brainstorm, tone adjustment
 
-These tools should operate on **selected text or context**, not blindly.
+These tools operate on **selected text or context**, not blindly.
 
 ---
 
@@ -233,23 +236,26 @@ These tools should operate on **selected text or context**, not blindly.
 
 ---
 
-### 5.9 Legal
+### 5.8 Legal
 
-The All Policies page provides access to all policy documents:
+The All Policies page provides access to all policy documents stored in the `legal/` directory:
 
-* Terms of Service
-* Privacy Policy
-* Copyright
-* Cookie Policy
-* Brand & IP Clarity
-* Trademark Path
-* Contact
+| Document | File |
+| -------- | ---- |
+| Terms of Service | `legal/terms.md` |
+| Privacy Policy | `legal/privacy.md` |
+| Copyright | `legal/copyright.md` |
+| Cookie Policy | `legal/cookie.md` |
+| Brand & IP Clarity | `legal/Brand_ip_Clarity.md` |
+| Trademark Path | `legal/Trademark_Path.md` |
+| Help | `legal/help.md` |
+| Contact | `legal/contact.md` |
 
 Accessible via footer links or the All Policies page.
 
 ---
 
-## 6. Recent Improvements (Version 84.7)
+## 6. Recent Improvements (Version 87.0)
 
 ### ✅ User Experience Enhancements
 
@@ -295,7 +301,7 @@ Accessible via footer links or the All Policies page.
 ### Current Limitations
 
 * Some AI features are experimental
-* Legacy `/pages` directory exists but is not used (can be safely ignored)
+* View files in `app/views/` are thin wrappers; render logic still lives in `app/main.py` (see `app/README.md` for migration status)
 
 ### Recommended Next Steps for Contributors
 
@@ -309,16 +315,16 @@ Accessible via footer links or the All Policies page.
 
 ## 8. Versioning System
 
-* **Current Version**: 85.4 (stored in `VERSION.txt`)
-* **Version Format**: `MAJOR.MINOR` (e.g., 85.4, 85.5, 86.0)
+* **Current Version**: 87.0 (stored in `VERSION.txt`)
+* **Version Format**: `MAJOR.MINOR` (e.g., 87.0, 87.1, 88.0)
 
 ### Versioning Rules
 
 The version increments with each merge following these rules:
 
 1. **Minor version** increments by 1 on each merged pull request to `main`
-   - Example: 85.4 → 85.5 → 85.6
-   - Rolls over at 10: 85.9 → 86.0
+   - Example: 87.0 → 87.1 → 87.2
+   - Rolls over at 10: 87.9 → 88.0
 
 2. **Major bumps** are handled via the Version Bump workflow dispatch inputs
 
@@ -354,6 +360,89 @@ For minor or major bumps, use the Version Bump workflow dispatch inputs.
 
 ---
 
+## 9A. Repository Organization (Current Architecture)
+
+The codebase follows a **single-entry, state-driven architecture** as outlined below. See `app/README.md` for migration status and future enhancements.
+
+### ✅ Directory Structure
+
+```
+Mantis-Studio/
+│
+├── app/main.py              # Single entrypoint (routing + layout)
+│
+├── app/
+│   ├── state.py             # Session state schema + defaults
+│   ├── router.py            # Central navigation logic
+│   ├── app_context.py       # App context reference
+│   │
+│   ├── layout/
+│   │   ├── sidebar.py       # Sidebar UI
+│   │   ├── header.py        # App header + version
+│   │   └── layout.py        # Layout utilities
+│   │
+│   ├── views/               # UI screens (one file each)
+│   │   ├── dashboard.py
+│   │   ├── projects.py
+│   │   ├── outline.py
+│   │   ├── editor.py
+│   │   ├── world_bible.py
+│   │   ├── ai_tools.py
+│   │   ├── export.py
+│   │   └── legal.py
+│   │
+│   ├── components/          # Reusable UI blocks
+│   │   ├── buttons.py
+│   │   ├── forms.py
+│   │   ├── editors.py
+│   │   └── ui.py
+│   │
+│   ├── services/            # Business logic (no UI)
+│   │   ├── projects.py
+│   │   ├── storage.py
+│   │   ├── ai.py
+│   │   ├── export.py
+│   │   ├── world_bible.py
+│   │   ├── world_bible_db.py
+│   │   └── world_bible_merge.py
+│   │
+│   ├── ui/                  # Additional UI utilities
+│   │   ├── components.py
+│   │   ├── layout.py
+│   │   └── theme.py
+│   │
+│   ├── config/
+│   │   └── settings.py
+│   │
+│   └── utils/
+│       ├── versioning.py
+│       ├── helpers.py
+│       ├── auth.py
+│       ├── keys.py
+│       └── navigation.py    # Centralized NAV_ITEMS config
+│
+├── docs/                    # Documentation (see Section 11)
+├── legal/                   # Policy documents (see Section 5.8)
+├── scripts/                 # Utility scripts (see Section 12)
+├── tests/                   # Automated tests
+├── assets/                  # Brand assets & CSS
+│
+├── VERSION.txt
+├── requirements.txt
+├── LICENSE.md
+└── Mantis_Launcher.bat      # Windows launcher
+```
+
+### Design Principles
+
+* Eliminates duplicate logic
+* Prevents buttons from silently failing
+* Makes debugging predictable
+* Allows contributors to understand the app quickly
+* Scales cleanly as features grow
+
+---
+
 ## 10. Getting Started & Next Steps
 
 ### 👋 New Users
@@ -366,87 +455,46 @@ For minor or major bumps, use the Version Bump workflow dispatch inputs.
 ### 🔧 For Developers
 Recommended technical improvements:
 
-1. Remove legacy Streamlit multipage routing (`/pages`)
-2. Centralize all navigation and callbacks
+1. Extract render logic from `app/main.py` into respective view files
+2. Move business logic from `app/main.py` to service modules
 3. Normalize session state schema
 4. Polish UI spacing, hierarchy, and feedback states
 
 ---
 
-## 9A. Repository Organization Recommendation (Critical)
+## 11. Documentation
 
-To ensure long-term maintainability, eliminate dead UI, and prevent state bugs, the repository should be restructured into a **single-entry, state-driven architecture**.
+Additional documentation lives in the `docs/` directory:
 
-### ✅ Recommended Directory Structure
-
-```
-Mantis-Studio/
-│
-├── app/main.py          # Single entrypoint (routing + layout only)
-│
-├── app/
-│   ├── state.py              # Session state schema + defaults
-│   ├── router.py             # Central navigation logic
-│   │
-│   ├── layout/
-│   │   ├── sidebar.py        # Sidebar UI
-│   │   ├── header.py         # App header + version
-│   │   └── styles.py         # CSS / theme helpers
-│   │
-│   ├── views/                # Each UI screen (one file each)
-│   │   ├── dashboard.py
-│   │   ├── projects.py
-│   │   ├── outline.py
-│   │   ├── editor.py
-│   │   ├── world_bible.py
-│   │   ├── ai_tools.py
-│   │   ├── export.py
-│   │   ├── account.py
-│   │   └── legal.py
-│   │
-│   ├── components/           # Reusable UI blocks
-│   │   ├── buttons.py
-│   │   ├── forms.py
-│   │   └── editors.py
-│   │
-│   ├── services/             # Business logic (no UI)
-│   │   ├── projects.py
-│   │   ├── storage.py
-│   │   ├── auth.py
-│   │   ├── ai.py
-│   │   └── export.py
-│   │
-│   └── utils/
-│       ├── versioning.py
-│       └── helpers.py
-│
-├── data/
-│   └── projects/
-│
-├── assets/
-│   └── styles.css
-│
-├── .github/workflows/
-│   └── version-bump.yml
-│
-├── VERSION.txt
-├── README.md
-└── requirements.txt
-```
-
-### Why This Matters
-
-* Eliminates duplicate logic
-* Prevents buttons from silently failing
-* Makes debugging predictable
-* Allows contributors to understand the app quickly
-* Scales cleanly as features grow
-
-This refactor is **strongly recommended before adding new features**.
+| Document | Path |
+| -------- | ---- |
+| Getting Started Guide | [`docs/guides/GETTING_STARTED.md`](docs/guides/GETTING_STARTED.md) |
+| Migration Guide | [`docs/guides/MIGRATION.md`](docs/guides/MIGRATION.md) |
+| Repository Structure | [`docs/architecture/REPOSITORY_STRUCTURE.md`](docs/architecture/REPOSITORY_STRUCTURE.md) |
+| Design System | [`docs/design/DESIGN_SYSTEM.md`](docs/design/DESIGN_SYSTEM.md) |
+| Navigation & IA Spec | [`docs/design/IA_NAV_SPEC.md`](docs/design/IA_NAV_SPEC.md) |
+| UX Audit | [`docs/design/ux-audit.md`](docs/design/ux-audit.md) |
+| Footer Design Spec | [`docs/footer-design-spec.md`](docs/footer-design-spec.md) |
+| Smoke Test Runbook | [`docs/runbooks/SMOKE_TEST.md`](docs/runbooks/SMOKE_TEST.md) |
+| App Architecture | [`app/README.md`](app/README.md) |
 
 ---
 
-## 10. Project Vision
+## 12. Utility Scripts
+
+Helper scripts are located in the `scripts/` directory:
+
+| Script | Purpose |
+| ------ | ------- |
+| `scripts/bump_version.py` | Increment the patch version in `VERSION.txt` |
+| `scripts/healthcheck.py` | Run a basic health check on the application |
+| `scripts/smoke_test.py` | Execute smoke tests to verify core functionality |
+
+**Windows users** can also launch the app with `Mantis_Launcher.bat`, which handles dependency checks, Ollama AI detection, and starts Streamlit automatically.
+
+---
+
+## 13. Project Vision
 
 Mantis Studio aims to be a **professional‑grade creative OS**, not just another AI chat wrapper.
 
