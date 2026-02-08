@@ -2556,6 +2556,16 @@ def _run_ui():
                     curr.update_content(val, "manual")
                     save_p()
 
+                # -- World Bible awareness: lightweight reference scan --
+                from app.services.world_bible_db import scan_editor_for_world_bible_references
+                wb_refs = scan_editor_for_world_bible_references(
+                    val or "", session_state=st.session_state
+                )
+                if wb_refs:
+                    names = ", ".join(r["name"] for r in wb_refs[:5])
+                    suffix = f" (+{len(wb_refs) - 5} more)" if len(wb_refs) > 5 else ""
+                    st.info(f"📖 World Bible references detected: {names}{suffix}")
+
                 autosave_state = "On" if st.session_state.auto_save else "Manual"
                 try:
                     last_edit = datetime.datetime.fromtimestamp(curr.modified_at).strftime("%b %d, %H:%M")

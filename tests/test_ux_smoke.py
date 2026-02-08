@@ -929,3 +929,147 @@ class TestQuickActionButtonsPrimary:
             f"All {button_count} quick action buttons should use type='primary', "
             f"but only {primary_count} do"
         )
+
+
+# ---------------------------------------------------------------------------
+# World Bible DB – structured lore intelligence layer
+# ---------------------------------------------------------------------------
+
+class TestWorldBibleDB:
+    """Validate the world-bible database CRUD, search, tagging, and helpers."""
+
+    @pytest.fixture(autouse=True)
+    def _session(self):
+        from app.services.world_bible_db import ensure_world_bible_db
+        self.ss: Dict[str, Any] = {}
+        ensure_world_bible_db(self.ss)
+
+    def test_ensure_creates_all_categories(self):
+        db = self.ss["world_bible_db"]
+        for cat in ("characters", "locations", "factions", "history", "rules"):
+            assert cat in db
+            assert isinstance(db[cat], dict)
+
+    def test_add_entry_returns_id_and_record(self):
+        from app.services.world_bible_db import add_entry
+        eid, rec = add_entry("characters", {"name": "Alice", "description": "Hero", "tags": ["protag"]}, session_state=self.ss)
+        assert eid
+        assert rec["id"] == eid
+        assert rec["name"] == "Alice"
+        assert rec["tags"] == ["protag"]
+        assert rec["created_at"]
+        assert rec["updated_at"]
+
+    def test_get_entry(self):
+        from app.services.world_bible_db import add_entry, get_entry
+        eid, _ = add_entry("locations", {"name": "Gotham", "description": "A city"}, session_state=self.ss)
+        got = get_entry("locations", eid, session_state=self.ss)
+        assert got is not None
+        assert got["name"] == "Gotham"
+
+    def test_update_entry(self):
+        from app.services.world_bible_db import add_entry, update_entry
+        eid, _ = add_entry("factions", {"name": "Order", "description": "Knights"}, session_state=self.ss)
+        updated = update_entry("factions", eid, {"description": "Holy Knights"}, session_state=self.ss)
+        assert updated is not None
+        assert updated["description"] == "Holy Knights"
+
+    def test_delete_entry(self):
+        from app.services.world_bible_db import add_entry, delete_entry, get_entry
+        eid, _ = add_entry("characters", {"name": "Bob", "description": "Sidekick"}, session_state=self.ss)
+        assert delete_entry("characters", eid, session_state=self.ss) is True
+        assert get_entry("characters", eid, session_state=self.ss) is None
+
+    def test_list_entries(self):
+        from app.services.world_bible_db import add_entry, list_entries
+        add_entry("rules", {"name": "Magic System", "description": "Elemental"}, session_state=self.ss)
+        entries = list_entries("rules", session_state=self.ss)
+        assert len(entries) >= 1
+
+    def test_search_world_bible(self):
+        from app.services.world_bible_db import add_entry, search_world_bible
+        add_entry("characters", {"name": "Zara", "description": "Warrior queen", "tags": ["royal"]}, session_state=self.ss)
+        results = search_world_bible("zara", session_state=self.ss)
+        assert len(results) == 1
+        assert results[0]["entry"]["name"] == "Zara"
+
+    def test_get_entries_by_tag(self):
+        from app.services.world_bible_db import add_entry, get_entries_by_tag
+        add_entry("characters", {"name": "Kai", "description": "Mage", "tags": ["magic"]}, session_state=self.ss)
+        results = get_entries_by_tag("magic", session_state=self.ss)
+        assert len(results) >= 1
+
+    def test_scan_editor_for_world_bible_references(self):
+        from app.services.world_bible_db import add_entry, scan_editor_for_world_bible_references
+        add_entry("characters", {"name": "Marcus", "description": "Knight"}, session_state=self.ss)
+        add_entry("locations", {"name": "Ironforge", "description": "City of steel"}, session_state=self.ss)
+        refs = scan_editor_for_world_bible_references("Marcus rode to Ironforge at dawn.", session_state=self.ss)
+        names = {r["name"] for r in refs}
+        assert "Marcus" in names
+        assert "Ironforge" in names
+
+    def test_scan_editor_empty_text(self):
+        from app.services.world_bible_db import scan_editor_for_world_bible_references
+        refs = scan_editor_for_world_bible_references("", session_state=self.ss)
+        assert refs == []
+
+    def test_check_world_bible_consistency(self):
+        from app.services.world_bible_db import check_world_bible_consistency
+        warnings = check_world_bible_consistency("Gandalf entered the room", session_state=self.ss)
+        assert any("Gandalf" in w for w in warnings)
+
+    def test_detect_canon_conflicts_global_duplicates(self):
+        from app.services.world_bible_db import add_entry, detect_canon_conflicts_global
+        add_entry("characters", {"name": "Eve", "description": "A", "tags": ["x"]}, session_state=self.ss)
+        add_entry("factions", {"name": "Eve", "description": "B", "tags": ["y"]}, session_state=self.ss)
+        conflicts = detect_canon_conflicts_global(session_state=self.ss)
+        assert any("Eve" in c.lower() or "eve" in c.lower() for c in conflicts)
+
+    def test_detect_canon_conflicts_global_missing_desc(self):
+        from app.services.world_bible_db import add_entry, detect_canon_conflicts_global
+        add_entry("characters", {"name": "Ghost", "description": "", "tags": []}, session_state=self.ss)
+        conflicts = detect_canon_conflicts_global(session_state=self.ss)
+        assert any("missing a description" in c for c in conflicts)
+
+    def test_build_world_bible_relationships(self):
+        from app.services.world_bible_db import add_entry, build_world_bible_relationships
+        add_entry("characters", {"name": "Aria", "description": "Friend of Bran", "tags": ["hero"]}, session_state=self.ss)
+        add_entry("characters", {"name": "Bran", "description": "Warrior", "tags": ["hero"]}, session_state=self.ss)
+        graph = build_world_bible_relationships(session_state=self.ss)
+        assert "nodes" in graph
+        assert "edges" in graph
+        assert len(graph["nodes"]) >= 2
+        assert len(graph["edges"]) >= 1  # shared tag 'hero'
+
+    def test_validate_world_timeline_clean(self):
+        from app.services.world_bible_db import add_entry, validate_world_timeline
+        add_entry("history", {"name": "Founding", "description": "City founded", "tags": [], "year": 100}, session_state=self.ss)
+        add_entry("history", {"name": "War", "description": "Great war", "tags": [], "year": 200}, session_state=self.ss)
+        warnings = validate_world_timeline(session_state=self.ss)
+        assert not any("Duplicate year" in w for w in warnings)
+
+    def test_validate_world_timeline_duplicate_year(self):
+        from app.services.world_bible_db import add_entry, validate_world_timeline
+        add_entry("history", {"name": "Event A", "description": "A", "tags": [], "year": 50}, session_state=self.ss)
+        add_entry("history", {"name": "Event B", "description": "B", "tags": [], "year": 50}, session_state=self.ss)
+        warnings = validate_world_timeline(session_state=self.ss)
+        assert any("Duplicate year 50" in w for w in warnings)
+
+    def test_validate_world_timeline_missing_year(self):
+        from app.services.world_bible_db import add_entry, validate_world_timeline
+        add_entry("history", {"name": "No Year", "description": "Missing", "tags": []}, session_state=self.ss)
+        warnings = validate_world_timeline(session_state=self.ss)
+        assert any("missing a year" in w for w in warnings)
+
+    def test_validate_world_bible_db_repairs(self):
+        from app.services.world_bible_db import validate_world_bible_db
+        # Inject a broken entry
+        self.ss["world_bible_db"]["characters"]["broken"] = {"name": None, "tags": "not-a-list"}
+        db = validate_world_bible_db(session_state=self.ss)
+        entry = db["characters"]["broken"]
+        assert entry["name"] == "Unnamed"
+        assert isinstance(entry["tags"], list)
+        assert entry["id"] == "broken"
+        assert isinstance(entry["description"], str)
+        assert entry["created_at"]
+        assert entry["updated_at"]
