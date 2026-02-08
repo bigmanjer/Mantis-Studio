@@ -37,6 +37,17 @@ class TestCriticalImports:
         assert hasattr(mod, "Project")
         assert hasattr(mod, "run_selftest")
 
+    def test_editor_chapter_buttons_have_keys(self):
+        mod = importlib.import_module("app.main")
+        source = Path(mod.__file__).read_text(encoding="utf-8")
+        assert 'key="editor_create_chapter_1"' in source
+        assert 'key="editor_new_chapter"' in source
+
+        ctx = importlib.import_module("app.app_context")
+        ctx_source = Path(ctx.__file__).read_text(encoding="utf-8")
+        assert 'key="editor_create_chapter_1"' in ctx_source
+        assert 'key="editor_new_chapter"' in ctx_source
+
     def test_import_difflib(self):
         """difflib is required for the editor diff view."""
         import difflib  # noqa: F401
