@@ -31,6 +31,7 @@ Directory Structure:
 """
 
 import datetime
+import difflib
 import json
 import logging
 import os
@@ -1505,6 +1506,19 @@ def _run_ui():
             model=get_ai_model(),
         )
         return results or []
+
+    def update_locked_chapters() -> None:
+        """Refresh the set of chapter indices that are locked due to canon violations."""
+        results = st.session_state.get("coherence_results", [])
+        locked = set()
+        for issue in results:
+            try:
+                idx = int(issue.get("chapter_index", -1))
+                if idx >= 0:
+                    locked.add(idx)
+            except (TypeError, ValueError):
+                pass
+        st.session_state["locked_chapters"] = locked
 
     LEGAL_DIR = Path(__file__).resolve().parents[1] / "legal"
 
@@ -5503,29 +5517,29 @@ def _run_ui():
                             full += chunk
                             stream_ph.markdown(f"**GENERATING:**\n\n{full}")
 
-                    if full.strip():
-                        if full.strip().startswith("ERROR: Canon violation detected."):
-                            st.error("Canon violation detected. Resolve issues before generating AI content.")
-                            return
-                        violations = detect_hard_canon_violation(p, curr.index, full)
-                        if violations:
-                            results = st.session_state.get("coherence_results", [])
-                            results.extend(violations)
-                            st.session_state["coherence_results"] = results
-                            update_locked_chapters()
-                            st.warning("Hard Canon conflict detected. AI output was not applied.")
-                            return
-                        new_text = ((curr.content or "") + "\n" + full.strip()).strip()
-                        curr.update_content(new_text, "AI Auto-Write")
-                        persist_project(p)
+                        if full.strip():
+                            if full.strip().startswith("ERROR: Canon violation detected."):
+                                st.error("Canon violation detected. Resolve issues before generating AI content.")
+                                return
+                            violations = detect_hard_canon_violation(p, curr.index, full)
+                            if violations:
+                                results = st.session_state.get("coherence_results", [])
+                                results.extend(violations)
+                                st.session_state["coherence_results"] = results
+                                update_locked_chapters()
+                                st.warning("Hard Canon conflict detected. AI output was not applied.")
+                                return
+                            new_text = ((curr.content or "") + "\n" + full.strip()).strip()
+                            curr.update_content(new_text, "AI Auto-Write")
+                            persist_project(p)
 
-                        # Queue sync into editor widget on next run (do NOT set ed_key here!)
-                        st.session_state._chapter_sync_id = curr.id
-                        st.session_state._chapter_sync_text = new_text
+                            # Queue sync into editor widget on next run (do NOT set ed_key here!)
+                            st.session_state._chapter_sync_id = curr.id
+                            st.session_state._chapter_sync_text = new_text
 
-                        st.toast("Chapter Updated")
-                        time.sleep(0.3)
-                        st.rerun()
+                            st.toast("Chapter Updated")
+                            time.sleep(0.3)
+                            st.rerun()
 
                 st.divider()
                 st.markdown("#### Summary")
