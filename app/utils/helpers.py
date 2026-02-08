@@ -40,6 +40,11 @@ def ai_connection_warning(st) -> None:
     if ss.get("providers"):
         return
 
+    # Check ai_keys dict populated when the user connects a provider via the UI.
+    ai_keys = ss.get("ai_keys")
+    if isinstance(ai_keys, dict) and any(ai_keys.values()):
+        return
+
     # Fallback: check resolved API keys written by initialize_session_state.
     if ss.get("groq_api_key") or ss.get("openai_api_key"):
         return

@@ -687,6 +687,59 @@ class TestHelpers:
         from app.utils.helpers import current_year
         assert current_year() >= 2026
 
+    # -- ai_connection_warning suppression tests --
+
+    def _make_fake_st(self, state_dict):
+        """Return a minimal mock of the Streamlit module for ai_connection_warning."""
+        class _SessionState(dict):
+            def get(self, key, default=None):
+                return super().get(key, default)
+        class _FakeSt:
+            def __init__(self, d):
+                self.session_state = _SessionState(d)
+                self.warned = False
+            def warning(self, msg):
+                self.warned = True
+            def button(self, *a, **kw):
+                return False
+        return _FakeSt(state_dict)
+
+    def test_ai_warning_shown_when_no_keys(self):
+        from app.utils.helpers import ai_connection_warning
+        fake_st = self._make_fake_st({})
+        ai_connection_warning(fake_st)
+        assert fake_st.warned, "Warning should be shown when no AI keys are configured"
+
+    def test_ai_warning_hidden_when_ai_keys_set(self):
+        from app.utils.helpers import ai_connection_warning
+        fake_st = self._make_fake_st({"ai_keys": {"groq": "sk-test-key"}})
+        ai_connection_warning(fake_st)
+        assert not fake_st.warned, "Warning should NOT be shown when ai_keys dict has a provider key"
+
+    def test_ai_warning_hidden_when_groq_api_key_set(self):
+        from app.utils.helpers import ai_connection_warning
+        fake_st = self._make_fake_st({"groq_api_key": "sk-test"})
+        ai_connection_warning(fake_st)
+        assert not fake_st.warned, "Warning should NOT be shown when groq_api_key is set"
+
+    def test_ai_warning_hidden_when_openai_api_key_set(self):
+        from app.utils.helpers import ai_connection_warning
+        fake_st = self._make_fake_st({"openai_api_key": "sk-test"})
+        ai_connection_warning(fake_st)
+        assert not fake_st.warned, "Warning should NOT be shown when openai_api_key is set"
+
+    def test_ai_warning_hidden_when_ai_configured_flag(self):
+        from app.utils.helpers import ai_connection_warning
+        fake_st = self._make_fake_st({"ai_configured": True})
+        ai_connection_warning(fake_st)
+        assert not fake_st.warned, "Warning should NOT be shown when ai_configured flag is set"
+
+    def test_ai_warning_shown_when_ai_keys_empty(self):
+        from app.utils.helpers import ai_connection_warning
+        fake_st = self._make_fake_st({"ai_keys": {}})
+        ai_connection_warning(fake_st)
+        assert fake_st.warned, "Warning should be shown when ai_keys dict is empty"
+
 
 # ---------------------------------------------------------------------------
 # 17) Layout duplicate removal – styles.py must no longer exist
