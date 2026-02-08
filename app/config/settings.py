@@ -40,7 +40,7 @@ class AppConfig:
     VERSION = get_app_version()
     PROJECTS_DIR = os.getenv("MANTIS_PROJECTS_DIR", "projects")
     BACKUPS_DIR = os.path.join(PROJECTS_DIR, ".backups")
-    # USERS_DIR = os.getenv("MANTIS_USERS_DIR", os.path.join(PROJECTS_DIR, "users"))  # Temporarily disabled
+
     GROQ_API_URL = os.getenv("GROQ_API_URL", "https://api.groq.com/openai/v1")
     GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
     GROQ_TIMEOUT = int(os.getenv("GROQ_TIMEOUT", "300"))
@@ -63,7 +63,7 @@ class AppConfig:
 def ensure_storage_dirs() -> None:
     os.makedirs(AppConfig.PROJECTS_DIR, exist_ok=True)
     os.makedirs(AppConfig.BACKUPS_DIR, exist_ok=True)
-    # os.makedirs(AppConfig.USERS_DIR, exist_ok=True)  # Temporarily disabled
+
 
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
