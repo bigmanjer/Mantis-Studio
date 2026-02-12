@@ -2653,8 +2653,8 @@ def _run_ui():
             "modified_at": meta.get("last_modified") or meta.get("modified_at"),
         }
 
-    DEFAULT_PROJECT_TITLE = "Default Project Title"
-    DEFAULT_PROJECT_GENRES = ["Default Genre 1", "Default Genre 2"]
+    DEFAULT_PROJECT_TITLE = ""  # Empty triggers _random_project_title()
+    DEFAULT_PROJECT_GENRES = ["Fantasy", "Adventure"]
     MAX_DRAFT_EXCERPT_LENGTH = 600
     AI_ERROR_MARKERS = (
         "not configured",
@@ -2789,9 +2789,9 @@ def _run_ui():
                         ai_used = True
 
         if not final_title:
-            final_title = DEFAULT_PROJECT_TITLE
+            final_title = _random_project_title()
         if not final_genre:
-            final_genre = _format_genre_list(DEFAULT_PROJECT_GENRES)
+            final_genre = _random_project_genres()
 
         genre_list = _parse_genre_list(final_genre) or list(DEFAULT_PROJECT_GENRES)
         return final_title, final_genre, genre_list, ai_used
@@ -4312,6 +4312,7 @@ def _run_ui():
                         # Automatically scan entities on save so World Bible stays in sync.
                         extract_entities_ui(p.outline or "", "Outline")
                         st.toast("Outline Saved & Entities Scanned")
+                        st.rerun()
 
         with right:
             with st.container(border=True):
@@ -4676,6 +4677,7 @@ def _run_ui():
                 with top[2]:
                     if st.button(f"➕ Add {category}", use_container_width=True):
                         st.session_state[f"add_open_{category}"] = True
+                        st.rerun()
 
                 if st.session_state.get(f"add_open_{category}", False):
                     with st.form(f"add_{category}"):
@@ -5381,6 +5383,7 @@ def _run_ui():
                             # Automatically scan entities from this chapter when the user explicitly saves it.
                             extract_entities_ui(curr.content or "", f"Ch {curr.index}")
                             st.toast("Chapter Saved & Entities Scanned")
+                            st.rerun()
                 with c2:
                     summary_cooldown = _cooldown_remaining(f"summary_{curr.id}", 10)
                     summary_label = (
