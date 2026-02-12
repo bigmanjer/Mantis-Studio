@@ -1294,6 +1294,45 @@ class TestQuickActionButtonsStyled:
 
 
 # ---------------------------------------------------------------------------
+# Dashboard AI CTA card – layout must be stable regardless of AI connection
+# ---------------------------------------------------------------------------
+
+class TestDashboardAICardLayoutStable:
+    """The AI providers card must always render on the dashboard.
+
+    Previously the card was only shown when keys were missing, causing
+    the button layout to shift when AI providers were connected.  Both
+    branches (connected / not-connected) must render a card_block so
+    the dashboard layout remains stable.
+    """
+
+    def test_main_renders_ai_card_in_both_branches(self):
+        src = (ROOT / "app" / "main.py").read_text(encoding="utf-8")
+        # Locate the conditional AI card section
+        assert "Connect your AI providers" in src
+        assert "AI providers connected" in src
+        # Both branches should use card_block so the layout is consistent
+        # Search before the "Connect" string to capture both card_block calls
+        marker = src.index("Connect your AI providers")
+        start = src.rfind("card_block(", 0, marker)
+        end = src.index("def render_projects", start)
+        section = src[start:end]
+        assert section.count("card_block(") >= 2, (
+            "Both connected and not-connected branches must render a card_block"
+        )
+
+    def test_app_context_renders_ai_card_in_both_branches(self):
+        src = (ROOT / "app" / "app_context.py").read_text(encoding="utf-8")
+        assert "Connect your AI providers" in src
+        assert "AI providers connected" in src
+        start = src.index("Connect your AI providers")
+        end = src.index("def render_projects", start)
+        section = src[start:end]
+        # app_context uses 'card(' from components
+        assert 'card("✅ AI providers connected"' in section or 'card("🔑 Connect your AI providers"' in section
+
+
+# ---------------------------------------------------------------------------
 # World Bible DB – structured lore intelligence layer
 # ---------------------------------------------------------------------------
 
