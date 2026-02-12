@@ -141,28 +141,18 @@ Mantis-Studio/
 
 For in-depth technical documentation, see:
 
-### Core Architecture
-
-- **[Application Structure](architecture/APP_STRUCTURE.md)** - Complete directory layout and module descriptions
-- **[Implementation Summary](architecture/IMPLEMENTATION_SUMMARY.md)** - Recent architectural improvements and debugging infrastructure
-
 ### Guides for Developers
 
-- **[Migration Guide](guides/MIGRATION.md)** - How to add new features and follow directory conventions
-- **[Contributing Guide](guides/contributing.md)** - Development setup and code style
-- **[Debugging Guide](guides/DEBUGGING_GUIDE.md)** - Troubleshooting methodology
+- **[Contributing Guide](../guides/CONTRIBUTING.md)** - Development setup, code style, and workflow
 
 ### Design & UX
 
-- **[Design System](design/DESIGN_SYSTEM.md)** - Design tokens, colors, typography
-- **[Information Architecture](design/IA_NAV_SPEC.md)** - Navigation structure and routing
-- **[Footer Design Spec](design/footer-design-spec.md)** - Footer implementation details
-- **[UX Audit](design/ux-audit.md)** - User experience analysis
+- **[Design System](../design/DESIGN_SYSTEM.md)** - Design tokens, colors, typography, navigation spec, footer design, and UX audit
 
 ### Testing
 
-- **[Testing Guide](guides/testing.md)** - Comprehensive testing documentation
-- **[Smoke Test Runbook](runbooks/SMOKE_TEST.md)** - QA checklist
+- **[Testing Guide](../guides/testing.md)** - Comprehensive testing documentation
+- **[Smoke Test Runbook](../runbooks/SMOKE_TEST.md)** - QA checklist
 
 ---
 
@@ -314,10 +304,10 @@ The architecture supports extension through:
 
 ## Resources
 
-- **[README](../README.md)** - Project overview
-- **[Contributing](guides/contributing.md)** - How to contribute
-- **[Testing](guides/testing.md)** - Testing guide
-- **[Documentation Index](index.md)** - Complete documentation
+- **[README](../../README.md)** - Project overview
+- **[Contributing](../guides/CONTRIBUTING.md)** - How to contribute
+- **[Testing](../guides/testing.md)** - Testing guide
+- **[Documentation Index](../guides/index.md)** - Complete documentation
 
 ---
 

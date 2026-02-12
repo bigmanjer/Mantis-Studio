@@ -469,12 +469,10 @@ Additional documentation lives in the `docs/` directory:
 | Document | Path |
 | -------- | ---- |
 | Getting Started Guide | [`docs/guides/GETTING_STARTED.md`](docs/guides/GETTING_STARTED.md) |
-| Migration Guide | [`docs/guides/MIGRATION.md`](docs/guides/MIGRATION.md) |
-| Repository Structure | [`docs/architecture/REPOSITORY_STRUCTURE.md`](docs/architecture/REPOSITORY_STRUCTURE.md) |
+| Contributing Guide | [`docs/guides/CONTRIBUTING.md`](docs/guides/CONTRIBUTING.md) |
+| Architecture | [`docs/architecture/architecture.md`](docs/architecture/architecture.md) |
 | Design System | [`docs/design/DESIGN_SYSTEM.md`](docs/design/DESIGN_SYSTEM.md) |
-| Navigation & IA Spec | [`docs/design/IA_NAV_SPEC.md`](docs/design/IA_NAV_SPEC.md) |
-| UX Audit | [`docs/design/ux-audit.md`](docs/design/ux-audit.md) |
-| Footer Design Spec | [`docs/footer-design-spec.md`](docs/footer-design-spec.md) |
+| Testing Guide | [`docs/guides/testing.md`](docs/guides/testing.md) |
 | Smoke Test Runbook | [`docs/runbooks/SMOKE_TEST.md`](docs/runbooks/SMOKE_TEST.md) |
 | App Architecture | [`app/README.md`](app/README.md) |
 

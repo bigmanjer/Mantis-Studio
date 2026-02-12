@@ -79,11 +79,72 @@ python scripts/smoke_test.py
 
 ## Code Style
 
+- **Line length**: 100 characters (configured in `pyproject.toml`)
 - Use `from __future__ import annotations` at the top of new modules.
 - Add type hints to function signatures.
 - Use `logging.getLogger("MANTIS")` for application logging.
 - Prefer `pathlib.Path` over `os.path` for file operations in new code.
 - Use `AppConfig` constants instead of hardcoding values.
+- **Docstrings**: Required for public functions and classes.
+- **Comments**: Use sparingly, prefer self-documenting code.
+
+## Code Quality
+
+### Formatting
+
+We use **Black** for code formatting and **isort** for import sorting:
+
+```bash
+# Auto-format all code
+make format
+
+# Check formatting without making changes
+make format-check
+```
+
+### Linting
+
+We use **flake8** for linting and **mypy** for type checking:
+
+```bash
+# Run all linters
+make lint
+
+# Run individual linters
+flake8 app/
+mypy app/ --ignore-missing-imports
+```
+
+## Using Make Commands
+
+The `Makefile` provides shortcuts for common tasks:
+
+```bash
+make help          # Show all available commands
+make install-dev   # Install all dependencies
+make test          # Run test suite
+make test-coverage # Run tests with coverage report
+make lint          # Run linters (flake8, mypy)
+make format        # Auto-format code (black, isort)
+make format-check  # Check formatting without changes
+make run           # Start the application
+make clean         # Remove build artifacts
+make diagnose      # Run comprehensive diagnostics
+```
+
+## Pre-commit Hooks
+
+Pre-commit hooks automatically run before each commit to ensure code quality.
+
+```bash
+# Install pre-commit hooks
+pre-commit install
+
+# Run manually on all files
+pre-commit run --all-files
+```
+
+Configured hooks include: trailing whitespace removal, end-of-file fixer, YAML/JSON/TOML validation, large file check, Black formatting, isort import sorting, flake8 linting, Bandit security scanning, and Markdown linting.
 
 ## Submitting a Pull Request
 
@@ -100,3 +161,41 @@ python scripts/smoke_test.py
 ## License
 
 By contributing, you agree that your contributions will be licensed under the project's existing license.
+
+## Troubleshooting
+
+### Import Errors
+
+```bash
+# Reinstall dependencies
+pip install -r requirements.txt --force-reinstall
+
+# Check Python version
+python --version  # Should be 3.10+
+```
+
+### Test Failures
+
+```bash
+# Run tests with verbose output
+pytest -vv
+
+# Run specific failing test
+pytest tests/test_file.py::test_name -vv
+
+# Run diagnostics
+make diagnose
+```
+
+### Application Won't Start
+
+```bash
+# Run health check
+make health
+
+# Run diagnostics
+make diagnose
+
+# Check logs
+tail -f logs/*.log
+```
