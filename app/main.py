@@ -2653,8 +2653,7 @@ def _run_ui():
             "modified_at": meta.get("last_modified") or meta.get("modified_at"),
         }
 
-    DEFAULT_PROJECT_TITLE = ""  # Empty triggers _random_project_title()
-    DEFAULT_PROJECT_GENRES = ["Fantasy", "Adventure"]
+    FALLBACK_PROJECT_GENRES = ["Fantasy", "Adventure"]
     MAX_DRAFT_EXCERPT_LENGTH = 600
     AI_ERROR_MARKERS = (
         "not configured",
@@ -2793,7 +2792,7 @@ def _run_ui():
         if not final_genre:
             final_genre = _random_project_genres()
 
-        genre_list = _parse_genre_list(final_genre) or list(DEFAULT_PROJECT_GENRES)
+        genre_list = _parse_genre_list(final_genre) or list(FALLBACK_PROJECT_GENRES)
         return final_title, final_genre, genre_list, ai_used
 
     def _random_project_title() -> str:
