@@ -96,6 +96,26 @@ def get_app_version() -> str:
     return "47.0"
 
 
+def _safe_int_env(env_var: str, default: int) -> int:
+    raw = os.getenv(env_var, "")
+    if not raw:
+        return default
+    try:
+        return int(raw)
+    except (ValueError, TypeError):
+        return default
+
+
+def _safe_float_env(env_var: str, default: float) -> float:
+    raw = os.getenv(env_var, "")
+    if not raw:
+        return default
+    try:
+        return float(raw)
+    except (ValueError, TypeError):
+        return default
+
+
 class AppConfig:
     APP_NAME = "MANTIS Studio"
     VERSION = get_app_version()
@@ -104,7 +124,7 @@ class AppConfig:
 
     GROQ_API_URL = os.getenv("GROQ_API_URL", "https://api.groq.com/openai/v1")
     GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
-    GROQ_TIMEOUT = int(os.getenv("GROQ_TIMEOUT", "300"))
+    GROQ_TIMEOUT = _safe_int_env("GROQ_TIMEOUT", 300)
     DEFAULT_MODEL = os.getenv("GROQ_MODEL", "llama3-8b-8192")
     OPENAI_API_URL = os.getenv("OPENAI_API_URL", "https://api.openai.com/v1")
     OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
@@ -115,10 +135,10 @@ class AppConfig:
     )
     MAX_PROMPT_CHARS = 16000
     SUMMARY_CONTEXT_CHARS = 4000
-    MAX_UPLOAD_MB = int(os.getenv("MANTIS_MAX_UPLOAD_MB", "10"))
-    SAVE_LOCK_TIMEOUT = int(os.getenv("MANTIS_SAVE_LOCK_TIMEOUT", "5"))
-    SAVE_LOCK_RETRY_SLEEP = float(os.getenv("MANTIS_SAVE_LOCK_RETRY_SLEEP", "0.1"))
-    WORLD_BIBLE_CONFIDENCE = float(os.getenv("MANTIS_WORLD_BIBLE_CONFIDENCE", "0.75"))
+    MAX_UPLOAD_MB = _safe_int_env("MANTIS_MAX_UPLOAD_MB", 10)
+    SAVE_LOCK_TIMEOUT = _safe_int_env("MANTIS_SAVE_LOCK_TIMEOUT", 5)
+    SAVE_LOCK_RETRY_SLEEP = _safe_float_env("MANTIS_SAVE_LOCK_RETRY_SLEEP", 0.1)
+    WORLD_BIBLE_CONFIDENCE = _safe_float_env("MANTIS_WORLD_BIBLE_CONFIDENCE", 0.75)
     
     # Documentation URLs
     GETTING_STARTED_URL = "https://github.com/bigmanjer/Mantis-Studio/blob/main/GETTING_STARTED.md"
@@ -1600,9 +1620,15 @@ def _run_ui():
     config_data = load_app_config()
 
     init_state("ui_theme", config_data.get("ui_theme", "Dark"))
-    init_state("daily_word_goal", int(config_data.get("daily_word_goal", 500)))
-    init_state("weekly_sessions_goal", int(config_data.get("weekly_sessions_goal", 4)))
-    init_state("focus_minutes", int(config_data.get("focus_minutes", 25)))
+    def _safe_int_val(value: object, default: int) -> int:
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return default
+
+    init_state("daily_word_goal", _safe_int_val(config_data.get("daily_word_goal", 500), 500))
+    init_state("weekly_sessions_goal", _safe_int_val(config_data.get("weekly_sessions_goal", 4), 4))
+    init_state("focus_minutes", _safe_int_val(config_data.get("focus_minutes", 25), 25))
     init_state("activity_log", list(config_data.get("activity_log", [])))
     init_state("projects_refresh_token", 0)
     init_state("delete_project_path", None)

@@ -63,6 +63,95 @@ class TestSafeEnvParsing:
             del os.environ["_TEST_SAFE_FLOAT"]
 
 
+class TestMainSafeEnvParsing:
+    """Verify that _safe_int_env and _safe_float_env in main.py handle bad env vars."""
+
+    def test_safe_int_env_valid(self):
+        from app.main import _safe_int_env
+
+        os.environ["_TEST_MAIN_INT"] = "42"
+        try:
+            assert _safe_int_env("_TEST_MAIN_INT", 10) == 42
+        finally:
+            del os.environ["_TEST_MAIN_INT"]
+
+    def test_safe_int_env_invalid_returns_default(self):
+        from app.main import _safe_int_env
+
+        os.environ["_TEST_MAIN_INT"] = "not_a_number"
+        try:
+            assert _safe_int_env("_TEST_MAIN_INT", 10) == 10
+        finally:
+            del os.environ["_TEST_MAIN_INT"]
+
+    def test_safe_int_env_empty_returns_default(self):
+        from app.main import _safe_int_env
+
+        assert _safe_int_env("_TEST_NONEXISTENT_MAIN_INT", 99) == 99
+
+    def test_safe_float_env_valid(self):
+        from app.main import _safe_float_env
+
+        os.environ["_TEST_MAIN_FLOAT"] = "3.14"
+        try:
+            assert abs(_safe_float_env("_TEST_MAIN_FLOAT", 1.0) - 3.14) < 0.001
+        finally:
+            del os.environ["_TEST_MAIN_FLOAT"]
+
+    def test_safe_float_env_invalid_returns_default(self):
+        from app.main import _safe_float_env
+
+        os.environ["_TEST_MAIN_FLOAT"] = "abc"
+        try:
+            assert _safe_float_env("_TEST_MAIN_FLOAT", 0.5) == 0.5
+        finally:
+            del os.environ["_TEST_MAIN_FLOAT"]
+
+
+class TestSafeConfigValueParsing:
+    """Verify that corrupted config values don't crash session state init."""
+
+    def test_non_numeric_daily_word_goal(self):
+        """Simulates config with non-numeric daily_word_goal."""
+        from app.config.settings import load_app_config, AppConfig
+        import json
+
+        # Write a config with an invalid value
+        config_path = AppConfig.CONFIG_PATH
+        os.makedirs(os.path.dirname(config_path) or ".", exist_ok=True)
+        data = {"daily_word_goal": "not_a_number", "weekly_sessions_goal": "bad", "focus_minutes": "nope"}
+        with open(config_path, "w", encoding="utf-8") as fh:
+            json.dump(data, fh)
+        try:
+            loaded = load_app_config()
+            from app.state import initialize_session_state
+            from unittest.mock import MagicMock
+
+            class MockSessionState(dict):
+                """Dict subclass that acts like Streamlit session_state."""
+                def __setattr__(self, key, value):
+                    self[key] = value
+                def __getattr__(self, key):
+                    try:
+                        return self[key]
+                    except KeyError:
+                        raise AttributeError(key)
+
+            mock_st = MagicMock()
+            mock_st.session_state = MockSessionState()
+
+            # Should not raise
+            initialize_session_state(mock_st, loaded)
+            assert mock_st.session_state.get("daily_word_goal") == 500
+            assert mock_st.session_state.get("weekly_sessions_goal") == 4
+            assert mock_st.session_state.get("focus_minutes") == 25
+        finally:
+            try:
+                os.remove(config_path)
+            except OSError:
+                pass
+
+
 class TestFileLock:
     """Verify the file_lock context manager works correctly."""
 
