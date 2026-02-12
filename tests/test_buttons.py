@@ -26,6 +26,28 @@ if str(ROOT) not in sys.path:
 MAIN_PY = ROOT / "app" / "main.py"
 APP_CTX = ROOT / "app" / "app_context.py"
 
+# Context window sizes for searching after a button label/key.
+# Buttons whose handlers are short (simple nav) need ~400 chars.
+# Buttons whose handlers are longer (AI calls, multi-branch logic) need more.
+_CTX_SHORT = 400       # nav buttons, simple state changes
+_CTX_MEDIUM = 800      # save + entity scan, delete with cleanup
+_CTX_LONG = 1200       # suggestion apply, AI key apply with auto-fetch
+_CTX_XLARGE = 2000     # import & analyze (create project + AI outline)
+_CTX_XXLARGE = 3000    # apply changes (3 apply-mode branches each with rerun)
+
+# How far back/forward to look when checking if a page-setting line is
+# inside a st.button block.
+_NAV_LOOKBACK_LINES = 20
+_NAV_LOOKAHEAD_LINES = 10
+
+# How many lines of context to capture around each st.button call.
+_BUTTON_BLOCK_LINES = 20
+
+# Minimum button counts to guard against accidental mass removal.
+# Update these when significant numbers of buttons are intentionally added/removed.
+_MIN_MAIN_BUTTONS = 60
+_MIN_CTX_BUTTONS = 30
+
 
 def _read(path: Path) -> str:
     return path.read_text(encoding="utf-8")
@@ -36,7 +58,12 @@ def _source() -> str:
 
 
 def _extract_render_function(fn_name: str) -> str:
-    """Extract the body of a top-level render function from main.py."""
+    """Extract the body of a top-level render function from main.py.
+
+    Assumes functions are defined at 4-space indentation inside the
+    module-level ``def run():`` block, which is the standard layout
+    for this codebase.
+    """
     src = _source()
     pattern = rf"^    def {fn_name}\b.*?(?=\n    def |\Z)"
     m = re.search(pattern, src, re.MULTILINE | re.DOTALL)
@@ -50,7 +77,7 @@ def _find_button_blocks(source: str) -> List[Tuple[int, str]]:
     lines = source.split("\n")
     for i, line in enumerate(lines):
         if "st.button(" in line:
-            block = "\n".join(lines[i : i + 20])
+            block = "\n".join(lines[i : i + _BUTTON_BLOCK_LINES])
             results.append((i + 1, block))
     return results
 
