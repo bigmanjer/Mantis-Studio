@@ -63,6 +63,106 @@ class TestSafeEnvParsing:
             del os.environ["_TEST_SAFE_FLOAT"]
 
 
+class TestMainSafeEnvParsing:
+    """Verify that _safe_int_env and _safe_float_env in main.py handle bad env vars."""
+
+    def test_safe_int_env_valid(self):
+        from app.main import _safe_int_env
+
+        os.environ["_TEST_MAIN_INT"] = "42"
+        try:
+            assert _safe_int_env("_TEST_MAIN_INT", 10) == 42
+        finally:
+            del os.environ["_TEST_MAIN_INT"]
+
+    def test_safe_int_env_invalid_returns_default(self):
+        from app.main import _safe_int_env
+
+        os.environ["_TEST_MAIN_INT"] = "not_a_number"
+        try:
+            assert _safe_int_env("_TEST_MAIN_INT", 10) == 10
+        finally:
+            del os.environ["_TEST_MAIN_INT"]
+
+    def test_safe_int_env_empty_returns_default(self):
+        from app.main import _safe_int_env
+
+        assert _safe_int_env("_TEST_NONEXISTENT_MAIN_INT", 99) == 99
+
+    def test_safe_float_env_valid(self):
+        from app.main import _safe_float_env
+
+        os.environ["_TEST_MAIN_FLOAT"] = "3.14"
+        try:
+            assert abs(_safe_float_env("_TEST_MAIN_FLOAT", 1.0) - 3.14) < 0.001
+        finally:
+            del os.environ["_TEST_MAIN_FLOAT"]
+
+    def test_safe_float_env_invalid_returns_default(self):
+        from app.main import _safe_float_env
+
+        os.environ["_TEST_MAIN_FLOAT"] = "abc"
+        try:
+            assert _safe_float_env("_TEST_MAIN_FLOAT", 0.5) == 0.5
+        finally:
+            del os.environ["_TEST_MAIN_FLOAT"]
+
+
+class TestSafeConfigValueParsing:
+    """Verify that corrupted config values don't crash session state init."""
+
+    def _init_with_config(self, data):
+        """Helper to initialize session state with given config data."""
+        from app.config.settings import AppConfig
+        from app.state import initialize_session_state
+        from unittest.mock import MagicMock
+        import json
+
+        config_path = AppConfig.CONFIG_PATH
+        os.makedirs(os.path.dirname(config_path) or ".", exist_ok=True)
+        with open(config_path, "w", encoding="utf-8") as fh:
+            json.dump(data, fh)
+
+        class MockSessionState(dict):
+            """Dict subclass that acts like Streamlit session_state."""
+            def __setattr__(self, key, value):
+                self[key] = value
+            def __getattr__(self, key):
+                try:
+                    return self[key]
+                except KeyError:
+                    raise AttributeError(key)
+
+        mock_st = MagicMock()
+        mock_st.session_state = MockSessionState()
+
+        from app.config.settings import load_app_config
+        loaded = load_app_config()
+        initialize_session_state(mock_st, loaded)
+
+        try:
+            os.remove(config_path)
+        except OSError:
+            pass
+
+        return mock_st.session_state
+
+    def test_invalid_daily_word_goal(self):
+        """Non-numeric daily_word_goal falls back to default."""
+        state = self._init_with_config({"daily_word_goal": "not_a_number"})
+        assert state.get("daily_word_goal") == 500
+
+    def test_invalid_weekly_sessions_goal(self):
+        """Non-numeric weekly_sessions_goal falls back to default."""
+        state = self._init_with_config({"weekly_sessions_goal": "bad"})
+        assert state.get("weekly_sessions_goal") == 4
+
+    def test_invalid_focus_minutes(self):
+        """Non-numeric focus_minutes falls back to default."""
+        state = self._init_with_config({"focus_minutes": "nope"})
+        assert state.get("focus_minutes") == 25
+
+
 class TestFileLock:
     """Verify the file_lock context manager works correctly."""
 
