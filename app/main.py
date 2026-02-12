@@ -3238,7 +3238,16 @@ def _run_ui():
                     if key_value.strip():
                         set_session_key(provider, key_value)
                         queue_widget_update(key_input_state, "")
-                        st.toast(f"{provider_label} key activated for this session.")
+                        # Auto-fetch models after applying key
+                        base_url = st.session_state.get(f"{provider}_base_url", "")
+                        fetch_fn = fetch_openai_models if provider == "openai" else fetch_groq_models
+                        models, _err = fetch_fn(base_url, key_value.strip())
+                        if models:
+                            st.session_state[f"{provider}_model_list"] = models
+                            st.session_state[f"{provider}_model_tests"] = {}
+                            st.toast(f"{provider_label} key activated — loaded {len(models)} models.")
+                        else:
+                            st.toast(f"{provider_label} key activated for this session.")
                         st.rerun()
                     else:
                         st.warning("Please enter an API key first.")
