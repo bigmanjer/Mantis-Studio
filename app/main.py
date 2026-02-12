@@ -1383,7 +1383,7 @@ def _run_ui():
     from pathlib import Path
     from app.components.ui import action_card, card, primary_button, section_header, stat_tile
     from app.ui.components import card_block, cta_tile, empty_state, header_bar, render_tag_list, section_title
-    from app.ui.layout import render_footer
+    from app.layout.layout import render_footer
     from app.ui.theme import inject_theme
     from app.utils.keys import ui_key
 
@@ -2653,8 +2653,7 @@ def _run_ui():
             "modified_at": meta.get("last_modified") or meta.get("modified_at"),
         }
 
-    DEFAULT_PROJECT_TITLE = "Default Project Title"
-    DEFAULT_PROJECT_GENRES = ["Default Genre 1", "Default Genre 2"]
+    FALLBACK_PROJECT_GENRES = ["Fantasy", "Adventure"]
     MAX_DRAFT_EXCERPT_LENGTH = 600
     AI_ERROR_MARKERS = (
         "not configured",
@@ -2789,11 +2788,11 @@ def _run_ui():
                         ai_used = True
 
         if not final_title:
-            final_title = DEFAULT_PROJECT_TITLE
+            final_title = _random_project_title()
         if not final_genre:
-            final_genre = _format_genre_list(DEFAULT_PROJECT_GENRES)
+            final_genre = _random_project_genres()
 
-        genre_list = _parse_genre_list(final_genre) or list(DEFAULT_PROJECT_GENRES)
+        genre_list = _parse_genre_list(final_genre) or list(FALLBACK_PROJECT_GENRES)
         return final_title, final_genre, genre_list, ai_used
 
     def _random_project_title() -> str:
@@ -3238,7 +3237,16 @@ def _run_ui():
                     if key_value.strip():
                         set_session_key(provider, key_value)
                         queue_widget_update(key_input_state, "")
-                        st.toast(f"{provider_label} key activated for this session.")
+                        # Auto-fetch models after applying key
+                        base_url = st.session_state.get(f"{provider}_base_url", "")
+                        fetch_fn = fetch_openai_models if provider == "openai" else fetch_groq_models
+                        models, _err = fetch_fn(base_url, key_value.strip())
+                        if models:
+                            st.session_state[f"{provider}_model_list"] = models
+                            st.session_state[f"{provider}_model_tests"] = {}
+                            st.toast(f"{provider_label} key activated — loaded {len(models)} models.")
+                        else:
+                            st.toast(f"{provider_label} key activated for this session.")
                         st.rerun()
                     else:
                         st.warning("Please enter an API key first.")
@@ -4122,6 +4130,7 @@ def _run_ui():
                             if st.button("🗑", key=f"del_{full}", use_container_width=True):
                                 st.session_state.delete_project_path = full
                                 st.session_state.delete_project_title = title
+                                st.rerun()
                     except Exception:
                         logger.warning("Failed to load project metadata: %s", full, exc_info=True)
 
@@ -4271,6 +4280,7 @@ def _run_ui():
                 if st.button("💾 Save Project", type="primary", use_container_width=True):
                     if persist_project(p, action="save"):
                         st.toast("Saved")
+                        st.rerun()
 
         left, right = st.columns([2.1, 1])
 
@@ -4301,6 +4311,7 @@ def _run_ui():
                         # Automatically scan entities on save so World Bible stays in sync.
                         extract_entities_ui(p.outline or "", "Outline")
                         st.toast("Outline Saved & Entities Scanned")
+                        st.rerun()
 
         with right:
             with st.container(border=True):
@@ -4665,6 +4676,7 @@ def _run_ui():
                 with top[2]:
                     if st.button(f"➕ Add {category}", use_container_width=True):
                         st.session_state[f"add_open_{category}"] = True
+                        st.rerun()
 
                 if st.session_state.get(f"add_open_{category}", False):
                     with st.form(f"add_{category}"):
@@ -4814,6 +4826,7 @@ def _run_ui():
                                 elif st.button("🗑 Delete", key=f"del_{e.id}", use_container_width=True):
                                     st.session_state.delete_entity_id = e.id
                                     st.session_state.delete_entity_name = e.name
+                                    st.rerun()
                             with d2:
                                 st.caption(f"Created: {time.strftime('%Y-%m-%d', time.localtime(e.created_at))}")
 
@@ -4852,6 +4865,7 @@ def _run_ui():
             if st.button("💾 Save Memory", use_container_width=True):
                 if persist_project(p, action="save"):
                     st.toast("Memory saved")
+                    st.rerun()
 
             st.divider()
             st.markdown("#### 🔍 Coherence Check")
@@ -5065,6 +5079,7 @@ def _run_ui():
                                 st.session_state["world_focus_entity"] = ent.id
                                 st.session_state["world_search_pending"] = ent.name
                                 st.toast("Entity highlighted in World Bible.")
+                                st.rerun()
             else:
                 st.success("No flagged entities right now.")
 
@@ -5301,6 +5316,7 @@ def _run_ui():
                     elif st.button("🗑 Delete Chapter", use_container_width=True, key=f"editor_del_{curr.id}"):
                         st.session_state.delete_chapter_id = curr.id
                         st.session_state.delete_chapter_title = curr.title
+                        st.rerun()
 
         stream_ph = st.empty()
         provider, active_key, _ = get_active_key_status()
@@ -5366,6 +5382,7 @@ def _run_ui():
                             # Automatically scan entities from this chapter when the user explicitly saves it.
                             extract_entities_ui(curr.content or "", f"Ch {curr.index}")
                             st.toast("Chapter Saved & Entities Scanned")
+                            st.rerun()
                 with c2:
                     summary_cooldown = _cooldown_remaining(f"summary_{curr.id}", 10)
                     summary_label = (
