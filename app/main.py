@@ -3962,6 +3962,14 @@ def _run_ui():
                         "https://platform.openai.com/api-keys",
                         use_container_width=True,
                     )
+        else:
+            with card_block("✅ AI providers connected", "Your AI providers are configured and ready to use."):
+                cta_left, cta_right = st.columns(2)
+                with cta_left:
+                    if st.button("⚙️ Manage AI Settings", use_container_width=True, key="dashboard__ai_connected_settings"):
+                        open_ai_settings()
+                with cta_right:
+                    st.caption("Groq and OpenAI are active.")
 
 
     def render_projects():
