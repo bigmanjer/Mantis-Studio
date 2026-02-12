@@ -4122,6 +4122,7 @@ def _run_ui():
                             if st.button("🗑", key=f"del_{full}", use_container_width=True):
                                 st.session_state.delete_project_path = full
                                 st.session_state.delete_project_title = title
+                                st.rerun()
                     except Exception:
                         logger.warning("Failed to load project metadata: %s", full, exc_info=True)
 
@@ -4271,6 +4272,7 @@ def _run_ui():
                 if st.button("💾 Save Project", type="primary", use_container_width=True):
                     if persist_project(p, action="save"):
                         st.toast("Saved")
+                        st.rerun()
 
         left, right = st.columns([2.1, 1])
 
@@ -4814,6 +4816,7 @@ def _run_ui():
                                 elif st.button("🗑 Delete", key=f"del_{e.id}", use_container_width=True):
                                     st.session_state.delete_entity_id = e.id
                                     st.session_state.delete_entity_name = e.name
+                                    st.rerun()
                             with d2:
                                 st.caption(f"Created: {time.strftime('%Y-%m-%d', time.localtime(e.created_at))}")
 
@@ -4852,6 +4855,7 @@ def _run_ui():
             if st.button("💾 Save Memory", use_container_width=True):
                 if persist_project(p, action="save"):
                     st.toast("Memory saved")
+                    st.rerun()
 
             st.divider()
             st.markdown("#### 🔍 Coherence Check")
@@ -5065,6 +5069,7 @@ def _run_ui():
                                 st.session_state["world_focus_entity"] = ent.id
                                 st.session_state["world_search_pending"] = ent.name
                                 st.toast("Entity highlighted in World Bible.")
+                                st.rerun()
             else:
                 st.success("No flagged entities right now.")
 
@@ -5301,6 +5306,7 @@ def _run_ui():
                     elif st.button("🗑 Delete Chapter", use_container_width=True, key=f"editor_del_{curr.id}"):
                         st.session_state.delete_chapter_id = curr.id
                         st.session_state.delete_chapter_title = curr.title
+                        st.rerun()
 
         stream_ph = st.empty()
         provider, active_key, _ = get_active_key_status()
