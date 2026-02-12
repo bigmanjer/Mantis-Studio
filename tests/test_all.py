@@ -1,22 +1,22 @@
-"""Comprehensive UX smoke tests for MANTIS Studio.
+"""Merged test suite for MANTIS Studio.
 
-These tests validate every page and critical function from the user's
-standpoint without requiring a running Streamlit server.  They exercise
-imports, data-layer operations, navigation config, utility functions,
-and the auth stub so that regressions in any module are caught early.
+This file combines all individual test modules into a single test file.
+Original files: test_ux_smoke.py, test_buttons.py, test_helpers.py,
+test_router.py, test_services.py, test_imports.py, test_bump_version.py
 """
 from __future__ import annotations
 
+import datetime
 import importlib
 import json
-import re
 import os
+import re
 import shutil
 import sys
 import tempfile
 import time
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Callable, Dict, List, Tuple
 
 import pytest
 
@@ -24,6 +24,14 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from app.router import get_nav_config, get_routes
+from app.utils.helpers import word_count, clamp, current_year
+from scripts.bump_version import bump_version
+
+
+# ============================================================================
+# Tests from test_ux_smoke.py — Comprehensive UX smoke tests
+# ============================================================================
 
 # ---------------------------------------------------------------------------
 # 1) Critical imports – every module that the UI depends on must import
@@ -1899,3 +1907,1869 @@ class TestWidgetWrapGuard:
         assert first_wrapper is second_wrapper, (
             "install_key_helpers double-wrapped selectbox"
         )
+
+
+# ============================================================================
+# Tests from test_buttons.py — Button tests for every page
+# ============================================================================
+
+MAIN_PY = ROOT / "app" / "main.py"
+APP_CTX = ROOT / "app" / "app_context.py"
+
+# Context window sizes for searching after a button label/key.
+# Buttons whose handlers are short (simple nav) need ~400 chars.
+# Buttons whose handlers are longer (AI calls, multi-branch logic) need more.
+_CTX_SHORT = 400       # nav buttons, simple state changes
+_CTX_MEDIUM = 800      # save + entity scan, delete with cleanup
+_CTX_LONG = 1200       # suggestion apply, AI key apply with auto-fetch
+_CTX_XLARGE = 2000     # import & analyze (create project + AI outline)
+_CTX_XXLARGE = 3000    # apply changes (3 apply-mode branches each with rerun)
+
+# How far back/forward to look when checking if a page-setting line is
+# inside a st.button block.
+_NAV_LOOKBACK_LINES = 20
+_NAV_LOOKAHEAD_LINES = 10
+
+# How many lines of context to capture around each st.button call.
+_BUTTON_BLOCK_LINES = 20
+
+# Minimum button counts to guard against accidental mass removal.
+# Update these when significant numbers of buttons are intentionally added/removed.
+_MIN_MAIN_BUTTONS = 60
+_MIN_CTX_BUTTONS = 30
+
+
+def _read(path: Path) -> str:
+    return path.read_text(encoding="utf-8")
+
+
+def _source() -> str:
+    return _read(MAIN_PY)
+
+
+def _extract_render_function(fn_name: str) -> str:
+    """Extract the body of a top-level render function from main.py.
+
+    Assumes functions are defined at 4-space indentation inside the
+    module-level ``def run():`` block, which is the standard layout
+    for this codebase.
+    """
+    src = _source()
+    pattern = rf"^    def {fn_name}\b.*?(?=\n    def |\Z)"
+    m = re.search(pattern, src, re.MULTILINE | re.DOTALL)
+    assert m, f"render function '{fn_name}' not found"
+    return m.group(0)
+
+
+def _find_button_blocks(source: str) -> List[Tuple[int, str]]:
+    """Return (line_number, block_text) for every st.button call."""
+    results = []
+    lines = source.split("\n")
+    for i, line in enumerate(lines):
+        if "st.button(" in line:
+            block = "\n".join(lines[i : i + _BUTTON_BLOCK_LINES])
+            results.append((i + 1, block))
+    return results
+
+
+# ---------------------------------------------------------------------------
+# 1) Legal / back-navigation pages
+# ---------------------------------------------------------------------------
+
+
+class TestLegalPageButtons:
+    """Every legal sub-page must have a back button with key and rerun."""
+
+    @pytest.mark.parametrize(
+        "fn_name,expected_label",
+        [
+            ("render_privacy", "Back to All Policies"),
+            ("render_terms", "Back to All Policies"),
+            ("render_copyright", "Back to All Policies"),
+            ("render_cookie", "Back to All Policies"),
+            ("render_help", "Back to Dashboard"),
+        ],
+    )
+    def test_back_button_exists(self, fn_name, expected_label):
+        body = _extract_render_function(fn_name)
+        assert expected_label in body, f"{fn_name} missing '{expected_label}' button"
+
+    @pytest.mark.parametrize(
+        "fn_name",
+        ["render_privacy", "render_terms", "render_copyright", "render_cookie", "render_help"],
+    )
+    def test_back_button_has_key(self, fn_name):
+        body = _extract_render_function(fn_name)
+        assert "key=" in body, f"{fn_name} back button missing key="
+
+    @pytest.mark.parametrize(
+        "fn_name",
+        ["render_privacy", "render_terms", "render_copyright", "render_cookie", "render_help"],
+    )
+    def test_back_button_calls_rerun(self, fn_name):
+        body = _extract_render_function(fn_name)
+        assert "st.rerun()" in body, f"{fn_name} back button missing st.rerun()"
+
+    @pytest.mark.parametrize(
+        "fn_name",
+        ["render_privacy", "render_terms", "render_copyright", "render_cookie", "render_help"],
+    )
+    def test_back_button_navigates(self, fn_name):
+        body = _extract_render_function(fn_name)
+        assert 'session_state.page' in body, f"{fn_name} back button doesn't navigate"
+
+
+# ---------------------------------------------------------------------------
+# 2) Legal redirect page (policy picker)
+# ---------------------------------------------------------------------------
+
+
+class TestLegalRedirectButtons:
+    """The legal redirect page shows a nav button per legal sub-page."""
+
+    def test_legal_nav_buttons_have_keys(self):
+        body = _extract_render_function("render_legal_redirect")
+        assert 'key=f"nav_{target}"' in body
+
+    def test_legal_nav_buttons_call_rerun(self):
+        body = _extract_render_function("render_legal_redirect")
+        assert "st.rerun()" in body
+
+
+# ---------------------------------------------------------------------------
+# 3) Dashboard (render_home) buttons
+# ---------------------------------------------------------------------------
+
+
+class TestDashboardButtons:
+    """Dashboard must have all expected CTA and quick-action buttons."""
+
+    @pytest.fixture(autouse=True)
+    def _load(self):
+        self.body = _extract_render_function("render_home")
+
+    def test_primary_cta_exists(self):
+        assert "primary_label" in self.body and 'type="primary"' in self.body
+
+    def test_resume_project_button(self):
+        assert "Resume project" in self.body
+
+    def test_new_project_button(self):
+        assert "New project" in self.body
+
+    def test_new_project_calls_rerun(self):
+        assert "open_new_project()" in self.body
+
+    def test_quick_action_buttons_count(self):
+        start = self.body.index("Quick Actions")
+        end = self.body.index("Recent Projects", start)
+        section = self.body[start:end]
+        count = section.count("st.button(")
+        assert count == 6, f"Expected 6 quick action buttons, found {count}"
+
+    def test_quick_action_buttons_all_secondary(self):
+        start = self.body.index("Quick Actions")
+        end = self.body.index("Recent Projects", start)
+        section = self.body[start:end]
+        btn_count = section.count("st.button(")
+        sec_count = section.count('type="secondary"')
+        assert sec_count == btn_count, (
+            f"All {btn_count} quick action buttons should be type='secondary', got {sec_count}"
+        )
+
+    def test_ai_settings_button(self):
+        assert "AI Settings" in self.body
+
+    def test_manage_ai_settings_button_has_key(self):
+        assert "dashboard__ai_connected_settings" in self.body
+
+    def test_recent_project_open_button(self):
+        assert "📂" in self.body
+
+    def test_recent_project_open_button_has_key(self):
+        assert 'key=f"open_' in self.body or "open_" in self.body
+
+
+# ---------------------------------------------------------------------------
+# 4) Projects page buttons
+# ---------------------------------------------------------------------------
+
+
+class TestProjectsPageButtons:
+    """Projects page: create, import, open, export, delete."""
+
+    @pytest.fixture(autouse=True)
+    def _load(self):
+        self.body = _extract_render_function("render_projects")
+
+    def test_create_project_form_submit(self):
+        assert "🚀 Create Project" in self.body
+
+    def test_create_project_is_form_submit(self):
+        assert "form_submit_button" in self.body
+
+    def test_import_analyze_button(self):
+        assert "Import & Analyze" in self.body
+
+    def test_import_button_calls_rerun(self):
+        # Import & Analyze has a rerun further down in its handler
+        idx = self.body.index("Import & Analyze")
+        after = self.body[idx : idx + 2000]
+        assert "st.rerun()" in after
+
+    def test_open_project_button_has_key(self):
+        assert 'key=f"open_' in self.body
+
+    def test_export_project_button_has_key(self):
+        assert 'key=f"export_' in self.body
+
+    def test_delete_project_button_has_key(self):
+        assert 'key=f"del_' in self.body
+
+    def test_confirm_delete_button(self):
+        assert "Confirm delete" in self.body
+
+    def test_confirm_delete_calls_rerun(self):
+        idx = self.body.index("Confirm delete")
+        after = self.body[idx : idx + 1000]
+        assert "st.rerun()" in after
+
+    def test_cancel_button(self):
+        assert '"Cancel"' in self.body
+
+    def test_cancel_calls_rerun(self):
+        idx = self.body.index('"Cancel"')
+        after = self.body[idx : idx + 500]
+        assert "st.rerun()" in after
+
+    def test_close_export_button(self):
+        assert "Close export" in self.body
+
+
+# ---------------------------------------------------------------------------
+# 5) AI Settings page buttons
+# ---------------------------------------------------------------------------
+
+
+class TestAISettingsButtons:
+    """AI Settings page: apply key, clear key, fetch models, test, save."""
+
+    @pytest.fixture(autouse=True)
+    def _load(self):
+        self.body = _extract_render_function("render_ai_settings")
+
+    def test_apply_key_button_has_key(self):
+        assert "session_key" in self.body
+
+    def test_apply_key_calls_rerun(self):
+        idx = self.body.index("Apply Key")
+        after = self.body[idx : idx + 1200]
+        assert "st.rerun()" in after
+
+    def test_clear_key_button_has_key(self):
+        assert "clear_session" in self.body
+
+    def test_clear_key_calls_rerun(self):
+        idx = self.body.index("Clear Key")
+        after = self.body[idx : idx + 400]
+        assert "st.rerun()" in after
+
+    def test_fetch_models_button_exists(self):
+        assert "Fetch Models" in self.body
+
+    def test_fetch_models_groq_calls_rerun(self):
+        # Find the groq fetch section
+        assert self.body.count("Fetch Models") >= 2  # groq + openai
+
+    def test_test_connection_button_exists(self):
+        assert "Test Connection" in self.body
+
+    def test_test_all_models_button_has_key(self):
+        assert "test_all_models_btn" in self.body
+
+    def test_save_settings_button(self):
+        assert "Save Settings" in self.body or "save_app_settings" in self.body
+
+    def test_apply_key_auto_fetches_models(self):
+        """When Apply Key is pressed, models should be auto-fetched."""
+        idx = self.body.index("Apply Key")
+        after = self.body[idx : idx + 500]
+        assert "fetch_fn" in after or "fetch_openai_models" in after or "fetch_groq_models" in after, (
+            "Apply Key should auto-fetch models after setting key"
+        )
+
+
+# ---------------------------------------------------------------------------
+# 6) Outline page buttons
+# ---------------------------------------------------------------------------
+
+
+class TestOutlinePageButtons:
+    """Outline page: save project, save outline, go to projects, AI generate."""
+
+    @pytest.fixture(autouse=True)
+    def _load(self):
+        self.body = _extract_render_function("render_outline")
+
+    def test_go_to_projects_button(self):
+        assert "Go to Projects" in self.body
+
+    def test_go_to_projects_calls_rerun(self):
+        idx = self.body.index("Go to Projects")
+        after = self.body[idx : idx + 500]
+        assert "st.rerun()" in after
+
+    def test_save_project_button(self):
+        assert "Save Project" in self.body
+
+    def test_save_project_calls_rerun(self):
+        idx = self.body.index("Save Project")
+        after = self.body[idx : idx + 500]
+        assert "st.rerun()" in after
+
+    def test_save_outline_button(self):
+        assert "Save Outline" in self.body
+
+    def test_save_outline_calls_rerun(self):
+        idx = self.body.index("Save Outline")
+        after = self.body[idx : idx + 700]
+        assert "st.rerun()" in after
+
+    def test_architect_generate_button(self):
+        # The outline page has an AI generate button
+        assert "primary" in self.body.lower()
+
+
+# ---------------------------------------------------------------------------
+# 7) World Bible page buttons
+# ---------------------------------------------------------------------------
+
+
+class TestWorldBibleButtons:
+    """World Bible page: add entity, delete entity, save memory, coherence, etc."""
+
+    @pytest.fixture(autouse=True)
+    def _load(self):
+        self.body = _extract_render_function("render_world")
+
+    def test_go_to_projects_button(self):
+        assert "Go to Projects" in self.body
+
+    def test_add_entity_button(self):
+        assert "Add {category}" in self.body or "➕ Add" in self.body
+
+    def test_add_entity_calls_rerun(self):
+        idx = self.body.index("➕ Add")
+        after = self.body[idx : idx + 400]
+        assert "st.rerun()" in after
+
+    def test_delete_entity_button_has_key(self):
+        assert 'key=f"del_{e.id}"' in self.body
+
+    def test_delete_entity_calls_rerun(self):
+        idx = self.body.index("🗑 Delete")
+        after = self.body[idx : idx + 400]
+        assert "st.rerun()" in after
+
+    def test_confirm_delete_button(self):
+        assert '"Confirm"' in self.body
+
+    def test_confirm_delete_calls_rerun(self):
+        idx = self.body.index('"Confirm"')
+        after = self.body[idx : idx + 500]
+        assert "st.rerun()" in after
+
+    def test_cancel_delete_calls_rerun(self):
+        # The entity delete Cancel button (not form cancel) calls rerun
+        assert '"Cancel"' in self.body
+        idx = self.body.rindex('"Cancel"')  # Last Cancel is the delete-cancel
+        after = self.body[idx : idx + 400]
+        assert "st.rerun()" in after
+
+    def test_save_memory_button(self):
+        assert "Save Memory" in self.body
+
+    def test_save_memory_calls_rerun(self):
+        idx = self.body.index("Save Memory")
+        after = self.body[idx : idx + 400]
+        assert "st.rerun()" in after
+
+    def test_apply_suggestion_button_has_key(self):
+        assert 'key=f"apply_suggestion_{idx}"' in self.body
+
+    def test_apply_suggestion_calls_rerun(self):
+        idx = self.body.index("✅ Apply")
+        after = self.body[idx : idx + 1200]
+        assert "st.rerun()" in after
+
+    def test_ignore_suggestion_button_has_key(self):
+        assert 'key=f"ignore_suggestion_{idx}"' in self.body
+
+    def test_ignore_suggestion_calls_rerun(self):
+        idx = self.body.index('key=f"ignore_suggestion')
+        after = self.body[idx : idx + 400]
+        assert "st.rerun()" in after
+
+    def test_coherence_check_button(self):
+        assert "coherence" in self.body.lower()
+
+    def test_apply_fix_button_has_key(self):
+        assert 'key=f"coh_apply_{idx}"' in self.body
+
+    def test_ignore_coherence_button_has_key(self):
+        assert 'key=f"coh_ignore_{idx}"' in self.body
+
+    def test_ignore_coherence_calls_rerun(self):
+        idx = self.body.index('key=f"coh_ignore')
+        after = self.body[idx : idx + 400]
+        assert "st.rerun()" in after
+
+    def test_jump_to_chapter_button_has_key(self):
+        assert 'key=f"jump_{e.id}"' in self.body
+
+    def test_jump_to_entity_button_has_key(self):
+        assert 'key=f"jump_entity_{ent.id}"' in self.body
+
+    def test_jump_to_entity_calls_rerun(self):
+        idx = self.body.index("Jump to Entity")
+        after = self.body[idx : idx + 500]
+        assert "st.rerun()" in after
+
+    def test_form_submit_save_exists(self):
+        assert "form_submit_button" in self.body
+
+    def test_form_cancel_exists(self):
+        # Check that entity form has both Save and Cancel buttons
+        assert '"Save"' in self.body
+        assert '"Cancel"' in self.body
+
+
+# ---------------------------------------------------------------------------
+# 8) Editor / Chapters page buttons
+# ---------------------------------------------------------------------------
+
+
+class TestEditorButtons:
+    """Editor (chapters) page: create, delete, save, summary, improve, auto-write."""
+
+    @pytest.fixture(autouse=True)
+    def _load(self):
+        self.body = _extract_render_function("render_chapters")
+
+    # --- No-project state ---
+    def test_go_to_projects_when_no_project(self):
+        assert "Go to Projects" in self.body
+
+    def test_go_to_projects_has_key(self):
+        assert "editor_no_project_go_projects" in self.body
+
+    def test_go_to_projects_calls_rerun(self):
+        idx = self.body.index("editor_no_project_go_projects")
+        after = self.body[idx : idx + 200]
+        assert "st.rerun()" in after
+
+    # --- Create chapter ---
+    def test_create_chapter_1_button_has_key(self):
+        assert "editor_create_chapter_1" in self.body
+
+    def test_create_chapter_1_type_primary(self):
+        idx = self.body.index("Create Chapter 1")
+        block = self.body[idx - 50 : idx + 200]
+        assert 'type="primary"' in block
+
+    def test_new_chapter_button_has_key(self):
+        assert "editor_new_chapter" in self.body
+
+    # --- Delete chapter ---
+    def test_delete_chapter_button_has_key(self):
+        assert 'key=f"editor_del_{curr.id}"' in self.body
+
+    def test_delete_chapter_calls_rerun(self):
+        idx = self.body.index("Delete Chapter")
+        after = self.body[idx : idx + 400]
+        assert "st.rerun()" in after
+
+    def test_delete_confirm_has_key(self):
+        assert "editor_del_ch_confirm" in self.body
+
+    def test_delete_confirm_calls_rerun(self):
+        idx = self.body.index("editor_del_ch_confirm")
+        after = self.body[idx : idx + 800]
+        assert "st.rerun()" in after
+
+    def test_delete_cancel_has_key(self):
+        assert "editor_del_ch_cancel" in self.body
+
+    def test_delete_cancel_calls_rerun(self):
+        idx = self.body.index("editor_del_ch_cancel")
+        after = self.body[idx : idx + 400]
+        assert "st.rerun()" in after
+
+    # --- Save chapter ---
+    def test_save_chapter_button(self):
+        assert "Save Chapter" in self.body
+
+    def test_save_chapter_has_key(self):
+        assert 'key=f"editor_save_{curr.id}"' in self.body
+
+    def test_save_chapter_calls_rerun(self):
+        idx = self.body.index("Save Chapter")
+        after = self.body[idx : idx + 800]
+        assert "st.rerun()" in after
+
+    # --- Summary ---
+    def test_update_summary_button(self):
+        assert "Update Summary" in self.body
+
+    def test_update_summary_has_key(self):
+        assert "editor_summary_" in self.body
+
+    def test_update_summary_calls_rerun(self):
+        idx = self.body.index("editor_summary_")
+        after = self.body[idx : idx + 800]
+        assert "st.rerun()" in after
+
+    # --- Improve ---
+    def test_generate_improvement_button(self):
+        assert "Generate Improvement" in self.body
+
+    def test_generate_improvement_has_key(self):
+        assert "editor_improve__generate_" in self.body
+
+    # --- Undo ---
+    def test_undo_button(self):
+        assert "Undo last apply" in self.body
+
+    def test_undo_has_key(self):
+        assert "editor_improve__undo_" in self.body
+
+    def test_undo_calls_rerun_on_success(self):
+        idx = self.body.index("Undo last apply")
+        after = self.body[idx : idx + 1000]
+        assert "st.rerun()" in after
+
+    # --- Apply Changes ---
+    def test_apply_changes_button(self):
+        assert "Apply Changes" in self.body
+
+    def test_apply_changes_has_key(self):
+        assert "editor_improve__apply_" in self.body
+
+    def test_apply_changes_calls_rerun(self):
+        idx = self.body.index("editor_improve__apply_")
+        after = self.body[idx : idx + 3000]
+        assert "st.rerun()" in after
+
+    # --- Copy Improved ---
+    def test_copy_improved_button(self):
+        assert "Copy Improved" in self.body
+
+    def test_copy_improved_has_key(self):
+        assert "editor_improve__copy_" in self.body
+
+    # --- Regenerate ---
+    def test_regenerate_button(self):
+        assert "Regenerate" in self.body
+
+    def test_regenerate_has_key(self):
+        assert "editor_improve__regenerate_" in self.body
+
+    # --- Discard ---
+    def test_discard_button(self):
+        assert "Discard" in self.body
+
+    def test_discard_has_key(self):
+        assert "editor_improve__discard_" in self.body
+
+    def test_discard_calls_rerun(self):
+        idx = self.body.index("editor_improve__discard_")
+        after = self.body[idx : idx + 400]
+        assert "st.rerun()" in after
+
+    # --- Auto-Write ---
+    def test_auto_write_button(self):
+        assert "Auto-Write Chapter" in self.body
+
+    def test_auto_write_has_key(self):
+        assert "editor_autowrite_" in self.body
+
+    def test_auto_write_blocked_has_key(self):
+        assert "editor_autowrite_blocked_" in self.body
+
+    # --- Set draft as active ---
+    def test_set_draft_active_button(self):
+        assert "Set as active" in self.body
+
+    def test_set_draft_active_has_key(self):
+        assert "editor_improve__set_active_" in self.body
+
+    def test_set_draft_active_calls_rerun(self):
+        idx = self.body.index("editor_improve__set_active_")
+        after = self.body[idx : idx + 1000]
+        assert "st.rerun()" in after
+
+    # --- Chapter navigation ---
+    def test_chapter_nav_buttons_have_keys(self):
+        assert "chapter_id" in self.body and "key=" in self.body
+
+
+# ---------------------------------------------------------------------------
+# 9) Export page buttons
+# ---------------------------------------------------------------------------
+
+
+class TestExportPageButtons:
+    """Export page must exist and have download/navigation functionality."""
+
+    def test_export_function_exists(self):
+        src = _source()
+        assert "def render_export" in src
+
+    def test_export_has_download_button(self):
+        body = _extract_render_function("render_export")
+        assert "download_button" in body or "download" in body.lower()
+
+
+# ---------------------------------------------------------------------------
+# 10) Welcome banner buttons
+# ---------------------------------------------------------------------------
+
+
+class TestWelcomeBannerButtons:
+    """Welcome banner: create first project and dismiss buttons."""
+
+    @pytest.fixture(autouse=True)
+    def _load(self):
+        self.body = _extract_render_function("render_welcome_banner")
+
+    def test_create_first_project_button(self):
+        assert "Create My First Project" in self.body
+
+    def test_create_first_project_type_primary(self):
+        idx = self.body.index("Create My First Project")
+        block = self.body[idx - 50 : idx + 200]
+        assert 'type="primary"' in block
+
+    def test_create_first_project_calls_rerun(self):
+        idx = self.body.index("Create My First Project")
+        after = self.body[idx : idx + 400]
+        assert "st.rerun()" in after
+
+    def test_dismiss_button(self):
+        assert "Got it" in self.body
+
+    def test_dismiss_calls_rerun(self):
+        idx = self.body.index("Got it")
+        after = self.body[idx : idx + 400]
+        assert "st.rerun()" in after
+
+
+# ---------------------------------------------------------------------------
+# 11) Page header buttons (generic reusable component)
+# ---------------------------------------------------------------------------
+
+
+class TestPageHeaderButtons:
+    """render_page_header: primary and secondary action buttons."""
+
+    @pytest.fixture(autouse=True)
+    def _load(self):
+        self.body = _extract_render_function("render_page_header")
+
+    def test_primary_button_has_key(self):
+        assert "{key_prefix}__primary" in self.body
+
+    def test_primary_button_type(self):
+        assert 'type="primary"' in self.body
+
+    def test_secondary_button_has_key(self):
+        assert "{key_prefix}__secondary" in self.body
+
+    def test_primary_calls_action(self):
+        assert "primary_action()" in self.body
+
+    def test_secondary_calls_action(self):
+        assert "secondary_action()" in self.body
+
+
+# ---------------------------------------------------------------------------
+# 12) Cross-cutting: every st.button that sets page must call rerun
+# ---------------------------------------------------------------------------
+
+
+class TestNavigationButtonsCallRerun:
+    """Every button that sets st.session_state.page must also call st.rerun()."""
+
+    def test_all_page_setting_buttons_call_rerun(self):
+        src = _source()
+        lines = src.split("\n")
+        violations = []
+        for i, line in enumerate(lines):
+            stripped = line.strip()
+            if "session_state.page" in stripped and "=" in stripped and "==" not in stripped:
+                # Look back up to 20 lines for a st.button context
+                context_start = max(0, i - 20)
+                context = "\n".join(lines[context_start : i + 1])
+                if "st.button(" in context:
+                    # Look forward for st.rerun() within 10 lines
+                    forward = "\n".join(lines[i : i + 10])
+                    if "st.rerun()" not in forward:
+                        violations.append(
+                            f"Line {i + 1}: sets session_state.page but doesn't call st.rerun() nearby"
+                        )
+        assert not violations, (
+            f"Buttons that navigate must call st.rerun():\n" + "\n".join(violations)
+        )
+
+
+# ---------------------------------------------------------------------------
+# 13) Cross-cutting: form submit buttons
+# ---------------------------------------------------------------------------
+
+
+class TestFormSubmitButtons:
+    """Every form_submit_button in the app."""
+
+    def test_create_project_form_submit(self):
+        src = _source()
+        assert '🚀 Create Project' in src
+
+    def test_entity_form_save(self):
+        src = _source()
+        # The entity form has Save and Cancel submit buttons
+        idx = src.index('form_submit_button("Save"')
+        assert idx > 0
+
+    def test_entity_form_cancel(self):
+        src = _source()
+        idx = src.index('form_submit_button("Cancel"')
+        assert idx > 0
+
+
+# ---------------------------------------------------------------------------
+# 14) Cross-cutting: link_button calls
+# ---------------------------------------------------------------------------
+
+
+class TestLinkButtons:
+    """All link_button calls should have valid URLs."""
+
+    def test_help_docs_link(self):
+        src = _source()
+        assert "github.com/bigmanjer/Mantis-Studio" in src
+
+    def test_groq_link(self):
+        src = _source()
+        assert "console.groq.com" in src
+
+    def test_openai_link(self):
+        src = _source()
+        assert "platform.openai.com" in src
+
+
+# ---------------------------------------------------------------------------
+# 15) Sidebar navigation buttons
+# ---------------------------------------------------------------------------
+
+
+class TestSidebarNavButtons:
+    """Sidebar nav buttons should have keys and call st.rerun."""
+
+    def test_sidebar_nav_buttons_have_keys(self):
+        src = _source()
+        assert 'key=f"nav_{target}"' in src
+
+    def test_sidebar_nav_buttons_call_rerun(self):
+        src = _source()
+        idx = src.index('key=f"nav_{target}"')
+        after = src[idx : idx + 200]
+        assert "st.rerun()" in after
+
+
+# ---------------------------------------------------------------------------
+# 16) Comprehensive: both main.py and app_context.py have matching buttons
+# ---------------------------------------------------------------------------
+
+
+class TestMainAndAppContextButtonParity:
+    """Critical buttons must exist in both main.py and app_context.py."""
+
+    def test_create_chapter_1_in_both(self):
+        main = _source()
+        ctx = _read(APP_CTX)
+        assert "editor_create_chapter_1" in main
+        assert "editor_create_chapter_1" in ctx
+
+    def test_new_chapter_in_both(self):
+        main = _source()
+        ctx = _read(APP_CTX)
+        assert "editor_new_chapter" in main
+        assert "editor_new_chapter" in ctx
+
+
+# ---------------------------------------------------------------------------
+# 17) Every delete-confirmation button pair calls rerun
+# ---------------------------------------------------------------------------
+
+
+class TestDeleteConfirmationPairs:
+    """Delete flows: the initial delete button, confirm, and cancel must all rerun."""
+
+    def test_chapter_delete_flow(self):
+        body = _extract_render_function("render_chapters")
+        # Delete button sets delete_chapter_id then calls rerun
+        assert "delete_chapter_id" in body
+        assert "delete_chapter_title" in body
+        # Count rerun calls - there should be at least 3 for delete flow
+        # (initial, confirm, cancel)
+        idx = body.index("Delete Chapter")
+        section = body[idx : idx + 500]
+        rerun_count = section.count("st.rerun()")
+        assert rerun_count >= 1, "Delete chapter button must call st.rerun()"
+
+    def test_entity_delete_flow(self):
+        body = _extract_render_function("render_world")
+        assert "delete_entity_id" in body
+        assert "delete_entity_name" in body
+
+    def test_project_delete_flow(self):
+        body = _extract_render_function("render_projects")
+        assert "delete_project_path" in body or "Confirm delete" in body
+
+
+# ---------------------------------------------------------------------------
+# 18) AI Settings: Apply Key fetches models automatically
+# ---------------------------------------------------------------------------
+
+
+class TestApplyKeyAutoFetch:
+    """Pressing Apply Key should automatically fetch models."""
+
+    def test_groq_or_openai_fetch_in_apply_handler(self):
+        body = _extract_render_function("render_ai_settings")
+        # Find the Apply Key handler
+        idx = body.index("Apply Key")
+        handler = body[idx : idx + 600]
+        # Should reference a fetch function
+        assert (
+            "fetch_fn" in handler
+            or "fetch_groq_models" in handler
+            or "fetch_openai_models" in handler
+        ), "Apply Key should auto-fetch models"
+
+
+# ---------------------------------------------------------------------------
+# 19) Button count sanity check
+# ---------------------------------------------------------------------------
+
+
+class TestButtonCountSanity:
+    """Ensure the app has a reasonable number of buttons (no accidental removal)."""
+
+    def test_main_has_at_least_60_buttons(self):
+        src = _source()
+        count = src.count("st.button(")
+        assert count >= 60, f"Expected at least 60 buttons in main.py, found {count}"
+
+    def test_app_context_has_buttons(self):
+        ctx = _read(APP_CTX)
+        count = ctx.count("st.button(")
+        assert count >= 30, f"Expected at least 30 buttons in app_context.py, found {count}"
+
+
+# ---------------------------------------------------------------------------
+# 20) Every render function with buttons handles its state correctly
+# ---------------------------------------------------------------------------
+
+
+class TestRenderFunctionButtonIntegrity:
+    """Every render function that has buttons should properly wire them."""
+
+    @pytest.mark.parametrize(
+        "fn_name",
+        [
+            "render_home",
+            "render_projects",
+            "render_ai_settings",
+            "render_outline",
+            "render_world",
+            "render_chapters",
+        ],
+    )
+    def test_render_function_has_buttons(self, fn_name):
+        body = _extract_render_function(fn_name)
+        assert "st.button(" in body, f"{fn_name} should have at least one button"
+
+    @pytest.mark.parametrize(
+        "fn_name",
+        [
+            "render_home",
+            "render_projects",
+            "render_outline",
+            "render_world",
+            "render_chapters",
+        ],
+    )
+    def test_render_function_has_rerun(self, fn_name):
+        body = _extract_render_function(fn_name)
+        assert "st.rerun()" in body, f"{fn_name} should call st.rerun() somewhere"
+
+
+# ============================================================================
+# Tests from test_helpers.py — Helper function unit tests
+# ============================================================================
+
+# ============================================================================
+# word_count Tests
+# ============================================================================
+
+class TestWordCount:
+    """Test suite for word_count utility function."""
+
+    @pytest.mark.parametrize(
+        "text,expected",
+        [
+            # Basic cases
+            ("hello world", 2),
+            ("single", 1),
+            ("one two three four five", 5),
+            
+            # Empty and whitespace
+            ("", 0),
+            ("   ", 0),
+            ("\n\n\n", 0),
+            ("\t\t", 0),
+            
+            # None handling
+            (None, 0),
+            
+            # Multiple whitespace types
+            ("word1\tword2\nword3", 3),
+            ("multiple   spaces   between", 3),
+            
+            # Punctuation (counted as part of words)
+            ("Hello, world!", 2),
+            ("It's a test.", 3),
+            ("One-two three", 2),
+            
+            # Numbers
+            ("123 456 789", 3),
+            ("word 123 word", 3),
+            
+            # Unicode
+            ("café résumé", 2),
+            ("hello 世界", 2),
+            
+            # Long text
+            ("The quick brown fox jumps over the lazy dog", 9),
+        ],
+    )
+    @pytest.mark.unit
+    def test_word_count_parametrized(self, text: str | None, expected: int):
+        """Test word_count with various inputs."""
+        assert word_count(text) == expected
+
+    @pytest.mark.unit
+    def test_word_count_paragraph(self):
+        """Test word_count with a full paragraph."""
+        text = """
+        This is a test paragraph with multiple lines.
+        It contains several sentences and should be counted correctly.
+        The function splits on whitespace.
+        """
+        # Count actual words (excluding empty strings from split)
+        expected = len([w for w in text.split() if w])
+        assert word_count(text) == expected
+
+
+# ============================================================================
+# clamp Tests
+# ============================================================================
+
+class TestClamp:
+    """Test suite for clamp utility function."""
+
+    @pytest.mark.parametrize(
+        "value,low,high,expected",
+        [
+            # Integer cases - value within bounds
+            (5, 0, 10, 5),
+            (0, 0, 10, 0),
+            (10, 0, 10, 10),
+            
+            # Integer cases - value below bounds
+            (-5, 0, 10, 0),
+            (-100, 0, 10, 0),
+            
+            # Integer cases - value above bounds
+            (15, 0, 10, 10),
+            (100, 0, 10, 10),
+            
+            # Float cases - value within bounds
+            (5.5, 0.0, 10.0, 5.5),
+            (0.0, 0.0, 10.0, 0.0),
+            (10.0, 0.0, 10.0, 10.0),
+            
+            # Float cases - value below bounds
+            (-5.5, 0.0, 10.0, 0.0),
+            (-100.5, 0.0, 10.0, 0.0),
+            
+            # Float cases - value above bounds
+            (15.5, 0.0, 10.0, 10.0),
+            (100.5, 0.0, 10.0, 10.0),
+            
+            # Mixed int/float
+            (5, 0.0, 10.0, 5),
+            (5.5, 0, 10, 5.5),
+            
+            # Negative bounds
+            (-5, -10, -1, -5),
+            (-15, -10, -1, -10),
+            (0, -10, -1, -1),
+            
+            # Zero bounds
+            (5, 0, 0, 0),
+            (-5, 0, 0, 0),
+            
+            # Same low and high
+            (5, 10, 10, 10),
+            (15, 10, 10, 10),
+        ],
+    )
+    @pytest.mark.unit
+    def test_clamp_parametrized(
+        self,
+        value: int | float,
+        low: int | float,
+        high: int | float,
+        expected: int | float
+    ):
+        """Test clamp with various numeric inputs."""
+        assert clamp(value, low, high) == expected
+
+    @pytest.mark.unit
+    def test_clamp_preserves_type(self):
+        """Test that clamp preserves numeric types when possible."""
+        # Integer clamping
+        result = clamp(5, 0, 10)
+        assert isinstance(result, int)
+        
+        # Float clamping
+        result = clamp(5.5, 0.0, 10.0)
+        assert isinstance(result, float)
+
+
+# ============================================================================
+# current_year Tests
+# ============================================================================
+
+class TestCurrentYear:
+    """Test suite for current_year utility function."""
+
+    @pytest.mark.unit
+    def test_current_year_returns_int(self):
+        """Test that current_year returns an integer."""
+        year = current_year()
+        assert isinstance(year, int)
+
+    @pytest.mark.unit
+    def test_current_year_reasonable_value(self):
+        """Test that current_year returns a reasonable year value."""
+        year = current_year()
+        # Should be between 2024 and 2100 for the foreseeable future
+        assert 2024 <= year <= 2100
+
+    @pytest.mark.unit
+    def test_current_year_matches_datetime(self):
+        """Test that current_year matches datetime.now()."""
+        year = current_year()
+        expected = datetime.datetime.now(datetime.timezone.utc).year
+        assert year == expected
+
+
+# ============================================================================
+# AI Connection Helper Tests
+# ============================================================================
+
+class TestAIConnectionHelpers:
+    """Test suite for AI connection helper functions."""
+
+    @pytest.mark.unit
+    def test_has_any_api_key_with_ai_configured(self, mock_session_state):
+        """Test _has_any_api_key when ai_configured flag is set."""
+        from app.utils.helpers import _has_any_api_key
+        
+        mock_session_state["ai_configured"] = True
+        assert _has_any_api_key(mock_session_state) is True
+
+    @pytest.mark.unit
+    def test_has_any_api_key_with_api_keys_flag(self, mock_session_state):
+        """Test _has_any_api_key when api_keys flag is set."""
+        from app.utils.helpers import _has_any_api_key
+        
+        mock_session_state["api_keys"] = True
+        assert _has_any_api_key(mock_session_state) is True
+
+    @pytest.mark.unit
+    def test_has_any_api_key_with_providers(self, mock_session_state):
+        """Test _has_any_api_key when providers flag is set."""
+        from app.utils.helpers import _has_any_api_key
+        
+        mock_session_state["providers"] = True
+        assert _has_any_api_key(mock_session_state) is True
+
+    @pytest.mark.unit
+    def test_has_any_api_key_with_ai_keys_dict(self, mock_session_state):
+        """Test _has_any_api_key with ai_keys dictionary."""
+        from app.utils.helpers import _has_any_api_key
+        
+        mock_session_state["ai_keys"] = {"groq": "test-key"}
+        assert _has_any_api_key(mock_session_state) is True
+
+    @pytest.mark.unit
+    def test_has_any_api_key_with_session_keys(self, mock_session_state):
+        """Test _has_any_api_key with ai_session_keys."""
+        from app.utils.helpers import _has_any_api_key
+        
+        mock_session_state["ai_session_keys"] = {"openai": "test-key"}
+        assert _has_any_api_key(mock_session_state) is True
+
+    @pytest.mark.unit
+    def test_has_any_api_key_with_direct_keys(self, mock_session_state):
+        """Test _has_any_api_key with direct API key values."""
+        from app.utils.helpers import _has_any_api_key
+        
+        mock_session_state["groq_api_key"] = "test-groq-key"
+        assert _has_any_api_key(mock_session_state) is True
+        
+        mock_session_state["groq_api_key"] = None
+        mock_session_state["openai_api_key"] = "test-openai-key"
+        assert _has_any_api_key(mock_session_state) is True
+
+    @pytest.mark.unit
+    def test_has_any_api_key_no_keys(self, mock_session_state):
+        """Test _has_any_api_key when no keys are configured."""
+        from app.utils.helpers import _has_any_api_key
+        
+        # Default mock_session_state has empty ai_keys
+        assert _has_any_api_key(mock_session_state) is False
+
+    @pytest.mark.unit
+    def test_has_tested_connection_with_groq_tests(self, mock_session_state):
+        """Test _has_tested_connection with groq model tests."""
+        from app.utils.helpers import _has_tested_connection
+        
+        mock_session_state["groq_model_tests"] = {"model1": "success"}
+        assert _has_tested_connection(mock_session_state) is True
+
+    @pytest.mark.unit
+    def test_has_tested_connection_with_openai_tests(self, mock_session_state):
+        """Test _has_tested_connection with openai model tests."""
+        from app.utils.helpers import _has_tested_connection
+        
+        mock_session_state["openai_model_tests"] = {"model1": "success"}
+        assert _has_tested_connection(mock_session_state) is True
+
+    @pytest.mark.unit
+    def test_has_tested_connection_with_model_lists(self, mock_session_state):
+        """Test _has_tested_connection with model lists."""
+        from app.utils.helpers import _has_tested_connection
+        
+        mock_session_state["groq_model_list"] = ["model1", "model2"]
+        assert _has_tested_connection(mock_session_state) is True
+
+    @pytest.mark.unit
+    def test_has_tested_connection_with_flags(self, mock_session_state):
+        """Test _has_tested_connection with connection tested flags."""
+        from app.utils.helpers import _has_tested_connection
+        
+        mock_session_state["groq_connection_tested"] = True
+        assert _has_tested_connection(mock_session_state) is True
+
+    @pytest.mark.unit
+    def test_has_tested_connection_no_tests(self, mock_session_state):
+        """Test _has_tested_connection when no tests have been run."""
+        from app.utils.helpers import _has_tested_connection
+        
+        assert _has_tested_connection(mock_session_state) is False
+
+
+# ============================================================================
+# Tests from test_router.py — Router and navigation tests
+# ============================================================================
+
+# ============================================================================
+# Navigation Configuration Tests
+# ============================================================================
+
+class TestGetNavConfig:
+    """Test suite for get_nav_config function."""
+
+    @pytest.mark.unit
+    def test_get_nav_config_returns_tuple(self):
+        """Test that get_nav_config returns a tuple of (labels, page_map)."""
+        result = get_nav_config(has_project=True)
+        assert isinstance(result, tuple)
+        assert len(result) == 2
+
+    @pytest.mark.unit
+    def test_get_nav_config_labels_is_list(self):
+        """Test that nav labels is a list of strings."""
+        labels, _ = get_nav_config(has_project=True)
+        assert isinstance(labels, list)
+        assert len(labels) > 0
+        assert all(isinstance(label, str) for label in labels)
+
+    @pytest.mark.unit
+    def test_get_nav_config_page_map_is_dict(self):
+        """Test that page_map is a dict mapping labels to keys."""
+        _, page_map = get_nav_config(has_project=True)
+        assert isinstance(page_map, dict)
+        assert len(page_map) > 0
+        assert all(isinstance(k, str) and isinstance(v, str) for k, v in page_map.items())
+
+    @pytest.mark.unit
+    def test_get_nav_config_contains_required_pages(self):
+        """Test that nav config includes required pages."""
+        labels, page_map = get_nav_config(has_project=True)
+        
+        # Check for essential pages
+        required_labels = ["Dashboard", "Projects"]
+        for required in required_labels:
+            assert required in labels, f"Missing required nav item: {required}"
+
+    @pytest.mark.unit
+    def test_get_nav_config_page_map_maps_labels(self):
+        """Test that all labels have corresponding page_map entries."""
+        labels, page_map = get_nav_config(has_project=True)
+        
+        for label in labels:
+            assert label in page_map, f"Label '{label}' not in page_map"
+
+    @pytest.mark.parametrize("has_project", [True, False])
+    @pytest.mark.unit
+    def test_get_nav_config_with_project_param(self, has_project: bool):
+        """Test get_nav_config with different has_project values."""
+        labels, page_map = get_nav_config(has_project=has_project)
+        
+        # Should return valid config regardless of has_project
+        assert isinstance(labels, list)
+        assert isinstance(page_map, dict)
+        assert len(labels) > 0
+        assert len(page_map) > 0
+
+
+# ============================================================================
+# Route Mapping Tests
+# ============================================================================
+
+class TestGetRoutes:
+    """Test suite for get_routes function."""
+
+    @pytest.mark.unit
+    def test_get_routes_returns_dict(self):
+        """Test that get_routes returns a dictionary."""
+        routes = get_routes()
+        assert isinstance(routes, dict)
+
+    @pytest.mark.unit
+    def test_get_routes_all_values_are_callable(self):
+        """Test that all route values are callable functions."""
+        routes = get_routes()
+        for route_key, renderer in routes.items():
+            assert callable(renderer), f"Route '{route_key}' renderer is not callable"
+
+    @pytest.mark.unit
+    def test_get_routes_contains_required_routes(self):
+        """Test that get_routes includes all required routes."""
+        routes = get_routes()
+        
+        required_routes = [
+            "home",
+            "projects",
+            "outline",
+            "chapters",
+            "world",
+            "export",
+            "ai",
+            "legal",
+        ]
+        
+        for route in required_routes:
+            assert route in routes, f"Missing required route: {route}"
+
+    @pytest.mark.unit
+    def test_get_routes_includes_legal_subroutes(self):
+        """Test that get_routes includes legal sub-pages."""
+        routes = get_routes()
+        
+        legal_routes = ["terms", "privacy", "copyright", "cookie", "help"]
+        
+        for route in legal_routes:
+            assert route in routes, f"Missing legal route: {route}"
+
+    @pytest.mark.unit
+    def test_get_routes_renderers_have_correct_names(self):
+        """Test that route renderers have expected function names."""
+        routes = get_routes()
+        
+        # Map routes to expected renderer function names
+        expected_names = {
+            "home": "render_home",
+            "projects": "render_projects",
+            "outline": "render_outline",
+            "chapters": "render_chapters",
+            "world": "render_world",
+            "export": "render_export",
+            "ai": "render_ai_settings",
+        }
+        
+        for route, expected_name in expected_names.items():
+            renderer = routes.get(route)
+            assert renderer is not None, f"Route '{route}' not found"
+            assert renderer.__name__ == expected_name, \
+                f"Route '{route}' has renderer '{renderer.__name__}', expected '{expected_name}'"
+
+    @pytest.mark.parametrize(
+        "route_key",
+        [
+            "home",
+            "projects",
+            "outline",
+            "chapters",
+            "world",
+            "export",
+            "ai",
+            "legal",
+            "terms",
+            "privacy",
+            "copyright",
+            "cookie",
+            "help",
+        ]
+    )
+    @pytest.mark.unit
+    def test_get_routes_each_route_exists(self, route_key: str):
+        """Test that each expected route exists in the routes dict."""
+        routes = get_routes()
+        assert route_key in routes, f"Route '{route_key}' not found in routes"
+        assert callable(routes[route_key]), f"Route '{route_key}' is not callable"
+
+
+# ============================================================================
+# Route Integration Tests
+# ============================================================================
+
+class TestRouteIntegration:
+    """Integration tests for navigation and routing."""
+
+    @pytest.mark.integration
+    def test_all_nav_labels_have_routes(self):
+        """Test that all navigation labels map to valid routes."""
+        labels, page_map = get_nav_config(has_project=True)
+        routes = get_routes()
+        
+        for label in labels:
+            page_key = page_map.get(label)
+            assert page_key is not None, f"Label '{label}' has no page_map entry"
+            
+            # The page_key should exist in routes
+            # (though some may map to the same renderer, like legal pages)
+            assert page_key in routes or any(page_key in routes for _ in [1]), \
+                f"Page key '{page_key}' for label '{label}' not found in routes"
+
+    @pytest.mark.integration
+    def test_route_consistency(self):
+        """Test that routes and navigation config are consistent."""
+        labels, page_map = get_nav_config(has_project=True)
+        routes = get_routes()
+        
+        # All page_map values should be route keys
+        for label, page_key in page_map.items():
+            # Extended map may include additional routes
+            if page_key not in routes:
+                # This is acceptable for extended routes
+                continue
+            
+            assert page_key in routes, \
+                f"Navigation label '{label}' maps to '{page_key}' which is not in routes"
+
+    @pytest.mark.integration
+    def test_no_duplicate_routes(self):
+        """Test that route keys are unique."""
+        routes = get_routes()
+        route_keys = list(routes.keys())
+        
+        # Check for duplicates
+        assert len(route_keys) == len(set(route_keys)), \
+            "Duplicate route keys found"
+
+    @pytest.mark.integration
+    def test_legal_routes_all_map_to_legal_redirect(self):
+        """Test that all legal sub-routes use the same renderer."""
+        routes = get_routes()
+        
+        legal_routes = ["legal", "terms", "privacy", "copyright", "cookie", "help"]
+        
+        # All should map to render_legal_redirect
+        legal_renderer = routes["legal"]
+        for route in legal_routes:
+            assert routes[route] == legal_renderer, \
+                f"Legal route '{route}' does not use render_legal_redirect"
+
+
+# ============================================================================
+# Tests from test_services.py — Service layer tests
+# ============================================================================
+
+class TestSafeEnvParsing:
+    """Verify that _safe_int and _safe_float handle bad env vars gracefully."""
+
+    def test_safe_int_valid(self):
+        from app.config.settings import _safe_int
+
+        os.environ["_TEST_SAFE_INT"] = "42"
+        try:
+            assert _safe_int("_TEST_SAFE_INT", 10) == 42
+        finally:
+            del os.environ["_TEST_SAFE_INT"]
+
+    def test_safe_int_invalid_returns_default(self):
+        from app.config.settings import _safe_int
+
+        os.environ["_TEST_SAFE_INT"] = "not_a_number"
+        try:
+            assert _safe_int("_TEST_SAFE_INT", 10) == 10
+        finally:
+            del os.environ["_TEST_SAFE_INT"]
+
+    def test_safe_int_empty_returns_default(self):
+        from app.config.settings import _safe_int
+
+        assert _safe_int("_TEST_NONEXISTENT_VAR_12345", 99) == 99
+
+    def test_safe_float_valid(self):
+        from app.config.settings import _safe_float
+
+        os.environ["_TEST_SAFE_FLOAT"] = "3.14"
+        try:
+            assert abs(_safe_float("_TEST_SAFE_FLOAT", 1.0) - 3.14) < 0.001
+        finally:
+            del os.environ["_TEST_SAFE_FLOAT"]
+
+    def test_safe_float_invalid_returns_default(self):
+        from app.config.settings import _safe_float
+
+        os.environ["_TEST_SAFE_FLOAT"] = "abc"
+        try:
+            assert _safe_float("_TEST_SAFE_FLOAT", 0.5) == 0.5
+        finally:
+            del os.environ["_TEST_SAFE_FLOAT"]
+
+
+class TestMainSafeEnvParsing:
+    """Verify that _safe_int_env and _safe_float_env in main.py handle bad env vars."""
+
+    def test_safe_int_env_valid(self):
+        from app.main import _safe_int_env
+
+        os.environ["_TEST_MAIN_INT"] = "42"
+        try:
+            assert _safe_int_env("_TEST_MAIN_INT", 10) == 42
+        finally:
+            del os.environ["_TEST_MAIN_INT"]
+
+    def test_safe_int_env_invalid_returns_default(self):
+        from app.main import _safe_int_env
+
+        os.environ["_TEST_MAIN_INT"] = "not_a_number"
+        try:
+            assert _safe_int_env("_TEST_MAIN_INT", 10) == 10
+        finally:
+            del os.environ["_TEST_MAIN_INT"]
+
+    def test_safe_int_env_empty_returns_default(self):
+        from app.main import _safe_int_env
+
+        assert _safe_int_env("_TEST_NONEXISTENT_MAIN_INT", 99) == 99
+
+    def test_safe_float_env_valid(self):
+        from app.main import _safe_float_env
+
+        os.environ["_TEST_MAIN_FLOAT"] = "3.14"
+        try:
+            assert abs(_safe_float_env("_TEST_MAIN_FLOAT", 1.0) - 3.14) < 0.001
+        finally:
+            del os.environ["_TEST_MAIN_FLOAT"]
+
+    def test_safe_float_env_invalid_returns_default(self):
+        from app.main import _safe_float_env
+
+        os.environ["_TEST_MAIN_FLOAT"] = "abc"
+        try:
+            assert _safe_float_env("_TEST_MAIN_FLOAT", 0.5) == 0.5
+        finally:
+            del os.environ["_TEST_MAIN_FLOAT"]
+
+
+class TestSafeConfigValueParsing:
+    """Verify that corrupted config values don't crash session state init."""
+
+    def _init_with_config(self, data):
+        """Helper to initialize session state with given config data."""
+        from app.config.settings import AppConfig
+        from app.state import initialize_session_state
+        from unittest.mock import MagicMock
+        import json
+
+        config_path = AppConfig.CONFIG_PATH
+        os.makedirs(os.path.dirname(config_path) or ".", exist_ok=True)
+        with open(config_path, "w", encoding="utf-8") as fh:
+            json.dump(data, fh)
+
+        class MockSessionState(dict):
+            """Dict subclass that acts like Streamlit session_state."""
+            def __setattr__(self, key, value):
+                self[key] = value
+            def __getattr__(self, key):
+                try:
+                    return self[key]
+                except KeyError:
+                    raise AttributeError(key)
+
+        mock_st = MagicMock()
+        mock_st.session_state = MockSessionState()
+
+        from app.config.settings import load_app_config
+        loaded = load_app_config()
+        initialize_session_state(mock_st, loaded)
+
+        try:
+            os.remove(config_path)
+        except OSError:
+            pass
+
+        return mock_st.session_state
+
+    def test_invalid_daily_word_goal(self):
+        """Non-numeric daily_word_goal falls back to default."""
+        state = self._init_with_config({"daily_word_goal": "not_a_number"})
+        assert state.get("daily_word_goal") == 500
+
+    def test_invalid_weekly_sessions_goal(self):
+        """Non-numeric weekly_sessions_goal falls back to default."""
+        state = self._init_with_config({"weekly_sessions_goal": "bad"})
+        assert state.get("weekly_sessions_goal") == 4
+
+    def test_invalid_focus_minutes(self):
+        """Non-numeric focus_minutes falls back to default."""
+        state = self._init_with_config({"focus_minutes": "nope"})
+        assert state.get("focus_minutes") == 25
+
+
+class TestFileLock:
+    """Verify the file_lock context manager works correctly."""
+
+    def test_file_lock_acquires_and_releases(self):
+        from app.services.storage import file_lock
+
+        with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as f:
+            path = f.name
+        try:
+            with file_lock(path, timeout=2) as acquired:
+                assert acquired is True
+                assert os.path.exists(path + ".lock")
+            # Lock file should be cleaned up after context exit
+            assert not os.path.exists(path + ".lock")
+        finally:
+            try:
+                os.remove(path)
+            except OSError:
+                pass
+
+    def test_file_lock_timeout(self):
+        from app.services.storage import file_lock, _acquire_lock
+
+        with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as f:
+            path = f.name
+        lock_path = path + ".lock"
+        try:
+            # Pre-create a lock file to simulate contention
+            with open(lock_path, "w") as lf:
+                lf.write("9999999")
+            # Set mtime to now so the stale-lock cleanup doesn't kick in
+            os.utime(lock_path, None)
+
+            with file_lock(path, timeout=0) as acquired:
+                assert acquired is False
+        finally:
+            try:
+                os.remove(lock_path)
+            except OSError:
+                pass
+            try:
+                os.remove(path)
+            except OSError:
+                pass
+
+
+class TestGenerateJsonExtraction:
+    """Verify that generate_json can extract JSON from AI responses."""
+
+    def test_json_surrounded_by_text(self):
+        # Simulate the JSON extraction logic from generate_json
+        import json
+        import re
+
+        txt = 'Here is the result: [{"name": "Aria"}] hope that helps!'
+        txt = re.sub(r"```json\s*", "", txt)
+        txt = re.sub(r"```\s*", "", txt).strip()
+        if not txt.startswith(("[", "{")):
+            bracket = txt.find("[")
+            brace = txt.find("{")
+            if bracket >= 0 and (brace < 0 or bracket < brace):
+                txt = txt[bracket:]
+            elif brace >= 0:
+                txt = txt[brace:]
+        # Should now parse successfully
+        d = json.loads(txt[:txt.rfind("]") + 1])
+        assert isinstance(d, list)
+        assert d[0]["name"] == "Aria"
+
+    def test_clean_json_array(self):
+        import json
+        txt = '[{"name": "Test"}]'
+        d = json.loads(txt)
+        assert isinstance(d, list)
+
+    def test_json_with_markdown_fences(self):
+        import json
+        import re
+        txt = '```json\n[{"name": "Test"}]\n```'
+        txt = re.sub(r"```json\s*", "", txt)
+        txt = re.sub(r"```\s*", "", txt).strip()
+        d = json.loads(txt)
+        assert isinstance(d, list)
+
+
+# ============================================================================
+# Tests from test_imports.py — Import smoke tests (deduplicated)
+# ============================================================================
+
+# ============================================================================
+# Service Module Imports
+# ============================================================================
+
+class TestServiceImports:
+    """Test that all service modules can be imported."""
+
+    @pytest.mark.parametrize(
+        "module_name",
+        [
+            "app.services.storage",
+            "app.services.export",
+            "app.services.ai",
+            "app.services.world_bible_db",
+            "app.services.world_bible",
+            "app.services.projects",
+            "app.services.world_bible_merge",
+        ]
+    )
+    @pytest.mark.smoke
+    def test_service_module_imports(self, module_name: str):
+        """Test that service modules import without errors."""
+        mod = importlib.import_module(module_name)
+        assert mod is not None
+
+
+# ============================================================================
+# View Module Imports
+# ============================================================================
+
+class TestViewImports:
+    """Test that all view modules can be imported."""
+
+    @pytest.mark.parametrize(
+        "module_name",
+        [
+            "app.views.ai_tools",
+            "app.views.dashboard",
+            "app.views.editor",
+            "app.views.export",
+            "app.views.legal",
+            "app.views.outline",
+            "app.views.projects",
+            "app.views.world_bible",
+        ]
+    )
+    @pytest.mark.smoke
+    def test_view_module_imports(self, module_name: str):
+        """Test that view modules import without errors."""
+        mod = importlib.import_module(module_name)
+        assert mod is not None
+
+
+# ============================================================================
+# Utility Module Imports
+# ============================================================================
+
+class TestUtilityImports:
+    """Test that all utility modules can be imported."""
+
+    @pytest.mark.parametrize(
+        "module_name",
+        [
+            "app.utils.keys",
+            "app.utils.auth",
+            "app.utils.versioning",
+            "app.utils.helpers",
+            "app.utils.navigation",
+        ]
+    )
+    @pytest.mark.smoke
+    def test_utility_module_imports(self, module_name: str):
+        """Test that utility modules import without errors."""
+        mod = importlib.import_module(module_name)
+        assert mod is not None
+
+
+# ============================================================================
+# Component Module Imports
+# ============================================================================
+
+class TestComponentImports:
+    """Test that all component modules can be imported."""
+
+    @pytest.mark.parametrize(
+        "module_name",
+        [
+            "app.components.forms",
+            "app.components.buttons",
+            "app.components.ui",
+            "app.components.editors",
+        ]
+    )
+    @pytest.mark.smoke
+    def test_component_module_imports(self, module_name: str):
+        """Test that component modules import without errors."""
+        mod = importlib.import_module(module_name)
+        assert mod is not None
+
+
+# ============================================================================
+# Config Module Imports
+# ============================================================================
+
+class TestConfigImports:
+    """Test that configuration modules can be imported."""
+
+    @pytest.mark.smoke
+    def test_import_settings(self):
+        """Test that settings module imports successfully."""
+        settings = importlib.import_module("app.config.settings")
+        assert hasattr(settings, "AppConfig")
+
+
+# ============================================================================
+# UI Button Key Tests
+# ============================================================================
+
+class TestEditorButtonKeysImport:
+    """Verify that editor buttons have unique keys to avoid Streamlit conflicts."""
+
+    @pytest.mark.smoke
+    def test_editor_chapter_buttons_have_keys(self):
+        """Test that chapter creation buttons have unique keys."""
+        mod = importlib.import_module("app.main")
+        source = Path(mod.__file__).read_text(encoding="utf-8")
+        
+        # Check for chapter creation button with key
+        assert re.search(
+            r"st\.button\([\s\S]*?['\"]➕ Create Chapter 1['\"][\s\S]*?"
+            r"key\s*=\s*['\"]editor_create_chapter_1['\"]",
+            source,
+        )
+        
+        assert re.search(
+            r"st\.button\([\s\S]*?['\"]➕ New Chapter['\"][\s\S]*?"
+            r"key\s*=\s*['\"]editor_new_chapter['\"]",
+            source,
+        )
+
+        # Also check app_context.py
+        ctx = importlib.import_module("app.app_context")
+        ctx_source = Path(ctx.__file__).read_text(encoding="utf-8")
+        
+        assert re.search(
+            r"st\.button\([\s\S]*?['\"]➕ Create Chapter 1['\"][\s\S]*?"
+            r"key\s*=\s*['\"]editor_create_chapter_1['\"]",
+            ctx_source,
+        )
+        
+        assert re.search(
+            r"st\.button\([\s\S]*?['\"]➕ New Chapter['\"][\s\S]*?"
+            r"key\s*=\s*['\"]editor_new_chapter['\"]",
+            ctx_source,
+        )
+
+
+# ============================================================================
+# Tests from test_bump_version.py — Version bump tests
+# ============================================================================
+
+class TestBumpVersion:
+    """Test suite for bump_version function."""
+
+    @pytest.mark.parametrize(
+        "current,expected",
+        [
+            ("85.4", "85.5"),
+            ("85.0", "85.1"),
+            ("85.8", "85.9"),
+            ("0.0", "0.1"),
+            ("100.5", "100.6"),
+        ],
+    )
+    @pytest.mark.unit
+    def test_minor_increment(self, current: str, expected: str):
+        """Minor version increments by 1."""
+        assert bump_version(current) == expected
+
+    @pytest.mark.parametrize(
+        "current,expected",
+        [
+            ("85.9", "86.0"),
+            ("0.9", "1.0"),
+            ("99.9", "100.0"),
+        ],
+    )
+    @pytest.mark.unit
+    def test_minor_rollover(self, current: str, expected: str):
+        """Major increments and minor resets when minor reaches 10."""
+        assert bump_version(current) == expected
+
+    @pytest.mark.unit
+    def test_current_version_file(self):
+        """VERSION.txt contains a valid version that can be bumped."""
+        version_file = ROOT / "VERSION.txt"
+        current = version_file.read_text(encoding="utf-8").strip()
+        result = bump_version(current)
+        parts = result.split(".")
+        assert len(parts) == 2
+        assert parts[0].isdigit()
+        assert parts[1].isdigit()
+
+    @pytest.mark.parametrize(
+        "bad_version",
+        [
+            "abc",
+            "1.2.3",
+            "",
+            "no_dot",
+        ],
+    )
+    @pytest.mark.unit
+    def test_invalid_format_exits(self, bad_version: str):
+        """Invalid formats cause SystemExit."""
+        with pytest.raises(SystemExit):
+            bump_version(bad_version)
