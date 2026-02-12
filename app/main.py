@@ -1383,7 +1383,7 @@ def _run_ui():
     from pathlib import Path
     from app.components.ui import action_card, card, primary_button, section_header, stat_tile
     from app.ui.components import card_block, cta_tile, empty_state, header_bar, render_tag_list, section_title
-    from app.ui.layout import render_footer
+    from app.layout.layout import render_footer
     from app.ui.theme import inject_theme
     from app.utils.keys import ui_key
 

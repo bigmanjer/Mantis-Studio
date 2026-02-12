@@ -106,7 +106,9 @@ class TestCriticalImports:
         importlib.import_module("app.ui.theme")
 
     def test_import_ui_layout(self):
-        importlib.import_module("app.ui.layout")
+        mod = importlib.import_module("app.layout.layout")
+        assert hasattr(mod, "render_footer")
+        assert hasattr(mod, "_build_footer_nav_links")
 
     def test_import_ui_components_file(self):
         mod = importlib.import_module("app.ui.components")
@@ -384,7 +386,7 @@ class TestNavigationParity:
     def test_footer_nav_links_match_nav_items(self):
         """The footer link builder must produce one link per NAV_ITEMS entry."""
         from app.utils.navigation import get_nav_items
-        from app.ui.layout import _build_footer_nav_links
+        from app.layout.layout import _build_footer_nav_links
 
         html = _build_footer_nav_links()
         for label, page_key, icon in get_nav_items():
@@ -894,7 +896,7 @@ class TestLayoutConsolidation:
         assert _CURRENT_YEAR >= 2026
 
     def test_ui_footer_year_is_dynamic(self):
-        from app.ui.layout import _CURRENT_YEAR
+        from app.layout.layout import _CURRENT_YEAR
         assert _CURRENT_YEAR >= 2026
 
 
