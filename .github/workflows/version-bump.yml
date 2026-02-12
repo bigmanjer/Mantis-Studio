@@ -32,4 +32,4 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add VERSION.txt
-          git diff --cached --quiet && echo "No version change" || (git commit -m "Bump version [skip bump]" && git push)
+          git diff --cached --quiet && echo "No version change detected, skipping commit" || (git commit -m "Bump version [skip bump]" && git push)
