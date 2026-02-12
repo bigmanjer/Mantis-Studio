@@ -1,0 +1,7 @@
+streamlit>=1.30.0
+requests
+pandas
+plotly
+Pillow
+python-dotenv
+supabase>=2.5.0
