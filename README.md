@@ -429,8 +429,7 @@ Mantis-Studio/
 │
 ├── VERSION.txt
 ├── requirements.txt
-├── LICENSE.md
-└── Mantis_Launcher.bat      # Windows launcher
+└── LICENSE.md
 ```
 
 ### Design Principles
@@ -487,8 +486,9 @@ Helper scripts are located in the `scripts/` directory:
 | `scripts/bump_version.py` | Increment the patch version in `VERSION.txt` |
 | `scripts/healthcheck.py` | Run a basic health check on the application |
 | `scripts/smoke_test.py` | Execute smoke tests to verify core functionality |
+| `scripts/Mantis_Launcher.bat` | Windows launcher (dependency checks, Ollama AI detection, Streamlit startup) |
 
-**Windows users** can also launch the app with `Mantis_Launcher.bat`, which handles dependency checks, Ollama AI detection, and starts Streamlit automatically.
+**Windows users** can launch the app with `scripts/Mantis_Launcher.bat`, which handles dependency checks, Ollama AI detection, and starts Streamlit automatically.
 
 ---
 

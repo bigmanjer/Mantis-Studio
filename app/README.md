@@ -12,34 +12,46 @@ app/
 ├── layout/               # Layout components
 │   ├── sidebar.py        # Sidebar UI
 │   ├── header.py         # App header + version
-│   └── styles.py         # CSS / theme helpers
+│   └── layout.py         # Theme tokens and footer
 │
 ├── views/                # Each UI screen (one file each)
-│   ├── dashboard.py      # Main dashboard (formerly home.py)
+│   ├── dashboard.py      # Main dashboard / home
 │   ├── projects.py       # Project management
 │   ├── outline.py        # Story outline
-│   ├── editor.py         # Chapter editor (formerly chapters.py)
-│   ├── world_bible.py    # World Bible (formerly world.py)
+│   ├── editor.py         # Chapter editor
+│   ├── world_bible.py    # World Bible
 │   ├── ai_tools.py       # AI configuration
 │   ├── export.py         # Export functionality
-│   ├── account.py        # Account management
 │   └── legal.py          # Legal pages
 │
 ├── components/           # Reusable UI blocks
 │   ├── buttons.py        # Button components and UI helpers
 │   ├── forms.py          # Form components
-│   └── editors.py        # Editor components
+│   ├── editors.py        # Editor components
+│   └── ui.py             # Shared UI helpers
 │
 ├── services/             # Business logic (no UI)
 │   ├── projects.py       # Project management logic
 │   ├── storage.py        # Storage and persistence
-│   ├── auth.py           # Authentication
 │   ├── ai.py             # AI/LLM services
-│   └── export.py         # Export logic
+│   ├── export.py         # Export logic
+│   ├── world_bible.py    # World bible logic
+│   ├── world_bible_db.py # World bible database layer
+│   └── world_bible_merge.py # World bible merge utilities
+│
+├── ui/                   # Additional UI utilities
+│   ├── components.py     # Re-export wrapper
+│   ├── layout.py         # Footer rendering
+│   └── theme.py          # Theme injection
+│
+├── config/
+│   └── settings.py       # App configuration
 │
 └── utils/
     ├── versioning.py     # Version management
     ├── helpers.py        # Common utilities
+    ├── auth.py           # Authentication helpers
+    ├── keys.py           # Widget key helpers
     └── navigation.py     # Navigation helpers
 ```
 

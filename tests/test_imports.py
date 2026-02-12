@@ -116,15 +116,12 @@ class TestViewImports:
         "module_name",
         [
             "app.views.ai_tools",
-            "app.views.chapters",
             "app.views.dashboard",
             "app.views.editor",
             "app.views.export",
-            "app.views.home",
             "app.views.legal",
             "app.views.outline",
             "app.views.projects",
-            "app.views.world",
             "app.views.world_bible",
         ]
     )
