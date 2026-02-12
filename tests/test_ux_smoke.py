@@ -1325,11 +1325,14 @@ class TestDashboardAICardLayoutStable:
         src = (ROOT / "app" / "app_context.py").read_text(encoding="utf-8")
         assert "Connect your AI providers" in src
         assert "AI providers connected" in src
-        start = src.index("Connect your AI providers")
+        # Both branches must render a card so the layout is stable
+        marker = src.index("Connect your AI providers")
+        start = src.rfind("card(", 0, marker)
         end = src.index("def render_projects", start)
         section = src[start:end]
-        # app_context uses 'card(' from components
-        assert 'card("✅ AI providers connected"' in section or 'card("🔑 Connect your AI providers"' in section
+        assert section.count("card(") >= 2, (
+            "Both connected and not-connected branches must render a card"
+        )
 
 
 # ---------------------------------------------------------------------------
