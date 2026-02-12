@@ -897,6 +897,20 @@ class TestLayoutConsolidation:
         from app.ui.layout import _CURRENT_YEAR
         assert _CURRENT_YEAR >= 2026
 
+    def test_ui_layout_back_to_top_uses_parent_window(self):
+        """Back-to-top must scroll the parent window (Streamlit iframe fix)."""
+        source = (ROOT / "app" / "ui" / "layout.py").read_text(encoding="utf-8")
+        assert "window.parent" in source, (
+            "Back-to-top button must use window.parent to escape Streamlit iframe"
+        )
+
+    def test_layout_back_to_top_uses_parent_window(self):
+        """Back-to-top must scroll the parent window (Streamlit iframe fix)."""
+        source = (ROOT / "app" / "layout" / "layout.py").read_text(encoding="utf-8")
+        assert "window.parent" in source, (
+            "Back-to-top button must use window.parent to escape Streamlit iframe"
+        )
+
 
 # ---------------------------------------------------------------------------
 # 18b) Light mode theme quality – comfort and readability
