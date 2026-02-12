@@ -202,7 +202,7 @@ def render_footer(
         </style>
         <footer class="mantis-footer" role="contentinfo" aria-label="Site footer">
           <div class="mantis-footer-top">
-            <a href="#" onclick="window.scrollTo({{top:0,behavior:'smooth'}});return false;" aria-label="Back to top">&uarr; Back to top</a>
+            <a href="#" onclick="var el=window.parent.document.querySelector('section.main');if(el)el.scrollTo({{top:0,behavior:'smooth'}});else window.parent.scrollTo({{top:0,behavior:'smooth'}});return false;" aria-label="Back to top">&uarr; Back to top</a>
           </div>
           <div class="mantis-footer-grid">
             <div class="mantis-footer-section mantis-footer-brand">
