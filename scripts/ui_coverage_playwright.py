@@ -65,7 +65,7 @@ def _record(actions: List[UIAction], label: str, status: str, details: str = "")
 def _start_streamlit() -> subprocess.Popen:
     """Launch the Streamlit app in a subprocess."""
     env = os.environ.copy()
-    env["STREAMLIT_BROWSER_GATHER_USAGE_STATS"] = "false"  # Streamlit expects lowercase.
+    env["STREAMLIT_BROWSER_GATHER_USAGE_STATS"] = "false"
     cmd = [
         sys.executable,
         "-m",
@@ -265,10 +265,9 @@ def _upload_file_if_present(scope, actions: List[UIAction]) -> None:
         return
     tmp_path = None
     try:
-        # Keep delete=False so the file path remains valid for upload.
-        with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False) as tmp:
+        fd, tmp_path = tempfile.mkstemp(suffix=".txt")
+        with os.fdopen(fd, "w") as tmp:
             tmp.write("Sample draft for automated UI coverage.\n")
-            tmp_path = tmp.name
         for idx in range(file_inputs.count()):
             file_input = file_inputs.nth(idx)
             try:
@@ -285,11 +284,19 @@ def _upload_file_if_present(scope, actions: List[UIAction]) -> None:
 
 def _should_skip_label(label: str, skip_set_lower: Iterable[str]) -> bool:
     """Return True when a label matches a lowercase skip token."""
-    label_lower = label.lower()
-    return any(
-        label_lower == skip or label_lower.endswith(skip)
-        for skip in skip_set_lower
-    )
+    return label.lower() in skip_set_lower
+
+
+def _collect_nav_skip_labels(page) -> List[str]:
+    """Collect nav button labels (including emojis) for skip filtering."""
+    labels = list(NAV_LABELS)
+    for nav in NAV_LABELS:
+        locator = page.get_by_role("button", name=re.compile(nav, re.IGNORECASE))
+        if locator.count():
+            text = locator.first.inner_text().strip()
+            if text and text not in labels:
+                labels.append(text)
+    return labels
 
 
 def _click_visible_buttons(scope, page, actions: List[UIAction], skip_labels: Iterable[str]) -> None:
@@ -360,10 +367,11 @@ def _run_ui_coverage() -> List[UIAction]:
             sidebar = page
         if main_area.count() == 0:
             main_area = page
+        nav_skip_labels = _collect_nav_skip_labels(page)
 
         for nav in NAV_LABELS:
             _click_nav(page, actions, nav)
-            _exercise_controls(sidebar, page, actions, skip_labels=NAV_LABELS)
+            _exercise_controls(sidebar, page, actions, skip_labels=nav_skip_labels)
             if nav == PROJECTS_LABEL:
                 _ensure_project_created(page, actions)
             _exercise_controls(main_area, page, actions, skip_labels=[])
