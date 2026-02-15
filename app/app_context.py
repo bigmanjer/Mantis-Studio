@@ -200,8 +200,8 @@ def _run_ui():
             logger.error("persist_project failed for '%s' (action=%s)", project.title, action)
             try:
                 st.toast("⚠️ Save failed — check file permissions and disk space.", icon="⚠️")
-            except Exception:
-                pass
+            except Exception as e:
+                st.error(f"Save failed: {e}")
             return False
         return True
 
@@ -1374,7 +1374,7 @@ def _run_ui():
                     genre = meta.get("genre") or "—"
                     row = st.columns([2.2, 1, 1])
                     with row[0]:
-                        if st.button(f"📂 {title}", use_container_width=True):
+                        if st.button(f"📂 {title}", use_container_width=True, key=f"dash_proj_{project_entry.get('path', '')}"):
                             loaded = load_project_safe(project_entry["path"], context="project")
                             if loaded:
                                 st.session_state.project = loaded
@@ -1383,7 +1383,7 @@ def _run_ui():
                     with row[1]:
                         st.caption(genre)
                     with row[2]:
-                        if st.button("Open", use_container_width=True):
+                        if st.button("Open", use_container_width=True, key=f"dash_open_{project_entry.get('path', '')}"):
                             loaded = load_project_safe(project_entry["path"], context="project")
                             if loaded:
                                 st.session_state.project = loaded
