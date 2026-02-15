@@ -1617,6 +1617,9 @@ def _run_ui():
     st.set_page_config(page_title=AppConfig.APP_NAME, page_icon=page_icon, layout="wide")
     inject_theme()
 
+    if "initialized" not in st.session_state:
+        st.session_state.initialized = True
+
     config_data = load_app_config()
 
     init_state("ui_theme", config_data.get("ui_theme", "Dark"))
@@ -5944,4 +5947,7 @@ if __name__ == "__main__":
         raise SystemExit(run_repair())
 
     # Default: run the Streamlit UI (Streamlit will execute this script).
-    _run_ui()
+    import streamlit.web.cli as stcli
+
+    sys.argv = ["streamlit", "run", __file__]
+    sys.exit(stcli.main())
