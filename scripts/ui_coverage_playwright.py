@@ -22,7 +22,7 @@ import tempfile
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable
+from typing import Iterable, TypeAlias
 
 import requests
 from playwright.sync_api import Error as PlaywrightError
@@ -46,7 +46,7 @@ NAV_LABELS = [
 SAMPLE_TEXT = "Automated UI coverage input."
 DEFAULT_TIMEOUT_MS = 5000
 REQUEST_TIMEOUT_SECONDS = 2
-Scope = Page | Locator
+Scope: TypeAlias = Page | Locator
 
 
 @dataclass
@@ -178,6 +178,8 @@ def _fill_textboxes(scope: Scope, actions: list[UIAction]) -> None:
             if current != new_value:
                 box.fill(new_value)
                 _record(actions, f"Textbox: {label}", "filled")
+            else:
+                _record(actions, f"Textbox: {label}", "skipped", "already set")
         except PlaywrightError as exc:
             _record(actions, "Textbox", "failed", str(exc))
 
