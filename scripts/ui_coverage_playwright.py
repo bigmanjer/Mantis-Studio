@@ -304,6 +304,7 @@ def _exercise_controls(scope, page, actions: List[UIAction], skip_labels: Iterab
     _click_tabs(scope, page, actions)
     _upload_file_if_present(scope, actions)
     _click_visible_buttons(scope, page, actions, skip_labels=skip_labels)
+    # Run a second pass to catch buttons revealed by expanders or reruns.
     _click_visible_buttons(scope, page, actions, skip_labels=skip_labels)
 
 
