@@ -32,9 +32,10 @@ from playwright.sync_api import sync_playwright
 
 ROOT = Path(__file__).resolve().parents[1]
 APP_URL = "http://localhost:8501"
+PROJECTS_LABEL = "Projects"
 NAV_LABELS = [
     "Dashboard",
-    "Projects",
+    PROJECTS_LABEL,
     "Write",
     "Editor",
     "World Bible",
@@ -95,6 +96,7 @@ def _wait_for_server(timeout_seconds: int = 60) -> None:
             health_response = requests.get(f"{APP_URL}/_stcore/health", timeout=2)
             if health_response.ok:
                 return
+            # Fallback to root endpoint if the health check is unavailable.
             root_response = requests.get(APP_URL, timeout=2)
             if root_response.ok:
                 return
@@ -286,7 +288,15 @@ def _click_visible_buttons(scope, page, actions: List[UIAction], skip_labels: It
     skip_set = {label.lower() for label in skip_labels}
     button_texts = scope.locator("button").all_inner_texts()
     link_buttons = scope.locator("a[role='button']").all_inner_texts()
-    for label in sorted({text.strip() for text in button_texts + link_buttons if text.strip()}):
+    ordered_labels: List[str] = []
+    seen_labels = set()
+    for text in button_texts + link_buttons:
+        label = text.strip()
+        if not label or label in seen_labels:
+            continue
+        seen_labels.add(label)
+        ordered_labels.append(label)
+    for label in ordered_labels:
         if _should_skip_label(label, skip_set):
             continue
         locator = scope.locator("button", has_text=label)
@@ -345,7 +355,7 @@ def _run_ui_coverage() -> List[UIAction]:
         for nav in NAV_LABELS:
             _click_nav(page, actions, nav)
             _exercise_controls(sidebar, page, actions, skip_labels=NAV_LABELS)
-            if nav.lower() == "projects":
+            if nav == PROJECTS_LABEL:
                 _ensure_project_created(page, actions)
             _exercise_controls(main_area, page, actions, skip_labels=[])
 
