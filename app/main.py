@@ -2263,8 +2263,8 @@ def _run_ui():
             logger.error("persist_project failed for '%s' (action=%s)", project.title, action)
             try:
                 st.toast("⚠️ Save failed — check file permissions and disk space.", icon="⚠️")
-            except Exception:
-                pass
+            except Exception as e:
+                st.error(f"Save failed for '{project.title}': {e}")
             return False
         # Remember the last active project so it can be restored after refresh
         config = load_app_config()
@@ -3924,7 +3924,8 @@ def _run_ui():
                         if st.button(
                             f"📂 {title}",
                             use_container_width=True,
-                            help=f"Open '{title}' in the editor"
+                            help=f"Open '{title}' in the editor",
+                            key=f"dash_proj_{project_entry.get('path', '')}"
                         ):
                             loaded = load_project_safe(project_entry["path"], context="project")
                             if loaded:
