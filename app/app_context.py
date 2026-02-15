@@ -201,7 +201,7 @@ def _run_ui():
             try:
                 st.toast("⚠️ Save failed — check file permissions and disk space.", icon="⚠️")
             except Exception as e:
-                st.error(f"Save failed: {e}")
+                st.error(f"Save failed for '{project.title}': {e}")
             return False
         return True
 

@@ -2264,7 +2264,7 @@ def _run_ui():
             try:
                 st.toast("⚠️ Save failed — check file permissions and disk space.", icon="⚠️")
             except Exception as e:
-                st.error(f"Save failed: {e}")
+                st.error(f"Save failed for '{project.title}': {e}")
             return False
         # Remember the last active project so it can be restored after refresh
         config = load_app_config()
