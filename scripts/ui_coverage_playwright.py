@@ -44,6 +44,7 @@ NAV_LABELS = [
 ]
 SAMPLE_TEXT = "Automated UI coverage input."
 DEFAULT_TIMEOUT_MS = 5000
+REQUEST_TIMEOUT_SECONDS = 2
 
 
 @dataclass
@@ -64,7 +65,7 @@ def _record(actions: List[UIAction], label: str, status: str, details: str = "")
 def _start_streamlit() -> subprocess.Popen:
     """Launch the Streamlit app in a subprocess."""
     env = os.environ.copy()
-    env["STREAMLIT_BROWSER_GATHER_USAGE_STATS"] = "false"
+    env["STREAMLIT_BROWSER_GATHER_USAGE_STATS"] = "false"  # Streamlit expects lowercase.
     cmd = [
         sys.executable,
         "-m",
@@ -93,11 +94,13 @@ def _wait_for_server(timeout_seconds: int = 60) -> None:
     """Wait for the Streamlit server to respond."""
     for _ in range(timeout_seconds):
         try:
-            health_response = requests.get(f"{APP_URL}/_stcore/health", timeout=2)
+            health_response = requests.get(
+                f"{APP_URL}/_stcore/health", timeout=REQUEST_TIMEOUT_SECONDS
+            )
             if health_response.ok:
                 return
             # Fallback to root endpoint if the health check is unavailable.
-            root_response = requests.get(APP_URL, timeout=2)
+            root_response = requests.get(APP_URL, timeout=REQUEST_TIMEOUT_SECONDS)
             if root_response.ok:
                 return
         except requests.RequestException:
@@ -262,6 +265,7 @@ def _upload_file_if_present(scope, actions: List[UIAction]) -> None:
         return
     tmp_path = None
     try:
+        # Keep delete=False so the file path remains valid for upload.
         with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False) as tmp:
             tmp.write("Sample draft for automated UI coverage.\n")
             tmp_path = tmp.name
