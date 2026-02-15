@@ -357,12 +357,18 @@ def _click_nav(page: Page, actions: list[UIAction], label: str) -> None:
 
 def _ensure_project_created(page: Page, actions: list[UIAction]) -> None:
     """Create a project if the create form is present."""
-    if page.get_by_role("button", name=re.compile("Create Project", re.IGNORECASE)).count() == 0:
+    create_button = page.get_by_role("button", name=re.compile("Create Project", re.IGNORECASE))
+    if create_button.count() == 0:
         return
     _fill_textboxes(page, actions)
-    create_button = page.get_by_role("button", name=re.compile("Create Project", re.IGNORECASE))
     _click_with_side_effects(page, create_button, actions, "Create Project")
     page.wait_for_timeout(1200)
+
+
+def _resolve_scope(page: Page, selector: str) -> Scope:
+    """Return a locator for a selector, or the page as a fallback."""
+    scope = page.locator(selector)
+    return scope if scope.count() else page
 
 
 def _run_ui_coverage() -> list[UIAction]:
@@ -374,12 +380,8 @@ def _run_ui_coverage() -> list[UIAction]:
         page = context.new_page()
         page.goto(APP_URL, wait_until="domcontentloaded", timeout=DEFAULT_TIMEOUT_MS)
 
-        sidebar = page.locator("section[data-testid='stSidebar']")
-        main_area = page.locator("section[data-testid='stMain']")
-        if sidebar.count() == 0:
-            sidebar = page
-        if main_area.count() == 0:
-            main_area = page
+        sidebar = _resolve_scope(page, "section[data-testid='stSidebar']")
+        main_area = _resolve_scope(page, "section[data-testid='stMain']")
         nav_skip_labels = _collect_nav_skip_labels(page)
 
         for nav in NAV_LABELS:
