@@ -260,26 +260,30 @@ def _upload_file_if_present(scope, actions: List[UIAction]) -> None:
     file_inputs = scope.locator("input[type='file']")
     if file_inputs.count() == 0:
         return
-    with tempfile.NamedTemporaryFile("w+", suffix=".txt", delete=False) as tmp:
-        tmp.write("Sample draft for automated UI coverage.\n")
-        tmp_path = tmp.name
-    for idx in range(file_inputs.count()):
-        file_input = file_inputs.nth(idx)
-        try:
-            if not file_input.is_visible() or not file_input.is_enabled():
-                continue
-            file_input.set_input_files(tmp_path)
-            _record(actions, "File upload", "uploaded", os.path.basename(tmp_path))
-        except PlaywrightError as exc:
-            _record(actions, "File upload", "failed", str(exc))
-    Path(tmp_path).unlink(missing_ok=True)
+    tmp_path = None
+    try:
+        with tempfile.NamedTemporaryFile("w+", suffix=".txt", delete=False) as tmp:
+            tmp.write("Sample draft for automated UI coverage.\n")
+            tmp_path = tmp.name
+        for idx in range(file_inputs.count()):
+            file_input = file_inputs.nth(idx)
+            try:
+                if not file_input.is_visible() or not file_input.is_enabled():
+                    continue
+                file_input.set_input_files(tmp_path)
+                _record(actions, "File upload", "uploaded", os.path.basename(tmp_path))
+            except PlaywrightError as exc:
+                _record(actions, "File upload", "failed", str(exc))
+    finally:
+        if tmp_path:
+            Path(tmp_path).unlink(missing_ok=True)
 
 
-def _should_skip_label(label: str, skip_labels: Iterable[str]) -> bool:
+def _should_skip_label(label: str, skip_set: Iterable[str]) -> bool:
     label_lower = label.lower()
     return any(
         label_lower == skip or label_lower.endswith(skip)
-        for skip in skip_labels
+        for skip in skip_set
     )
 
 
@@ -376,11 +380,18 @@ def main() -> int:
         except subprocess.TimeoutExpired:
             streamlit_process.kill()
 
+    status_counts = {}
+    for action in actions:
+        status_counts[action.status] = status_counts.get(action.status, 0) + 1
+    success_statuses = {"clicked", "filled", "set", "toggled", "selected", "uploaded"}
     summary = {
         "total_actions": len(actions),
-        "clicked": sum(1 for action in actions if action.status == "clicked"),
-        "failed": sum(1 for action in actions if action.status == "failed"),
-        "skipped": sum(1 for action in actions if action.status == "skipped"),
+        "successful": sum(
+            1 for action in actions if action.status in success_statuses
+        ),
+        "failed": status_counts.get("failed", 0),
+        "skipped": status_counts.get("skipped", 0),
+        "status_counts": status_counts,
     }
     print("[UI] Summary:", json.dumps(summary, indent=2))
     return 0
