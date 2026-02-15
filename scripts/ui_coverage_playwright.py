@@ -22,7 +22,7 @@ import tempfile
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, List
+from typing import Iterable
 
 import requests
 from playwright.sync_api import Error as PlaywrightError
@@ -56,7 +56,7 @@ class UIAction:
     details: str = ""
 
 
-def _record(actions: List[UIAction], label: str, status: str, details: str = "") -> None:
+def _record(actions: list[UIAction], label: str, status: str, details: str = "") -> None:
     actions.append(UIAction(label=label, status=status, details=details))
     detail_suffix = f" ({details})" if details else ""
     print(f"[UI] {label}: {status}{detail_suffix}")
@@ -109,7 +109,7 @@ def _wait_for_server(timeout_seconds: int = 60) -> None:
     raise RuntimeError("Streamlit server did not start within the expected timeout.")
 
 
-def _click_with_side_effects(page, locator, actions: List[UIAction], label: str) -> None:
+def _click_with_side_effects(page, locator, actions: list[UIAction], label: str) -> None:
     """Click a locator and handle optional popups/downloads."""
     if locator.count() == 0:
         _record(actions, label, "failed", "not found")
@@ -157,7 +157,7 @@ def _click_with_side_effects(page, locator, actions: List[UIAction], label: str)
         _record(actions, label, "failed", str(exc))
 
 
-def _fill_textboxes(scope, actions: List[UIAction]) -> None:
+def _fill_textboxes(scope, actions: list[UIAction]) -> None:
     """Fill any visible text inputs with sample data."""
     textboxes = scope.get_by_role("textbox")
     for idx in range(textboxes.count()):
@@ -175,7 +175,7 @@ def _fill_textboxes(scope, actions: List[UIAction]) -> None:
             _record(actions, "Textbox", "failed", str(exc))
 
 
-def _fill_number_inputs(scope, actions: List[UIAction]) -> None:
+def _fill_number_inputs(scope, actions: list[UIAction]) -> None:
     """Adjust number inputs so they register a change."""
     spinbuttons = scope.get_by_role("spinbutton")
     for idx in range(spinbuttons.count()):
@@ -190,7 +190,7 @@ def _fill_number_inputs(scope, actions: List[UIAction]) -> None:
             _record(actions, "Number input", "failed", str(exc))
 
 
-def _toggle_checkboxes(scope, page, actions: List[UIAction]) -> None:
+def _toggle_checkboxes(scope, page, actions: list[UIAction]) -> None:
     """Toggle each checkbox once."""
     checkboxes = scope.get_by_role("checkbox")
     for idx in range(checkboxes.count()):
@@ -206,7 +206,7 @@ def _toggle_checkboxes(scope, page, actions: List[UIAction]) -> None:
             _record(actions, "Checkbox", "failed", str(exc))
 
 
-def _select_comboboxes(scope, page, actions: List[UIAction]) -> None:
+def _select_comboboxes(scope, page, actions: list[UIAction]) -> None:
     """Open comboboxes and select the first available option."""
     comboboxes = scope.locator("[role='combobox']")
     for idx in range(comboboxes.count()):
@@ -226,7 +226,7 @@ def _select_comboboxes(scope, page, actions: List[UIAction]) -> None:
             _record(actions, "Combobox", "failed", str(exc))
 
 
-def _click_radios(scope, page, actions: List[UIAction]) -> None:
+def _click_radios(scope, page, actions: list[UIAction]) -> None:
     """Click each radio button."""
     radios = scope.locator("[role='radio']")
     for idx in range(radios.count()):
@@ -242,7 +242,7 @@ def _click_radios(scope, page, actions: List[UIAction]) -> None:
             _record(actions, "Radio", "failed", str(exc))
 
 
-def _click_tabs(scope, page, actions: List[UIAction]) -> None:
+def _click_tabs(scope, page, actions: list[UIAction]) -> None:
     """Click each tab in tab sets to reveal content."""
     tabs = scope.get_by_role("tab")
     for idx in range(tabs.count()):
@@ -258,7 +258,7 @@ def _click_tabs(scope, page, actions: List[UIAction]) -> None:
             _record(actions, "Tab", "failed", str(exc))
 
 
-def _upload_file_if_present(scope, actions: List[UIAction]) -> None:
+def _upload_file_if_present(scope, actions: list[UIAction]) -> None:
     """Upload a sample file when a file input is present."""
     file_inputs = scope.locator("input[type='file']")
     if file_inputs.count() == 0:
@@ -287,7 +287,7 @@ def _should_skip_label(label: str, skip_set_lower: Iterable[str]) -> bool:
     return label.lower() in skip_set_lower
 
 
-def _collect_nav_skip_labels(page) -> List[str]:
+def _collect_nav_skip_labels(page) -> list[str]:
     """Collect nav button labels (including emojis) for skip filtering."""
     labels = list(NAV_LABELS)
     for nav in NAV_LABELS:
@@ -299,12 +299,12 @@ def _collect_nav_skip_labels(page) -> List[str]:
     return labels
 
 
-def _click_visible_buttons(scope, page, actions: List[UIAction], skip_labels: Iterable[str]) -> None:
+def _click_visible_buttons(scope, page, actions: list[UIAction], skip_labels: Iterable[str]) -> None:
     """Click every visible button except those in the skip list."""
     skip_set_lower = {label.lower() for label in skip_labels}
     button_texts = scope.locator("button").all_inner_texts()
     link_buttons = scope.locator("a[role='button']").all_inner_texts()
-    ordered_labels: List[str] = []
+    ordered_labels: list[str] = []
     seen_labels = set()
     for text in button_texts + link_buttons:
         label = text.strip()
@@ -321,7 +321,7 @@ def _click_visible_buttons(scope, page, actions: List[UIAction], skip_labels: It
         _click_with_side_effects(page, locator, actions, f"Button: {label}")
 
 
-def _exercise_controls(scope, page, actions: List[UIAction], skip_labels: Iterable[str]) -> None:
+def _exercise_controls(scope, page, actions: list[UIAction], skip_labels: Iterable[str]) -> None:
     """Exercise inputs, tabs, and buttons within a page scope."""
     _fill_textboxes(scope, actions)
     _fill_number_inputs(scope, actions)
@@ -335,14 +335,14 @@ def _exercise_controls(scope, page, actions: List[UIAction], skip_labels: Iterab
     _click_visible_buttons(scope, page, actions, skip_labels=skip_labels)
 
 
-def _click_nav(page, actions: List[UIAction], label: str) -> None:
+def _click_nav(page, actions: list[UIAction], label: str) -> None:
     """Navigate using sidebar buttons."""
     locator = page.get_by_role("button", name=re.compile(label, re.IGNORECASE))
     _click_with_side_effects(page, locator, actions, f"Nav: {label}")
     page.wait_for_timeout(800)
 
 
-def _ensure_project_created(page, actions: List[UIAction]) -> None:
+def _ensure_project_created(page, actions: list[UIAction]) -> None:
     """Create a project if the create form is present."""
     if page.get_by_role("button", name=re.compile("Create Project", re.IGNORECASE)).count() == 0:
         return
@@ -352,9 +352,9 @@ def _ensure_project_created(page, actions: List[UIAction]) -> None:
     page.wait_for_timeout(1200)
 
 
-def _run_ui_coverage() -> List[UIAction]:
+def _run_ui_coverage() -> list[UIAction]:
     """Run the UI coverage flow across all navigation sections."""
-    actions: List[UIAction] = []
+    actions: list[UIAction] = []
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch(headless=True)
         context = browser.new_context(accept_downloads=True)
