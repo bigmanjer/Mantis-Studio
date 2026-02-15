@@ -262,7 +262,7 @@ def _upload_file_if_present(scope, actions: List[UIAction]) -> None:
         return
     tmp_path = None
     try:
-        with tempfile.NamedTemporaryFile("w+", suffix=".txt", delete=False) as tmp:
+        with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False) as tmp:
             tmp.write("Sample draft for automated UI coverage.\n")
             tmp_path = tmp.name
         for idx in range(file_inputs.count()):
@@ -279,17 +279,18 @@ def _upload_file_if_present(scope, actions: List[UIAction]) -> None:
             Path(tmp_path).unlink(missing_ok=True)
 
 
-def _should_skip_label(label: str, skip_set: Iterable[str]) -> bool:
+def _should_skip_label(label: str, skip_set_lower: Iterable[str]) -> bool:
+    """Return True when a label matches a lowercase skip token."""
     label_lower = label.lower()
     return any(
         label_lower == skip or label_lower.endswith(skip)
-        for skip in skip_set
+        for skip in skip_set_lower
     )
 
 
 def _click_visible_buttons(scope, page, actions: List[UIAction], skip_labels: Iterable[str]) -> None:
     """Click every visible button except those in the skip list."""
-    skip_set = {label.lower() for label in skip_labels}
+    skip_set_lower = {label.lower() for label in skip_labels}
     button_texts = scope.locator("button").all_inner_texts()
     link_buttons = scope.locator("a[role='button']").all_inner_texts()
     ordered_labels: List[str] = []
@@ -301,7 +302,7 @@ def _click_visible_buttons(scope, page, actions: List[UIAction], skip_labels: It
         seen_labels.add(label)
         ordered_labels.append(label)
     for label in ordered_labels:
-        if _should_skip_label(label, skip_set):
+        if _should_skip_label(label, skip_set_lower):
             continue
         locator = scope.locator("button", has_text=label)
         if locator.count() == 0:
