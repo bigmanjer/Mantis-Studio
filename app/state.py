@@ -7,6 +7,22 @@ from typing import Dict, List, Optional, Tuple
 from app.config.settings import AppConfig
 
 
+def _safe_int(value: object, default: int) -> int:
+    """Parse *value* as an integer, returning *default* on failure."""
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _safe_float(value: object, default: float) -> float:
+    """Parse *value* as a float, returning *default* on failure."""
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
 def ui_key(name: str) -> str:
     """Stable widget key helper (returns the same key string)."""
     return name
@@ -100,12 +116,6 @@ def install_key_helpers(st) -> Tuple[contextmanager, Dict[Tuple[str, str, str], 
 
 def initialize_session_state(st, config_data: Dict[str, str]) -> None:
     st.session_state.setdefault("ai_keys", {})
-
-    def _safe_int(value: object, default: int) -> int:
-        try:
-            return int(value)
-        except (TypeError, ValueError):
-            return default
 
     def _resolve_api_key(provider: str, default_value: str) -> str:
         session_key = (st.session_state.get("ai_keys") or {}).get(provider, "")
