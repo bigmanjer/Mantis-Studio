@@ -1292,7 +1292,9 @@ class TestActionCardButtonsPrimary:
         from app.components.buttons import action_card
 
         src = inspect.getsource(action_card)
-        assert 'type="primary"' in src, "action_card button should use type='primary'"
+        signature = inspect.signature(action_card)
+        assert signature.parameters["button_type"].default == "primary"
+        assert "type=button_type" in src, "action_card should pass through button_type"
 
 
 class TestQuickActionButtonsStyled:

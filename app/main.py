@@ -3685,7 +3685,9 @@ def _run_ui():
             if recent_projects and not st.session_state.project:
                 loaded = load_project_safe(recent_projects[0]["path"], context="recent project")
                 if not loaded:
-                    return
+                    st.session_state.page = "projects"
+                    st.toast("Select a project to continue.")
+                    st.rerun()
                 st.session_state.project = loaded
             if focus_tab:
                 st.session_state.world_focus_tab = focus_tab
