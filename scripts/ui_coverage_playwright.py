@@ -276,17 +276,18 @@ def _upload_file_if_present(scope, actions: List[UIAction]) -> None:
 def _should_skip_label(label: str, skip_labels: Iterable[str]) -> bool:
     label_lower = label.lower()
     return any(
-        label_lower == skip.lower() or label_lower.endswith(skip.lower())
+        label_lower == skip or label_lower.endswith(skip)
         for skip in skip_labels
     )
 
 
 def _click_visible_buttons(scope, page, actions: List[UIAction], skip_labels: Iterable[str]) -> None:
     """Click every visible button except those in the skip list."""
+    skip_set = {label.lower() for label in skip_labels}
     button_texts = scope.locator("button").all_inner_texts()
     link_buttons = scope.locator("a[role='button']").all_inner_texts()
     for label in sorted({text.strip() for text in button_texts + link_buttons if text.strip()}):
-        if _should_skip_label(label, skip_labels):
+        if _should_skip_label(label, skip_set):
             continue
         locator = scope.locator("button", has_text=label)
         if locator.count() == 0:
