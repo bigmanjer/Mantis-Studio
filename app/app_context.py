@@ -1193,9 +1193,13 @@ def _run_ui():
                 st.session_state.page = "projects"
                 st.toast("Create or import a project to unlock this module.")
                 st.rerun()
+                return
             if recent_projects and not st.session_state.project:
                 loaded = load_project_safe(recent_projects[0]["path"], context="recent project")
                 if not loaded:
+                    st.session_state.page = "projects"
+                    st.toast("Select a project to continue.")
+                    st.rerun()
                     return
                 st.session_state.project = loaded
             if focus_tab:
@@ -1314,24 +1318,50 @@ def _run_ui():
         section_header("Quick actions", "Jump straight into your most-used tools.")
         quick_row_one = st.columns(3)
         with quick_row_one[0]:
-            if action_card("✍️ Editor", "Draft chapters and summaries.", help_text="Open the chapter editor."):
+            if action_card(
+                "✍️ Editor",
+                "Draft chapters and summaries.",
+                help_text="Open the chapter editor.",
+                button_type="secondary",
+            ):
                 open_recent_project("chapters")
         with quick_row_one[1]:
-            if action_card("📝 Outline", "Plan beats, arcs, and chapter flow."):
+            if action_card(
+                "📝 Outline",
+                "Plan beats, arcs, and chapter flow.",
+                button_type="secondary",
+            ):
                 open_recent_project("outline")
         with quick_row_one[2]:
-            if action_card("🌍 World Bible", "Characters, places, factions, lore."):
+            if action_card(
+                "🌍 World Bible",
+                "Characters, places, factions, lore.",
+                button_type="secondary",
+            ):
                 open_recent_project("world")
 
         quick_row_two = st.columns(3)
         with quick_row_two[0]:
-            if action_card("🧠 Memory", "Hard canon rules and guidelines."):
+            if action_card(
+                "🧠 Memory",
+                "Hard canon rules and guidelines.",
+                button_type="secondary",
+            ):
                 open_recent_project("world", focus_tab="Memory")
         with quick_row_two[1]:
-            if action_card("📊 Insights", "Canon health and analytics."):
+            if action_card(
+                "📊 Insights",
+                "Canon health and analytics.",
+                button_type="secondary",
+            ):
                 open_recent_project("world", focus_tab="Insights")
         with quick_row_two[2]:
-            if action_card("⬇️ Export", "Download your project as markdown.", button_label="Export"):
+            if action_card(
+                "⬇️ Export",
+                "Download your project as markdown.",
+                button_label="Export",
+                button_type="secondary",
+            ):
                 open_export()
 
         with st.container(border=True):

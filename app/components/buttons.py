@@ -79,6 +79,7 @@ def action_card(
     title: str,
     caption: str,
     button_label: str = "Open",
+    button_type: str = "primary",
     key: Optional[str] = None,
     help_text: Optional[str] = None,
     *,
@@ -92,6 +93,7 @@ def action_card(
         title: Card heading.
         caption: Short description below the heading.
         button_label: Text on the action button.
+        button_type: Streamlit button type ("primary" or "secondary").
         key: Streamlit widget key.
         help_text: Tooltip for the button.
         icon: Optional emoji/icon prepended to *title*.
@@ -106,5 +108,9 @@ def action_card(
         """,
     )
     return st.button(
-        button_label, key=key, use_container_width=True, type="primary", help=help_text
+        button_label,
+        key=key,
+        use_container_width=True,
+        type=button_type,
+        help=help_text,
     )

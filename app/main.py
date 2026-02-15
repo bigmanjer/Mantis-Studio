@@ -3682,9 +3682,13 @@ def _run_ui():
                 st.session_state.page = "projects"
                 st.toast("Create or import a project to unlock this module.")
                 st.rerun()
+                return
             if recent_projects and not st.session_state.project:
                 loaded = load_project_safe(recent_projects[0]["path"], context="recent project")
                 if not loaded:
+                    st.session_state.page = "projects"
+                    st.toast("Select a project to continue.")
+                    st.rerun()
                     return
                 st.session_state.project = loaded
             if focus_tab:
