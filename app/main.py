@@ -5958,7 +5958,7 @@ if __name__ == "__main__":
     except ImportError:
         # streamlit.runtime doesn't exist in older versions, try to launch anyway
         pass
-    
+
     if should_launch:
         import streamlit.web.cli as stcli
         sys.argv = ["streamlit", "run", __file__]
