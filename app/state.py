@@ -138,3 +138,23 @@ def initialize_session_state(st, config_data: Dict[str, str] = None) -> None:
     
     from app.session_init import initialize_session_state as init_session
     init_session(st)
+
+    # Backward-compatibility bridge for legacy callers/tests that still pass
+    # config_data. The new initializer loads config internally, but when explicit
+    # data is provided we still honor these values to preserve prior behavior.
+    if config_data:
+        ai_session_keys = st.session_state.get("ai_session_keys", {})
+        ai_session_keys.setdefault("groq", "")
+        ai_session_keys.setdefault("openai", "")
+        if config_data.get("groq_api_key"):
+            ai_session_keys["groq"] = config_data.get("groq_api_key", "")
+            st.session_state["groq_api_key"] = config_data.get("groq_api_key", "")
+        if config_data.get("openai_api_key"):
+            ai_session_keys["openai"] = config_data.get("openai_api_key", "")
+            st.session_state["openai_api_key"] = config_data.get("openai_api_key", "")
+        st.session_state["ai_session_keys"] = ai_session_keys
+
+        if "groq_connection_tested" in config_data:
+            st.session_state["groq_connection_tested"] = bool(config_data.get("groq_connection_tested"))
+        if "openai_connection_tested" in config_data:
+            st.session_state["openai_connection_tested"] = bool(config_data.get("openai_connection_tested"))

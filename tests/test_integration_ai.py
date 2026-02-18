@@ -1,18 +1,16 @@
-"""Integration tests for AI functionality with proper mocking.
+"""Integration tests for AI functionality using stdlib mocks only.
 
-These tests address gaps in the existing test suite by actually testing
-AI integration flows with mocked API responses, rather than bypassing
-the logic with fake stubs.
+These tests avoid third-party network mocking dependencies so the suite can run in
+restricted CI/offline environments.
 """
 from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, Dict
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
-import responses
+import requests
 
 # Ensure app package is importable
 import sys
@@ -20,291 +18,189 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from app.services.ai import AIEngine, sanitize_ai_input, _truncate_prompt
 from app.config.settings import AppConfig
+from app.services.ai import AIEngine, _truncate_prompt, sanitize_ai_input
+
+
+class MockHTTPResponse:
+    """Tiny response object compatible with AIEngine's usage."""
+
+    def __init__(self, *, status_code: int = 200, json_data=None, text: str = "", iter_lines_data=None):
+        self.status_code = status_code
+        self._json_data = json_data
+        self.text = text
+        self._iter_lines_data = iter_lines_data or []
+
+    def raise_for_status(self):
+        if self.status_code >= 400:
+            raise requests.HTTPError(f"HTTP {self.status_code}")
+
+    def json(self):
+        if isinstance(self._json_data, Exception):
+            raise self._json_data
+        return self._json_data
+
+    def iter_lines(self):
+        return iter(self._iter_lines_data)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        return False
 
 
 class TestAIEngineIntegration:
-    """Test AI engine with mocked API responses."""
-
     @pytest.fixture
     def ai_engine(self):
-        """Create an AI engine instance for testing."""
         return AIEngine(timeout=5)
 
-    @responses.activate
     def test_probe_models_success(self, ai_engine):
-        """Test that model probing works with a valid API key."""
-        responses.add(
-            responses.GET,
-            f"{AppConfig.GROQ_API_URL}/models",
-            json={
-                "data": [
-                    {"id": "llama-3.1-8b-instant"},
-                    {"id": "mixtral-8x7b-32768"},
-                    {"id": "gemma-7b-it"}
-                ]
-            },
-            status=200
-        )
+        with patch.object(
+            ai_engine.session,
+            "get",
+            return_value=MockHTTPResponse(
+                json_data={
+                    "data": [
+                        {"id": "llama-3.1-8b-instant"},
+                        {"id": "mixtral-8x7b-32768"},
+                        {"id": "gemma-7b-it"},
+                    ]
+                }
+            ),
+        ):
+            models = ai_engine.probe_models("sk-test-key")
 
-        models = ai_engine.probe_models("sk-test-key")
         assert len(models) == 3
         assert "llama-3.1-8b-instant" in models
         assert "mixtral-8x7b-32768" in models
 
-    @responses.activate
     def test_probe_models_failure(self, ai_engine):
-        """Test that model probing handles API failures gracefully."""
-        responses.add(
-            responses.GET,
-            f"{AppConfig.GROQ_API_URL}/models",
-            status=401
-        )
-
-        models = ai_engine.probe_models("invalid-key")
+        with patch.object(ai_engine.session, "get", side_effect=requests.HTTPError("401")):
+            models = ai_engine.probe_models("invalid-key")
         assert models == []
 
-    @responses.activate
     def test_generate_non_streaming(self, ai_engine):
-        """Test non-streaming generation with mocked API."""
-        responses.add(
-            responses.POST,
-            f"{AppConfig.GROQ_API_URL}/chat/completions",
-            json={
-                "choices": [{
-                    "message": {
-                        "content": "Chapter 1: The Beginning\n\nOnce upon a time..."
-                    }
-                }]
-            },
-            status=200
+        stream_resp = MockHTTPResponse(iter_lines_data=[])
+        nonstream_resp = MockHTTPResponse(
+            json_data={
+                "choices": [{"message": {"content": "Chapter 1: The Beginning\n\nOnce upon a time..."}}]
+            }
         )
+        with patch.object(ai_engine.session, "post", side_effect=[stream_resp, nonstream_resp]):
+            with patch.object(AppConfig, "GROQ_API_KEY", "sk-test-key"):
+                result = ai_engine.generate("Generate a story", "llama-3.1-8b-instant")
 
-        with patch.object(AppConfig, 'GROQ_API_KEY', 'sk-test-key'):
-            result = ai_engine.generate("Generate a story", "llama-3.1-8b-instant")
-            
         assert "text" in result
         assert "Chapter 1: The Beginning" in result["text"]
 
-    @responses.activate
     def test_generate_with_api_error(self, ai_engine):
-        """Test that generation handles API errors gracefully."""
-        responses.add(
-            responses.POST,
-            f"{AppConfig.GROQ_API_URL}/chat/completions",
-            status=500
-        )
+        with patch.object(ai_engine.session, "post", side_effect=requests.HTTPError("500")):
+            with patch.object(AppConfig, "GROQ_API_KEY", "sk-test-key"):
+                result = ai_engine.generate("Generate a story", "llama-3.1-8b-instant")
 
-        with patch.object(AppConfig, 'GROQ_API_KEY', 'sk-test-key'):
-            result = ai_engine.generate("Generate a story", "llama-3.1-8b-instant")
-            
         assert "text" in result
-        # Should contain error message
         assert "failed" in result["text"].lower() or "error" in result["text"].lower()
 
     def test_generate_without_api_key(self, ai_engine):
-        """Test that generation fails gracefully without API key."""
-        with patch.object(AppConfig, 'GROQ_API_KEY', ''):
+        with patch.object(AppConfig, "GROQ_API_KEY", ""):
             chunks = list(ai_engine.generate_stream("Test prompt", "llama-3.1-8b-instant"))
-            
+
         assert len(chunks) > 0
         assert "API key not configured" in chunks[0]
 
     def test_generate_without_model(self, ai_engine):
-        """Test that generation fails gracefully without model."""
-        with patch.object(AppConfig, 'GROQ_API_KEY', 'sk-test-key'):
+        with patch.object(AppConfig, "GROQ_API_KEY", "sk-test-key"):
             chunks = list(ai_engine.generate_stream("Test prompt", ""))
-            
+
         assert len(chunks) > 0
         assert "model not configured" in chunks[0]
 
-    def test_generate_json_requires_valid_response(self):
-        """Test JSON extraction requires valid JSON in response."""
-        # This is tested by the actual generate_json method
-        # which handles JSON extraction and parsing
-        ai_engine = AIEngine()
-        
-        # Invalid JSON should return None
-        # This is integration-level behavior that would need
-        # a complete mock of the streaming response
-        assert ai_engine is not None
-
-
-class TestAICanonEnforcement:
-    """Test that hard canon rules are properly enforced."""
-
-    def test_canon_enforcement_requires_streamlit_session(self):
-        """Test that canon enforcement only works when streamlit is available."""
-        # This test documents that canon enforcement requires Streamlit session state
-        # In a real scenario, these would be integration tests running the actual app
-        ai_engine = AIEngine()
-        
-        # Without streamlit in sys.modules, generation should work normally
-        with patch.object(AppConfig, 'GROQ_API_KEY', 'sk-test-key'):
-            # This would need a full integration test environment
-            # For now, we just verify the engine can be created
-            assert ai_engine is not None
-
 
 class TestAISanitization:
-    """Test input sanitization before sending to AI."""
-
     def test_sanitize_removes_null_bytes(self):
-        """Test that null bytes are removed from input."""
-        text = "Hello\x00World\x00"
-        result = sanitize_ai_input(text)
-        assert "\x00" not in result
-        assert result == "HelloWorld"
+        assert sanitize_ai_input("Hello\x00World\x00") == "HelloWorld"
 
     def test_sanitize_strips_whitespace(self):
-        """Test that leading/trailing whitespace is removed."""
-        text = "  \n  Hello World  \n  "
-        result = sanitize_ai_input(text)
-        assert result == "Hello World"
+        assert sanitize_ai_input("  \n  Hello World  \n  ") == "Hello World"
 
     def test_sanitize_respects_max_length(self):
-        """Test that text is truncated to max length."""
-        text = "a" * 1000
-        result = sanitize_ai_input(text, max_length=100)
-        assert len(result) == 100
+        assert len(sanitize_ai_input("a" * 1000, max_length=100)) == 100
 
     def test_sanitize_handles_empty_input(self):
-        """Test that empty input is handled gracefully."""
         assert sanitize_ai_input("") == ""
         assert sanitize_ai_input(None) == ""
         assert sanitize_ai_input("   ") == ""
 
     def test_truncate_prompt_logs_warning(self):
-        """Test that truncation logs a warning."""
-        long_prompt = "x" * 50000
-        with patch('app.services.ai.logger') as mock_logger:
-            result = _truncate_prompt(long_prompt, 10000)
-            
+        with patch("app.services.ai.logger") as mock_logger:
+            result = _truncate_prompt("x" * 50000, 10000)
+
         assert len(result) == 10000
         mock_logger.warning.assert_called_once()
 
 
 class TestAIStreamingGeneration:
-    """Test streaming generation behavior."""
-
-    @responses.activate
     def test_streaming_chunks_collected(self):
-        """Test that streaming chunks are properly collected."""
-        # Mock streaming response
-        responses.add(
-            responses.POST,
-            f"{AppConfig.GROQ_API_URL}/chat/completions",
-            json={
-                "choices": [{
-                    "message": {"content": "Line 1\nLine 2\nLine 3"}
-                }]
-            },
-            status=200,
-            stream=False
-        )
+        stream_lines = [
+            b'data: {"choices":[{"delta":{"content":"Line 1\\n"}}]}',
+            b'data: {"choices":[{"delta":{"content":"Line 2\\n"}}]}',
+            b'data: {"choices":[{"delta":{"content":"Line 3"}}]}',
+            b"data: [DONE]",
+        ]
+        stream_resp = MockHTTPResponse(iter_lines_data=stream_lines)
 
         ai_engine = AIEngine()
-        with patch.object(AppConfig, 'GROQ_API_KEY', 'sk-test-key'):
-            chunks = list(ai_engine.generate_stream("Test", "llama-3.1-8b-instant"))
+        with patch.object(ai_engine.session, "post", return_value=stream_resp):
+            with patch.object(AppConfig, "GROQ_API_KEY", "sk-test-key"):
+                chunks = list(ai_engine.generate_stream("Test", "llama-3.1-8b-instant"))
 
-        # All chunks should be collected
         full_text = "".join(chunks)
         assert "Line 1" in full_text
         assert "Line 2" in full_text
         assert "Line 3" in full_text
 
-    @responses.activate
     def test_streaming_handles_timeout(self):
-        """Test that streaming handles timeouts gracefully."""
-        import requests.exceptions
-        
-        responses.add(
-            responses.POST,
-            f"{AppConfig.GROQ_API_URL}/chat/completions",
-            body=requests.exceptions.Timeout("Request timed out")
-        )
-
         ai_engine = AIEngine(timeout=1)
-        with patch.object(AppConfig, 'GROQ_API_KEY', 'sk-test-key'):
-            chunks = list(ai_engine.generate_stream("Test", "llama-3.1-8b-instant"))
+        with patch.object(ai_engine.session, "post", side_effect=requests.exceptions.Timeout("timeout")):
+            with patch.object(AppConfig, "GROQ_API_KEY", "sk-test-key"):
+                chunks = list(ai_engine.generate_stream("Test", "llama-3.1-8b-instant"))
 
-        # Should yield error message
-        assert len(chunks) > 0
         full_text = "".join(chunks)
         assert "error" in full_text.lower() or "failed" in full_text.lower()
 
 
 class TestAIErrorHandling:
-    """Test comprehensive error handling in AI operations."""
-
-    @responses.activate
-    def test_401_unauthorized(self):
-        """Test handling of unauthorized (invalid API key) errors."""
-        responses.add(
-            responses.POST,
-            f"{AppConfig.GROQ_API_URL}/chat/completions",
-            json={"error": {"message": "Invalid API key"}},
-            status=401
-        )
-
+    @pytest.mark.parametrize("status_code", [401, 429])
+    def test_http_errors(self, status_code):
         ai_engine = AIEngine()
-        with patch.object(AppConfig, 'GROQ_API_KEY', 'sk-invalid-key'):
-            result = ai_engine.generate("Test", "llama-3.1-8b-instant")
-
-        assert "text" in result
-        # Should contain error message about failure
-        assert "failed" in result["text"].lower()
-
-    @responses.activate
-    def test_429_rate_limit(self):
-        """Test handling of rate limit errors."""
-        responses.add(
-            responses.POST,
-            f"{AppConfig.GROQ_API_URL}/chat/completions",
-            json={"error": {"message": "Rate limit exceeded"}},
-            status=429
-        )
-
-        ai_engine = AIEngine()
-        with patch.object(AppConfig, 'GROQ_API_KEY', 'sk-test-key'):
-            result = ai_engine.generate("Test", "llama-3.1-8b-instant")
+        with patch.object(ai_engine.session, "post", return_value=MockHTTPResponse(status_code=status_code)):
+            with patch.object(AppConfig, "GROQ_API_KEY", "sk-test-key"):
+                result = ai_engine.generate("Test", "llama-3.1-8b-instant")
 
         assert "text" in result
         assert "failed" in result["text"].lower()
 
-    @responses.activate
     def test_malformed_json_response(self):
-        """Test handling of malformed JSON responses."""
-        responses.add(
-            responses.POST,
-            f"{AppConfig.GROQ_API_URL}/chat/completions",
-            body="This is not JSON",
-            status=200
-        )
-
         ai_engine = AIEngine()
-        with patch.object(AppConfig, 'GROQ_API_KEY', 'sk-test-key'):
-            result = ai_engine.generate("Test", "llama-3.1-8b-instant")
+        stream_resp = MockHTTPResponse(iter_lines_data=[])
+        malformed_json_resp = MockHTTPResponse(json_data=json.JSONDecodeError("msg", "doc", 1))
+
+        with patch.object(ai_engine.session, "post", side_effect=[stream_resp, malformed_json_resp]):
+            with patch.object(AppConfig, "GROQ_API_KEY", "sk-test-key"):
+                result = ai_engine.generate("Test", "llama-3.1-8b-instant")
 
         assert "text" in result
-        # Should handle gracefully
         assert "failed" in result["text"].lower() or result["text"] == ""
 
-    @responses.activate
     def test_missing_choices_in_response(self):
-        """Test handling of responses missing expected fields."""
-        responses.add(
-            responses.POST,
-            f"{AppConfig.GROQ_API_URL}/chat/completions",
-            json={"data": []},  # Missing 'choices' key
-            status=200
-        )
-
         ai_engine = AIEngine()
-        with patch.object(AppConfig, 'GROQ_API_KEY', 'sk-test-key'):
-            result = ai_engine.generate("Test", "llama-3.1-8b-instant")
+        stream_resp = MockHTTPResponse(iter_lines_data=[])
+        missing_choices_resp = MockHTTPResponse(json_data={"data": []})
+
+        with patch.object(ai_engine.session, "post", side_effect=[stream_resp, missing_choices_resp]):
+            with patch.object(AppConfig, "GROQ_API_KEY", "sk-test-key"):
+                result = ai_engine.generate("Test", "llama-3.1-8b-instant")
 
         assert "text" in result
-        # Should return empty or error message
         assert "empty" in result["text"].lower() or result["text"] == ""
