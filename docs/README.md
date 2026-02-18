@@ -21,6 +21,8 @@ Step-by-step guides for users and developers:
 | **[Debugging Guide](guides/DEBUGGING.md)** | Comprehensive troubleshooting and debug mode guide |
 | **[Contributing Guide](guides/CONTRIBUTING.md)** | Development setup and contribution workflow |
 | **[Testing Guide](guides/testing.md)** | Complete testing strategy, best practices, and how-to |
+| **[Maintenance Guide](guides/MAINTENANCE_GUIDE.md)** | Best practices for ongoing maintenance |
+| **[Dashboard Components Guide](guides/DASHBOARD_COMPONENTS_GUIDE.md)** | Developer reference for dashboard components |
 
 ## 🏗️ Architecture & Technical
 
@@ -32,6 +34,7 @@ Deep dives into the system architecture and technical decisions:
 | **[Stabilization Summary](architecture/STABILIZATION_SUMMARY.md)** | Recent architectural improvements and refactoring |
 | **[Stabilization Quick Reference](architecture/STABILIZATION_QUICK_REFERENCE.md)** | Quick reference for stabilization patterns |
 | **[App Structure](../app/README.md)** | Detailed app directory structure and design principles |
+| **[Detailed Audit Report](DETAILED_AUDIT_REPORT.md)** | Comprehensive code audit (698 lines, technical reference) |
 
 ## 🎨 Design
 
@@ -40,6 +43,7 @@ UI/UX design documentation:
 | Document | Description |
 |----------|-------------|
 | **[Design System](design/DESIGN_SYSTEM.md)** | UI components, design tokens, and style guide |
+| **[Dashboard Redesign](DASHBOARD_REDESIGN.md)** | Dashboard UI improvements and redesign documentation |
 
 ## 📋 Planning & Roadmap
 
@@ -57,6 +61,15 @@ Operational procedures and testing:
 | Document | Description |
 |----------|-------------|
 | **[Smoke Test](runbooks/SMOKE_TEST.md)** | QA smoke testing procedures |
+
+## 📜 Audit & Quality
+
+Code quality, security, and audit documentation:
+
+| Document | Description |
+|----------|-------------|
+| **[Audit & Improvements](AUDIT_AND_IMPROVEMENTS.md)** | Complete audit summary, improvements, and production readiness |
+| **[Detailed Audit Report](DETAILED_AUDIT_REPORT.md)** | Full technical audit report (698 lines) |
 
 ## 📜 Other
 
@@ -86,6 +99,9 @@ Operational procedures and testing:
 docs/
 ├── README.md                              # This file - navigation hub
 ├── CHANGELOG.md                           # Version history
+├── AUDIT_AND_IMPROVEMENTS.md              # Consolidated audit & improvements
+├── DETAILED_AUDIT_REPORT.md               # Full technical audit report
+├── DASHBOARD_REDESIGN.md                  # Dashboard redesign documentation
 │
 ├── guides/                                # User-facing guides
 │   ├── GETTING_STARTED.md                 # Installation & first project
@@ -93,11 +109,14 @@ docs/
 │   ├── AGENT_QUICK_REFERENCE.md           # Agent quick reference
 │   ├── DEBUGGING.md                       # Troubleshooting guide
 │   ├── CONTRIBUTING.md                    # Development setup
+│   ├── MAINTENANCE_GUIDE.md               # Maintenance best practices
+│   ├── DASHBOARD_COMPONENTS_GUIDE.md      # Dashboard components reference
 │   ├── testing.md                         # Testing guide (consolidated)
 │   └── index.md                           # Guides index
 │
 ├── architecture/                          # Technical deep dives
 │   ├── architecture.md                    # System design
+│   ├── QA_AUDIT_REPORT.md                 # QA audit findings
 │   ├── STABILIZATION_SUMMARY.md           # Implementation details
 │   └── STABILIZATION_QUICK_REFERENCE.md   # Quick reference
 │
@@ -106,6 +125,7 @@ docs/
 │
 ├── planning/                              # Project planning
 │   ├── ROADMAP.md                         # Future improvements
+│   ├── MANTIS_STRATEGIC_ROADMAP.md        # Strategic planning
 │   └── COMPETITIVE_ANALYSIS.md            # Market positioning
 │
 └── runbooks/                              # Operational procedures
