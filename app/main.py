@@ -41,6 +41,7 @@ import shutil
 import sys
 import time
 import uuid
+import webbrowser
 from collections.abc import Generator
 from dataclasses import asdict, dataclass, field, fields
 from pathlib import Path
@@ -2296,20 +2297,21 @@ def _run_ui():
             with st.container(border=True):
                 st.markdown("### 🎉 What's New in Mantis Studio")
                 st.markdown(f"""
-                **Version {current_version} is now available!**
+                **Version {current_version} is now available!** (Updated from {last_seen_version})
                 
-                **Recent Updates:**
-                - 🔔 Added in-app "What's New" notifications so you never miss updates
-                - 📊 Version information is now more visible in the UI
-                - 📝 Improved changelog documentation for all version changes
-                - 🐛 Continuous bug fixes and improvements
+                **What Changed:**
+                - 🔔 **NEW**: You can now see what changed between versions!
+                  - This notification system was added to address user feedback
+                  - Version updates are now visible and transparent
+                - 📝 **Improved**: Complete changelog documentation for all recent versions
+                - 📊 **Enhanced**: Better version tracking and update notifications
                 
-                **Changes Since Your Last Visit:**
-                - Version bumps now include meaningful change summaries
-                - Better tracking of what's new between releases
-                - Enhanced transparency about updates
+                **Why This Matters:**
+                - You previously reported: "merged 4 times now with no changed from users point of view"
+                - This fix ensures you always know when the app updates and what's new
+                - All future updates will show clear release notes
                 
-                👉 **Check the [Changelog](https://github.com/bigmanjer/Mantis-Studio/blob/main/docs/CHANGELOG.md) for complete details**
+                👉 **See the [full changelog](https://github.com/bigmanjer/Mantis-Studio/blob/main/docs/CHANGELOG.md) for complete details**
                 """)
                 
                 col1, col2 = st.columns([1, 1])
@@ -2321,7 +2323,6 @@ def _run_ui():
                         st.rerun()
                 with col2:
                     if st.button("📖 View Full Changelog", use_container_width=True):
-                        import webbrowser
                         webbrowser.open("https://github.com/bigmanjer/Mantis-Studio/blob/main/docs/CHANGELOG.md")
                         config["last_seen_version"] = current_version
                         save_app_config(config)

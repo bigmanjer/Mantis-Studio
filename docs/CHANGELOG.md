@@ -34,57 +34,65 @@ This release directly addresses user feedback about version changes being invisi
 
 ## [91.5] - 2026-02-18
 
-### Changed
-- Incremental improvements and bug fixes
+### Note
+- Version auto-incremented by CI/CD workflow
+- Specific changes not documented in this retroactive update
 
 ---
 
 ## [91.4] - 2026-02-18
 
-### Changed
-- Incremental improvements and bug fixes
+### Note
+- Version auto-incremented by CI/CD workflow
+- Specific changes not documented in this retroactive update
 
 ---
 
 ## [91.3] - 2026-02-18
 
-### Changed
-- Incremental improvements and bug fixes
+### Note
+- Version auto-incremented by CI/CD workflow
+- Specific changes not documented in this retroactive update
 
 ---
 
 ## [91.2] - 2026-02-18
 
-### Changed
-- Incremental improvements and bug fixes
+### Note
+- Version auto-incremented by CI/CD workflow
+- Specific changes not documented in this retroactive update
 
 ---
 
 ## [91.1] - 2026-02-18
 
-### Changed
-- Incremental improvements and bug fixes
+### Note
+- Version auto-incremented by CI/CD workflow
+- Specific changes not documented in this retroactive update
 
 ---
 
 ## [91.0] - 2026-02-18
 
-### Changed
-- Incremental improvements and bug fixes
+### Note
+- Version auto-incremented by CI/CD workflow
+- Specific changes not documented in this retroactive update
 
 ---
 
 ## [90.9] - 2026-02-18
 
-### Changed
-- Incremental improvements and bug fixes
+### Note
+- Version auto-incremented by CI/CD workflow
+- Specific changes not documented in this retroactive update
 
 ---
 
 ## [90.8] - 2026-02-18
 
-### Changed
-- Incremental improvements and bug fixes
+### Note
+- Version auto-incremented by CI/CD workflow
+- Specific changes not documented in this retroactive update
 
 ---
 
