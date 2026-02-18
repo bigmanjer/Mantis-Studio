@@ -5,6 +5,29 @@ All notable changes to Mantis Studio are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+- 🎨 Replaced in-app branding assets with slices generated from `assets/NEW MANTIS BRANDING.png`, including a new emblem, wordmark, full lockup, and favicon set (1x + 2x) generated at runtime from the source board.
+- 🧭 Updated Streamlit branding references for page icon, header logo, sidebar logo, and home-header emblem to use generated `branding/*` assets.
+- 📐 Tuned header logo sizing for the wider lockup image so branding renders cleanly at default viewport widths.
+- 🎛️ Refined header/sidebar brand containers and logo treatment (transparent extraction + themed glow frames) so the new brand system feels native to the product UI instead of pasted-in artboards.
+
+### Branding asset map
+- `assets/branding/mantis_favicon.png` → Streamlit `page_icon` metadata
+- `assets/branding/mantis_wordmark.png` → `app_context` header logo
+- `assets/branding/mantis_lockup.png` → `main.py` top brand header
+- `assets/branding/mantis_emblem.png` → sidebar brand + compact header icon
+
+### Changelog output
+- Images sliced at runtime: 8 outputs (`mantis_emblem`, `mantis_wordmark`, `mantis_lockup`, `mantis_favicon`, each with 1x and 2x variants).
+- Code files updated: `app/app_context.py`, `app/main.py`, `app/layout/enhanced_sidebar.py`, `app/utils/branding_assets.py`.
+
+### Fixed
+- 🧩 Eliminated binary image slices from git history moving forward by generating derived branding assets on demand, which avoids PR tooling failures on binary diffs.
+
+---
+
 ## [91.6] - 2026-02-18
 
 ### Added

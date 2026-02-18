@@ -191,23 +191,29 @@ def apply_theme(tokens: Dict[str, str]) -> None:
         align-items:center;
     }}
     .mantis-header-logo {{
-        width:88px;
-        height:88px;
-        border-radius:18px;
+        width:236px;
+        height:82px;
+        border-radius:16px;
         background: var(--mantis-header-logo-bg);
+        background: linear-gradient(135deg, color-mix(in srgb, var(--mantis-header-logo-bg) 82%, transparent), transparent);
+        border: 1px solid var(--mantis-primary-border);
+        border: 1px solid color-mix(in srgb, var(--mantis-accent) 28%, transparent);
         display:flex;
         align-items:center;
         justify-content:center;
         overflow:hidden;
         box-shadow:
-            inset 0 0 0 1px rgba(0,0,0,0.06),
-            0 0 18px var(--mantis-accent-glow);
+            inset 0 0 0 1px rgba(0,0,0,0.04),
+            0 8px 22px var(--mantis-accent-glow),
+            0 8px 22px color-mix(in srgb, var(--mantis-accent-glow) 60%, transparent);
     }}
     .mantis-header-logo img {{
-        height:60px;
-        width:auto;
+        width:100%;
+        max-height:62px;
+        object-fit:contain;
         padding:0;
         border-radius:0;
+        filter: drop-shadow(0 0 10px color-mix(in srgb, var(--mantis-accent-glow) 75%, transparent));
     }}
     .mantis-header-title {{
         font-size:22px;
@@ -460,6 +466,24 @@ def apply_theme(tokens: Dict[str, str]) -> None:
     .mantis-sidebar-brand--modern {{
         gap: 2px;
     }}
+    .mantis-sidebar-logo {
+        width: 100%;
+        max-width: 148px;
+        margin: 0 auto 6px;
+        padding: 8px;
+        border-radius: 14px;
+        background: var(--mantis-sidebar-logo-bg);
+        background: linear-gradient(145deg, color-mix(in srgb, var(--mantis-sidebar-logo-bg) 92%, transparent), transparent);
+        border: 1px solid var(--mantis-sidebar-brand-border);
+        border: 1px solid color-mix(in srgb, var(--mantis-accent) 20%, transparent);
+    }
+    .mantis-sidebar-logo img {
+        width: 100%;
+        display:block;
+        object-fit: contain;
+        filter: drop-shadow(0 0 8px color-mix(in srgb, var(--mantis-accent-glow) 80%, transparent));
+    }
+
     .mantis-sidebar-brand--modern [data-testid="stImage"] {{
         width: 100%;
         margin: 2px 0 4px;
