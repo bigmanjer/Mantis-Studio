@@ -1809,6 +1809,24 @@ class TestWorldBibleMerge:
         assert "northern garrison" in ent.description
         assert "brave warrior" in ent.description
 
+    def test_apply_alias_only_no_actual_changes_returns_duplicate(self):
+        """apply_suggestion should return duplicate when nothing is changed."""
+        from app.services.world_bible_merge import apply_suggestion
+        ent_orig, _ = self.project.upsert_entity("Elena", "Character", "A brave warrior.")
+        classified = {
+            "type": "alias_only",
+            "entity_id": ent_orig.id,
+            "name": "Elena",
+            "category": "Character",
+            "description": "A brave warrior.",
+            "aliases": [],
+            "novel_bullets": [],
+            "novel_aliases": [],
+        }
+        ent, action = apply_suggestion(self.project, classified)
+        assert ent.id == ent_orig.id
+        assert action == "duplicate"
+
 
 # ---------------------------------------------------------------------------
 # World Bible suggestion queue
@@ -2368,6 +2386,12 @@ class TestWorldBibleButtons:
         idx = self.body.index("✅ Apply")
         after = self.body[idx : idx + 1200]
         assert "st.rerun()" in after
+
+    def test_apply_suggestion_duplicate_toast_message(self):
+        idx = self.body.index("✅ Apply")
+        after = self.body[idx : idx + 1400]
+        assert '_action == "duplicate"' in after
+        assert "No new World Bible changes to apply." in after
 
     def test_ignore_suggestion_button_has_key(self):
         assert 'key=f"ignore_suggestion_{idx}"' in self.body
