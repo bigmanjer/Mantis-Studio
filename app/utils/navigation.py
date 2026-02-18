@@ -25,12 +25,12 @@ NAV_ITEMS: List[Tuple[str, str, str]] = [
 ]
 
 NAV_SECTIONS: List[Tuple[str, List[Tuple[str, str, str]]]] = [
-    ("🏠 Home", [("Dashboard", "home", "🏠")]),
-    ("🗂 Workspace", [("Projects", "projects", "📁"), ("Export", "export", "⬇️")]),
-    ("🧠 Intelligence", [("World Bible", "world", "🌍")]),
-    ("✍ Writing", [("Write", "outline", "✍️"), ("Editor", "chapters", "🧩")]),
-    ("📊 Insights", [("Memory", "memory", "🧠"), ("Insights", "insights", "📊")]),
-    ("⚙ System", [("AI Settings", "ai", "⚙️"), ("All Policies", "legal", "📜")]),
+    ("Dashboard", [("Overview", "home", "🏠")]),
+    ("Projects", [("Projects", "projects", "📁")]),
+    ("Modules", [("Outline", "outline", "🧭"), ("Editor", "chapters", "✍️")]),
+    ("Intelligence", [("World Bible", "world", "🌍"), ("Memory", "memory", "🧠"), ("Insights", "insights", "📊")]),
+    ("Exports", [("Export", "export", "⬇️")]),
+    ("Settings", [("AI Settings", "ai", "⚙️"), ("Policies", "legal", "📜")]),
 ]
 
 # Extended map includes entries that don't appear in the main nav bar
