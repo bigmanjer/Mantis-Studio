@@ -21,7 +21,7 @@ def render_sidebar_brand(version: str) -> None:
     st.html(f'<div class="mantis-sidebar-meta"><span class="mantis-sidebar-version">Enterprise Console · v{version}</span></div><div class="mantis-sidebar-divider"></div></div>')
 
 
-def render_theme_selector(scope: Callable[[str], Any]) -> None:
+def render_theme_selector(key_scope: Callable[[str], Any]) -> None:
     st.html("<div class='mantis-nav-section'>Appearance</div>")
     with scope("theme_selector"):
         current_theme = st.session_state.get("ui_theme", "Dark")
@@ -43,7 +43,7 @@ def render_project_info(project: Optional[Any]) -> None:
     st.html(f'<div class="mantis-project-chip"><div class="mantis-project-chip__title">{project.title}</div><div class="mantis-project-chip__meta">📚 {project.get_total_word_count():,} words</div></div>')
 
 
-def render_navigation_section(section_name: str, nav_items: list, current_page: str, world_focus: str, expanded: bool, slugify: Callable, scope: Callable[[str], Any]) -> None:
+def render_navigation_section(section_name: str, nav_items: list, current_page: str, world_focus: str, expanded: bool, slugify: Callable, key_scope: Callable[[str], Any]) -> None:
     with st.expander(section_name, expanded=expanded):
         for label, target, icon in nav_items:
             if target == "memory":
@@ -79,7 +79,7 @@ def render_navigation_section(section_name: str, nav_items: list, current_page: 
                     st.rerun()
 
 
-def render_project_actions(project: Optional[Any], save_callback: Callable, close_callback: Callable, scope: Callable[[str], Any]) -> None:
+def render_project_actions(project: Optional[Any], save_callback: Callable, close_callback: Callable, key_scope: Callable[[str], Any]) -> None:
     if not project:
         return
     st.divider()
@@ -143,9 +143,6 @@ def render_enhanced_sidebar(version: str, project: Optional[Any], current_page: 
         with nullcontext():
             yield
 
-    def safe_scope(scope_name: str):
-        return scoped(scope_name, key_scope)
-
     with st.sidebar:
         with safe_scope("sidebar"):
             render_sidebar_brand(version)
@@ -172,8 +169,8 @@ def render_enhanced_sidebar(version: str, project: Optional[Any], current_page: 
             st.divider()
             st.html("<div class='mantis-nav-section'>Navigation</div>")
             for idx, (section_name, nav_items) in enumerate(get_nav_sections()):
-                render_navigation_section(section_name, nav_items, current_page, world_focus, idx < 2, slugify, safe_scope)
-            render_project_actions(project, save_project_callback, close_project_callback, safe_scope)
+                render_navigation_section(section_name, nav_items, current_page, world_focus, idx < 2, slugify, key_scope)
+            render_project_actions(project, save_project_callback, close_project_callback, key_scope)
         render_debug_panel(instance_id)
 
 
