@@ -3733,12 +3733,7 @@ def _run_ui():
         groq_key, _ = get_effective_key("groq", st.session_state.get("user_id"))
         openai_key, _ = get_effective_key("openai", st.session_state.get("user_id"))
         project_health_completed = sum(
-            [
-                1 if recent_projects else 0,
-                1 if has_outline else 0,
-                1 if has_chapter else 0,
-                1 if canon_icon != "🔴" else 0,
-            ]
+            [bool(recent_projects), bool(has_outline), bool(has_chapter), canon_icon != "🔴"]
         )
         project_health_percent = int((project_health_completed / 4) * 100)
         latest_chapter_label = "You last worked on Chapter — · recently"
@@ -3821,7 +3816,7 @@ def _run_ui():
 
         top_cols = st.columns([2.2, 1])
         with top_cols[0]:
-            with card_block("Next narrative milestone", "Create or advance your story with one guided action."):
+            with card_block("Next Narrative Milestone", "Create or advance your story with one guided action."):
                 st.markdown(f"### {project_title}")
                 st.caption(latest_chapter_label)
                 if st.button(primary_label, type="primary", use_container_width=True):
@@ -3864,7 +3859,9 @@ def _run_ui():
                     st.caption("• Resolve canon issues in World Bible before publishing.")
                 else:
                     st.caption("• Review insights and export your latest draft.")
-                st.caption(f"Prompt: {milestone_label} for {project_title}.")
+                st.caption(
+                    f"Expert prompt: Advance '{project_title}' by completing the next narrative milestone."
+                )
                 st.caption(
                     "Token budget: "
                     + ("Connected" if (groq_key or openai_key) else "Connect AI providers")
