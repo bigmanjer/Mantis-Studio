@@ -68,6 +68,8 @@ def get_nav_items() -> List[Tuple[str, str, str]]:
 
 def get_nav_sections() -> List[Tuple[str, List[Tuple[str, str, str]]]]:
     """Return sidebar navigation grouped into SaaS-style sections."""
+    # Return shallow copies so callers can safely iterate/mutate locally
+    # without altering module-level constants shared across reruns.
     return [(section, list(items)) for section, items in NAV_SECTIONS]
 
 

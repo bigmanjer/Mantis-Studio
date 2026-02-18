@@ -28,6 +28,11 @@ from app.router import get_nav_config, get_routes
 from app.utils.helpers import word_count, clamp, current_year
 from scripts.bump_version import bump_version
 
+# These routes are represented in grouped navigation as focused/redirect views:
+# - memory / insights map to the world page with a focus tab
+# - legal maps to the legal redirect hub and policy routes
+EXCLUDED_NAV_TARGETS = {"memory", "insights", "legal"}
+
 
 # ============================================================================
 # Tests from test_ux_smoke.py — Comprehensive UX smoke tests
@@ -408,13 +413,19 @@ class TestNavigationParity:
         from app.utils.navigation import get_nav_items, get_nav_sections
 
         nav_targets = {target for _, target, _ in get_nav_items()}
+        grouped_all_targets = {
+            target
+            for _, items in get_nav_sections()
+            for _, target, _ in items
+        }
         grouped_targets = {
             target
             for _, items in get_nav_sections()
             for _, target, _ in items
-            if target not in {"memory", "insights", "legal"}
+            if target not in EXCLUDED_NAV_TARGETS
         }
         assert nav_targets.issubset(grouped_targets)
+        assert EXCLUDED_NAV_TARGETS.issubset(grouped_all_targets)
 
     def test_footer_nav_links_match_nav_items(self):
         """The footer link builder must produce one link per NAV_ITEMS entry."""
@@ -2076,6 +2087,7 @@ class TestLegalRedirectButtons:
 
     def test_legal_nav_buttons_have_keys(self):
         body = _extract_render_function("render_legal_redirect")
+        assert "legal_pages = [" in body
         assert "st.expander(label)" in body
 
     def test_legal_nav_buttons_call_rerun(self):
@@ -2737,6 +2749,7 @@ class TestSidebarNavButtons:
     def test_sidebar_nav_buttons_call_rerun(self):
         src = _source()
         idx = src.index('key=f"nav_{target}_{_slugify(label)}"')
+        # Window includes the button branch and callback body for rerun assertion.
         after = src[idx : idx + 1200]
         assert "st.rerun()" in after
 

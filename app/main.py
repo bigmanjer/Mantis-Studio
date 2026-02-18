@@ -3568,8 +3568,8 @@ def _run_ui():
             nav_sections = get_nav_sections()
             current_page = st.session_state.get("page", "home")
             world_focus = st.session_state.get("world_focus_tab", "")
-            for section_name, nav_items in nav_sections:
-                with st.expander(section_name, expanded=section_name in {"🏠 Home", "🗂 Workspace"}):
+            for section_idx, (section_name, nav_items) in enumerate(nav_sections):
+                with st.expander(section_name, expanded=section_idx < 2):
                     for label, target, icon in nav_items:
                         if target == "memory":
                             is_active = current_page == "world" and world_focus == "Memory"
@@ -3788,7 +3788,12 @@ def _run_ui():
             datetime.date.fromtimestamp(last_action_ts) if last_action_ts else None
         )
         last_action_label = (st.session_state.get("last_action") or "").lower()
-        ai_ops_today = 1 if last_action_day == today and "ai" in last_action_label else 0
+        ai_action_tokens = ("analysis", "insights", "memory", "semantic", "entity", "ai")
+        ai_ops_today = (
+            1
+            if last_action_day == today and any(token in last_action_label for token in ai_action_tokens)
+            else 0
+        )
         system_mode = "Cloud" if (groq_key or openai_key) else "Local"
         autosave_status = "Auto-saving" if st.session_state.get("auto_save", True) else "Saved"
 
@@ -3810,10 +3815,12 @@ def _run_ui():
             action_cols = st.columns(3)
             with action_cols[0]:
                 if st.button("New Project", type="primary", use_container_width=True):
-                    open_new_project()
+                    with st.spinner("Opening project setup..."):
+                        open_new_project()
             with action_cols[1]:
                 if st.button("Open Workspace", use_container_width=True):
-                    open_recent_project("chapters")
+                    with st.spinner("Opening workspace..."):
+                        open_recent_project("chapters")
             with action_cols[2]:
                 if st.button("Run Analysis", use_container_width=True):
                     with st.spinner("Preparing analysis workspace..."):
@@ -3904,8 +3911,8 @@ def _run_ui():
             ),
         ]
 
-        for group_name, features in feature_groups:
-            with st.expander(group_name, expanded=group_name == "🧠 Intelligence"):
+        for group_idx, (group_name, features) in enumerate(feature_groups):
+            with st.expander(group_name, expanded=group_idx == 0):
                 for feature_name, feature_caption, action in features:
                     feature_cols = st.columns([2.2, 1])
                     with feature_cols[0]:
@@ -3917,10 +3924,7 @@ def _run_ui():
                             key=f"dashboard_feature_{_slugify(group_name)}_{_slugify(feature_name)}",
                             use_container_width=True,
                         ):
-                            if group_name == "🧠 Intelligence":
-                                with st.spinner(f"Loading {feature_name.lower()}..."):
-                                    action()
-                            else:
+                            with st.spinner(f"Loading {feature_name.lower()}..."):
                                 action()
 
         if not groq_key or not openai_key:
