@@ -2178,7 +2178,7 @@ class TestAISettingsButtons:
 
     def test_apply_key_calls_rerun(self):
         idx = self.body.index("Apply Key")
-        after = self.body[idx : idx + 1500]
+        after = self.body[idx : idx + 2000]
         assert "st.rerun()" in after
 
     def test_clear_key_button_has_key(self):

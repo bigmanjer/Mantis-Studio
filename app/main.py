@@ -3275,7 +3275,13 @@ def _run_ui():
                             st.toast(f"{provider_label} key activated — loaded {len(models)} models.")
                         else:
                             st.toast(f"{provider_label} key activated for this session.")
-                        st.session_state[f"{provider}_connection_tested"] = test_fn(base_url, key_value.strip())
+                        connection_ok = test_fn(base_url, key_value.strip())
+                        st.session_state[f"{provider}_connection_tested"] = connection_ok
+                        if not connection_ok:
+                            st.toast(
+                                f"{provider_label} connection test failed. Check your API key and base URL.",
+                                icon="⚠️",
+                            )
                         st.rerun()
                     else:
                         st.warning("Please enter an API key first.")
@@ -3324,6 +3330,8 @@ def _run_ui():
                             st.session_state.openai_base_url,
                             openai_key,
                         )
+                        if not st.session_state.openai_connection_tested:
+                            st.toast("OpenAI connection test failed. Check your API key and base URL.", icon="⚠️")
                 
                 with st.expander("⚙️ Advanced Settings", expanded=False):
                     openai_url = st.text_input(
@@ -3413,6 +3421,8 @@ def _run_ui():
                             st.session_state.groq_base_url,
                             groq_key,
                         )
+                        if not st.session_state.groq_connection_tested:
+                            st.toast("Groq connection test failed. Check your API key and base URL.", icon="⚠️")
                 
                 with st.expander("⚙️ Advanced Settings", expanded=False):
                     groq_url = st.text_input(
