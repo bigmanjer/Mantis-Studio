@@ -878,9 +878,9 @@ Install dependencies:
 pip install -r requirements.txt
 ```
 
-For development-specific dependencies (if you have a `requirements-dev.txt`):
+For additional local tooling (optional), install packages directly as needed:
 ```bash
-pip install -r requirements-dev.txt
+pip install pytest pytest-cov responses
 ```
 
 ### Configuration
