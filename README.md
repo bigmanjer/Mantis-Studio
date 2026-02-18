@@ -20,6 +20,25 @@
 
 ---
 
+## 🤖 GitHub Copilot Custom Agent
+
+**Have GitHub Copilot?** This repository includes a specialized **mantis-engineer** agent!
+
+The agent provides expert assistance with:
+- 🐛 Debugging Streamlit issues (blank pages, state resets, key collisions)
+- 🔧 Refactoring and code organization
+- 💾 Session state management patterns
+- 🚀 Deployment and production readiness
+
+**To use the agent:**
+1. Open GitHub Copilot Chat
+2. Type `@mantis-engineer` followed by your question
+3. Example: `@mantis-engineer How do I fix session state resets?`
+
+📖 **[Complete Agent Usage Guide →](docs/guides/USING_CUSTOM_AGENT.md)** | 🚀 **[Quick Reference →](AGENT_USAGE.md)**
+
+---
+
 ## 📚 What This Document Covers
 
 This README explains **what the app does, how it is structured, what every major button/section is supposed to do, and how the UI flows from a user’s point of view**.
@@ -484,6 +503,7 @@ Additional documentation lives in the `docs/` directory:
 | Document | Path |
 | -------- | ---- |
 | Getting Started Guide | [`docs/guides/GETTING_STARTED.md`](docs/guides/GETTING_STARTED.md) |
+| **Using Custom GitHub Copilot Agent** | [`docs/guides/USING_CUSTOM_AGENT.md`](docs/guides/USING_CUSTOM_AGENT.md) |
 | Contributing Guide | [`docs/guides/CONTRIBUTING.md`](docs/guides/CONTRIBUTING.md) |
 | Architecture | [`docs/architecture/architecture.md`](docs/architecture/architecture.md) |
 | Design System | [`docs/design/DESIGN_SYSTEM.md`](docs/design/DESIGN_SYSTEM.md) |
