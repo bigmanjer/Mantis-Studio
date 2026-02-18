@@ -42,6 +42,10 @@ def render_card(title: str, content: Callable[[], None], subtitle: Optional[str]
 def render_metric_card(label: str, value: str) -> None:
     """Render a metric card with consistent styling for the dashboard.
     
+    This is a semantic alias for render_metric() that provides clearer intent
+    when used in dashboard contexts. The function name explicitly indicates
+    it renders a "card" component, improving code readability.
+    
     Args:
         label: The metric label (e.g., "Total Projects")
         value: The metric value (e.g., "5")
