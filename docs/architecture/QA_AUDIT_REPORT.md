@@ -173,9 +173,8 @@ Detected widget usage in audited code:
 
 ### Critical Errors (Must Fix Immediately)
 
-1. **(Resolved)** Undefined function call in legacy UI path: `update_locked_chapters()` now defined in `app/app_context.py`.
-2. **(Resolved)** Broken healthcheck import target (`app.ui.layout`) corrected to `app.layout.layout`.
-3. Remaining critical runtime blockers: none identified in current automated checks.
+1. **Undefined function call in legacy UI path**: `update_locked_chapters()` used but not defined in `app/app_context.py` coherence action path.
+2. **Broken healthcheck import target** (`app.ui.layout`) causes official healthcheck to fail.
 
 ### High Risk Issues
 
@@ -208,8 +207,8 @@ Detected widget usage in audited code:
 ### State Management Problems
 
 1. AppConfig class-level mutation from session state.
-2. Large cross-feature key surface increases accidental coupling risk.
-3. Session + UI logic are still tightly coupled in monolithic render functions.
+2. Legacy path state helper mismatch (`update_locked_chapters`).
+3. Large cross-feature key surface increases accidental coupling risk.
 
 ### Performance Risks
 
@@ -230,24 +229,20 @@ Rationale: strong test pass rate and defensive defaults, but reduced by structur
 
 ## Prioritized Fix Order
 
-1. Decide and enforce single active UI shell:
+1. Fix hard failures:
+   - `update_locked_chapters` mismatch in `app/app_context.py` (or retire path explicitly).
+   - `scripts/healthcheck.py` invalid import target.
+2. Decide and enforce single active UI shell:
    - Deprecate/remove or isolate `app/app_context.py` from production paths.
-2. Break circular imports:
+3. Break circular imports:
    - Extract shared navigation constants into a pure data module with no back-imports.
-3. Refactor largest UI functions incrementally:
+4. Refactor largest UI functions incrementally:
    - Split into feature modules + testable action handlers.
-4. Tighten exception handling:
+5. Tighten exception handling:
    - Replace broad catches in critical action paths with scoped exceptions and user-visible error messages.
-5. Strengthen state contracts:
+6. Strengthen state contracts:
    - Central key schema + typed accessors; avoid mutating global config class from session.
-6. Align dependencies and docs:
+7. Align dependencies and docs:
    - Reconcile README stack claims with `requirements.txt`.
-7. Expand automated UI behavior tests:
+8. Expand automated UI behavior tests:
    - Add per-button action tests for critical flows (project create/delete, chapter create/delete, world apply/ignore, AI settings save/test).
-
-
-## Post-Audit Fixes Applied
-
-- Added missing `update_locked_chapters()` helper in `app/app_context.py` so coherence action buttons no longer reference an undefined symbol.
-- Updated `scripts/healthcheck.py` import target from `app.ui.layout` to `app.layout.layout`, restoring healthcheck pass behavior.
-- Removed a circular dependency edge by making `app.utils.navigation.get_nav_config()` self-contained (no back import into `app.router`).

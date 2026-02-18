@@ -45,7 +45,7 @@ The **mantis-engineer** custom agent is your AI pair programmer specialized for 
 
 ## Learn More
 
-📖 **[Complete Guide](docs/guides/USING_CUSTOM_AGENT.md)** - Detailed usage instructions, examples, and troubleshooting
+📖 **[Complete Guide](USING_CUSTOM_AGENT.md)** - Detailed usage instructions, examples, and troubleshooting
 
 ---
 

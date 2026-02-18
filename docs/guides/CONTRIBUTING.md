@@ -148,44 +148,41 @@ python scripts/smoke_test.py
 
 ### Formatting
 
-We use **Black** for code formatting and **isort** for import sorting:
+If you use formatters locally, run them directly with Python tooling:
 
 ```bash
-# Auto-format all code
-make format
-
-# Check formatting without making changes
-make format-check
+python -m black app tests
+python -m isort app tests
 ```
 
 ### Linting
 
-We use **flake8** for linting and **mypy** for type checking:
+If lint/type-check tools are installed in your environment:
 
 ```bash
-# Run all linters
-make lint
-
-# Run individual linters
-flake8 app/
-mypy app/ --ignore-missing-imports
+python -m flake8 app tests
+python -m mypy app --ignore-missing-imports
 ```
 
-## Using Make Commands
+## Common Commands (Current Repo)
 
-The `Makefile` provides shortcuts for common tasks:
+This repository does **not** include a Makefile. Use direct commands instead:
 
 ```bash
-make help          # Show all available commands
-make install-dev   # Install all dependencies
-make test          # Run test suite
-make test-coverage # Run tests with coverage report
-make lint          # Run linters (flake8, mypy)
-make format        # Auto-format code (black, isort)
-make format-check  # Check formatting without changes
-make run           # Start the application
-make clean         # Remove build artifacts
-make diagnose      # Run comprehensive diagnostics
+# Install runtime dependencies
+pip install -r requirements.txt
+
+# Run tests
+pytest
+
+# Run tests with coverage
+pytest --cov=app --cov-report=term-missing
+
+# Start the app
+streamlit run app/main.py
+
+# Run diagnostics script
+python scripts/diagnose.py
 ```
 
 ## Pre-commit Hooks
@@ -240,7 +237,7 @@ pytest -vv
 pytest tests/test_file.py::test_name -vv
 
 # Run diagnostics
-make diagnose
+python scripts/diagnose.py
 ```
 
 ### Application Won't Start
@@ -250,7 +247,7 @@ make diagnose
 make health
 
 # Run diagnostics
-make diagnose
+python scripts/diagnose.py
 
 # Check logs
 tail -f logs/*.log
