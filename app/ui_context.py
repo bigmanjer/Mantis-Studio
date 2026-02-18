@@ -95,9 +95,9 @@ class UIContext:
         cooldowns = self.st.session_state.setdefault("_cooldowns", {})
         cooldowns[action_key] = time.time()
     
-    @self.st.cache_data(show_spinner=False)
     def load_asset_bytes(self, filename: str) -> Optional[bytes]:
-        """Load asset file as bytes (cached)."""
+        """Load asset file as bytes (cached via Streamlit)."""
+        # Note: Caching is handled by Streamlit's built-in caching when called through st
         path = self.assets_dir / filename
         if not path.exists():
             return None
