@@ -2144,16 +2144,16 @@ class TestDashboardButtons:
         start = self.body.index("Feature Access")
         end = self.body.index("Connect your AI providers", start)
         section = self.body[start:end]
-        assert "for feature_name, feature_caption, action in features:" in section
-        assert "dashboard_feature_" in section
+        # New implementation uses render_feature_group instead of inline loop
+        assert "for group_idx, (group_name, features) in enumerate(feature_groups):" in section
+        assert "render_feature_group(" in section
+        assert "key_prefix=\"dashboard\"" in section
 
     def test_dashboard_sections_exist(self):
-        start = self.body.index("Command Center")
-        end = self.body.index("Connect your AI providers", start)
-        section = self.body[start:end]
-        assert "Metrics Overview" in section
-        assert "Workspace Hub" in section
-        assert "Feature Access" in section
+        # The new dashboard doesn't have "Command Center" - it has section headers instead
+        assert "Metrics Overview" in self.body
+        assert "Workspace Hub" in self.body
+        assert "Feature Access" in self.body
 
     def test_ai_settings_button(self):
         assert "Settings" in self.body

@@ -3935,7 +3935,7 @@ def _run_ui():
                     with row[1]:
                         st.caption(f"Modified {modified}")
                     with row[2]:
-                        if st.button("Open", use_container_width=True, key=f"dash_hub_open_{project_entry['path']}"):
+                        if st.button("Open Workspace", use_container_width=True, key=f"dash_hub_open_{project_entry['path']}"):
                             _open_project(project_entry["path"])
             
             render_workspace_hub_section("Recent Projects", _recent_projects_content)

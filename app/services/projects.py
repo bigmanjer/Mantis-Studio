@@ -77,6 +77,12 @@ class Chapter:
     history: List[Dict[str, Any]] = field(default_factory=list)
 
     def update_content(self, new_text: str, source: str = "manual"):
+        """Update chapter content and track in revision history.
+        
+        Args:
+            new_text: The new chapter content
+            source: Source of the update (e.g., "manual", "ai", "import")
+        """
         if self.content == new_text:
             return
         self.history.append(
@@ -95,6 +101,16 @@ class Chapter:
 
 
 def sanitize_chapter_title(title: str) -> str:
+    """Clean and normalize a chapter title.
+    
+    Removes quotes, asterisks, extra whitespace, and other formatting artifacts.
+    
+    Args:
+        title: Raw chapter title
+        
+    Returns:
+        Cleaned chapter title string
+    """
     raw = (title or "").strip()
     if not raw:
         return ""
