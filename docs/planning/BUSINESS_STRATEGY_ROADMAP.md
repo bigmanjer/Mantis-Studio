@@ -1,4 +1,6 @@
-# MANTIS Strategic Roadmap
+# MANTIS Business Strategy Roadmap
+
+> **Business positioning, market strategy, and go-to-market approach for MANTIS Studio**
 
 ## 1) Executive Summary
 
@@ -19,6 +21,8 @@ Transform MANTIS from a single-instance, Streamlit-heavy AI tool into a multi-te
 
 ### Why It Matters in the AI Market
 The current AI writing market is saturated with generic chat interfaces and broad marketing-copy tools. Narrative creation requires continuity, structure, lore consistency, iterative drafting, and editorial control over long time horizons. MANTIS addresses this gap by focusing on workflow depth rather than prompt novelty. This positions it in a durable segment where switching costs can be driven by project context, team processes, and accumulated narrative assets.
+
+> 🔧 **See Also**: [Technical Product Roadmap](ROADMAP.md) for implementation details, phases, and engineering milestones.
 
 ---
 

@@ -31,10 +31,9 @@ Deep dives into the system architecture and technical decisions:
 | Document | Description |
 |----------|-------------|
 | **[Architecture](architecture/architecture.md)** | System design and component overview |
-| **[Stabilization Summary](architecture/STABILIZATION_SUMMARY.md)** | Recent architectural improvements and refactoring |
-| **[Stabilization Quick Reference](architecture/STABILIZATION_QUICK_REFERENCE.md)** | Quick reference for stabilization patterns |
+| **[Stabilization Implementation Guide](architecture/STABILIZATION_IMPLEMENTATION_GUIDE.md)** | Complete guide to stabilization refactoring, patterns, and usage |
 | **[App Structure](../app/README.md)** | Detailed app directory structure and design principles |
-| **[Detailed Audit Report](DETAILED_AUDIT_REPORT.md)** | Comprehensive code audit (698 lines, technical reference) |
+| **[Detailed Audit Report](DETAILED_AUDIT_REPORT.md)** | Comprehensive code audit from 2024 with 2026 follow-up |
 
 ## 🎨 Design
 
@@ -51,7 +50,8 @@ Project planning and future direction:
 
 | Document | Description |
 |----------|-------------|
-| **[Roadmap](planning/ROADMAP.md)** | Planned features and improvements |
+| **[Technical Product Roadmap](planning/ROADMAP.md)** | Technical implementation roadmap and engineering milestones |
+| **[Business Strategy Roadmap](planning/BUSINESS_STRATEGY_ROADMAP.md)** | Market positioning, business strategy, and go-to-market approach |
 | **[Competitive Analysis](planning/COMPETITIVE_ANALYSIS.md)** | Market positioning and feature comparison |
 
 ## 🔧 Runbooks
@@ -68,8 +68,17 @@ Code quality, security, and audit documentation:
 
 | Document | Description |
 |----------|-------------|
-| **[Audit & Improvements](AUDIT_AND_IMPROVEMENTS.md)** | Complete audit summary, improvements, and production readiness |
-| **[Detailed Audit Report](DETAILED_AUDIT_REPORT.md)** | Full technical audit report (698 lines) |
+| **[Detailed Audit Report](DETAILED_AUDIT_REPORT.md)** | Complete code audit from 2024 with 2026 follow-up and production readiness assessment |
+| **[QA Audit Report](architecture/QA_AUDIT_REPORT.md)** | QA-focused audit findings |
+
+## 📦 Releases & Issue Resolutions
+
+Release documentation and specific issue resolutions:
+
+| Document | Description |
+|----------|-------------|
+| **[Releases Index](releases/README.md)** | Index of all release notes and issue resolutions |
+| **[2026-02-18 Project Creation Resolution](releases/2026-02-18_PROJECT_CREATION_RESOLUTION.md)** | Resolution for project creation issues |
 
 ## 📜 Other
 
@@ -99,8 +108,7 @@ Code quality, security, and audit documentation:
 docs/
 ├── README.md                              # This file - navigation hub
 ├── CHANGELOG.md                           # Version history
-├── AUDIT_AND_IMPROVEMENTS.md              # Consolidated audit & improvements
-├── DETAILED_AUDIT_REPORT.md               # Full technical audit report
+├── DETAILED_AUDIT_REPORT.md               # Full technical audit report (2024 + 2026)
 ├── DASHBOARD_REDESIGN.md                  # Dashboard redesign documentation
 │
 ├── guides/                                # User-facing guides
@@ -117,16 +125,19 @@ docs/
 ├── architecture/                          # Technical deep dives
 │   ├── architecture.md                    # System design
 │   ├── QA_AUDIT_REPORT.md                 # QA audit findings
-│   ├── STABILIZATION_SUMMARY.md           # Implementation details
-│   └── STABILIZATION_QUICK_REFERENCE.md   # Quick reference
+│   └── STABILIZATION_IMPLEMENTATION_GUIDE.md  # Complete stabilization guide
 │
 ├── design/                                # UI/UX design
 │   └── DESIGN_SYSTEM.md                   # Design system and tokens
 │
 ├── planning/                              # Project planning
-│   ├── ROADMAP.md                         # Future improvements
-│   ├── MANTIS_STRATEGIC_ROADMAP.md        # Strategic planning
+│   ├── ROADMAP.md                         # Technical product roadmap
+│   ├── BUSINESS_STRATEGY_ROADMAP.md       # Business strategy and market positioning
 │   └── COMPETITIVE_ANALYSIS.md            # Market positioning
+│
+├── releases/                              # Release notes & resolutions
+│   ├── README.md                          # Releases index
+│   └── 2026-02-18_PROJECT_CREATION_RESOLUTION.md
 │
 └── runbooks/                              # Operational procedures
     └── SMOKE_TEST.md                      # QA testing
