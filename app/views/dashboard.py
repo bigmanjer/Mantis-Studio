@@ -18,6 +18,8 @@ def render(ctx: Any = None) -> None:
     from app.core.navigation import navigate
     
     # Ensure session state safety
+    # Note: Both 'current_page' and 'page' are used for compatibility
+    # 'page' is the main router key, 'current_page' is for navigation tracking
     if "current_page" not in st.session_state:
         st.session_state.current_page = "home"
     
@@ -61,7 +63,9 @@ def render(ctx: Any = None) -> None:
     # Count projects
     project_count = len(st.session_state.projects)
     c1.metric("Projects", project_count)
+    # TODO: Calculate actual chapter count from loaded projects
     c2.metric("Chapters", "—")
+    # TODO: Calculate total word count across all projects
     c3.metric("Word Count", "—")
     
     st.divider()
@@ -72,21 +76,42 @@ def render(ctx: Any = None) -> None:
     if not st.session_state.projects:
         st.info("No projects yet. Create one to begin.")
     else:
-        # Show up to 5 most recent projects
-        for project in st.session_state.projects[:5]:
+        # Show up to 5 most recent projects with clickable buttons
+        for idx, project in enumerate(st.session_state.projects[:5]):
             # Handle different project data structures
             if isinstance(project, dict):
                 project_name = project.get("title") or project.get("name") or "Untitled"
-                st.write(f"📁 {project_name}")
+                project_path = project.get("path") or project.get("filepath")
             elif hasattr(project, "title"):
-                st.write(f"📁 {project.title}")
+                project_name = project.title
+                project_path = getattr(project, "filepath", None)
             else:
-                st.write(f"📁 {project}")
+                project_name = str(project)
+                project_path = None
+            
+            # Create clickable button for each project
+            col1, col2 = st.columns([4, 1])
+            with col1:
+                st.write(f"📁 {project_name}")
+            with col2:
+                if st.button("Open", key=f"open_project_{idx}", use_container_width=True):
+                    # Load and switch to the project
+                    if project_path:
+                        try:
+                            from app.services.projects import Project
+                            loaded = Project.load(project_path)
+                            if loaded:
+                                st.session_state.project = loaded
+                                st.toast(f"Loaded project: {project_name}")
+                        except Exception as e:
+                            st.error(f"Failed to load project: {e}")
+                    navigate("chapters")
     
     st.divider()
     
     # Project Progress widget
     st.subheader("Project Progress")
+    # TODO: Calculate actual progress based on active project completion
     st.progress(0.0)
 
 
