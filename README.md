@@ -35,7 +35,7 @@ The agent provides expert assistance with:
 2. Type `@mantis-engineer` followed by your question
 3. Example: `@mantis-engineer How do I fix session state resets?`
 
-📖 **[Complete Agent Usage Guide →](docs/guides/USING_CUSTOM_AGENT.md)**
+📖 **[Complete Agent Usage Guide →](docs/guides/USING_CUSTOM_AGENT.md)** | 🚀 **[Quick Reference →](AGENT_USAGE.md)**
 
 ---
 
