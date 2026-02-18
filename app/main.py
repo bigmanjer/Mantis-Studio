@@ -4624,7 +4624,10 @@ def _run_ui():
                                 review_queue.pop(idx)
                                 st.session_state["world_bible_review"] = review_queue
                                 persist_project(p)
-                                st.toast("World Bible updated.")
+                                if _action == "duplicate":
+                                    st.toast("No new World Bible changes to apply.")
+                                else:
+                                    st.toast("World Bible updated.")
                                 st.rerun()
                         with c2:
                             if st.button("🗑 Ignore", key=f"ignore_suggestion_{idx}", use_container_width=True):

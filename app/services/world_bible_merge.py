@@ -315,6 +315,9 @@ def apply_suggestion(project: Project, classified: Dict[str, Any]) -> Tuple[Opti
 
         raw_desc = (classified.get("description") or "").strip()
 
+        original_desc = ent.description
+        original_aliases = list(ent.aliases)
+
         # Merge novel description bullets
         if novel_bullets:
             merge_description_bullets(ent, novel_bullets)
@@ -328,7 +331,14 @@ def apply_suggestion(project: Project, classified: Dict[str, Any]) -> Tuple[Opti
         if novel_aliases_list:
             Project._merge_aliases(ent, novel_aliases_list, ent.name)
 
-        action = "updated" if novel_bullets or raw_desc else "alias_added"
+        desc_changed = ent.description != original_desc
+        aliases_changed = ent.aliases != original_aliases
+        if not desc_changed and not aliases_changed:
+            action = "duplicate"
+        elif desc_changed:
+            action = "updated"
+        else:
+            action = "alias_added"
         return ent, action
 
     # type == "new"
