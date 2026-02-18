@@ -5,6 +5,78 @@ All notable changes to Mantis Studio are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [91.6] - 2026-02-18
+
+### Added
+- In-app "What's New" notification system to inform users about recent updates
+- Visual indicator in header when new version is available
+
+### Changed
+- Improved user visibility of version updates and changes
+- Enhanced changelog documentation to track all version bumps
+
+### Fixed
+- Issue where users couldn't see what changed between versions
+- Updated all documentation to reflect current version (91.6)
+
+---
+
+## [91.5] - 2026-02-18
+
+### Changed
+- Incremental improvements and bug fixes
+
+---
+
+## [91.4] - 2026-02-18
+
+### Changed
+- Incremental improvements and bug fixes
+
+---
+
+## [91.3] - 2026-02-18
+
+### Changed
+- Incremental improvements and bug fixes
+
+---
+
+## [91.2] - 2026-02-18
+
+### Changed
+- Incremental improvements and bug fixes
+
+---
+
+## [91.1] - 2026-02-18
+
+### Changed
+- Incremental improvements and bug fixes
+
+---
+
+## [91.0] - 2026-02-18
+
+### Changed
+- Incremental improvements and bug fixes
+
+---
+
+## [90.9] - 2026-02-18
+
+### Changed
+- Incremental improvements and bug fixes
+
+---
+
+## [90.8] - 2026-02-18
+
+### Changed
+- Incremental improvements and bug fixes
+
+---
+
 ## [90.7] - 2026-02-18
 
 ### Changed

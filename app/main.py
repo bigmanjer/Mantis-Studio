@@ -2284,8 +2284,59 @@ def _run_ui():
         save_app_config(config)
         return True
 
+    def check_and_show_whats_new() -> None:
+        """Check if app version has changed and show What's New notification."""
+        config = load_app_config()
+        last_seen_version = config.get("last_seen_version", "")
+        current_version = AppConfig.VERSION
+        
+        # Check if this is a new version
+        if last_seen_version and last_seen_version != current_version:
+            # Show What's New banner
+            with st.container(border=True):
+                st.markdown("### 🎉 What's New in Mantis Studio")
+                st.markdown(f"""
+                **Version {current_version} is now available!**
+                
+                **Recent Updates:**
+                - 🔔 Added in-app "What's New" notifications so you never miss updates
+                - 📊 Version information is now more visible in the UI
+                - 📝 Improved changelog documentation for all version changes
+                - 🐛 Continuous bug fixes and improvements
+                
+                **Changes Since Your Last Visit:**
+                - Version bumps now include meaningful change summaries
+                - Better tracking of what's new between releases
+                - Enhanced transparency about updates
+                
+                👉 **Check the [Changelog](https://github.com/bigmanjer/Mantis-Studio/blob/main/docs/CHANGELOG.md) for complete details**
+                """)
+                
+                col1, col2 = st.columns([1, 1])
+                with col1:
+                    if st.button("✅ Got it, thanks!", use_container_width=True, type="primary"):
+                        # Update last seen version
+                        config["last_seen_version"] = current_version
+                        save_app_config(config)
+                        st.rerun()
+                with col2:
+                    if st.button("📖 View Full Changelog", use_container_width=True):
+                        import webbrowser
+                        webbrowser.open("https://github.com/bigmanjer/Mantis-Studio/blob/main/docs/CHANGELOG.md")
+                        config["last_seen_version"] = current_version
+                        save_app_config(config)
+                        st.rerun()
+        elif not last_seen_version:
+            # First time user - set version silently
+            config["last_seen_version"] = current_version
+            save_app_config(config)
+
     def render_welcome_banner(context: str) -> None:
         """Show helpful context-aware guidance for first-time users."""
+        # Show What's New banner if version changed
+        if context == "home":
+            check_and_show_whats_new()
+        
         if context == "home" and st.session_state.get("first_run", True):
             with st.container(border=True):
                 st.markdown("### 👋 Welcome to Mantis Studio!")
