@@ -3683,6 +3683,7 @@ def _run_ui():
                 with action_cols[0]:
                     if st.button(
                         "💾 Save Project",
+                        key="sidebar_save_project",
                         type="primary",
                         use_container_width=True,
                         help="Save all changes to this project"
@@ -3692,6 +3693,7 @@ def _run_ui():
                 with action_cols[1]:
                     if st.button(
                         "✖ Close Project",
+                        key="sidebar_close_project",
                         use_container_width=True,
                         help="Save and close the current project"
                     ):
@@ -4391,7 +4393,7 @@ def _run_ui():
                     p.genre = new_genre
                     save_p()
             with top3:
-                if st.button("💾 Save Project", type="primary", use_container_width=True):
+                if st.button("💾 Save Project", key="outline_save_project", type="primary", use_container_width=True):
                     if persist_project(p, action="save"):
                         st.toast("Saved")
                         st.rerun()
