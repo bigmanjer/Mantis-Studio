@@ -342,9 +342,9 @@ st.session_state.debug = True
 This will show full stack traces in error UI.
 
 ### Documentation
-- **STABILIZATION_SUMMARY.md** - Complete technical overview
-- **README.md** - User guide and features
-- **tests/README.md** - Testing guide
+- **[Stabilization Summary](STABILIZATION_SUMMARY.md)** - Complete technical overview (in same folder)
+- **[Main README](../../README.md)** - User guide and features
+- **[Testing Guide](../guides/testing.md)** - Comprehensive testing documentation
 
 ## Summary
 
@@ -360,7 +360,7 @@ This will show full stack traces in error UI.
 - `app/ui_context.py` - Shared utilities
 - `app/router.py` - Navigation + error handling
 - `app/main.py` - Entry point (simplified)
-- `STABILIZATION_SUMMARY.md` - Full documentation
+- **[Stabilization Summary](STABILIZATION_SUMMARY.md)** - Full documentation
 
 ### Production Checklist
 - [x] All modules import successfully

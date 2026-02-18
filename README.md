@@ -35,7 +35,7 @@ The agent provides expert assistance with:
 2. Type `@mantis-engineer` followed by your question
 3. Example: `@mantis-engineer How do I fix session state resets?`
 
-📖 **[Complete Agent Usage Guide →](docs/guides/USING_CUSTOM_AGENT.md)** | 🚀 **[Quick Reference →](AGENT_USAGE.md)**
+📖 **[Complete Agent Usage Guide →](docs/guides/USING_CUSTOM_AGENT.md)** | 🚀 **[Quick Reference →](docs/guides/AGENT_QUICK_REFERENCE.md)**
 
 ---
 
@@ -321,7 +321,7 @@ Accessible via footer links or the All Policies page.
 
 If you encounter problems like black screens, rendering issues, or errors:
 
-1. **[📖 Complete Debugging Guide](docs/DEBUGGING.md)** - Comprehensive troubleshooting, debug mode, and visual guide
+1. **[📖 Complete Debugging Guide](docs/guides/DEBUGGING.md)** - Comprehensive troubleshooting, debug mode, and visual guide
 2. **[GitHub Issues](https://github.com/bigmanjer/Mantis-Studio/issues)** - Report bugs or search for solutions
 
 ### Quick Debug Steps
@@ -329,7 +329,7 @@ If you encounter problems like black screens, rendering issues, or errors:
 1. Enable debug mode in sidebar: **Advanced > Enable Debug Mode**
 2. Check terminal logs for error messages
 3. Use the Debug Panel in sidebar to inspect app state
-4. See the [debugging guide](docs/DEBUGGING.md) for detailed step-by-step instructions
+4. See the [debugging guide](docs/guides/DEBUGGING.md) for detailed step-by-step instructions
 
 ### Known Issues & Planned Improvements
 
@@ -507,9 +507,7 @@ Additional documentation lives in the `docs/` directory:
 | Contributing Guide | [`docs/guides/CONTRIBUTING.md`](docs/guides/CONTRIBUTING.md) |
 | Architecture | [`docs/architecture/architecture.md`](docs/architecture/architecture.md) |
 | Design System | [`docs/design/DESIGN_SYSTEM.md`](docs/design/DESIGN_SYSTEM.md) |
-| Testing Guide | [`docs/guides/testing.md`](docs/guides/testing.md) |
-| Testing Strategy | [`docs/guides/TESTING_STRATEGY.md`](docs/guides/TESTING_STRATEGY.md) |
-| Test Improvements | [`docs/guides/TEST_IMPROVEMENTS.md`](docs/guides/TEST_IMPROVEMENTS.md) |
+| **Testing Guide** (Consolidated) | [`docs/guides/testing.md`](docs/guides/testing.md) |
 | Smoke Test Runbook | [`docs/runbooks/SMOKE_TEST.md`](docs/runbooks/SMOKE_TEST.md) |
 | App Architecture | [`app/README.md`](app/README.md) |
 
