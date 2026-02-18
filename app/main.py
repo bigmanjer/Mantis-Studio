@@ -5242,8 +5242,10 @@ def _run_ui():
             st.metric("AI Readiness", f"{readiness}%")
 
     def render_chapters():
-        # Enhanced page header
+        # Get project first
         p = st.session_state.project
+        
+        # Enhanced page header (only if project exists)
         if p:
             enhanced_page_header(
                 title="Editor",
@@ -5254,6 +5256,7 @@ def _run_ui():
         
         # Single welcome banner for the editor page (avoid duplicate widgets / duplicate keys).
         render_welcome_banner("editor")
+        
         if not p:
             with st.container(border=True):
                 st.info("📭 No project loaded. Create or open a project to start writing.")

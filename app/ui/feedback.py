@@ -302,7 +302,7 @@ def progress_bar_with_message(
 
 def feedback_message(
     message: str,
-    type: str = "success",
+    message_type: str = "success",
     icon: Optional[str] = None,
     dismissible: bool = True,
 ) -> None:
@@ -310,8 +310,8 @@ def feedback_message(
     
     Args:
         message: The feedback message to display
-        type: Message type - "success", "error", "warning", "info"
-        icon: Optional custom icon (default: auto-selected based on type)
+        message_type: Message type - "success", "error", "warning", "info"
+        icon: Optional custom icon (default: auto-selected based on message_type)
         dismissible: Whether the message can be dismissed
     """
     default_icons = {
@@ -321,7 +321,7 @@ def feedback_message(
         "info": "ℹ",
     }
     
-    icon_display = icon or default_icons.get(type, "ℹ")
+    icon_display = icon or default_icons.get(message_type, "ℹ")
     
     type_classes = {
         "success": "mantis-feedback-success",
@@ -330,7 +330,7 @@ def feedback_message(
         "info": "mantis-feedback-info",
     }
     
-    feedback_class = type_classes.get(type, "mantis-feedback-info")
+    feedback_class = type_classes.get(message_type, "mantis-feedback-info")
     
     html = f"""
     <div class="mantis-feedback-message {feedback_class}">

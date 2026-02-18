@@ -6,13 +6,13 @@ This module provides:
 - Context-aware help and guidance
 """
 
-from typing import List, Dict, Optional, Callable
+from typing import List, Dict, Optional, Callable, Any
 import streamlit as st
 
 
 def render_nav_section(
     title: str,
-    items: List[Dict[str, any]],
+    items: List[Dict[str, Any]],
     current_page: str,
 ) -> None:
     """Render a navigation section in the sidebar with grouped items.
@@ -39,9 +39,6 @@ def render_nav_section(
             item_class += " mantis-nav-item-disabled"
         
         badge_html = f'<span class="mantis-nav-badge">{badge}</span>' if badge else ''
-        
-        # Use unique key for each button
-        button_key = f"nav_{page}_{label.lower().replace(' ', '_')}"
         
         html_items.append(f"""
         <div class="{item_class}" data-page="{page}">
