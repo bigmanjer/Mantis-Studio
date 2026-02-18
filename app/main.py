@@ -5829,7 +5829,7 @@ def _run_ui():
 
     def _render_current_page() -> None:
         rendered_page = False
-        current_page = st.session_state.page
+        current_page = st.session_state.get("page")
         logger.info(f"Rendering page: {current_page}")
         
         if st.session_state.page == "home":
