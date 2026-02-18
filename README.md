@@ -507,9 +507,7 @@ Additional documentation lives in the `docs/` directory:
 | Contributing Guide | [`docs/guides/CONTRIBUTING.md`](docs/guides/CONTRIBUTING.md) |
 | Architecture | [`docs/architecture/architecture.md`](docs/architecture/architecture.md) |
 | Design System | [`docs/design/DESIGN_SYSTEM.md`](docs/design/DESIGN_SYSTEM.md) |
-| Testing Guide | [`docs/guides/testing.md`](docs/guides/testing.md) |
-| Testing Strategy | [`docs/guides/TESTING_STRATEGY.md`](docs/guides/TESTING_STRATEGY.md) |
-| Test Improvements | [`docs/guides/TEST_IMPROVEMENTS.md`](docs/guides/TEST_IMPROVEMENTS.md) |
+| **Testing Guide** (Consolidated) | [`docs/guides/testing.md`](docs/guides/testing.md) |
 | Smoke Test Runbook | [`docs/runbooks/SMOKE_TEST.md`](docs/runbooks/SMOKE_TEST.md) |
 | App Architecture | [`app/README.md`](app/README.md) |
 
