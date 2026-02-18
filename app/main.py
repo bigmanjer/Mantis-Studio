@@ -1388,7 +1388,8 @@ def _run_ui():
     from contextlib import contextmanager
     from pathlib import Path
     from app.components.ui import action_card, card, primary_button, section_header, stat_tile
-    from app.ui.components import card_block, cta_tile, empty_state, header_bar, render_tag_list, section_title
+    from app.ui.components import card_block, cta_tile, empty_state, header_bar, render_tag_list
+    from app.ui.ui_layout import render_card, render_metric, render_section_header
     from app.layout.layout import render_footer
     from app.ui.theme import inject_theme
     from app.utils.keys import ui_key
@@ -1769,6 +1770,10 @@ def _run_ui():
         --mantis-surface-alt: {tokens["surface_alt"]};
         --mantis-success: {tokens["success"]};
         --mantis-warning: {tokens["warning"]};
+        --mantis-space-1: 8px;
+        --mantis-space-2: 16px;
+        --mantis-space-3: 24px;
+        --mantis-space-4: 32px;
     }}
     .stApp {{
         background-color: var(--mantis-bg);
@@ -1883,6 +1888,17 @@ def _run_ui():
     hr {{ border-color: var(--mantis-divider) !important; }}
     section[data-testid="stSidebar"] {{ background: var(--mantis-sidebar-bg); border-right: 1px solid var(--mantis-sidebar-border); }}
     section[data-testid="stSidebar"] h1, section[data-testid="stSidebar"] h2, section[data-testid="stSidebar"] h3 {{ color: var(--mantis-text); }}
+    section[data-testid="stSidebar"] details summary {{
+        color: var(--mantis-text) !important;
+        font-weight: 600;
+        background: var(--mantis-surface-alt);
+        border: 1px solid var(--mantis-card-border);
+        border-radius: 12px;
+        padding: 6px 10px;
+    }}
+    section[data-testid="stSidebar"] details[open] {{
+        margin-bottom: 8px;
+    }}
     div[data-testid="stSidebarNav"] {{ display: none; }}
     div[data-testid="stToast"] {{ border-radius: 14px !important; }}
 
@@ -3547,20 +3563,44 @@ def _run_ui():
             st.divider()
             st.html("<div class='mantis-nav-section'>Navigation</div>")
 
-            # Sidebar navigation items are defined in app/utils/navigation.py.
-            # Edit NAV_ITEMS there to add, remove, or reorder entries — the
-            # footer navigation is generated from the same list.
-            from app.utils.navigation import get_nav_items
-            nav_groups = get_nav_items()
+            from app.utils.navigation import get_nav_sections
 
-            for label, target, icon in nav_groups:
-                is_active = st.session_state.page == target or (
-                    target == "outline" and st.session_state.page == "outline"
-                )
-                button_label = f"{icon} {label}"
-                if st.button(button_label, key=f"nav_{target}", use_container_width=True, disabled=is_active):
-                    st.session_state.page = target
-                    st.rerun()
+            nav_sections = get_nav_sections()
+            current_page = st.session_state.get("page", "home")
+            world_focus = st.session_state.get("world_focus_tab", "")
+            for section_name, nav_items in nav_sections:
+                with st.expander(section_name, expanded=section_name in {"🏠 Home", "🗂 Workspace"}):
+                    for label, target, icon in nav_items:
+                        if target == "memory":
+                            is_active = current_page == "world" and world_focus == "Memory"
+                        elif target == "insights":
+                            is_active = current_page == "world" and world_focus == "Insights"
+                        elif target == "legal":
+                            is_active = current_page in {
+                                "legal",
+                                "terms",
+                                "privacy",
+                                "copyright",
+                                "cookie",
+                                "help",
+                            }
+                        else:
+                            is_active = current_page == target
+                        if st.button(
+                            f"{icon} {label}",
+                            key=f"nav_{target}_{_slugify(label)}",
+                            use_container_width=True,
+                            disabled=is_active,
+                        ):
+                            if target == "memory":
+                                st.session_state.world_focus_tab = "Memory"
+                                st.session_state.page = "world"
+                            elif target == "insights":
+                                st.session_state.world_focus_tab = "Insights"
+                                st.session_state.page = "world"
+                            else:
+                                st.session_state.page = target
+                            st.rerun()
 
             if st.session_state.project:
                 st.divider()
@@ -3742,262 +3782,146 @@ def _run_ui():
             st.session_state.page = "projects"
             st.rerun()
 
-        header_bar(
-            "Dashboard",
-            "A command center for your story, projects, and AI workflows.",
-            pill="Workspace",
+        today = datetime.date.today()
+        last_action_ts = st.session_state.get("last_action_ts")
+        last_action_day = (
+            datetime.date.fromtimestamp(last_action_ts) if last_action_ts else None
         )
+        last_action_label = (st.session_state.get("last_action") or "").lower()
+        ai_ops_today = 1 if last_action_day == today and "ai" in last_action_label else 0
+        system_mode = "Cloud" if (groq_key or openai_key) else "Local"
+        autosave_status = "Auto-saving" if st.session_state.get("auto_save", True) else "Saved"
 
-        top_cols = st.columns([2.2, 1])
-        with top_cols[0]:
-            with card_block("Next Narrative Milestone", "Create or advance your story with one guided action."):
-                st.markdown(f"### {project_title}")
-                st.caption(latest_chapter_label)
-                if st.button(primary_label, type="primary", use_container_width=True):
-                    if primary_target == "chapters" and latest_chapter_id:
-                        st.session_state.curr_chap_id = latest_chapter_id
-                        st.session_state.active_chapter_id = latest_chapter_id
-                    open_recent_project(primary_target)
-                action_row = st.columns(2)
-                with action_row[0]:
-                    if st.button("📂 Resume project", use_container_width=True, disabled=not recent_projects):
-                        open_recent_project("chapters")
-                with action_row[1]:
-                    if st.button("🧭 New project", use_container_width=True):
-                        open_new_project()
+        def _open_project(project_path: str, target: str = "chapters") -> None:
+            loaded = load_project_safe(project_path, context="project")
+            if loaded:
+                st.session_state.project = loaded
+                st.session_state.page = target
+                st.rerun()
 
-        with top_cols[1]:
-            with card_block("Project health"):
-                k1, k2 = st.columns(2)
-                with k1:
-                    stat_tile("Active projects", str(len(recent_projects)), icon="📁")
-                with k2:
-                    stat_tile("Latest genre", (recent_snapshot or {}).get("genre", "—"), icon="🏷️")
-                k3, k4 = st.columns(2)
-                with k3:
-                    stat_tile("Weekly sessions", f"{weekly_count}/{weekly_goal}", icon="🗓️")
-                with k4:
-                    stat_tile("Writing streak", f"{_activity_streak()} days", icon="🔥")
-                st.progress(project_health_percent / 100)
-                st.caption(f"Workflow completion: {project_health_percent}%")
-                st.caption(f"Canon health: {canon_icon} {canon_label}.")
-
-            with card_block("Next best actions"):
-                if not recent_projects:
-                    st.caption("• Create your first project to unlock guided workflows.")
-                elif not has_outline:
-                    st.caption("• Build your outline to define structure and pacing.")
-                elif not has_chapter:
-                    st.caption("• Draft your next chapter to move the narrative forward.")
-                elif canon_icon == "🔴":
-                    st.caption("• Resolve canon issues in World Bible before publishing.")
-                else:
-                    st.caption("• Review insights and export your latest draft.")
-                st.caption(
-                    f"Expert prompt: Advance '{project_title}' by completing the next narrative milestone."
-                )
-                st.caption(
-                    "Token budget: "
-                    + ("Connected" if (groq_key or openai_key) else "Connect AI providers")
-                )
-
-        section_title("Quick Actions", "Jump straight into your most-used tools.")
-        # Static labels used for button text and JS styling hook (not user-controlled).
-        quick_action_labels = [
-            "Open Editor",
-            "Open Outline",
-            "Open World Bible",
-            "Open Memory",
-            "Open Insights",
-            "Go to Export",
-        ]
-        # Shared labels for button text and the JS styling hook.
-        quick_action_label_json = json.dumps(quick_action_labels)
-        st.html(
-            """
-            <style>
-            .quick-action-btn {
-                border-radius: 16px !important;
-                font-family: 'Inter', sans-serif !important;
-                font-weight: 600 !important;
-                font-size: 14px !important;
-                letter-spacing: 0.01em !important;
-                padding: 0.7rem 1.1rem !important;
-                border: 1px solid var(--mantis-button-border) !important;
-                background: var(--mantis-button-bg) !important;
-                color: var(--mantis-text) !important;
-                cursor: pointer;
-                position: relative;
-                transition: transform 0.18s cubic-bezier(0.22, 1, 0.36, 1),
-                            border-color 0.18s ease,
-                            box-shadow 0.18s ease,
-                            background 0.18s ease !important;
-            }
-
-            .quick-action-btn:hover {
-                transform: translateY(-1px);
-                border-color: var(--mantis-button-hover-border) !important;
-                box-shadow: var(--mantis-shadow-button),
-                            0 0 12px var(--mantis-accent-glow, rgba(34, 197, 94, 0.18));
-                background: var(--mantis-button-bg) !important;
-            }
-            </style>
-            """,
-        )
-        quick_action_script = Template(
-            r"""
-            <div style="display:none" aria-hidden="true">
-                <script>
-                (() => {
-                    const labels = new Set($quick_action_labels);
-                    const normalize = (text) => (text || "").replace(/\s+/g, " ").trim();
-                    const RETRY_INTERVAL_MS = 60;
-                    const MAX_STYLE_ATTEMPTS = 12; // 12 attempts x 60ms = 720ms total wait time.
-                    const apply = () => {
-                        let found = 0;
-                        document.querySelectorAll("button").forEach((button) => {
-                            const label = normalize(button.textContent);
-                            if (labels.has(label)) {
-                                button.classList.add("quick-action-btn");
-                                found += 1;
-                            }
-                        });
-                        return found;
-                    };
-                    let attempts = 0;
-                    const tick = () => {
-                        const found = apply();
-                        // Polling keeps the hook lightweight for Streamlit-rendered buttons.
-                        if (found < labels.size && attempts < MAX_STYLE_ATTEMPTS) {
-                            attempts += 1;
-                            setTimeout(tick, RETRY_INTERVAL_MS);
-                        } else if (found < labels.size && attempts >= MAX_STYLE_ATTEMPTS) {
-                            console.warn(
-                                "Failed to style all quick action buttons: " +
-                                    found +
-                                    "/" +
-                                    labels.size +
-                                    " found after " +
-                                    MAX_STYLE_ATTEMPTS +
-                                    " attempts.",
-                            );
-                        }
-                    };
-                    tick();
-                })();
-                </script>
-            </div>
-            """,
-        ).substitute(quick_action_labels=quick_action_label_json)
-        st.html(quick_action_script, unsafe_allow_javascript=True)
-        quick_grid = st.container()
-        with quick_grid:
-            qcols = st.columns(3)
-            with qcols[0]:
-                cta_tile("✍️ Editor", "Draft chapters and summaries.")
-                if st.button(
-                    quick_action_labels[0],
-                    use_container_width=True,
-                    type="secondary",
-                    help="Start writing or editing your chapters"
-                ):
+        def _hero_section() -> None:
+            st.markdown("# MANTIS")
+            st.markdown("### Modular AI Narrative Text Intelligence System")
+            status_cols = st.columns([1, 1])
+            with status_cols[0]:
+                st.markdown("🟢 **Operational**")
+            with status_cols[1]:
+                st.caption(f"💾 {autosave_status}")
+            action_cols = st.columns(3)
+            with action_cols[0]:
+                if st.button("New Project", type="primary", use_container_width=True):
+                    open_new_project()
+            with action_cols[1]:
+                if st.button("Open Workspace", use_container_width=True):
                     open_recent_project("chapters")
-            with qcols[1]:
-                cta_tile("📝 Outline", "Plan beats, arcs, and chapter flow.")
-                if st.button(
-                    quick_action_labels[1],
-                    use_container_width=True,
-                    type="secondary",
-                    help="Create or edit your story structure and plot outline"
-                ):
-                    open_recent_project("outline")
-            with qcols[2]:
-                cta_tile("🌍 World Bible", "Characters, places, factions, lore.")
-                if st.button(
-                    quick_action_labels[2],
-                    use_container_width=True,
-                    type="secondary",
-                    help="Manage your story's canonical characters, locations, and lore"
-                ):
-                    open_recent_project("world")
+            with action_cols[2]:
+                if st.button("Run Analysis", use_container_width=True):
+                    with st.spinner("Preparing analysis workspace..."):
+                        open_recent_project("world", focus_tab="Insights")
 
-        quick_grid_two = st.container()
-        with quick_grid_two:
-            qcols = st.columns(3)
-            with qcols[0]:
-                cta_tile("🧠 Memory", "Hard canon rules and guidelines.")
-                if st.button(quick_action_labels[3], use_container_width=True, type="secondary"):
-                    open_recent_project("world", focus_tab="Memory")
-            with qcols[1]:
-                cta_tile("📊 Insights", "Canon health and analytics.")
-                if st.button(
-                    quick_action_labels[4],
-                    use_container_width=True,
-                    type="secondary",
-                    help="View analytics and consistency insights for your story world"
-                ):
-                    open_recent_project("world", focus_tab="Insights")
-            with qcols[2]:
-                cta_tile("⬇️ Export", "Download your project.")
-                if st.button(
-                    quick_action_labels[5],
-                    use_container_width=True,
-                    type="secondary",
-                    help="Export your project as markdown for sharing or publishing"
-                ):
-                    open_export()
+        render_card("Command Center", _hero_section)
+        st.divider()
 
-        with card_block("Recent Projects", "Select a project to open and pick up where you left off."):
-            if not recent_projects:
-                empty_state("No projects yet", "Create one to start writing.")
-            else:
+        render_section_header("Metrics Overview")
+        metric_cols = st.columns(4)
+        with metric_cols[0]:
+            render_metric("Total Projects", str(len(recent_projects)))
+        with metric_cols[1]:
+            render_metric("Active Workspace", active_project.title if active_project else "None")
+        with metric_cols[2]:
+            render_metric("AI Operations Today", str(ai_ops_today))
+        with metric_cols[3]:
+            render_metric("System Mode", system_mode)
+        st.divider()
+
+        render_section_header("Workspace Hub", "Open recent projects or create a new workspace.")
+        hub_cols = st.columns([2, 1])
+        with hub_cols[0]:
+            def _recent_projects_section() -> None:
+                if not recent_projects:
+                    st.info("No projects yet — create your first workspace.")
+                    return
                 for project_entry in recent_projects[:5]:
                     meta = project_entry.get("meta", {})
                     title = meta.get("title") or os.path.basename(project_entry.get("path", "Untitled"))
-                    genre = meta.get("genre") or "—"
-                    row = st.columns([2.2, 1, 1])
+                    modified = time.strftime(
+                        "%Y-%m-%d %H:%M",
+                        time.localtime(os.path.getmtime(project_entry["path"])),
+                    )
+                    row = st.columns([2.4, 1.2, 0.8])
                     with row[0]:
-                        if st.button(
-                            f"📂 {title}",
-                            use_container_width=True,
-                            help=f"Open '{title}' in the editor",
-                            key=f"dash_proj_{project_entry.get('path', '')}"
-                        ):
-                            loaded = load_project_safe(project_entry["path"], context="project")
-                            if loaded:
-                                st.session_state.project = loaded
-                                st.session_state.page = "chapters"
-                                st.rerun()
+                        st.markdown(f"**{title}**")
                     with row[1]:
-                        st.caption(genre)
+                        st.caption(f"Modified {modified}")
                     with row[2]:
+                        if st.button("Open", use_container_width=True, key=f"dash_hub_open_{project_entry['path']}"):
+                            _open_project(project_entry["path"])
+
+            render_card("Recent Projects", _recent_projects_section)
+
+        with hub_cols[1]:
+            def _new_project_section() -> None:
+                st.caption("Start a fresh narrative workspace with guided setup.")
+                if st.button("Create New Project", type="primary", use_container_width=True):
+                    open_new_project()
+                st.caption(primary_label)
+
+            render_card("Create Workspace", _new_project_section)
+        st.divider()
+
+        render_section_header("Feature Access", "Grouped tools for intelligence, writing, insights, and system controls.")
+        feature_groups = [
+            (
+                "🧠 Intelligence",
+                [
+                    ("Narrative Analysis", "Analyze structure and milestones.", lambda: open_recent_project("outline")),
+                    ("Semantic Tools", "Review memory and semantic coherence.", lambda: open_recent_project("world", focus_tab="Memory")),
+                    ("Entity Extraction", "Manage entities from the World Bible.", lambda: open_recent_project("world")),
+                ],
+            ),
+            (
+                "✍ Writing",
+                [
+                    ("Editor", "Draft and revise scenes.", lambda: open_recent_project("chapters")),
+                    ("Rewrite", "Open editor tools for rewrites.", lambda: open_recent_project("chapters")),
+                    ("Tone Modulation", "Refine voice and tone from editor workflows.", lambda: open_recent_project("chapters")),
+                ],
+            ),
+            (
+                "📊 Insights",
+                [
+                    ("Reports", "Prepare export-ready story reports.", open_export),
+                    ("Analytics", "Open canon analytics and health.", lambda: open_recent_project("world", focus_tab="Insights")),
+                    ("Data Viewer", "Inspect project metadata and structure.", lambda: open_recent_project("projects")),
+                ],
+            ),
+            (
+                "⚙ System",
+                [
+                    ("Settings", "Manage AI providers and keys.", open_ai_settings),
+                    ("Configuration", "Adjust themes and workspace preferences.", open_ai_settings),
+                ],
+            ),
+        ]
+
+        for group_name, features in feature_groups:
+            with st.expander(group_name, expanded=group_name == "🧠 Intelligence"):
+                for feature_name, feature_caption, action in features:
+                    feature_cols = st.columns([2.2, 1])
+                    with feature_cols[0]:
+                        st.markdown(f"**{feature_name}**")
+                        st.caption(feature_caption)
+                    with feature_cols[1]:
                         if st.button(
                             "Open",
+                            key=f"dashboard_feature_{_slugify(group_name)}_{_slugify(feature_name)}",
                             use_container_width=True,
-                            help=f"Load this project and start editing",
-                            key=f"open_{project_entry.get('path', '')}"
                         ):
-                            loaded = load_project_safe(project_entry["path"], context="project")
-                            if loaded:
-                                st.session_state.project = loaded
-                                st.session_state.page = "chapters"
-                                st.rerun()
-
-        with card_block("Utilities"):
-            util_cols = st.columns(2)
-            with util_cols[0]:
-                st.markdown("**AI Settings**")
-                st.caption("Manage providers, models, and API access.")
-                if st.button("⚙️ AI Settings", use_container_width=True):
-                    open_ai_settings()
-            with util_cols[1]:
-                st.markdown("**Help Docs**")
-                st.caption("Guides, README notes, and updates.")
-                st.link_button(
-                    "📖 Help Docs",
-                    "https://github.com/bigmanjer/Mantis-Studio",
-                    use_container_width=True,
-                )
+                            if group_name == "🧠 Intelligence":
+                                with st.spinner(f"Loading {feature_name.lower()}..."):
+                                    action()
+                            else:
+                                action()
 
         if not groq_key or not openai_key:
             with card_block("🔑 Connect your AI providers", "Unlock generation, summaries, and entity tools with API access."):
