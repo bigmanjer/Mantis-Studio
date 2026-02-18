@@ -8,16 +8,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [91.6] - 2026-02-18
 
 ### Added
-- In-app "What's New" notification system to inform users about recent updates
-- Visual indicator in header when new version is available
+- ✨ **In-app "What's New" notification system**: Users now see a friendly notification banner when the app version updates
+  - Shows key changes and improvements in each version
+  - Includes direct link to full changelog
+  - Dismissible with persistent memory of last seen version
+  - Helps users understand what changed between updates
+- 📊 Version tracking in user config to detect when app has been updated
 
 ### Changed
-- Improved user visibility of version updates and changes
-- Enhanced changelog documentation to track all version bumps
+- 📝 Updated CHANGELOG.md to document all versions from 90.7 to 91.6
+- 📖 Updated README.md to reflect current version (91.6) throughout documentation
+- 🎯 Improved transparency about version changes and updates
 
 ### Fixed
-- Issue where users couldn't see what changed between versions
-- Updated all documentation to reflect current version (91.6)
+- ❌ **Major UX Issue**: Users can now see what changed between versions
+  - Previously, users reported "merged 4 times now with no changed from users point of view"
+  - Version number was incrementing but changes were invisible to users
+  - Now users get a clear notification when version changes
+- 📚 Documentation version inconsistencies corrected
+
+### Impact
+This release directly addresses user feedback about version changes being invisible. Users will now be informed whenever the app updates, creating better awareness and transparency about ongoing improvements.
 
 ---
 
