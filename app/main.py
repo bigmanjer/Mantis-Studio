@@ -1664,171 +1664,22 @@ def _run_ui():
 
     apply_pending_widget_updates()
 
-    theme = st.session_state.ui_theme if st.session_state.ui_theme in ("Dark", "Light") else "Dark"
-    theme_tokens = {
-        "Dark": {
-            "bg": "#020617",
-            "bg_glow": "radial-gradient(circle at 20% 20%, rgba(34,197,94,0.18), transparent 45%), radial-gradient(circle at 80% 0%, rgba(74,222,128,0.18), transparent 40%)",
-            "text": "#ecfdf5",
-            "muted": "#b6c3d1",
-            "input_bg": "#0b1216",
-            "input_border": "#166534",
-            "button_bg": "linear-gradient(180deg, #0f1a15, #0b1411)",
-            "button_border": "#163f2a",
-            "button_hover_border": "#22c55e",
-            "primary_bg": "linear-gradient(135deg, #15803d, #22c55e)",
-            "primary_border": "rgba(34,197,94,0.55)",
-            "primary_hover_border": "#4ade80",
-            "card_bg": "linear-gradient(180deg, rgba(6,18,14,0.95), rgba(4,12,10,0.95))",
-            "card_border": "#163523",
-            "sidebar_bg": "linear-gradient(180deg, #020617, #07150f)",
-            "sidebar_border": "#123123",
-            "sidebar_title": "#7dd3a7",
-            "divider": "#143023",
-            "expander_border": "#1f3b2d",
-            "header_gradient": "linear-gradient(135deg, #0b1216, #0f1a15)",
-            "header_logo_bg": "rgba(34,197,94,0.2)",
-            "header_sub": "#c7f2da",
-            "shadow_strong": "0 18px 40px rgba(0,0,0,0.55)",
-            "shadow_button": "0 10px 22px rgba(0,0,0,0.4)",
-            "sidebar_brand_bg": "linear-gradient(180deg, rgba(6,18,14,0.85), rgba(4,10,8,0.95))",
-            "sidebar_brand_border": "rgba(34,197,94,0.25)",
-            "sidebar_logo_bg": "rgba(34,197,94,0.12)",
-            "accent": "#22c55e",
-            "accent_soft": "rgba(34,197,94,0.18)",
-            "accent_glow": "rgba(34,197,94,0.35)",
-            "surface": "rgba(6,18,14,0.85)",
-            "surface_alt": "rgba(5,14,11,0.9)",
-            "success": "#22c55e",
-            "warning": "#f59e0b",
-        },
-        "Light": {
-            "bg": "#f4f6f5",
-            "bg_glow": "radial-gradient(circle at 20% 20%, rgba(34,197,94,0.08), transparent 45%), radial-gradient(circle at 80% 0%, rgba(74,222,128,0.06), transparent 40%)",
-            "text": "#1a2e23",
-            "muted": "#3d4f47",
-            "input_bg": "#fafbfa",
-            "input_border": "#6a8a7b",
-            "button_bg": "linear-gradient(180deg, #fafbfa, #f0f5f2)",
-            "button_border": "#6a8a7b",
-            "button_hover_border": "#16a34a",
-            "primary_bg": "linear-gradient(135deg, #16a34a, #15803d)",
-            "primary_border": "rgba(22,163,74,0.5)",
-            "primary_hover_border": "#15803d",
-            "card_bg": "#fafbfa",
-            "card_border": "#708a7e",
-            "sidebar_bg": "linear-gradient(180deg, #eef1ef, #e4e9e6)",
-            "sidebar_border": "#708378",
-            "sidebar_title": "#15803d",
-            "divider": "#7a8e82",
-            "expander_border": "#708a7e",
-            "header_gradient": "linear-gradient(135deg, #e2f3e8, #d0eddb)",
-            "header_logo_bg": "#ddf0e4",
-            "header_sub": "#276740",
-            "shadow_strong": "0 12px 24px rgba(20,40,30,0.12)",
-            "shadow_button": "0 6px 14px rgba(20,40,30,0.10)",
-            "sidebar_brand_bg": "linear-gradient(180deg, rgba(250,251,250,0.95), rgba(243,247,245,0.95))",
-            "sidebar_brand_border": "rgba(20,40,30,0.18)",
-            "sidebar_logo_bg": "rgba(22,163,74,0.10)",
-            "accent": "#16a34a",
-            "accent_soft": "rgba(22,163,74,0.12)",
-            "accent_glow": "rgba(22,163,74,0.30)",
-            "surface": "rgba(250,251,250,0.95)",
-            "surface_alt": "rgba(243,247,245,0.95)",
-            "success": "#15803d",
-            "warning": "#b45309",
-        },
-    }
-    tokens = theme_tokens[theme]
+    # Apply enhanced theme system from design system
+    try:
+        from app.ui.enhanced_theme import inject_enhanced_theme
+        theme = st.session_state.ui_theme if st.session_state.ui_theme in ("Dark", "Light") else "Dark"
+        inject_enhanced_theme(theme)
+        logger.info(f"Enhanced theme '{theme}' injected successfully")
+    except Exception as e:
+        logger.error(f"Failed to inject enhanced theme: {e}", exc_info=True)
+        # Fallback to old theme system if enhanced theme fails
+        inject_theme()
+        logger.info("Fell back to legacy theme system")
 
+    # Apply additional header/card styles that are specific to main.py layouts
     st.html(
-        f"""
+        """
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@400;600&family=Inter:wght@400;600&family=Space+Grotesk:wght@500;700&display=swap');
-    :root {{
-        --mantis-bg: {tokens["bg"]};
-        --mantis-bg-glow: {tokens["bg_glow"]};
-        --mantis-text: {tokens["text"]};
-        --mantis-muted: {tokens["muted"]};
-        --mantis-input-bg: {tokens["input_bg"]};
-        --mantis-input-border: {tokens["input_border"]};
-        --mantis-button-bg: {tokens["button_bg"]};
-        --mantis-button-border: {tokens["button_border"]};
-        --mantis-button-hover-border: {tokens["button_hover_border"]};
-        --mantis-primary-bg: {tokens["primary_bg"]};
-        --mantis-primary-border: {tokens["primary_border"]};
-        --mantis-primary-hover-border: {tokens["primary_hover_border"]};
-        --mantis-card-bg: {tokens["card_bg"]};
-        --mantis-card-border: {tokens["card_border"]};
-        --mantis-sidebar-bg: {tokens["sidebar_bg"]};
-        --mantis-sidebar-border: {tokens["sidebar_border"]};
-        --mantis-sidebar-title: {tokens["sidebar_title"]};
-        --mantis-divider: {tokens["divider"]};
-        --mantis-expander-border: {tokens["expander_border"]};
-        --mantis-header-gradient: {tokens["header_gradient"]};
-        --mantis-header-logo-bg: {tokens["header_logo_bg"]};
-        --mantis-header-sub: {tokens["header_sub"]};
-        --mantis-shadow-strong: {tokens["shadow_strong"]};
-        --mantis-shadow-button: {tokens["shadow_button"]};
-        --mantis-sidebar-brand-bg: {tokens["sidebar_brand_bg"]};
-        --mantis-sidebar-brand-border: {tokens["sidebar_brand_border"]};
-        --mantis-sidebar-logo-bg: {tokens["sidebar_logo_bg"]};
-        --mantis-accent: {tokens["accent"]};
-        --mantis-accent-soft: {tokens["accent_soft"]};
-        --mantis-accent-glow: {tokens["accent_glow"]};
-        --mantis-surface: {tokens["surface"]};
-        --mantis-surface-alt: {tokens["surface_alt"]};
-        --mantis-success: {tokens["success"]};
-        --mantis-warning: {tokens["warning"]};
-        --mantis-space-1: 8px;
-        --mantis-space-2: 16px;
-        --mantis-space-3: 24px;
-        --mantis-space-4: 32px;
-    }}
-    .stApp {{
-        background-color: var(--mantis-bg);
-        background-image: var(--mantis-bg-glow);
-        color: var(--mantis-text);
-        font-family: 'Inter', sans-serif;
-    }}
-    .block-container {{ padding-top: 2.6rem; padding-bottom: 2.6rem; max-width: 1380px; }}
-    header[data-testid="stHeader"] {{ height: 2.6rem; }}
-    h1, h2, h3 {{ letter-spacing: -0.02em; font-family: 'Space Grotesk', sans-serif; }}
-    .stMarkdown, .stMarkdown p, .stMarkdown span, .stMarkdown li, .stMarkdown div,
-    .stTextInput label, .stSelectbox label, .stCheckbox label, .stRadio label,
-    .stNumberInput label, .stTextArea label {{
-        color: var(--mantis-text) !important;
-    }}
-    .stTextInput input,
-    .stNumberInput input,
-    .stSelectbox div[data-baseweb="select"] > div,
-    .stMultiSelect div[data-baseweb="select"] > div {{
-        background-color: var(--mantis-input-bg) !important;
-        color: var(--mantis-text) !important;
-        border: 1px solid var(--mantis-input-border) !important;
-    }}
-    div[data-baseweb="select"] input {{
-        color: var(--mantis-text) !important;
-    }}
-    div[data-baseweb="select"] span {{
-        color: var(--mantis-text) !important;
-    }}
-    div[data-baseweb="menu"] {{
-        background: var(--mantis-card-bg) !important;
-        border: 1px solid var(--mantis-card-border) !important;
-    }}
-    div[data-baseweb="option"] {{
-        color: var(--mantis-text) !important;
-        background: transparent !important;
-    }}
-    div[data-baseweb="option"]:hover {{
-        background: var(--mantis-accent-soft) !important;
-    }}
-    .stTextArea textarea {{ background-color: var(--mantis-input-bg) !important; color: var(--mantis-text) !important; font-family: 'Crimson Pro', serif !important; font-size: 18px !important; line-height: 1.65 !important; border: 1px solid var(--mantis-input-border) !important; }}
-
-    .mantis-muted {{ color: var(--mantis-muted); }}
-    div[data-testid="stCaptionContainer"] {{ color: var(--mantis-muted); }}
-
     .mantis-header {{
         display:flex;
         align-items:center;
@@ -1889,39 +1740,37 @@ def _run_ui():
         font-size:12px;
         color: var(--mantis-muted);
     }}
-
-    /* Button styles are defined centrally in assets/styles.css
-       and injected via app/ui/theme.py — see the Unified Button System. */
-
-    [data-testid="stVerticalBlock"] [data-testid="stContainer"] {{ border-radius: 16px !important; }}
-    .stExpander {{ border: 1px solid var(--mantis-expander-border) !important; border-radius: 16px !important; }}
-    hr {{ border-color: var(--mantis-divider) !important; }}
-    section[data-testid="stSidebar"] {{ background: var(--mantis-sidebar-bg); border-right: 1px solid var(--mantis-sidebar-border); }}
-    section[data-testid="stSidebar"] h1, section[data-testid="stSidebar"] h2, section[data-testid="stSidebar"] h3 {{ color: var(--mantis-text); }}
-    section[data-testid="stSidebar"] details summary {{
+    </style>
+    """
+    )
+    
+    st.html(
+        """
+    <style>
+    section[data-testid="stSidebar"] details summary {
         color: var(--mantis-text) !important;
         font-weight: 600;
         background: var(--mantis-surface-alt);
         border: 1px solid var(--mantis-card-border);
         border-radius: 12px;
         padding: 6px 10px;
-    }}
-    section[data-testid="stSidebar"] details[open] {{
+    }
+    section[data-testid="stSidebar"] details[open] {
         margin-bottom: 8px;
-    }}
-    div[data-testid="stSidebarNav"] {{ display: none; }}
-    div[data-testid="stToast"] {{ border-radius: 14px !important; }}
+    }
+    div[data-testid="stSidebarNav"] { display: none; }
+    div[data-testid="stToast"] { border-radius: 14px !important; }
 
     /* --- CARD POLISH --- */
-    div[data-testid="stContainer"] {{
+    div[data-testid="stContainer"] {
         background: var(--mantis-card-bg);
         border-radius: 20px !important;
         padding: 22px !important;
         border: 1px solid var(--mantis-card-border) !important;
         box-shadow: var(--mantis-shadow-strong);
         margin-bottom: 18px;
-    }}
-    .mantis-pill {{
+    }
+    .mantis-pill {
         display:inline-flex;
         align-items:center;
         gap:6px;
@@ -1932,51 +1781,51 @@ def _run_ui():
         border: 1px solid var(--mantis-accent-glow);
         color: var(--mantis-text);
         letter-spacing: 0.02em;
-    }}
-    .mantis-hero-caption {{
+    }
+    .mantis-hero-caption {
         font-size:12px;
         color: var(--mantis-muted);
         margin-top:4px;
-    }}
-    div[data-testid="stContainer"] h3 {{
+    }
+    div[data-testid="stContainer"] h3 {
         margin-top: 0;
         margin-bottom: 12px;
         color: var(--mantis-text);
-    }}
-    .mantis-hero {{
+    }
+    .mantis-hero {
         background: var(--mantis-surface);
         border-radius: 22px;
         padding: 22px 24px;
         border: 1px solid var(--mantis-card-border);
         box-shadow: var(--mantis-shadow-strong);
-    }}
-    .mantis-hero-title {{
+    }
+    .mantis-hero-title {
         font-size: 28px;
         font-weight: 700;
         margin-bottom: 6px;
-    }}
-    .mantis-hero-sub {{
+    }
+    .mantis-hero-sub {
         color: var(--mantis-muted);
         font-size: 14px;
-    }}
-    .mantis-page-header {{
+    }
+    .mantis-page-header {
         display: flex;
         justify-content: space-between;
         align-items: flex-start;
         gap: 12px;
-    }}
-    .mantis-page-title {{
+    }
+    .mantis-page-title {
         font-size: 26px;
         font-weight: 700;
         margin: 0;
         color: var(--mantis-text);
-    }}
-    .mantis-page-sub {{
+    }
+    .mantis-page-sub {
         color: var(--mantis-muted);
         margin-top: 4px;
         font-size: 14px;
-    }}
-    .mantis-tag {{
+    }
+    .mantis-tag {
         display:inline-flex;
         align-items:center;
         gap:6px;
@@ -1987,53 +1836,53 @@ def _run_ui():
         background: var(--mantis-accent-soft);
         color: var(--mantis-text);
         border: 1px solid var(--mantis-accent-glow);
-    }}
-    .mantis-kpi-grid {{
+    }
+    .mantis-kpi-grid {
         display:grid;
         grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
         gap:12px;
         margin-top: 14px;
-    }}
-    .mantis-kpi-card {{
+    }
+    .mantis-kpi-card {
         padding: 12px 14px;
         border-radius: 16px;
         background: var(--mantis-surface-alt);
         border: 1px solid var(--mantis-card-border);
-    }}
-    .mantis-kpi-label {{
+    }
+    .mantis-kpi-label {
         font-size:11px;
         text-transform: uppercase;
         letter-spacing: 0.08em;
         color: var(--mantis-muted);
         margin-bottom: 6px;
-    }}
-    .mantis-kpi-value {{
+    }
+    .mantis-kpi-value {
         font-size:20px;
         font-weight:700;
-    }}
-    .mantis-section-title {{
+    }
+    .mantis-section-title {
         font-size:20px;
         font-weight:700;
         margin-bottom: 6px;
-    }}
-    .mantis-section-header {{
+    }
+    .mantis-section-header {
         display:flex;
         align-items:flex-end;
         justify-content:space-between;
         gap:16px;
         margin: 6px 0 14px;
-    }}
-    .mantis-section-caption {{
+    }
+    .mantis-section-caption {
         color: var(--mantis-muted);
         font-size: 13px;
-    }}
-    .mantis-soft {{
+    }
+    .mantis-soft {
         background: var(--mantis-surface-alt);
         border-radius: 16px;
         padding: 14px;
         border: 1px solid var(--mantis-card-border);
-    }}
-    .mantis-stat-tile {{
+    }
+    .mantis-stat-tile {
         display:flex;
         flex-direction:column;
         gap:6px;
@@ -2041,8 +1890,8 @@ def _run_ui():
         border-radius: 16px;
         background: var(--mantis-surface-alt);
         border: 1px solid var(--mantis-card-border);
-    }}
-    .mantis-stat-icon {{
+    }
+    .mantis-stat-icon {
         width: 30px;
         height: 30px;
         border-radius: 10px;
@@ -2052,44 +1901,44 @@ def _run_ui():
         background: var(--mantis-accent-soft);
         border: 1px solid var(--mantis-accent-glow);
         font-size: 14px;
-    }}
-    .mantis-stat-label {{
+    }
+    .mantis-stat-label {
         font-size: 11px;
         text-transform: uppercase;
         letter-spacing: 0.08em;
         color: var(--mantis-muted);
-    }}
-    .mantis-stat-value {{
+    }
+    .mantis-stat-value {
         font-size: 20px;
         font-weight: 700;
         color: var(--mantis-text);
-    }}
-    .mantis-stat-help {{
+    }
+    .mantis-stat-help {
         font-size: 12px;
         color: var(--mantis-muted);
-    }}
+    }
 
     /* --- SIDEBAR POLISH --- */
-    section[data-testid="stSidebar"] {{
+    section[data-testid="stSidebar"] {
         background: var(--mantis-sidebar-bg);
         border-right: 1px solid var(--mantis-sidebar-border);
-    }}
-    section[data-testid="stSidebar"] h3 {{
+    }
+    section[data-testid="stSidebar"] h3 {
         color: var(--mantis-sidebar-title);
         font-weight: 700;
         letter-spacing: 0.04em;
         text-transform: uppercase;
         font-size: 12px;
-    }}
+    }
     section[data-testid="stSidebar"] .stMarkdown,
     section[data-testid="stSidebar"] p,
-    section[data-testid="stSidebar"] label {{
+    section[data-testid="stSidebar"] label {
         color: var(--mantis-text);
-    }}
+    }
 
 
     /* --- SIDEBAR BRAND --- */
-    .mantis-sidebar-brand{{
+    .mantis-sidebar-brand{
         display:flex;
         gap:12px;
         align-items:center;
@@ -2099,8 +1948,8 @@ def _run_ui():
         background: var(--mantis-sidebar-brand-bg);
         border: 1px solid var(--mantis-sidebar-brand-border);
         box-shadow: var(--mantis-shadow-button);
-    }}
-    .mantis-sidebar-logo{{
+    }
+    .mantis-sidebar-logo{
         width:70px;
         height:70px;
         border-radius: 14px;
@@ -2111,13 +1960,13 @@ def _run_ui():
         overflow:hidden;
         box-shadow: inset 0 0 0 1px rgba(0,0,0,0.05), 0 6px 16px rgba(0,0,0,0.2);
         flex: 0 0 auto;
-    }}
-    .mantis-sidebar-logo img{{
+    }
+    .mantis-sidebar-logo img{
         height:48px;
         width:auto;
         display:block;
-    }}
-    .mantis-avatar {{
+    }
+    .mantis-avatar {
         height:44px;
         width:44px;
         border-radius:50%;
@@ -2129,46 +1978,46 @@ def _run_ui():
         font-weight:700;
         font-size:0.9rem;
         border: 1px solid var(--mantis-card-border);
-    }}
-    .mantis-logo-fallback {{
+    }
+    .mantis-logo-fallback {
         font-size: 0.95rem;
         font-weight: 700;
         color: var(--mantis-sidebar-title);
-    }}
-    .mantis-sidebar-title{{
+    }
+    .mantis-sidebar-title{
         font-weight:800;
         font-size:14px;
         color: var(--mantis-text);
         line-height:1.1;
-    }}
-    .mantis-sidebar-sub{{
+    }
+    .mantis-sidebar-sub{
         font-size:12px;
         color: var(--mantis-muted);
         margin-top:2px;
         line-height:1.1;
-    }}
-    .mantis-banner img {{
+    }
+    .mantis-banner img {
         max-height: 180px;
         object-fit: contain;
-    }}
+    }
 
     /* --- NAV RADIO STYLE --- */
-    div[role="radiogroup"] > label {{
+    div[role="radiogroup"] > label {
         background: var(--mantis-surface-alt);
         padding: 10px 12px;
         border-radius: 12px;
         border: 1px solid var(--mantis-card-border);
         margin-bottom: 8px;
-    }}
-    div[role="radiogroup"] > label span {{
+    }
+    div[role="radiogroup"] > label span {
         color: var(--mantis-text);
-    }}
-    div[role="radiogroup"] > label:has(input:checked) {{
+    }
+    div[role="radiogroup"] > label:has(input:checked) {
         border-color: var(--mantis-accent);
         box-shadow: 0 0 0 1px var(--mantis-accent-glow);
-    }}
-</style>
-    """,
+    }
+    </style>
+    """
     )
 
     # --- BRAND HEADER (UI only) ---
@@ -3607,155 +3456,39 @@ def _run_ui():
                 else:
                     st.caption(f"{label} — not available")
 
-    with st.sidebar:
-        with key_scope("sidebar"):
-            st.markdown("### MANTIS Studio")
-            st.caption(f"Version {AppConfig.VERSION}")
-            st.html("<div class='mantis-nav-section'>Appearance</div>")
-            st.selectbox("Theme", ["Dark", "Light"], key="ui_theme")
-            
-            # Debug mode toggle for troubleshooting
-            with st.expander("🔧 Advanced", expanded=False):
-                st.checkbox(
-                    "Enable Debug Mode",
-                    key="debug",
-                    help="Show detailed debugging information and logs"
-                )
-                if st.session_state.debug:
-                    st.caption("✓ Debug mode active")
-                    st.caption("Check terminal for detailed logs")
-            
-            st.divider()
-
-            if st.session_state.project:
-                p = st.session_state.project
-                st.html("<div class='mantis-nav-section'>Current Project</div>")
-                st.caption(p.title)
-                st.caption(f"📚 {p.get_total_word_count()} words")
-            else:
-                st.info("No project loaded.")
-
-            st.divider()
-            st.html("<div class='mantis-nav-section'>Navigation</div>")
-
-            from app.utils.navigation import get_nav_sections
-
-            nav_sections = get_nav_sections()
-            current_page = st.session_state.get("page", "home")
-            world_focus = st.session_state.get("world_focus_tab", "")
-            for section_idx, (section_name, nav_items) in enumerate(nav_sections):
-                with st.expander(section_name, expanded=section_idx < 2):
-                    for label, target, icon in nav_items:
-                        if target == "memory":
-                            is_active = current_page == "world" and world_focus == "Memory"
-                        elif target == "insights":
-                            is_active = current_page == "world" and world_focus == "Insights"
-                        elif target == "legal":
-                            is_active = current_page in {
-                                "legal",
-                                "terms",
-                                "privacy",
-                                "copyright",
-                                "cookie",
-                                "help",
-                            }
-                        else:
-                            is_active = current_page == target
-                        if st.button(
-                            f"{icon} {label}",
-                            key=f"nav_{target}_{_slugify(label)}",
-                            use_container_width=True,
-                            disabled=is_active,
-                        ):
-                            if target == "memory":
-                                st.session_state.world_focus_tab = "Memory"
-                                st.session_state.page = "world"
-                            elif target == "insights":
-                                st.session_state.world_focus_tab = "Insights"
-                                st.session_state.page = "world"
-                            else:
-                                st.session_state.page = target
-                            st.rerun()
-
-            if st.session_state.project:
-                st.divider()
-                action_cols = st.columns(2)
-                with action_cols[0]:
-                    if st.button(
-                        "💾 Save Project",
-                        key="sidebar_save_project",
-                        type="primary",
-                        use_container_width=True,
-                        help="Save all changes to this project"
-                    ):
-                        if persist_project(p, action="save"):
-                            st.toast("Project saved successfully")
-                with action_cols[1]:
-                    if st.button(
-                        "✖ Close Project",
-                        key="sidebar_close_project",
-                        use_container_width=True,
-                        help="Save and close the current project"
-                    ):
-                        save_p()
-                        # Clear the last_project_path from config to prevent auto-reload
-                        config = load_app_config()
-                        config.pop("last_project_path", None)
-                        save_app_config(config)
-                        st.session_state.project = None
-                        st.session_state.page = "home"
-                        st.rerun()
-
-            # Debug panel - enhanced for troubleshooting black screen issues
-            if debug_enabled():
-                st.divider()
-                st.markdown("### 🛠 Debug Panel")
-                
-                with st.expander("📊 Session State", expanded=False):
-                    st.caption(f"**Current Page:** {st.session_state.get('page', 'unknown')}")
-                    st.caption(f"**Initialized:** {st.session_state.get('initialized', False)}")
-                    st.caption(f"**Project Loaded:** {st.session_state.project is not None}")
-                    if st.session_state.project:
-                        st.caption(f"  - Title: {st.session_state.project.title}")
-                        st.caption(f"  - Path: {st.session_state.project.filepath}")
-                    
-                    last_action = st.session_state.get("last_action") or "—"
-                    last_action_ts = st.session_state.get("last_action_ts")
-                    if last_action_ts:
-                        st.caption(f"**Last Action:** {last_action} ({time.strftime('%H:%M:%S', time.localtime(last_action_ts))})")
-                    else:
-                        st.caption(f"**Last Action:** {last_action}")
-                    
-                    last_exception = st.session_state.get("last_exception") or "—"
-                    st.caption(f"**Last Exception:** {last_exception}")
-                
-                with st.expander("🔧 System Info", expanded=False):
-                    st.caption(f"**Python:** {sys.version.split()[0]}")
-                    st.caption(f"**Streamlit:** {st.__version__}")
-                    st.caption(f"**App Version:** {AppConfig.VERSION}")
-                    st.caption(f"**Projects Dir:** {AppConfig.PROJECTS_DIR}")
-                    st.caption(f"**Config Path:** {AppConfig.CONFIG_PATH}")
-                
-                with st.expander("📝 Session State Keys", expanded=False):
-                    keys = sorted([k for k in st.session_state.keys() if not k.startswith("_")])
-                    st.caption(f"Total: {len(keys)} keys")
-                    for key in keys[:20]:  # Show first 20 keys
-                        value = st.session_state.get(key)
-                        value_str = str(value)[:50] if value is not None else "None"
-                        st.caption(f"- {key}: {value_str}")
-                    if len(keys) > 20:
-                        st.caption(f"... and {len(keys) - 20} more")
-                
-                if st.button("🔄 Force Rerun", use_container_width=True):
-                    st.rerun()
-                
-                if st.button("🗑️ Clear Session State", use_container_width=True):
-                    # Clear only user-defined keys, preserve Streamlit internal state
-                    keys_to_clear = [k for k in st.session_state.keys() if not k.startswith("_")]
-                    for key in keys_to_clear:
-                        del st.session_state[key]
-                    st.toast(f"Cleared {len(keys_to_clear)} session state keys")
-                    st.rerun()
+    # Render enhanced sidebar
+    from app.layout.enhanced_sidebar import render_enhanced_sidebar
+    
+    def save_project_callback():
+        """Callback for saving project from sidebar"""
+        p = st.session_state.project
+        if persist_project(p, action="save"):
+            return True
+        return False
+    
+    def close_project_callback():
+        """Callback for closing project from sidebar"""
+        p = st.session_state.project
+        save_p()
+        # Clear the last_project_path from config to prevent auto-reload
+        config = load_app_config()
+        config.pop("last_project_path", None)
+        save_app_config(config)
+        st.session_state.project = None
+        st.session_state.page = "home"
+        st.rerun()
+    
+    render_enhanced_sidebar(
+        version=AppConfig.VERSION,
+        project=st.session_state.project,
+        current_page=st.session_state.get("page", "home"),
+        world_focus=st.session_state.get("world_focus_tab", ""),
+        debug_enabled=debug_enabled(),
+        key_scope=key_scope,
+        slugify=_slugify,
+        save_project_callback=save_project_callback,
+        close_project_callback=close_project_callback,
+    )
 
     def render_home():
         # Import new dashboard components
