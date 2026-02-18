@@ -148,8 +148,14 @@ os.makedirs(AppConfig.PROJECTS_DIR, exist_ok=True)
 os.makedirs(AppConfig.BACKUPS_DIR, exist_ok=True)
 
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+logging.basicConfig(
+    level=logging.DEBUG if os.getenv("MANTIS_DEBUG") else logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s:%(lineno)d - %(message)s"
+)
 logger = logging.getLogger("MANTIS")
+logger.info("=" * 60)
+logger.info("MANTIS Studio Starting...")
+logger.info("=" * 60)
 
 
 def load_app_config() -> Dict[str, str]:
@@ -1612,15 +1618,39 @@ def _run_ui():
             st.session_state.page = "home"
             st.rerun()
 
+    logger.info("Starting UI initialization...")
+    logger.debug(f"Assets directory: {ASSETS_DIR}")
+    
     icon_path = ASSETS_DIR / "mantis_logo_trans.png"
     page_icon = str(icon_path) if icon_path.exists() else "🪲"
-    st.set_page_config(page_title=AppConfig.APP_NAME, page_icon=page_icon, layout="wide")
-    inject_theme()
+    logger.debug(f"Icon path exists: {icon_path.exists()}, using: {page_icon}")
+    
+    try:
+        st.set_page_config(page_title=AppConfig.APP_NAME, page_icon=page_icon, layout="wide")
+        logger.info("Page config set successfully")
+    except Exception as e:
+        logger.error(f"Failed to set page config: {e}", exc_info=True)
+        raise
+    
+    try:
+        inject_theme()
+        logger.info("Theme injected successfully")
+    except Exception as e:
+        logger.error(f"Failed to inject theme: {e}", exc_info=True)
+        raise
 
     if "initialized" not in st.session_state:
         st.session_state.initialized = True
+        logger.info("Session state initialized for first time")
 
-    config_data = load_app_config()
+    try:
+        config_data = load_app_config()
+        logger.info(f"App config loaded: {len(config_data)} keys")
+        logger.debug(f"Config keys: {list(config_data.keys())}")
+    except Exception as e:
+        logger.error(f"Failed to load app config: {e}", exc_info=True)
+        config_data = {}
+        st.warning("⚠️ Failed to load app configuration. Using defaults.")
 
     init_state("ui_theme", config_data.get("ui_theme", "Dark"))
     def _safe_int_val(value: object, default: int) -> int:
@@ -2187,10 +2217,12 @@ def _run_ui():
         """,
     )
 
+    logger.info("Initializing session state...")
     init_state("user_id", None)
     init_state("projects_dir", None)
     init_state("project", None)
     init_state("page", "home")
+    logger.debug(f"Default page set to: {st.session_state.page}")
     init_state("auto_save", True)
     init_state("ghost_text", "")
     init_state("pending_improvement_text", "")
@@ -2205,6 +2237,7 @@ def _run_ui():
     init_state("is_premium", True)
     init_state("pending_action", None)
     st.session_state.setdefault("ai_keys", {})
+    logger.info("Session state initialization complete")
 
     def _resolve_api_key(provider: str, default_value: str) -> str:
         session_key = (st.session_state.get("ai_keys") or {}).get(provider, "")
@@ -2351,6 +2384,7 @@ def _run_ui():
     # Local-first: use the default projects directory
     if not st.session_state.get("projects_dir"):
         st.session_state.projects_dir = AppConfig.PROJECTS_DIR
+        logger.info(f"Projects directory set to: {AppConfig.PROJECTS_DIR}")
 
     # Restore the last active project from config if none is loaded
     if not st.session_state.get("project"):
@@ -2358,8 +2392,35 @@ def _run_ui():
         if last_path and os.path.isfile(last_path):
             try:
                 st.session_state.project = Project.load(last_path)
-            except Exception:
-                logger.warning("Failed to restore last project: %s", last_path, exc_info=True)
+                logger.info(f"Restored last project: {st.session_state.project.title}")
+            except Exception as e:
+                logger.warning("Failed to restore last project: %s - %s", last_path, e, exc_info=True)
+    
+    # Startup diagnostics - run once per session
+    if not st.session_state.get("_startup_diagnostics_run"):
+        st.session_state._startup_diagnostics_run = True
+        logger.info("=" * 60)
+        logger.info("STARTUP DIAGNOSTICS")
+        logger.info("=" * 60)
+        logger.info(f"App Version: {AppConfig.VERSION}")
+        logger.info(f"Python Version: {sys.version.split()[0]}")
+        logger.info(f"Streamlit Version: {st.__version__}")
+        logger.info(f"Projects Directory: {AppConfig.PROJECTS_DIR}")
+        logger.info(f"Projects Dir Exists: {os.path.exists(AppConfig.PROJECTS_DIR)}")
+        logger.info(f"Config Path: {AppConfig.CONFIG_PATH}")
+        logger.info(f"Config Exists: {os.path.exists(AppConfig.CONFIG_PATH)}")
+        logger.info(f"Assets Directory: {ASSETS_DIR}")
+        logger.info(f"Assets Dir Exists: {ASSETS_DIR.exists()}")
+        logger.info(f"Current Page: {st.session_state.page}")
+        logger.info(f"Project Loaded: {st.session_state.project is not None}")
+        if st.session_state.project:
+            logger.info(f"  - Project Title: {st.session_state.project.title}")
+            logger.info(f"  - Project Path: {st.session_state.project.filepath}")
+        logger.info(f"Session State Keys: {len(st.session_state.keys())} total")
+        logger.info(f"Debug Mode: {debug_enabled()}")
+        logger.info("=" * 60)
+        logger.info("STARTUP DIAGNOSTICS COMPLETE - App initialized successfully")
+        logger.info("=" * 60)
 
     # Reliable navigation rerun (avoids Streamlit edge cases when returning early)
     if st.session_state.get("_force_nav"):
@@ -3564,6 +3625,19 @@ def _run_ui():
             st.caption(f"Version {AppConfig.VERSION}")
             st.html("<div class='mantis-nav-section'>Appearance</div>")
             st.selectbox("Theme", ["Dark", "Light"], key="ui_theme")
+            
+            # Debug mode toggle for troubleshooting
+            with st.expander("🔧 Advanced", expanded=False):
+                debug_mode = st.checkbox(
+                    "Enable Debug Mode",
+                    value=st.session_state.get("debug", False),
+                    help="Show detailed debugging information and logs"
+                )
+                st.session_state.debug = debug_mode
+                if debug_mode:
+                    st.caption("✓ Debug mode active")
+                    st.caption("Check terminal for detailed logs")
+            
             st.divider()
 
             if st.session_state.project:
@@ -3619,18 +3693,56 @@ def _run_ui():
                         st.session_state.page = "home"
                         st.rerun()
 
+            # Debug panel - enhanced for troubleshooting black screen issues
             if debug_enabled():
                 st.divider()
-                st.markdown("### 🛠 Debug")
-                st.caption(f"Page: {st.session_state.get('page', 'unknown')}")
-                last_action = st.session_state.get("last_action") or "—"
-                last_action_ts = st.session_state.get("last_action_ts")
-                if last_action_ts:
-                    st.caption(f"Last action: {last_action} ({time.strftime('%H:%M:%S', time.localtime(last_action_ts))})")
-                else:
-                    st.caption(f"Last action: {last_action}")
-                last_exception = st.session_state.get("last_exception") or "—"
-                st.caption(f"Last exception: {last_exception}")
+                st.markdown("### 🛠 Debug Panel")
+                
+                with st.expander("📊 Session State", expanded=False):
+                    st.caption(f"**Current Page:** {st.session_state.get('page', 'unknown')}")
+                    st.caption(f"**Initialized:** {st.session_state.get('initialized', False)}")
+                    st.caption(f"**Project Loaded:** {st.session_state.project is not None}")
+                    if st.session_state.project:
+                        st.caption(f"  - Title: {st.session_state.project.title}")
+                        st.caption(f"  - Path: {st.session_state.project.filepath}")
+                    
+                    last_action = st.session_state.get("last_action") or "—"
+                    last_action_ts = st.session_state.get("last_action_ts")
+                    if last_action_ts:
+                        st.caption(f"**Last Action:** {last_action} ({time.strftime('%H:%M:%S', time.localtime(last_action_ts))})")
+                    else:
+                        st.caption(f"**Last Action:** {last_action}")
+                    
+                    last_exception = st.session_state.get("last_exception") or "—"
+                    st.caption(f"**Last Exception:** {last_exception}")
+                
+                with st.expander("🔧 System Info", expanded=False):
+                    st.caption(f"**Python:** {sys.version.split()[0]}")
+                    st.caption(f"**Streamlit:** {st.__version__}")
+                    st.caption(f"**App Version:** {AppConfig.VERSION}")
+                    st.caption(f"**Projects Dir:** {AppConfig.PROJECTS_DIR}")
+                    st.caption(f"**Config Path:** {AppConfig.CONFIG_PATH}")
+                
+                with st.expander("📝 Session State Keys", expanded=False):
+                    keys = sorted([k for k in st.session_state.keys() if not k.startswith("_")])
+                    st.caption(f"Total: {len(keys)} keys")
+                    for key in keys[:20]:  # Show first 20 keys
+                        value = st.session_state.get(key)
+                        value_str = str(value)[:50] if value is not None else "None"
+                        st.caption(f"- {key}: {value_str}")
+                    if len(keys) > 20:
+                        st.caption(f"... and {len(keys) - 20} more")
+                
+                if st.button("🔄 Force Rerun", use_container_width=True):
+                    st.rerun()
+                
+                if st.button("🗑️ Clear Session State", use_container_width=True):
+                    # Clear only user-defined keys, preserve Streamlit internal state
+                    keys_to_clear = [k for k in st.session_state.keys() if not k.startswith("_")]
+                    for key in keys_to_clear:
+                        del st.session_state[key]
+                    st.toast(f"Cleared {len(keys_to_clear)} session state keys")
+                    st.rerun()
 
     def render_home():
         render_welcome_banner("home")
@@ -5755,74 +5867,125 @@ def _run_ui():
 
     def _render_current_page() -> None:
         rendered_page = False
+        current_page = st.session_state.page
+        logger.info(f"Rendering page: {current_page}")
+        
         if st.session_state.page == "home":
+            logger.debug("Rendering home/dashboard page")
             with key_scope("dashboard"):
                 render_home()
             rendered_page = True
         elif st.session_state.page == "projects":
+            logger.debug("Rendering projects page")
             with key_scope("projects"):
                 render_projects()
             rendered_page = True
         elif st.session_state.page == "ai":
+            logger.debug("Rendering AI settings page")
             with key_scope("settings"):
                 render_ai_settings()
             rendered_page = True
         elif st.session_state.page == "legal":
+            logger.debug("Rendering legal page")
             with key_scope("legal"):
                 render_legal_redirect()
             rendered_page = True
         elif st.session_state.page == "privacy":
+            logger.debug("Rendering privacy page")
             with key_scope("privacy"):
                 render_privacy()
             rendered_page = True
         elif st.session_state.page == "terms":
+            logger.debug("Rendering terms page")
             with key_scope("terms"):
                 render_terms()
             rendered_page = True
         elif st.session_state.page == "copyright":
+            logger.debug("Rendering copyright page")
             with key_scope("copyright"):
                 render_copyright()
             rendered_page = True
         elif st.session_state.page == "cookie":
+            logger.debug("Rendering cookie page")
             with key_scope("cookie"):
                 render_cookie()
             rendered_page = True
         elif st.session_state.page == "help":
+            logger.debug("Rendering help page")
             with key_scope("help"):
                 render_help()
             rendered_page = True
         elif st.session_state.page == "export":
+            logger.debug("Rendering export page")
             with key_scope("export"):
                 render_export()
             rendered_page = True
         else:
             pg = st.session_state.page
             if pg == "outline":
+                logger.debug("Rendering outline page")
                 with key_scope("outline"):
                     render_outline()
                 rendered_page = True
             elif pg == "world":
+                logger.debug("Rendering world bible page")
                 with key_scope("world"):
                     render_world()
                 rendered_page = True
             elif pg == "chapters":
+                logger.debug("Rendering chapters/editor page")
                 with key_scope("editor"):
                     render_chapters()
                 rendered_page = True
             else:
+                logger.warning(f"Unknown page '{pg}', redirecting to home")
                 st.session_state.page = "home"
                 st.rerun()
         if rendered_page:
+            logger.debug("Rendering footer")
             render_app_footer()
+            logger.info(f"Page '{current_page}' rendered successfully")
 
     try:
+        logger.info("=" * 60)
+        logger.info("Starting page render cycle")
+        logger.info("=" * 60)
         _render_current_page()
+        logger.info("Page render cycle completed successfully")
     except Exception as exc:
-        st.session_state["last_exception"] = f"{type(exc).__name__}: {exc}"
-        logger.exception("Unhandled UI exception", exc_info=True)
-        st.error("Something went wrong while rendering this page. Try reloading the app or returning to the dashboard.")
-        if debug_enabled():
-            st.exception(exc)
+        error_msg = f"{type(exc).__name__}: {exc}"
+        st.session_state["last_exception"] = error_msg
+        logger.error("=" * 60)
+        logger.error("UNHANDLED UI EXCEPTION")
+        logger.error("=" * 60)
+        logger.error(f"Page: {st.session_state.get('page', 'unknown')}")
+        logger.error(f"Error: {error_msg}")
+        logger.exception("Exception details:", exc_info=True)
+        logger.error("=" * 60)
+        
+        st.error("⚠️ **Something went wrong while rendering this page.**")
+        st.markdown("""
+        ### Troubleshooting Steps:
+        1. Try reloading the app (F5 or Ctrl+R)
+        2. Return to the dashboard using the sidebar
+        3. Check the terminal/logs for detailed error messages
+        4. If the issue persists, please report it on GitHub with the error details below
+        """)
+        
+        with st.expander("🔍 Error Details (Click to expand)", expanded=False):
+            st.code(error_msg, language="text")
+            if debug_enabled():
+                st.write("**Debug Mode Active - Full Stack Trace:**")
+                st.exception(exc)
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("🏠 Return to Dashboard", use_container_width=True, type="primary"):
+                st.session_state.page = "home"
+                st.rerun()
+        with col2:
+            if st.button("🔄 Reload App", use_container_width=True):
+                st.rerun()
 
 
 def run_selftest() -> int:
