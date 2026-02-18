@@ -63,6 +63,7 @@ from app.services.projects import Chapter, Entity, Project, sanitize_chapter_tit
 from app.services.world_bible import queue_world_bible_suggestion
 from app.services.ai import AIEngine, AnalysisEngine, REWRITE_PRESETS, StoryEngine, rewrite_prompt
 from app.state import initialize_session_state, install_key_helpers, ui_key
+from app.utils.branding_assets import read_asset_bytes, resolve_asset_path
 
 # NOTE: Streamlit-dependent utilities are imported inside _run_ui() so
 # `python app/main.py --selftest` can run without Streamlit installed.
@@ -106,13 +107,10 @@ def _run_ui():
 
     @st.cache_data(show_spinner=False)
     def load_asset_bytes(filename: str) -> Optional[bytes]:
-        path = ASSETS_DIR / filename
-        if not path.exists():
-            return None
         try:
-            return path.read_bytes()
+            return read_asset_bytes(ASSETS_DIR, filename)
         except Exception:
-            logger.warning("Failed to load asset %s", path, exc_info=True)
+            logger.warning("Failed to load asset %s", filename, exc_info=True)
             return None
 
     def asset_base64(filename: str) -> str:
@@ -183,8 +181,8 @@ def _run_ui():
     def render_help():
         st.markdown("## Help\n\nVisit our [GitHub](https://github.com/bigmanjer/Mantis-Studio/issues) for support.")
 
-    icon_path = ASSETS_DIR / "mantis_logo_trans.png"
-    page_icon = str(icon_path) if icon_path.exists() else "🪲"
+    icon_path = resolve_asset_path(ASSETS_DIR, "branding/mantis_favicon.png")
+    page_icon = str(icon_path) if icon_path and icon_path.exists() else "🪲"
     st.set_page_config(page_title=AppConfig.APP_NAME, page_icon=page_icon, layout="wide")
 
     config_data = load_app_config()
@@ -195,7 +193,7 @@ def _run_ui():
     tokens = get_theme_tokens(theme)[theme]
     apply_theme(tokens)
 
-    header_logo_b64 = asset_base64("mantis_logo_trans.png")
+    header_logo_b64 = asset_base64("branding/mantis_wordmark.png")
     render_header(AppConfig.VERSION, header_logo_b64)
 
     
@@ -1056,7 +1054,7 @@ def _run_ui():
 
     with st.sidebar:
         with key_scope("sidebar"):
-            sidebar_logo_b64 = asset_base64("mantis_logo_trans.png")
+            sidebar_logo_b64 = asset_base64("branding/mantis_emblem.png")
             sidebar_logo_html = (
                 f'<img src="data:image/png;base64,{sidebar_logo_b64}" alt="MANTIS logo" />'
                 if sidebar_logo_b64
@@ -1258,7 +1256,7 @@ def _run_ui():
             key_prefix="dashboard_header",
         )
 
-        hero_logo_bytes = load_asset_bytes("mantis_logo_trans.png")
+        hero_logo_bytes = load_asset_bytes("branding/mantis_emblem.png")
         with st.container(border=True):
             hero_cols = st.columns([2.4, 1])
             with hero_cols[0]:

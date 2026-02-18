@@ -11,7 +11,10 @@ This module provides a redesigned sidebar with:
 
 from __future__ import annotations
 from typing import Any, Callable, Optional
+from pathlib import Path
 import streamlit as st
+
+from app.utils.branding_assets import resolve_asset_path
 
 
 def render_sidebar_brand(version: str) -> None:
@@ -21,7 +24,12 @@ def render_sidebar_brand(version: str) -> None:
         version: Application version string
     """
     st.html('<div class="mantis-sidebar-brand mantis-sidebar-brand--modern">')
-    st.image("assets/mantis_logo_trans.png", use_container_width=True)
+    assets_dir = Path(__file__).resolve().parents[2] / "assets"
+    emblem_path = resolve_asset_path(assets_dir, "branding/mantis_emblem.png")
+    if emblem_path:
+        st.image(str(emblem_path), width=132)
+    else:
+        st.markdown("**MANTIS**")
     st.html(
         f"""
         <div class="mantis-sidebar-meta">

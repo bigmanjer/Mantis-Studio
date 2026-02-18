@@ -55,6 +55,7 @@ if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
 from app.utils.navigation import get_nav_config
+from app.utils.branding_assets import read_asset_bytes, resolve_asset_path
 
 # NOTE: Streamlit-dependent utilities are imported inside _run_ui() so
 # `python -m app.main --selftest` can run without Streamlit installed.
@@ -1411,15 +1412,12 @@ def _run_ui():
 
     @st.cache_data(show_spinner=False)
     def load_asset_bytes(filename: str) -> Optional[bytes]:
-        path = ASSETS_DIR / filename
-        if not path.exists():
-            return None
         try:
-            return path.read_bytes()
+            return read_asset_bytes(ASSETS_DIR, filename)
         except Exception:
             logging.getLogger("MANTIS").warning(
                 "Failed to load asset %s",
-                path,
+                filename,
                 exc_info=True,
             )
             return None
@@ -1632,9 +1630,9 @@ def _run_ui():
     logger.info("Starting UI initialization...")
     logger.debug(f"Assets directory: {ASSETS_DIR}")
     
-    icon_path = ASSETS_DIR / "mantis_logo_trans.png"
-    page_icon = str(icon_path) if icon_path.exists() else "🪲"
-    logger.debug(f"Icon path exists: {icon_path.exists()}, using: {page_icon}")
+    icon_path = resolve_asset_path(ASSETS_DIR, "branding/mantis_favicon.png")
+    page_icon = str(icon_path) if icon_path and icon_path.exists() else "🪲"
+    logger.debug(f"Icon path exists: {bool(icon_path and icon_path.exists())}, using: {page_icon}")
     
     try:
         st.set_page_config(page_title=AppConfig.APP_NAME, page_icon=page_icon, layout="wide")
@@ -1703,25 +1701,31 @@ def _run_ui():
         gap:10px;
         align-items:center;
     }}
-    .mantis-header-logo {{
-        width:88px;
-        height:88px;
-        border-radius:18px;
+    .mantis-header-logo {
+        width:236px;
+        height:82px;
+        border-radius:16px;
         background: var(--mantis-header-logo-bg);
+        background: linear-gradient(135deg, color-mix(in srgb, var(--mantis-header-logo-bg) 82%, transparent), transparent);
+        border: 1px solid var(--mantis-primary-border);
+        border: 1px solid color-mix(in srgb, var(--mantis-accent) 28%, transparent);
         display:flex;
         align-items:center;
         justify-content:center;
         overflow:hidden;
         box-shadow:
-            inset 0 0 0 1px rgba(0,0,0,0.06),
-            0 0 18px var(--mantis-accent-glow);
-    }}
-    .mantis-header-logo img {{
-        height:60px;
-        width:auto;
+            inset 0 0 0 1px rgba(0,0,0,0.04),
+            0 8px 22px var(--mantis-accent-glow),
+            0 8px 22px color-mix(in srgb, var(--mantis-accent-glow) 60%, transparent);
+    }
+    .mantis-header-logo img {
+        width:100%;
+        max-height:62px;
+        object-fit:contain;
         padding:0;
         border-radius:0;
-    }}
+        filter: drop-shadow(0 0 10px color-mix(in srgb, var(--mantis-accent-glow) 75%, transparent));
+    }
     .mantis-header-title {{
         font-size:22px;
         font-weight:800;
@@ -1952,6 +1956,23 @@ def _run_ui():
     .mantis-sidebar-brand--modern {
         gap: 2px;
     }
+    .mantis-sidebar-logo {
+        width: 100%;
+        max-width: 148px;
+        margin: 0 auto 6px;
+        padding: 8px;
+        border-radius: 14px;
+        background: var(--mantis-sidebar-logo-bg);
+        background: linear-gradient(145deg, color-mix(in srgb, var(--mantis-sidebar-logo-bg) 92%, transparent), transparent);
+        border: 1px solid var(--mantis-sidebar-brand-border);
+        border: 1px solid color-mix(in srgb, var(--mantis-accent) 20%, transparent);
+    }
+    .mantis-sidebar-logo img {
+        width: 100%;
+        display: block;
+        object-fit: contain;
+        filter: drop-shadow(0 0 8px color-mix(in srgb, var(--mantis-accent-glow) 80%, transparent));
+    }
     .mantis-sidebar-brand--modern [data-testid="stImage"] {
         width: 100%;
         margin: 2px 0 4px;
@@ -2036,7 +2057,7 @@ def _run_ui():
     )
 
     # --- BRAND HEADER (UI only) ---
-    header_logo_b64 = asset_base64("mantis_logo_trans full.png")
+    header_logo_b64 = asset_base64("branding/mantis_lockup.png")
     header_logo_html = (
         f'<img src="data:image/png;base64,{header_logo_b64}" alt="MANTIS logo" />'
         if header_logo_b64
@@ -2245,7 +2266,7 @@ def _run_ui():
         render_footer(AppConfig.VERSION)
 
     def _render_header_bar(recent_projects: List[Dict[str, Any]]) -> None:
-        logo_bytes = load_asset_bytes("mantis_logo_trans.png")
+        logo_bytes = load_asset_bytes("branding/mantis_emblem.png")
         left_col, mid_col, right_col = st.columns([1.6, 2.2, 1.2], vertical_alignment="center")
         with left_col:
             if logo_bytes:
