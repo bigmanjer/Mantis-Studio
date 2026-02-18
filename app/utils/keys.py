@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from typing import Iterable, Optional
+from typing import Optional
 
 
 def _slugify(value: str) -> str:
