@@ -1390,7 +1390,7 @@ def _run_ui():
     from pathlib import Path
     from app.components.ui import action_card, card, primary_button, section_header, stat_tile
     from app.ui.components import card_block, cta_tile, empty_state, header_bar, render_tag_list
-    from app.ui.ui_layout import render_card, render_metric, render_section_header
+    from app.ui.ui_layout import render_card, render_metric, render_section_header, render_metric_card, render_empty_state
     from app.layout.layout import render_footer
     from app.ui.theme import inject_theme
     from app.utils.keys import ui_key
@@ -3758,17 +3758,13 @@ def _run_ui():
                     st.rerun()
 
     def render_home():
-        # Import new dashboard components
-        from app.ui.dashboard_components import (
-            render_hero_header,
-            render_metrics_row,
-            render_workspace_hub_section,
-            render_feature_group,
-            render_dashboard_section_header,
-            add_divider_with_spacing,
-        )
-        
+        """Render the redesigned dashboard with modern SaaS-style Command Center layout."""
+        # Remove old banner - optionally keep for first-time users
         render_welcome_banner("home")
+        
+        # =================================================================
+        # DATA PREPARATION (unchanged - keep all existing logic)
+        # =================================================================
         active_dir = get_active_projects_dir()
         recent_projects = _load_recent_projects(active_dir, st.session_state.projects_refresh_token)
 
@@ -3821,6 +3817,269 @@ def _run_ui():
         elif has_outline:
             primary_label = "📝 Build your outline"
             primary_target = "outline"
+
+        # Action handlers (unchanged)
+        def open_recent_project(target: str, focus_tab: Optional[str] = None) -> None:
+            if not recent_projects and not st.session_state.project:
+                st.session_state.page = "projects"
+                st.toast("Create or import a project to unlock this module.")
+                st.rerun()
+            if recent_projects and not st.session_state.project:
+                loaded = load_project_safe(recent_projects[0]["path"], context="recent project")
+                if not loaded:
+                    st.session_state.page = "projects"
+                    st.toast("Select a project to continue.")
+                    st.rerun()
+                st.session_state.project = loaded
+            if focus_tab:
+                st.session_state.world_focus_tab = focus_tab
+            st.session_state.page = target
+            st.rerun()
+
+        def open_export() -> None:
+            export_path = None
+            if st.session_state.project and st.session_state.project.filepath:
+                export_path = st.session_state.project.filepath
+            elif recent_projects:
+                export_path = recent_projects[0]["path"]
+            if export_path:
+                st.session_state.export_project_path = export_path
+                st.session_state.page = "export"
+                st.rerun()
+            else:
+                st.session_state.page = "export"
+                st.toast("Select a project to export.")
+                st.rerun()
+
+        def open_ai_settings() -> None:
+            st.session_state.ai_settings__flash = True
+            st.session_state.page = "ai"
+            st.rerun()
+
+        def open_primary_cta() -> None:
+            if primary_target == "chapters" and latest_chapter_id:
+                st.session_state.curr_chap_id = latest_chapter_id
+                st.session_state.active_chapter_id = latest_chapter_id
+            open_recent_project(primary_target)
+
+        def open_new_project() -> None:
+            st.session_state.page = "projects"
+            st.rerun()
+
+        today = datetime.date.today()
+        last_action_ts = st.session_state.get("last_action_ts")
+        last_action_day = (
+            datetime.date.fromtimestamp(last_action_ts) if last_action_ts else None
+        )
+        last_action_label = (st.session_state.get("last_action") or "").lower()
+        ai_action_tokens = ("analysis", "insights", "memory", "semantic", "entity", "ai")
+        ai_ops_today = (
+            1
+            if last_action_day == today and any(token in last_action_label for token in ai_action_tokens)
+            else 0
+        )
+        system_mode = "Cloud" if (groq_key or openai_key) else "Local"
+        autosave_status = "Auto-saving" if st.session_state.get("auto_save", True) else "Saved"
+
+        def _open_project(project_path: str, target: str = "chapters") -> None:
+            loaded = load_project_safe(project_path, context="project")
+            if loaded:
+                st.session_state.project = loaded
+                st.session_state.page = target
+                st.rerun()
+
+        # =================================================================
+        # 1️⃣ HERO HEADER SECTION - Full Width Top
+        # =================================================================
+        st.html(
+            f"""
+            <div class="mantis-hero-header">
+                <div class="mantis-hero-title">MANTIS</div>
+                <div class="mantis-hero-subtitle">Modular AI Narrative Text Intelligence System</div>
+                <div class="mantis-hero-status">🟢 Operational · {autosave_status}</div>
+            </div>
+            """
+        )
+        
+        # Primary action buttons
+        hero_cols = st.columns(3)
+        with hero_cols[0]:
+            if st.button("✨ New Project", type="primary", use_container_width=True, key="hero_new_project"):
+                with st.spinner("Opening project setup..."):
+                    open_new_project()
+        with hero_cols[1]:
+            if st.button("📂 Open Workspace", use_container_width=True, key="hero_open_workspace"):
+                with st.spinner("Opening workspace..."):
+                    open_recent_project("chapters")
+        with hero_cols[2]:
+            if st.button("🔍 Run Analysis", use_container_width=True, key="hero_run_analysis"):
+                with st.spinner("Preparing analysis workspace..."):
+                    open_recent_project("world", focus_tab="Insights")
+
+        st.html("<div style='margin-top: 32px;'></div>")
+
+        # =================================================================
+        # 2️⃣ METRICS OVERVIEW ROW - 4 KPI Cards
+        # =================================================================
+        render_section_header("Metrics Overview", "Track your projects and AI activity at a glance")
+        
+        metric_cols = st.columns(4)
+        with metric_cols[0]:
+            render_metric_card("Total Projects", str(len(recent_projects)))
+        with metric_cols[1]:
+            render_metric_card("Active Workspace", active_project.title if active_project else "None")
+        with metric_cols[2]:
+            render_metric_card("AI Operations Today", str(ai_ops_today))
+        with metric_cols[3]:
+            render_metric_card("System Mode", system_mode)
+
+        st.html("<div style='margin-top: 32px;'></div>")
+
+        # =================================================================
+        # 3️⃣ WORKSPACE HUB SECTION - 2 Column Layout
+        # =================================================================
+        render_section_header("Workspace Hub", "Access recent projects or start fresh")
+        
+        hub_cols = st.columns([2, 1], gap="large")
+        
+        # LEFT: Recent Projects
+        with hub_cols[0]:
+            with st.container(border=True):
+                st.markdown("### 📚 Recent Projects")
+                
+                if not recent_projects:
+                    render_empty_state(
+                        "📂",
+                        "No projects yet",
+                        "Create your first workspace to start building your narrative."
+                    )
+                else:
+                    for project_entry in recent_projects[:5]:
+                        meta = project_entry.get("meta", {})
+                        title = meta.get("title") or os.path.basename(project_entry.get("path", "Untitled"))
+                        modified = time.strftime(
+                            "%Y-%m-%d %H:%M",
+                            time.localtime(os.path.getmtime(project_entry["path"])),
+                        )
+                        
+                        row = st.columns([3, 1.5, 0.8])
+                        with row[0]:
+                            st.markdown(f"**{title}**")
+                        with row[1]:
+                            st.caption(f"Modified {modified}")
+                        with row[2]:
+                            if st.button("Open", use_container_width=True, key=f"dash_hub_open_{project_entry['path']}"):
+                                _open_project(project_entry["path"])
+                        
+                        # Add subtle divider between projects
+                        if project_entry != recent_projects[:5][-1]:
+                            st.html("<div style='height: 1px; background: var(--mantis-border, rgba(148, 163, 184, 0.1)); margin: 8px 0;'></div>")
+
+        # RIGHT: Create New Project CTA
+        with hub_cols[1]:
+            with st.container(border=True):
+                st.markdown("### ✨ Create Workspace")
+                st.caption("Start a fresh narrative workspace with guided setup and AI-powered tools.")
+                
+                st.html("<div style='margin: 16px 0;'></div>")
+                
+                if st.button("🚀 Create New Project", type="primary", use_container_width=True, key="hub_create_new"):
+                    open_new_project()
+                
+                st.html("<div style='margin: 12px 0;'></div>")
+                st.caption(f"💡 {primary_label}")
+
+        st.html("<div style='margin-top: 32px;'></div>")
+
+        # =================================================================
+        # 4️⃣ FEATURE ACCESS - Grouped, Not Listed
+        # =================================================================
+        render_section_header("Feature Access", "Organized tools for intelligence, writing, insights, and system management")
+        
+        feature_groups = [
+            (
+                "🧠 Intelligence",
+                "AI-powered narrative analysis and semantic tools",
+                [
+                    ("Narrative Analysis", "Analyze structure and story milestones", lambda: open_recent_project("outline")),
+                    ("Semantic Tools", "Review memory and semantic coherence", lambda: open_recent_project("world", focus_tab="Memory")),
+                    ("Entity Extraction", "Manage characters and entities from World Bible", lambda: open_recent_project("world")),
+                ],
+            ),
+            (
+                "✍ Writing",
+                "Draft, revise, and refine your narrative",
+                [
+                    ("Editor", "Draft and revise scenes and chapters", lambda: open_recent_project("chapters")),
+                    ("Rewrite Tools", "AI-assisted rewriting and refinement", lambda: open_recent_project("chapters")),
+                    ("Tone Modulation", "Adjust voice and tone with precision", lambda: open_recent_project("chapters")),
+                ],
+            ),
+            (
+                "📊 Insights",
+                "Reports, analytics, and data visualization",
+                [
+                    ("Export Reports", "Generate export-ready story reports", open_export),
+                    ("Canon Analytics", "View story health and consistency metrics", lambda: open_recent_project("world", focus_tab="Insights")),
+                    ("Data Viewer", "Inspect project metadata and structure", lambda: open_recent_project("projects")),
+                ],
+            ),
+            (
+                "⚙ System",
+                "Configuration and preferences",
+                [
+                    ("AI Settings", "Manage AI providers and API keys", open_ai_settings),
+                    ("Preferences", "Adjust themes and workspace settings", open_ai_settings),
+                ],
+            ),
+        ]
+
+        for group_idx, (group_name, group_desc, features) in enumerate(feature_groups):
+            with st.expander(f"**{group_name}** · {group_desc}", expanded=group_idx == 0):
+                for idx, (feature_name, feature_caption, action) in enumerate(features):
+                    cols = st.columns([3, 1])
+                    with cols[0]:
+                        st.markdown(f"**{feature_name}**")
+                        st.caption(feature_caption)
+                    with cols[1]:
+                        if st.button(
+                            "Open",
+                            key=f"dashboard_feature_{_slugify(group_name)}_{idx}",
+                            use_container_width=True,
+                        ):
+                            with st.spinner(f"Loading {feature_name.lower()}..."):
+                                action()
+                    
+                    # Add divider between items
+                    if idx < len(features) - 1:
+                        st.html("<div style='height: 1px; background: var(--mantis-border, rgba(148, 163, 184, 0.1)); margin: 12px 0;'></div>")
+
+        st.html("<div style='margin-top: 32px;'></div>")
+
+        # =================================================================
+        # AI PROVIDER STATUS (unchanged functionality)
+        # =================================================================
+        if not groq_key and not openai_key:
+            with card_block("🔑 Connect AI Providers", "Unlock generation, summaries, and entity extraction"):
+                st.caption("Connect at least one AI provider to access advanced features.")
+                cta_cols = st.columns(2)
+                with cta_cols[0]:
+                    st.link_button("Get Groq API Key", "https://console.groq.com/keys", use_container_width=True)
+                with cta_cols[1]:
+                    st.link_button("Get OpenAI API Key", "https://platform.openai.com/api-keys", use_container_width=True)
+        else:
+            with card_block("✅ AI Providers Connected", "Your AI providers are configured and ready"):
+                provider_status = []
+                if groq_key:
+                    provider_status.append("Groq")
+                if openai_key:
+                    provider_status.append("OpenAI")
+                
+                st.caption(f"Active providers: {', '.join(provider_status)}")
+                
+                if st.button("⚙️ Manage AI Settings", use_container_width=True, key="dashboard__ai_connected_settings"):
+                    open_ai_settings()
+
 
         def open_recent_project(target: str, focus_tab: Optional[str] = None) -> None:
             if not recent_projects and not st.session_state.project:

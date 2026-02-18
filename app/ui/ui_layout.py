@@ -37,3 +37,32 @@ def render_card(title: str, content: Callable[[], None], subtitle: Optional[str]
         if subtitle:
             st.caption(subtitle)
         content()
+
+
+def render_metric_card(label: str, value: str) -> None:
+    """Render a metric card with consistent styling for the dashboard.
+    
+    Args:
+        label: The metric label (e.g., "Total Projects")
+        value: The metric value (e.g., "5")
+    """
+    render_metric(label, value)
+
+
+def render_empty_state(icon: str, title: str, message: str) -> None:
+    """Render an empty state with icon and message.
+    
+    Args:
+        icon: Emoji icon
+        title: Empty state title
+        message: Descriptive message
+    """
+    st.html(
+        f"""
+        <div class="mantis-empty-state">
+            <div class="mantis-empty-state-icon">{icon}</div>
+            <div class="mantis-empty-state-title">{title}</div>
+            <div class="mantis-empty-state-message">{message}</div>
+        </div>
+        """
+    )
