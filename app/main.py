@@ -1638,60 +1638,18 @@ def _run_ui():
     except Exception as e:
         logger.error(f"Failed to inject theme: {e}", exc_info=True)
         raise
-
-    if "initialized" not in st.session_state:
-        st.session_state.initialized = True
-        logger.info("Session state initialized for first time")
-
+    
+    # Use centralized session initialization module
+    from app.session_init import initialize_session_state
     try:
-        config_data = load_app_config()
-        logger.info(f"App config loaded: {len(config_data)} keys")
-        logger.debug(f"Config keys: {list(config_data.keys())}")
+        initialize_session_state(st)
+        logger.info("Session state initialized successfully via session_init module")
     except Exception as e:
-        logger.error(f"Failed to load app config: {e}", exc_info=True)
-        config_data = {}
-        st.warning("⚠️ Failed to load app configuration. Using defaults.")
-
-    init_state("ui_theme", config_data.get("ui_theme", "Dark"))
-    def _safe_int_val(value: object, default: int) -> int:
-        try:
-            return int(value)
-        except (TypeError, ValueError):
-            return default
-
-    init_state("daily_word_goal", _safe_int_val(config_data.get("daily_word_goal", 500), 500))
-    init_state("weekly_sessions_goal", _safe_int_val(config_data.get("weekly_sessions_goal", 4), 4))
-    init_state("focus_minutes", _safe_int_val(config_data.get("focus_minutes", 25), 25))
-    init_state("activity_log", list(config_data.get("activity_log", [])))
-    init_state("projects_refresh_token", 0)
-    init_state("delete_project_path", None)
-    init_state("delete_project_title", None)
-    init_state("delete_entity_id", None)
-    init_state("delete_entity_name", None)
-    init_state("delete_chapter_id", None)
-    init_state("delete_chapter_title", None)
-    init_state("export_project_path", None)
-    init_state("world_search", "")
-    init_state("world_search_pending", None)
-    init_state("world_focus_entity", None)
-    init_state("world_focus_tab", None)
-    init_state("world_tabs", "Characters")
-    init_state("world_bible_review", [])
-    init_state("last_entity_scan", None)
-    # ---- World Bible structured database layer ----
-    from app.services.world_bible_db import ensure_world_bible_db
-    ensure_world_bible_db(st.session_state)
-    init_state("locked_chapters", set())
-    init_state("_chapter_sync_id", None)
-    init_state("_chapter_sync_text", None)
-    init_state("curr_chap_id", None)
-    init_state("out_txt_project_id", None)
-    init_state("_outline_sync", None)
-    st.session_state.setdefault("canon_health_log", [])
-    init_state("debug", False)
-    init_state("last_action", "")
-    init_state("last_action_ts", None)
-    init_state("last_exception", "")
+        logger.error(f"Failed to initialize session state: {e}", exc_info=True)
+        # Set absolute minimum state to prevent total failure
+        st.session_state.setdefault("page", "home")
+        st.session_state.setdefault("initialized", True)
+        st.warning("⚠️ Failed to initialize application state. Some features may not work correctly.")
 
     apply_pending_widget_updates()
 
@@ -5946,6 +5904,7 @@ def _run_ui():
             render_app_footer()
             logger.info(f"Page '{current_page}' rendered successfully")
 
+    # Render with comprehensive error handling and fallback UI
     try:
         logger.info("=" * 60)
         logger.info("Starting page render cycle")
@@ -5953,6 +5912,7 @@ def _run_ui():
         _render_current_page()
         logger.info("Page render cycle completed successfully")
     except Exception as exc:
+        # Comprehensive error handling with fallback UI to ensure app never shows blank page
         error_msg = f"{type(exc).__name__}: {exc}"
         st.session_state["last_exception"] = error_msg
         logger.error("=" * 60)
@@ -5963,29 +5923,41 @@ def _run_ui():
         logger.exception("Exception details:", exc_info=True)
         logger.error("=" * 60)
         
-        st.error("⚠️ **Something went wrong while rendering this page.**")
-        st.markdown("""
-        ### Troubleshooting Steps:
-        1. Try reloading the app (F5 or Ctrl+R)
-        2. Return to the dashboard using the sidebar
-        3. Check the terminal/logs for detailed error messages
-        4. If the issue persists, please report it on GitHub with the error details below
-        """)
-        
-        with st.expander("🔍 Error Details (Click to expand)", expanded=False):
-            st.code(error_msg, language="text")
-            if debug_enabled():
-                st.write("**Debug Mode Active - Full Stack Trace:**")
-                st.exception(exc)
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            if st.button("🏠 Return to Dashboard", use_container_width=True, type="primary"):
-                st.session_state.page = "home"
-                st.rerun()
-        with col2:
-            if st.button("🔄 Reload App", use_container_width=True):
-                st.rerun()
+        # Render fallback error UI
+        try:
+            st.error("⚠️ **Something went wrong while rendering this page.**")
+            st.markdown("""
+            ### Troubleshooting Steps:
+            1. Try reloading the app (F5 or Ctrl+R)
+            2. Return to the dashboard using the sidebar or button below
+            3. Check the terminal/logs for detailed error messages
+            4. If the issue persists, please report it on GitHub with the error details below
+            """)
+            
+            with st.expander("🔍 Error Details (Click to expand)", expanded=False):
+                st.code(error_msg, language="text")
+                if debug_enabled():
+                    st.write("**Debug Mode Active - Full Stack Trace:**")
+                    st.exception(exc)
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button("🏠 Return to Dashboard", use_container_width=True, type="primary", key="error_fallback_home"):
+                    st.session_state.page = "home"
+                    st.rerun()
+            with col2:
+                if st.button("🔄 Reload App", use_container_width=True, key="error_fallback_reload"):
+                    st.rerun()
+        except Exception as fallback_exc:
+            # Last resort: even the error UI failed
+            logger.critical(f"Error fallback UI failed: {fallback_exc}", exc_info=True)
+            try:
+                st.text("Critical error - please refresh the page")
+                if st.button("Refresh", key="error_critical_refresh"):
+                    st.rerun()
+            except Exception:
+                # Nothing we can do at this point
+                pass
 
 
 def run_selftest() -> int:
