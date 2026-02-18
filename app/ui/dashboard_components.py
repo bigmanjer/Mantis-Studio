@@ -36,13 +36,13 @@ def render_hero_header(
     tertiary_action: Optional[Callable[[], None]] = None,
 ) -> None:
     """Render the hero header section at the top of the dashboard.
-    
+
     This creates a visually distinct top section with:
     - Large MANTIS title
     - Subtitle
     - System status indicator
     - 3 Primary action buttons
-    
+
     Args:
         status_label: Status indicator text (default: "🟢 Operational")
         status_caption: Additional status caption
@@ -193,7 +193,7 @@ def render_feature_group(
     key_prefix: str = "",
 ) -> None:
     """Render a collapsible group of features with consistent styling.
-    
+
     Args:
         group_name: Name of the feature group (e.g., "🧠 Intelligence")
         features: List of (feature_name, description, action) tuples
@@ -210,9 +210,10 @@ def render_feature_group(
                 st.caption(feature_desc)
             
             with feature_cols[1]:
-                # Generate safe key
-                safe_group = group_name.replace(" ", "_").replace("🧠", "intel").replace("✍", "write").replace("📊", "insight").replace("⚙", "sys")
-                safe_feature = feature_name.replace(" ", "_").lower()
+                # Generate safe key by removing all non-alphanumeric characters
+                import re
+                safe_group = re.sub(r"[^a-zA-Z0-9]+", "_", group_name).strip("_").lower()
+                safe_feature = re.sub(r"[^a-zA-Z0-9]+", "_", feature_name).strip("_").lower()
                 button_key = f"{key_prefix}_feature_{safe_group}_{safe_feature}_{idx}"
                 
                 if st.button("Open", key=button_key, use_container_width=True):
