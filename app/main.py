@@ -3757,6 +3757,44 @@ def _run_ui():
         add_divider_with_spacing(top=3, bottom=3)
 
         # =====================================================================
+        # 3.5️⃣ QUICK START ONBOARDING
+        # =====================================================================
+        with st.expander("🚀 Quick Start Guide", expanded=not recent_projects):
+            st.caption("New to MANTIS? Use this flow to get moving in under two minutes.")
+            steps_col, templates_col = st.columns([1.3, 1.7])
+            with steps_col:
+                st.markdown(
+                    """
+1. **Create a workspace** from the panel above.
+2. **Generate an outline** in Architect.
+3. **Draft chapters** in Editor.
+4. **Review canon** in World Bible.
+5. **Export draft** to TXT/Markdown.
+                    """
+                )
+            with templates_col:
+                st.markdown("**Starter templates**")
+                tpl_a, tpl_b, tpl_c = st.columns(3)
+                with tpl_a:
+                    if st.button("🧙 Fantasy", use_container_width=True, key="dashboard_tpl_fantasy"):
+                        st.session_state["new_project_genre_prefill"] = "Epic Fantasy"
+                        st.toast("Template primed: Epic Fantasy", icon="🧙")
+                        st.session_state.page = "projects"
+                        st.rerun()
+                with tpl_b:
+                    if st.button("🚀 Sci‑Fi", use_container_width=True, key="dashboard_tpl_scifi"):
+                        st.session_state["new_project_genre_prefill"] = "Science Fiction"
+                        st.toast("Template primed: Science Fiction", icon="🚀")
+                        st.session_state.page = "projects"
+                        st.rerun()
+                with tpl_c:
+                    if st.button("📖 Memoir", use_container_width=True, key="dashboard_tpl_memoir"):
+                        st.session_state["new_project_genre_prefill"] = "Memoir"
+                        st.toast("Template primed: Memoir", icon="📖")
+                        st.session_state.page = "projects"
+                        st.rerun()
+
+        # =====================================================================
         # 4️⃣ FEATURE ACCESS — GROUPED, NOT LISTED
         # =====================================================================
         render_dashboard_section_header(
@@ -3877,6 +3915,7 @@ def _run_ui():
             "Set a title, genre, and author details to build your base.",
         )
         with st.container(border=True):
+            genre_prefill = st.session_state.pop("new_project_genre_prefill", "")
             with st.form("new_project_form", clear_on_submit=False):
                 c1, c2 = st.columns([2, 1])
                 with c1:
@@ -3888,6 +3927,7 @@ def _run_ui():
                 with c2:
                     g = st.text_input(
                         "Genre",
+                        value=genre_prefill,
                         placeholder="e.g., Dark Fantasy, Sci-Fi Noir",
                         help="Specify the genre(s) to help guide AI suggestions and tone."
                     )
@@ -5915,6 +5955,18 @@ def run_repair() -> int:
 
 # If launched directly by Python (e.g., from the .bat launcher), support utility flags.
 # Only execute when run as main script, not when imported by tests or other modules.
+def _is_running_under_streamlit() -> bool:
+    """Best-effort detection for scripts executed by Streamlit itself."""
+    if os.getenv("STREAMLIT_SERVER_PORT"):
+        return True
+    try:
+        from streamlit import runtime
+
+        return bool(runtime.exists())
+    except Exception:
+        return False
+
+
 if __name__ == "__main__":
     if SELFTEST_MODE:
         raise SystemExit(run_selftest())
@@ -5922,19 +5974,10 @@ if __name__ == "__main__":
     if REPAIR_MODE:
         raise SystemExit(run_repair())
 
-    # Default: run the Streamlit UI (Streamlit will execute this script).
-    # Check if we're already running inside Streamlit to avoid double-initialization
-    should_launch = True
-    try:
-        from streamlit import runtime
-        if runtime.exists():
-            # Already running in Streamlit, don't launch again
-            should_launch = False
-    except ImportError:
-        # streamlit.runtime doesn't exist in older versions, try to launch anyway
-        pass
-
-    if should_launch:
+    # Default: run the Streamlit UI.
+    # Important for cloud deploys: avoid nested `streamlit run` launches when
+    # Streamlit is already the process owner (can manifest as redirect loops).
+    if not _is_running_under_streamlit():
         import streamlit.web.cli as stcli
         sys.argv = ["streamlit", "run", __file__]
         sys.exit(stcli.main())

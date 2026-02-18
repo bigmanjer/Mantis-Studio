@@ -12,6 +12,7 @@ This module provides a redesigned sidebar with:
 from __future__ import annotations
 from typing import Any, Callable, Optional
 from pathlib import Path
+import uuid
 import streamlit as st
 
 from app.utils.branding_assets import resolve_asset_path
@@ -49,12 +50,15 @@ def render_theme_selector(key_scope: Callable) -> None:
     """
     st.html("<div class='mantis-nav-section'>Appearance</div>")
     with key_scope("theme_selector"):
-        st.selectbox(
+        current_theme = st.session_state.get("ui_theme", "Dark")
+        selected_theme = st.selectbox(
             "Theme",
             ["Dark", "Light"],
-            key="ui_theme",
+            index=0 if current_theme == "Dark" else 1,
+            key=f"sidebar_ui_theme_selector_{uuid.uuid4().hex}",
             label_visibility="collapsed",
         )
+        st.session_state.ui_theme = selected_theme
 
 
 def render_project_info(project: Optional[Any]) -> None:
@@ -157,7 +161,7 @@ def render_navigation_section(
             
             # Navigation button
             button_label = f"{icon} {label}"
-            button_key = f"nav_{target}_{slugify(label)}"
+            button_key = f"nav_{target}_{slugify(label)}_{uuid.uuid4().hex}"
             
             with key_scope(button_key):
                 if st.button(
@@ -206,7 +210,7 @@ def render_project_actions(
         with key_scope("sidebar_save_btn"):
             if st.button(
                 "💾 Save",
-                key="sidebar_save_project",
+                key=f"sidebar_save_project_{uuid.uuid4().hex}",
                 type="primary",
                 use_container_width=True,
                 help="Save all changes to this project"
@@ -221,7 +225,7 @@ def render_project_actions(
         with key_scope("sidebar_close_btn"):
             if st.button(
                 "✖ Close",
-                key="sidebar_close_project",
+                key=f"sidebar_close_project_{uuid.uuid4().hex}",
                 use_container_width=True,
                 help="Save and close the current project"
             ):
@@ -333,12 +337,14 @@ def render_enhanced_sidebar(
             # Debug mode toggle
             with st.expander("🔧 Advanced", expanded=False):
                 with key_scope("debug_toggle"):
-                    st.checkbox(
+                    debug_flag = st.checkbox(
                         "Enable Debug Mode",
-                        key="debug",
+                        value=bool(st.session_state.get("debug", False)),
+                        key=f"debug_toggle_{uuid.uuid4().hex}",
                         help="Show detailed debugging information and logs"
                     )
-                    if st.session_state.debug:
+                    st.session_state.debug = debug_flag
+                    if debug_flag:
                         st.caption("✓ Debug mode active")
                         st.caption("Check terminal for detailed logs")
             
