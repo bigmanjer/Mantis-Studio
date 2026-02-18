@@ -321,8 +321,7 @@ The agent will explain:
 - **[Getting Started Guide](GETTING_STARTED.md)**: New user onboarding
 - **[Contributing Guide](CONTRIBUTING.md)**: Development setup and practices
 - **[Debugging Guide](DEBUGGING.md)**: Comprehensive debugging steps
-- **[Stabilization Summary](../architecture/STABILIZATION_SUMMARY.md)**: Recent architectural improvements
-- **[Stabilization Quick Reference](../architecture/STABILIZATION_QUICK_REFERENCE.md)**: Common patterns and anti-patterns
+- **[Stabilization Implementation Guide](../architecture/STABILIZATION_IMPLEMENTATION_GUIDE.md)**: Complete stabilization guide with patterns and usage
 
 ## Support
 

@@ -1,17 +1,21 @@
 # 🚀 MANTIS Studio Product Roadmap
 
-> **Transforming MANTIS from a Local Writing Tool into a Hosted AI Narrative Intelligence Platform**
+> **Technical roadmap for transforming MANTIS from a Local Writing Tool into a Hosted AI Narrative Intelligence Platform**
 
 ---
 
 ## Document Purpose
 
-This roadmap outlines the strategic evolution of **MANTIS Studio** (Modular AI Narrative Text Intelligence System) from a single-user Streamlit application into a fully hosted, scalable, multi-user SaaS platform. This document is designed for:
+This is the **technical and engineering-focused roadmap** that outlines the strategic evolution of **MANTIS Studio** (Modular AI Narrative Text Intelligence System) from a single-user Streamlit application into a fully hosted, scalable, multi-user SaaS platform. 
+
+This document is designed for:
 
 - **Developers** looking to contribute to platform features
 - **Potential Contributors** seeking technical direction
 - **Investors & Early Adopters** evaluating product vision and market opportunity
 - **Platform & DevOps Teams** planning hosting and deployment infrastructure
+
+> 📘 **See Also**: [Business Strategy Roadmap](BUSINESS_STRATEGY_ROADMAP.md) for market positioning, business strategy, and go-to-market approach.
 
 ---
 
