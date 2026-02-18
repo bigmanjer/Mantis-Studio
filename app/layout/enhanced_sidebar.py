@@ -1,7 +1,9 @@
 """Enhanced Sidebar Component for Mantis Studio."""
 from __future__ import annotations
 
+from contextlib import contextmanager, nullcontext
 from pathlib import Path
+from typing import Any, Callable, Optional
 import uuid
 import streamlit as st
 
@@ -19,7 +21,7 @@ def render_sidebar_brand(version: str) -> None:
     st.html(f'<div class="mantis-sidebar-meta"><span class="mantis-sidebar-version">Enterprise Console · v{version}</span></div><div class="mantis-sidebar-divider"></div></div>')
 
 
-def render_theme_selector(instance_id: str) -> None:
+def render_theme_selector(key_scope: Callable[[str], Any]) -> None:
     st.html("<div class='mantis-nav-section'>Appearance</div>")
     with key_scope("theme_selector"):
         current_theme = st.session_state.get("ui_theme", "Dark")
@@ -41,9 +43,8 @@ def render_project_info(project: Optional[Any]) -> None:
     st.html(f'<div class="mantis-project-chip"><div class="mantis-project-chip__title">{project.title}</div><div class="mantis-project-chip__meta">📚 {project.get_total_word_count():,} words</div></div>')
 
 
-def render_navigation_section(section_name: str, nav_items: list, current_page: str, world_focus: str, expanded: bool, slugify: Callable, instance_id: str) -> None:
+def render_navigation_section(section_name: str, nav_items: list, current_page: str, world_focus: str, expanded: bool, slugify: Callable, key_scope: Callable[[str], Any]) -> None:
     with st.expander(section_name, expanded=expanded):
-        section_slug = slugify(section_name)
         for label, target, icon in nav_items:
             if target == "memory":
                 is_active = current_page == "world" and world_focus == "Memory"
@@ -78,7 +79,7 @@ def render_navigation_section(section_name: str, nav_items: list, current_page: 
                     st.rerun()
 
 
-def render_project_actions(project: Optional[Any], save_callback: Callable, close_callback: Callable, instance_id: str) -> None:
+def render_project_actions(project: Optional[Any], save_callback: Callable, close_callback: Callable, key_scope: Callable[[str], Any]) -> None:
     if not project:
         return
     st.divider()
@@ -112,30 +113,35 @@ def render_project_actions(project: Optional[Any], save_callback: Callable, clos
                 close_callback()
 
 
-def render_debug_panel(key_scope: Callable) -> None:
-    """Render debug panel for troubleshooting.
-    
-    Args:
-        key_scope: Key scope context manager
-    """
-    import time
-    import sys
-    
+def render_debug_panel(instance_id: str) -> None:
+    """Render debug panel for troubleshooting."""
+
     st.divider()
     st.html("<div class='mantis-nav-section'>Diagnostics</div>")
     st.session_state.debug = st.checkbox("Enable Debug Mode", value=bool(st.session_state.get("debug", False)), key=f"sidebar_debug_{instance_id}")
 
 
-def render_enhanced_sidebar(version: str, project: Optional[Any], current_page: str, world_focus: str, debug_enabled: bool, key_scope: Callable, slugify: Callable, save_project_callback: Callable, close_project_callback: Callable) -> None:
-    del debug_enabled, key_scope
+def render_enhanced_sidebar(version: str, project: Optional[Any], current_page: str, world_focus: str, debug_enabled: bool, key_scope: Callable[[str], Any], slugify: Callable, save_project_callback: Callable, close_project_callback: Callable) -> None:
+    del debug_enabled
     from app.utils.navigation import get_nav_sections
 
     instance_id = uuid.uuid4().hex
 
-    def scoped(name: str):
-        if callable(key_scope):
-            return key_scope(name)
-        return nullcontext()
+    @contextmanager
+    def scoped(scope_name: str, scope_manager: Optional[Callable[[str], Any]] = None):
+        """Safely scope widget keys for sidebar sections.
+
+        Falls back to a no-op context manager if no callable key scoping
+        function is provided.
+        """
+        manager = scope_manager if scope_manager is not None else key_scope
+        if callable(manager):
+            with manager(scope_name):
+                yield
+            return
+
+        with nullcontext():
+            yield
 
     with st.sidebar:
         with scoped("sidebar"):
@@ -163,21 +169,8 @@ def render_enhanced_sidebar(version: str, project: Optional[Any], current_page: 
             st.divider()
             st.html("<div class='mantis-nav-section'>Navigation</div>")
             for idx, (section_name, nav_items) in enumerate(get_nav_sections()):
-                render_navigation_section(section_name, nav_items, current_page, world_focus, idx < 2, slugify, instance_id)
-            render_project_actions(project, save_project_callback, close_project_callback, instance_id)
-            render_debug_panel(instance_id)
-
-    instance_id = uuid.uuid4().hex
-    with st.sidebar:
-        render_sidebar_brand(version)
-        render_theme_selector(instance_id)
-        st.divider()
-        render_project_info(project)
-        st.divider()
-        st.html("<div class='mantis-nav-section'>Navigation</div>")
-        for idx, (section_name, nav_items) in enumerate(get_nav_sections()):
-            render_navigation_section(section_name, nav_items, current_page, world_focus, idx < 2, slugify, instance_id)
-        render_project_actions(project, save_project_callback, close_project_callback, instance_id)
+                render_navigation_section(section_name, nav_items, current_page, world_focus, idx < 2, slugify, key_scope)
+            render_project_actions(project, save_project_callback, close_project_callback, key_scope)
         render_debug_panel(instance_id)
 
 
