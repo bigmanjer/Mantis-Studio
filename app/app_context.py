@@ -158,6 +158,19 @@ def _run_ui():
         )
         return results or []
 
+    def update_locked_chapters() -> None:
+        """Refresh the set of chapter indices locked by coherence issues."""
+        results = st.session_state.get("coherence_results", [])
+        locked = set()
+        for issue in results:
+            try:
+                idx = int(issue.get("chapter_index", -1))
+            except (TypeError, ValueError):
+                continue
+            if idx >= 0:
+                locked.add(idx)
+        st.session_state["locked_chapters"] = locked
+
     def render_privacy():
         st.markdown("## Privacy Policy\n\nLocal-only storage. No analytics.")
 
