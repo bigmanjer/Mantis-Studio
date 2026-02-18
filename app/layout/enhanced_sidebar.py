@@ -23,7 +23,7 @@ def render_sidebar_brand(version: str) -> None:
 
 def render_theme_selector(key_scope: Callable[[str], Any]) -> None:
     st.html("<div class='mantis-nav-section'>Appearance</div>")
-    with key_scope("theme_selector"):
+    with scope("theme_selector"):
         current_theme = st.session_state.get("ui_theme", "Dark")
         selected_theme = st.selectbox(
             "Theme",
@@ -59,7 +59,7 @@ def render_navigation_section(section_name: str, nav_items: list, current_page: 
             button_label = f"{icon} {label}"
             button_key = f"nav_{target}_{slugify(label)}_{uuid.uuid4().hex}"
             
-            with key_scope(button_key):
+            with scope(button_key):
                 if st.button(
                     button_label,
                     key=button_key,
@@ -88,7 +88,7 @@ def render_project_actions(project: Optional[Any], save_callback: Callable, clos
     col1, col2 = st.columns(2)
     
     with col1:
-        with key_scope("sidebar_save_btn"):
+        with scope("sidebar_save_btn"):
             if st.button(
                 "💾 Save",
                 key=f"sidebar_save_project_{uuid.uuid4().hex}",
@@ -103,7 +103,7 @@ def render_project_actions(project: Optional[Any], save_callback: Callable, clos
                     st.toast(f"⚠ Save failed: {str(e)}", icon="⚠")
     
     with col2:
-        with key_scope("sidebar_close_btn"):
+        with scope("sidebar_close_btn"):
             if st.button(
                 "✖ Close",
                 key=f"sidebar_close_project_{uuid.uuid4().hex}",
@@ -144,15 +144,15 @@ def render_enhanced_sidebar(version: str, project: Optional[Any], current_page: 
             yield
 
     with st.sidebar:
-        with scoped("sidebar"):
+        with safe_scope("sidebar"):
             render_sidebar_brand(version)
             
             # Theme selector
-            render_theme_selector(key_scope)
+            render_theme_selector(safe_scope)
             
             # Debug mode toggle
             with st.expander("🔧 Advanced", expanded=False):
-                with key_scope("debug_toggle"):
+                with safe_scope("debug_toggle"):
                     debug_flag = st.checkbox(
                         "Enable Debug Mode",
                         value=bool(st.session_state.get("debug", False)),
