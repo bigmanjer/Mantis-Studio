@@ -24,6 +24,17 @@ class UIContext:
     """
     
     def __init__(self, st):
+        """Initialize UI context with Streamlit instance.
+        
+        Args:
+            st: Streamlit module instance
+            
+        Instance Attributes:
+            st: Streamlit module reference
+            widget_counters: Track auto-generated widget keys by type
+            key_prefix_stack: Stack of key scopes for namespacing
+            assets_dir: Path to assets directory
+        """
         self.st = st
         self.widget_counters: Dict[Tuple[str, str, str], int] = {}
         self.key_prefix_stack: List[str] = []
