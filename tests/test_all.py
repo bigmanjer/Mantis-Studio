@@ -28,6 +28,11 @@ from app.router import get_nav_config, get_routes
 from app.utils.helpers import word_count, clamp, current_year
 from scripts.bump_version import bump_version
 
+# These routes are represented in grouped navigation as focused/redirect views:
+# - memory / insights map to the world page with a focus tab
+# - legal maps to the legal redirect hub and policy routes
+EXCLUDED_NAV_TARGETS = {"memory", "insights", "legal"}
+
 
 # ============================================================================
 # Tests from test_ux_smoke.py — Comprehensive UX smoke tests
@@ -390,6 +395,37 @@ class TestNavigationParity:
         assert len(items) >= 7
         for item in items:
             assert len(item) == 3, "Each item must be (label, page_key, icon)"
+
+    def test_get_nav_sections_has_required_groups(self):
+        from app.utils.navigation import get_nav_sections
+
+        groups = [group for group, _ in get_nav_sections()]
+        assert groups == [
+            "🏠 Home",
+            "🗂 Workspace",
+            "🧠 Intelligence",
+            "✍ Writing",
+            "📊 Insights",
+            "⚙ System",
+        ]
+
+    def test_get_nav_sections_keeps_existing_pages_available(self):
+        from app.utils.navigation import get_nav_items, get_nav_sections
+
+        nav_targets = {target for _, target, _ in get_nav_items()}
+        grouped_all_targets = {
+            target
+            for _, items in get_nav_sections()
+            for _, target, _ in items
+        }
+        grouped_targets = {
+            target
+            for _, items in get_nav_sections()
+            for _, target, _ in items
+            if target not in EXCLUDED_NAV_TARGETS
+        }
+        assert nav_targets.issubset(grouped_targets)
+        assert EXCLUDED_NAV_TARGETS.issubset(grouped_all_targets)
 
     def test_footer_nav_links_match_nav_items(self):
         """The footer link builder must produce one link per NAV_ITEMS entry."""
@@ -1298,24 +1334,31 @@ class TestActionCardButtonsPrimary:
 
 
 class TestQuickActionButtonsStyled:
-    """Quick action buttons must use the navigation button theme."""
+    """Dashboard feature access groups should remain present and actionable."""
 
-    def test_main_quick_action_buttons_use_secondary(self):
+    def test_dashboard_feature_groups_exist(self):
         src = (ROOT / "app" / "main.py").read_text(encoding="utf-8")
-        # Find the Quick Actions section and verify all st.button calls use type="secondary"
-        start = src.index("Quick Actions")
-        # The quick action section ends before "Recent Projects"
-        end = src.index("Recent Projects", start)
+        start = src.index("Feature Access")
+        end = src.index("Connect your AI providers", start)
         section = src[start:end]
-        # Count st.button calls vs type="secondary" occurrences in the section
-        button_count = section.count("st.button(")
-        secondary_count = section.count('type="secondary"')
-        assert ".quick-action-btn" in section, "Quick action CSS class should be defined in the section"
-        assert button_count == 6, f"Expected 6 quick action buttons, found {button_count}"
-        assert secondary_count == button_count, (
-            f"All {button_count} quick action buttons should use type='secondary', "
-            f"but only {secondary_count} do"
-        )
+        assert "🧠 Intelligence" in section
+        assert "✍ Writing" in section
+        assert "📊 Insights" in section
+        assert "⚙ System" in section
+        for label in (
+            "Narrative Analysis",
+            "Semantic Tools",
+            "Entity Extraction",
+            "Editor",
+            "Rewrite",
+            "Tone Modulation",
+            "Reports",
+            "Analytics",
+            "Data Viewer",
+            "Settings",
+            "Configuration",
+        ):
+            assert label in section
 
 
 # ---------------------------------------------------------------------------
@@ -2044,7 +2087,8 @@ class TestLegalRedirectButtons:
 
     def test_legal_nav_buttons_have_keys(self):
         body = _extract_render_function("render_legal_redirect")
-        assert 'key=f"nav_{target}"' in body
+        assert "legal_pages = [" in body
+        assert "st.expander(label)" in body
 
     def test_legal_nav_buttons_call_rerun(self):
         body = _extract_render_function("render_legal_redirect")
@@ -2070,47 +2114,44 @@ class TestDashboardButtons:
         assert "Create/Advance Next Narrative Milestone" in self.body
 
     def test_resume_project_button(self):
-        assert "Resume project" in self.body
+        assert "Open Workspace" in self.body
 
     def test_new_project_button(self):
-        assert "New project" in self.body
+        assert "New Project" in self.body
 
     def test_new_project_calls_rerun(self):
         assert "open_new_project()" in self.body
 
-    def test_quick_action_buttons_count(self):
-        start = self.body.index("Quick Actions")
-        end = self.body.index("Recent Projects", start)
+    def test_feature_access_buttons_count(self):
+        start = self.body.index("Feature Access")
+        end = self.body.index("Connect your AI providers", start)
         section = self.body[start:end]
-        count = section.count("st.button(")
-        assert count == 6, f"Expected 6 quick action buttons, found {count}"
+        assert "for feature_name, feature_caption, action in features:" in section
+        assert "dashboard_feature_" in section
 
-    def test_quick_action_buttons_all_secondary(self):
-        start = self.body.index("Quick Actions")
-        end = self.body.index("Recent Projects", start)
+    def test_dashboard_sections_exist(self):
+        start = self.body.index("Command Center")
+        end = self.body.index("Connect your AI providers", start)
         section = self.body[start:end]
-        btn_count = section.count("st.button(")
-        sec_count = section.count('type="secondary"')
-        assert sec_count == btn_count, (
-            f"All {btn_count} quick action buttons should be type='secondary', got {sec_count}"
-        )
+        assert "Metrics Overview" in section
+        assert "Workspace Hub" in section
+        assert "Feature Access" in section
 
     def test_ai_settings_button(self):
-        assert "AI Settings" in self.body
+        assert "Settings" in self.body
 
     def test_manage_ai_settings_button_has_key(self):
         assert "dashboard__ai_connected_settings" in self.body
 
     def test_dashboard_has_project_health_and_next_actions_panels(self):
-        assert "Project health" in self.body
-        assert "Next best actions" in self.body
-        assert "Token budget:" in self.body
+        assert "AI Operations Today" in self.body
+        assert "System Mode" in self.body
 
     def test_recent_project_open_button(self):
-        assert "📂" in self.body
+        assert "Open Workspace" in self.body
 
     def test_recent_project_open_button_has_key(self):
-        assert 'key=f"open_' in self.body or "open_" in self.body
+        assert "dash_hub_open_" in self.body
 
 
 # ---------------------------------------------------------------------------
@@ -2703,12 +2744,13 @@ class TestSidebarNavButtons:
 
     def test_sidebar_nav_buttons_have_keys(self):
         src = _source()
-        assert 'key=f"nav_{target}"' in src
+        assert 'key=f"nav_{target}_{_slugify(label)}"' in src
 
     def test_sidebar_nav_buttons_call_rerun(self):
         src = _source()
-        idx = src.index('key=f"nav_{target}"')
-        after = src[idx : idx + 200]
+        idx = src.index('key=f"nav_{target}_{_slugify(label)}"')
+        # Window includes the button branch and callback body for rerun assertion.
+        after = src[idx : idx + 1200]
         assert "st.rerun()" in after
 
 

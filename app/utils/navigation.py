@@ -24,6 +24,15 @@ NAV_ITEMS: List[Tuple[str, str, str]] = [
     ("AI Settings", "ai", "🤖"),
 ]
 
+NAV_SECTIONS: List[Tuple[str, List[Tuple[str, str, str]]]] = [
+    ("🏠 Home", [("Dashboard", "home", "🏠")]),
+    ("🗂 Workspace", [("Projects", "projects", "📁"), ("Export", "export", "⬇️")]),
+    ("🧠 Intelligence", [("World Bible", "world", "🌍")]),
+    ("✍ Writing", [("Write", "outline", "✍️"), ("Editor", "chapters", "🧩")]),
+    ("📊 Insights", [("Memory", "memory", "🧠"), ("Insights", "insights", "📊")]),
+    ("⚙ System", [("AI Settings", "ai", "⚙️"), ("All Policies", "legal", "📜")]),
+]
+
 # Extended map includes entries that don't appear in the main nav bar
 # (e.g. Memory and Insights route to the World Bible page with a focus tab).
 EXTENDED_MAP: Dict[str, str] = {
@@ -57,4 +66,18 @@ def get_nav_items() -> List[Tuple[str, str, str]]:
     return list(NAV_ITEMS)
 
 
-__all__ = ["NAV_ITEMS", "EXTENDED_MAP", "get_nav_config", "get_nav_items"]
+def get_nav_sections() -> List[Tuple[str, List[Tuple[str, str, str]]]]:
+    """Return sidebar navigation grouped into SaaS-style sections."""
+    # Return shallow copies so callers can safely iterate/mutate locally
+    # without altering module-level constants shared across reruns.
+    return [(section, list(items)) for section, items in NAV_SECTIONS]
+
+
+__all__ = [
+    "NAV_ITEMS",
+    "NAV_SECTIONS",
+    "EXTENDED_MAP",
+    "get_nav_config",
+    "get_nav_items",
+    "get_nav_sections",
+]
