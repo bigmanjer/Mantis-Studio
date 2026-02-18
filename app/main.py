@@ -3726,9 +3726,16 @@ def _run_ui():
             or (recent_snapshot or {}).get("title")
             or "Your next story"
         )
+        milestone_label = "🚀 Create/Advance Next Narrative Milestone"
         weekly_goal = max(1, int(st.session_state.weekly_sessions_goal))
         weekly_count = _weekly_activity_count()
         canon_icon, canon_label = get_canon_health()
+        groq_key, _ = get_effective_key("groq", st.session_state.get("user_id"))
+        openai_key, _ = get_effective_key("openai", st.session_state.get("user_id"))
+        project_health_completed = sum(
+            [bool(recent_projects), bool(has_outline), bool(has_chapter), canon_icon != "🔴"]
+        )
+        project_health_percent = int((project_health_completed / 4) * 100)
         latest_chapter_label = "You last worked on Chapter — · recently"
         latest_chapter_index = None
         latest_chapter_id = None
@@ -3742,7 +3749,7 @@ def _run_ui():
             latest_chapter_id = ch.id
             latest_chapter_label = f"Latest: Chapter {ch.index} — {ch.title}"
 
-        primary_label = "✨ Start your story"
+        primary_label = milestone_label
         primary_target = "projects"
         if canon_icon == "🔴":
             primary_label = "🛠 Fix story issues"
@@ -3809,7 +3816,7 @@ def _run_ui():
 
         top_cols = st.columns([2.2, 1])
         with top_cols[0]:
-            with card_block("Current project", "Pick up where you left off or start fresh."):
+            with card_block("Next Narrative Milestone", "Create or advance your story with one guided action."):
                 st.markdown(f"### {project_title}")
                 st.caption(latest_chapter_label)
                 if st.button(primary_label, type="primary", use_container_width=True):
@@ -3826,7 +3833,7 @@ def _run_ui():
                         open_new_project()
 
         with top_cols[1]:
-            with card_block("Workspace snapshot"):
+            with card_block("Project health"):
                 k1, k2 = st.columns(2)
                 with k1:
                     stat_tile("Active projects", str(len(recent_projects)), icon="📁")
@@ -3837,7 +3844,28 @@ def _run_ui():
                     stat_tile("Weekly sessions", f"{weekly_count}/{weekly_goal}", icon="🗓️")
                 with k4:
                     stat_tile("Writing streak", f"{_activity_streak()} days", icon="🔥")
+                st.progress(project_health_percent / 100)
+                st.caption(f"Workflow completion: {project_health_percent}%")
                 st.caption(f"Canon health: {canon_icon} {canon_label}.")
+
+            with card_block("Next best actions"):
+                if not recent_projects:
+                    st.caption("• Create your first project to unlock guided workflows.")
+                elif not has_outline:
+                    st.caption("• Build your outline to define structure and pacing.")
+                elif not has_chapter:
+                    st.caption("• Draft your next chapter to move the narrative forward.")
+                elif canon_icon == "🔴":
+                    st.caption("• Resolve canon issues in World Bible before publishing.")
+                else:
+                    st.caption("• Review insights and export your latest draft.")
+                st.caption(
+                    f"Expert prompt: Advance '{project_title}' by completing the next narrative milestone."
+                )
+                st.caption(
+                    "Token budget: "
+                    + ("Connected" if (groq_key or openai_key) else "Connect AI providers")
+                )
 
         section_title("Quick Actions", "Jump straight into your most-used tools.")
         # Static labels used for button text and JS styling hook (not user-controlled).
@@ -4037,8 +4065,6 @@ def _run_ui():
                     use_container_width=True,
                 )
 
-        groq_key, _ = get_effective_key("groq", st.session_state.get("user_id"))
-        openai_key, _ = get_effective_key("openai", st.session_state.get("user_id"))
         if not groq_key or not openai_key:
             with card_block("🔑 Connect your AI providers", "Unlock generation, summaries, and entity tools with API access."):
                 cta_left, cta_right = st.columns(2)

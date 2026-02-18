@@ -2066,6 +2066,9 @@ class TestDashboardButtons:
     def test_primary_cta_exists(self):
         assert "primary_label" in self.body and 'type="primary"' in self.body
 
+    def test_primary_cta_uses_milestone_copy(self):
+        assert "Create/Advance Next Narrative Milestone" in self.body
+
     def test_resume_project_button(self):
         assert "Resume project" in self.body
 
@@ -2097,6 +2100,11 @@ class TestDashboardButtons:
 
     def test_manage_ai_settings_button_has_key(self):
         assert "dashboard__ai_connected_settings" in self.body
+
+    def test_dashboard_has_project_health_and_next_actions_panels(self):
+        assert "Project health" in self.body
+        assert "Next best actions" in self.body
+        assert "Token budget:" in self.body
 
     def test_recent_project_open_button(self):
         assert "📂" in self.body
