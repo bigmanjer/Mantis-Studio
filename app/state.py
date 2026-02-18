@@ -114,101 +114,27 @@ def install_key_helpers(st) -> Tuple[contextmanager, Dict[Tuple[str, str, str], 
     return key_scope, widget_counters
 
 
-def initialize_session_state(st, config_data: Dict[str, str]) -> None:
-    st.session_state.setdefault("ai_keys", {})
-
-    def _resolve_api_key(provider: str, default_value: str) -> str:
-        session_key = (st.session_state.get("ai_keys") or {}).get(provider, "")
-        if session_key:
-            return session_key
-        config_key = config_data.get(f"{provider}_api_key", "")
-        if config_key:
-            return config_key
-        return default_value or ""
-
-    # ---- simple defaults (setdefault avoids overwriting) ----
-    defaults: Dict[str, object] = {
-        "ui_theme": config_data.get("ui_theme", "Dark"),
-        "daily_word_goal": _safe_int(config_data.get("daily_word_goal"), 500),
-        "weekly_sessions_goal": _safe_int(config_data.get("weekly_sessions_goal"), 4),
-        "focus_minutes": _safe_int(config_data.get("focus_minutes"), 25),
-        "projects_refresh_token": 0,
-        "delete_project_path": None,
-        "delete_project_title": None,
-        "delete_entity_id": None,
-        "delete_entity_name": None,
-        "delete_chapter_id": None,
-        "delete_chapter_title": None,
-        "export_project_path": None,
-        "world_search": "",
-        "world_search_pending": None,
-        "world_focus_entity": None,
-        "world_focus_tab": None,
-        "world_tabs": "Characters",
-        "last_entity_scan": None,
-        "_chapter_sync_id": None,
-        "_chapter_sync_text": None,
-        "curr_chap_id": None,
-        "active_chapter_id": None,
-        "chapters_project_id": None,
-        "chapters": [],
-        "out_txt_project_id": None,
-        "_outline_sync": None,
-        "user_id": None,
-        "projects_dir": None,
-        "project": None,
-        "page": "home",
-        "auto_save": True,
-        "ghost_text": "",
-        "pending_improvement_text": "",
-        "first_run": True,
-        "is_premium": True,
-        "pending_action": None,
-        "openai_base_url": config_data.get("openai_base_url", AppConfig.OPENAI_API_URL),
-        "openai_model": config_data.get("openai_model", AppConfig.OPENAI_MODEL),
-        "groq_base_url": config_data.get("groq_base_url", AppConfig.GROQ_API_URL),
-        "groq_model": config_data.get("groq_model", AppConfig.DEFAULT_MODEL),
-        "_force_nav": False,
-        "editor_improve__copy_buffer": "",
-    }
-    for key, default in defaults.items():
-        st.session_state.setdefault(key, default)
-
-    # ---- mutable defaults (must not share references) ----
-    st.session_state.setdefault("activity_log", list(config_data.get("activity_log", [])))
-    st.session_state.setdefault("world_bible_review", [])
-    st.session_state.setdefault("locked_chapters", set())
-    st.session_state.setdefault("canon_health_log", [])
-    st.session_state.setdefault("pending_improvement_meta", {})
-    st.session_state.setdefault("chapter_text_prev", {})
-    st.session_state.setdefault("chapter_drafts", [])
-    st.session_state.setdefault("openai_model_list", [])
-    st.session_state.setdefault("openai_model_tests", {})
-    st.session_state.setdefault("groq_model_list", [])
-    st.session_state.setdefault("groq_model_tests", {})
-    st.session_state.setdefault("groq_connection_tested",
-                                bool(config_data.get("groq_connection_tested")))
-    st.session_state.setdefault("openai_connection_tested",
-                                bool(config_data.get("openai_connection_tested")))
-
-    # ---- Populate ai_session_keys from saved config so the warning check works ----
-    if "ai_session_keys" not in st.session_state:
-        st.session_state["ai_session_keys"] = {
-            "groq": config_data.get("groq_api_key", ""),
-            "openai": config_data.get("openai_api_key", ""),
-        }
-
-    # ---- World Bible structured database layer ----
-    from app.services.world_bible_db import ensure_world_bible_db
-    ensure_world_bible_db(st.session_state)
-
-    # ---- always-overwritten keys (API keys refresh every run) ----
-    st.session_state.openai_api_key = _resolve_api_key("openai", AppConfig.OPENAI_API_KEY)
-    st.session_state.groq_api_key = _resolve_api_key("groq", AppConfig.GROQ_API_KEY)
-
-    AppConfig.GROQ_API_URL = st.session_state.groq_base_url
-    AppConfig.GROQ_API_KEY = _resolve_api_key("groq", AppConfig.GROQ_API_KEY)
-    AppConfig.DEFAULT_MODEL = st.session_state.groq_model
-    AppConfig.OPENAI_API_URL = st.session_state.openai_base_url
-    AppConfig.OPENAI_API_KEY = _resolve_api_key("openai", AppConfig.OPENAI_API_KEY)
-    AppConfig.OPENAI_MODEL = st.session_state.openai_model
+def initialize_session_state(st, config_data: Dict[str, str] = None) -> None:
+    """Legacy wrapper - now delegates to app.session_init module.
+    
+    This function is maintained for backward compatibility with existing imports.
+    New code should import from app.session_init directly.
+    
+    NOTE: The config_data parameter is now ignored and deprecated.
+    Configuration is loaded automatically by the new implementation.
+    
+    Args:
+        st: Streamlit module instance
+        config_data: DEPRECATED - no longer used, kept for backward compatibility
+    """
+    import warnings
+    if config_data is not None:
+        warnings.warn(
+            "The config_data parameter is deprecated and will be removed in a future version. "
+            "Configuration is now loaded automatically.",
+            DeprecationWarning,
+            stacklevel=2
+        )
+    
+    from app.session_init import initialize_session_state as init_session
+    init_session(st)

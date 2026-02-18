@@ -332,17 +332,19 @@ class StoryEngine:
         match = re.search(rf"(?i)Chapter {chapter_index}[:\s]+(.*?)(?=\n|$)", project.outline or "")
         if match:
             specific_beat = match.group(1).strip()
-            outline_context += f"\n\nCURRENT CHAPTER OBJECTIVE: {specific_beat}"
+            outline_context = f"{outline_context}\n\nCURRENT CHAPTER OBJECTIVE: {specific_beat}"
 
         prev_chaps = [c for c in project.get_ordered_chapters() if c.index < chapter_index]
         story_so_far = ""
         prev_text = ""
 
         if prev_chaps:
-            story_so_far = "PREVIOUS EVENTS:\n"
+            # Use list comprehension and join for efficient string building
+            story_parts = ["PREVIOUS EVENTS:"]
             for c in prev_chaps[-5:]:
                 summ = c.summary if c.summary else "No summary."
-                story_so_far += f"Ch {c.index}: {summ}\n"
+                story_parts.append(f"Ch {c.index}: {summ}")
+            story_so_far = "\n".join(story_parts) + "\n"
             prev_text = f"\nIMMEDIATELY PRECEDING SCENE:\n{(prev_chaps[-1].content or '')[-1500:]}\n"
 
         prompt = (
@@ -370,9 +372,12 @@ class StoryEngine:
         chaps = project.get_ordered_chapters()
         if not chaps:
             return "No content."
-        txt = ""
-        for c in chaps:
-            txt += f"Ch {c.index} ({c.title}): {c.summary or (c.content or '')[:300]}\n"
+        # Use list comprehension and join for efficient string building
+        chapter_summaries = [
+            f"Ch {c.index} ({c.title}): {c.summary or (c.content or '')[:300]}"
+            for c in chaps
+        ]
+        txt = "\n".join(chapter_summaries) + "\n"
         prompt = f"Create a structured outline based on these chapters:\n\n{txt}"
         return AIEngine().generate(prompt, model).get("text", "") or ""
 

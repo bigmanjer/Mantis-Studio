@@ -49,16 +49,18 @@ class Entity:
                 to_add.append(s)
 
         if to_add:
-            if self.description and not self.description.startswith("-"):
-                self.description = f"- {self.description.strip()}"
-            elif not self.description:
-                self.description = ""
-
-            for item in to_add:
-                if self.description:
-                    self.description += f"\n- {item}"
+            # Use list building and join for efficient string assembly
+            desc_parts = []
+            if self.description:
+                if not self.description.startswith("-"):
+                    desc_parts.append(f"- {self.description.strip()}")
                 else:
-                    self.description = f"- {item}"
+                    desc_parts.append(self.description)
+            
+            for item in to_add:
+                desc_parts.append(f"- {item}")
+            
+            self.description = "\n".join(desc_parts)
 
 
 @dataclass
