@@ -5976,8 +5976,8 @@ try:
     if runtime.exists():
         _run_ui()
 except ImportError:
-    # Streamlit not available or runtime doesn't exist - don't run UI
-    # This allows imports in tests and other contexts
+    # Streamlit not available - don't run UI
+    # This allows imports in tests and other contexts where Streamlit is not installed
     pass
 
 
