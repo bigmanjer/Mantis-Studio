@@ -129,10 +129,16 @@ def render_debug_panel(key_scope: Callable) -> None:
 def render_enhanced_sidebar(version: str, project: Optional[Any], current_page: str, world_focus: str, debug_enabled: bool, key_scope: Callable, slugify: Callable, save_project_callback: Callable, close_project_callback: Callable) -> None:
     del debug_enabled, key_scope
     from app.utils.navigation import get_nav_sections
-    
+
+    instance_id = uuid.uuid4().hex
+
+    def scoped(name: str):
+        if callable(key_scope):
+            return key_scope(name)
+        return nullcontext()
+
     with st.sidebar:
-        with key_scope("sidebar"):
-            # Brand section
+        with scoped("sidebar"):
             render_sidebar_brand(version)
             
             # Theme selector
@@ -153,38 +159,13 @@ def render_enhanced_sidebar(version: str, project: Optional[Any], current_page: 
                         st.caption("Check terminal for detailed logs")
             
             st.divider()
-            
-            # Current project info
             render_project_info(project)
-            
             st.divider()
-            
-            # Navigation sections
             st.html("<div class='mantis-nav-section'>Navigation</div>")
-            
-            nav_sections = get_nav_sections()
-            for section_idx, (section_name, nav_items) in enumerate(nav_sections):
-                render_navigation_section(
-                    section_name=section_name,
-                    nav_items=nav_items,
-                    current_page=current_page,
-                    world_focus=world_focus,
-                    expanded=section_idx < 2,  # Expand first two sections by default
-                    key_scope=key_scope,
-                    slugify=slugify,
-                )
-            
-            # Project actions
-            render_project_actions(
-                project=project,
-                key_scope=key_scope,
-                save_callback=save_project_callback,
-                close_callback=close_project_callback,
-            )
-            
-            # Debug panel
-            if debug_enabled:
-                render_debug_panel(key_scope)
+            for idx, (section_name, nav_items) in enumerate(get_nav_sections()):
+                render_navigation_section(section_name, nav_items, current_page, world_focus, idx < 2, slugify, instance_id)
+            render_project_actions(project, save_project_callback, close_project_callback, instance_id)
+            render_debug_panel(instance_id)
 
     instance_id = uuid.uuid4().hex
     with st.sidebar:
