@@ -186,7 +186,8 @@ instructions: |
   
   # ✅ CORRECT - List + join (O(n))
   parts = [f"{item}" for item in items]
-  result = "\n".join(parts) + "\n"
+  result = "\n".join(parts + [""]) if parts else ""  # Consistent trailing newline
+  # Or simpler: result = "\n".join(parts) + "\n" if parts else ""
   ```
 
   ### AI Prompt Optimization:
