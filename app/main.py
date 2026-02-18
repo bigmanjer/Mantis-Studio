@@ -1394,6 +1394,15 @@ def _run_ui():
     from app.layout.layout import render_footer
     from app.ui.theme import inject_theme
     from app.utils.keys import ui_key
+    # Import enhanced UI feedback components
+    from app.ui.feedback import (
+        loading_state,
+        step_indicator,
+        progress_bar_with_message,
+        feedback_message,
+        page_header as enhanced_page_header,
+    )
+    from app.ui.navigation import help_tooltip, quick_action_card
 
     widget_counters: Dict[tuple, int] = {}
     key_prefix_stack: List[str] = []
@@ -3237,6 +3246,20 @@ def _run_ui():
         return
 
     def render_ai_settings():
+        # Enhanced page header
+        enhanced_page_header(
+            title="AI Configuration",
+            subtitle="Configure AI providers and API keys for intelligent writing assistance",
+            icon="🤖",
+            breadcrumbs=["Home", "Settings", "AI Configuration"]
+        )
+        
+        # Add helpful guidance
+        help_tooltip(
+            text="MANTIS Studio supports multiple AI providers. Configure at least one provider to unlock AI-assisted features like outline generation, chapter writing, and world-building.",
+            title="Getting Started with AI"
+        )
+        
         def refresh_all_models() -> None:
             st.cache_data.clear()
             refresh_models()
@@ -4039,6 +4062,14 @@ def _run_ui():
 
 
     def render_projects():
+        # Enhanced page header with breadcrumbs
+        enhanced_page_header(
+            title="Projects",
+            subtitle="Create, import, and manage your story worlds",
+            icon="📁",
+            breadcrumbs=["Home", "Projects"]
+        )
+        
         render_welcome_banner("projects")
         active_dir = get_active_projects_dir()
         recent_projects = _load_recent_projects(active_dir, st.session_state.projects_refresh_token)
@@ -4130,15 +4161,40 @@ def _run_ui():
                     )
                 else:
                     txt = uf.read().decode("utf-8", errors="replace")
-                    if st.button("Import & Analyze", use_container_width=True):
+                    if st.button("Import & Analyze", use_container_width=True, type="primary"):
                         try:
+                            # Show step indicator for import process
+                            step_indicator(
+                                steps=["Upload File", "Create Project", "Analyze Content", "Generate Outline"],
+                                current_step=1
+                            )
+                            
                             p = Project.create("Imported Project", storage_dir=get_active_projects_dir())
                             p.import_text_file(txt)
+                            
+                            # Update step indicator
+                            step_indicator(
+                                steps=["Upload File", "Create Project", "Analyze Content", "Generate Outline"],
+                                current_step=2,
+                                completed_steps=[0, 1]
+                            )
+                            
                             active_provider = _normalize_provider(st.session_state.get("ai_provider", "groq"))
                             active_key, _ = get_effective_key(active_provider, st.session_state.get("user_id"))
                             if active_key and get_ai_model():
-                                with st.spinner("Reviewing document and generating outline..."):
-                                    p.outline = StoryEngine.reverse_engineer_outline(p, get_ai_model())
+                                # Enhanced loading state
+                                loading_state(
+                                    message="Analyzing your document...",
+                                    subtext="This may take 10-30 seconds depending on length",
+                                    show_spinner=True
+                                )
+                                p.outline = StoryEngine.reverse_engineer_outline(p, get_ai_model())
+                                
+                                # Show success feedback
+                                feedback_message(
+                                    "Document imported and outline generated successfully!",
+                                    type="success"
+                                )
                             else:
                                 st.warning(
                                     f"Add a {_provider_label(active_provider)} API key and model to auto-generate an outline."
@@ -5186,9 +5242,18 @@ def _run_ui():
             st.metric("AI Readiness", f"{readiness}%")
 
     def render_chapters():
+        # Enhanced page header
+        p = st.session_state.project
+        if p:
+            enhanced_page_header(
+                title="Editor",
+                subtitle="Write chapters, update summaries, and apply AI improvements",
+                icon="✍️",
+                breadcrumbs=["Home", p.title, "Editor"]
+            )
+        
         # Single welcome banner for the editor page (avoid duplicate widgets / duplicate keys).
         render_welcome_banner("editor")
-        p = st.session_state.project
         if not p:
             with st.container(border=True):
                 st.info("📭 No project loaded. Create or open a project to start writing.")
