@@ -1,0 +1,33 @@
+[tool.pytest.ini_options]
+minversion = "7.0"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "-ra",
+    "--strict-markers",
+    "--strict-config",
+    "--showlocals",
+]
+
+# Register custom marks
+markers = [
+    "unit: Unit tests that test individual components in isolation",
+    "integration: Integration tests that test multiple components together",
+    "smoke: Smoke tests for quick verification of critical functionality",
+    "slow: Tests that take a long time to run",
+]
+
+[tool.coverage.run]
+source = ["app"]
+omit = [
+    "*/tests/*",
+    "*/test_*.py",
+    "*/__pycache__/*",
+]
+
+[tool.coverage.report]
+precision = 2
+show_missing = true
+skip_covered = false
