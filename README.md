@@ -274,7 +274,7 @@ Accessible via footer links or the All Policies page.
 
 ---
 
-## 6. Recent Improvements (Version 87.0)
+## 6. Recent Improvements (Version 91.6)
 
 ### ✅ User Experience Enhancements
 
@@ -350,7 +350,7 @@ If you encounter problems like black screens, rendering issues, or errors:
 
 ## 8. Versioning System
 
-* **Current Version**: 87.0 (stored in `VERSION.txt`)
+* **Current Version**: 91.6 (stored in `VERSION.txt`)
 * **Version Format**: `MAJOR.MINOR` (e.g., 87.0, 87.1, 88.0)
 
 ### Versioning Rules
@@ -358,8 +358,8 @@ If you encounter problems like black screens, rendering issues, or errors:
 The version increments with each merge following these rules:
 
 1. **Minor version** increments by 1 on each merged pull request to `main`
-   - Example: 87.0 → 87.1 → 87.2
-   - Rolls over at 10: 87.9 → 88.0
+   - Example: 91.0 → 91.1 → 91.2
+   - Rolls over at 10: 91.9 → 92.0
 
 2. **Major bumps** are handled via the Version Bump workflow dispatch inputs
 

@@ -5,6 +5,97 @@ All notable changes to Mantis Studio are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [91.6] - 2026-02-18
+
+### Added
+- ✨ **In-app "What's New" notification system**: Users now see a friendly notification banner when the app version updates
+  - Shows key changes and improvements in each version
+  - Includes direct link to full changelog
+  - Dismissible with persistent memory of last seen version
+  - Helps users understand what changed between updates
+- 📊 Version tracking in user config to detect when app has been updated
+
+### Changed
+- 📝 Updated CHANGELOG.md to document all versions from 90.7 to 91.6
+- 📖 Updated README.md to reflect current version (91.6) throughout documentation
+- 🎯 Improved transparency about version changes and updates
+
+### Fixed
+- ❌ **Major UX Issue**: Users can now see what changed between versions
+  - Previously, users reported "merged 4 times now with no changed from users point of view"
+  - Version number was incrementing but changes were invisible to users
+  - Now users get a clear notification when version changes
+- 📚 Documentation version inconsistencies corrected
+
+### Impact
+This release directly addresses user feedback about version changes being invisible. Users will now be informed whenever the app updates, creating better awareness and transparency about ongoing improvements.
+
+---
+
+## [91.5] - 2026-02-18
+
+### Note
+- Version auto-incremented by CI/CD workflow
+- Specific changes not documented in this retroactive update
+
+---
+
+## [91.4] - 2026-02-18
+
+### Note
+- Version auto-incremented by CI/CD workflow
+- Specific changes not documented in this retroactive update
+
+---
+
+## [91.3] - 2026-02-18
+
+### Note
+- Version auto-incremented by CI/CD workflow
+- Specific changes not documented in this retroactive update
+
+---
+
+## [91.2] - 2026-02-18
+
+### Note
+- Version auto-incremented by CI/CD workflow
+- Specific changes not documented in this retroactive update
+
+---
+
+## [91.1] - 2026-02-18
+
+### Note
+- Version auto-incremented by CI/CD workflow
+- Specific changes not documented in this retroactive update
+
+---
+
+## [91.0] - 2026-02-18
+
+### Note
+- Version auto-incremented by CI/CD workflow
+- Specific changes not documented in this retroactive update
+
+---
+
+## [90.9] - 2026-02-18
+
+### Note
+- Version auto-incremented by CI/CD workflow
+- Specific changes not documented in this retroactive update
+
+---
+
+## [90.8] - 2026-02-18
+
+### Note
+- Version auto-incremented by CI/CD workflow
+- Specific changes not documented in this retroactive update
+
+---
+
 ## [90.7] - 2026-02-18
 
 ### Changed
