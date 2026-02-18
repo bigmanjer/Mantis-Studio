@@ -2176,6 +2176,11 @@ def _run_ui():
     )
 
     logger.info("Initializing session state...")
+    
+    # Load app configuration for session state initialization
+    config_data = load_app_config()
+    logger.debug(f"Loaded app config: {list(config_data.keys())}")
+    
     init_state("user_id", None)
     init_state("projects_dir", None)
     init_state("project", None)
@@ -5958,6 +5963,22 @@ def _run_ui():
             except Exception:
                 # Nothing we can do at this point
                 pass
+
+
+# Execute the UI when running under Streamlit (not when imported by tests/other modules)
+# This is the main entry point when `streamlit run app/main.py` is executed
+try:
+    import streamlit as st
+    from streamlit import runtime
+    
+    # Only run UI if we're already inside a Streamlit runtime
+    # (which happens when `streamlit run app/main.py` is executed)
+    if runtime.exists():
+        _run_ui()
+except ImportError:
+    # Streamlit not available - don't run UI
+    # This allows imports in tests and other contexts where Streamlit is not installed
+    pass
 
 
 def run_selftest() -> int:
