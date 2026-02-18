@@ -3681,6 +3681,16 @@ def _run_ui():
                     st.rerun()
 
     def render_home():
+        # Import new dashboard components
+        from app.ui.dashboard_components import (
+            render_hero_header,
+            render_metrics_row,
+            render_workspace_hub_section,
+            render_feature_group,
+            render_dashboard_section_header,
+            add_divider_with_spacing,
+        )
+        
         render_welcome_banner("home")
         active_dir = get_active_projects_dir()
         recent_projects = _load_recent_projects(active_dir, st.session_state.projects_refresh_token)
@@ -3804,49 +3814,61 @@ def _run_ui():
                 st.session_state.page = target
                 st.rerun()
 
-        def _hero_section() -> None:
-            st.markdown("# MANTIS")
-            st.markdown("### Modular AI Narrative Text Intelligence System")
-            status_cols = st.columns([1, 1])
-            with status_cols[0]:
-                st.markdown("🟢 **Operational**")
-            with status_cols[1]:
-                st.caption(f"💾 {autosave_status}")
-            action_cols = st.columns(3)
-            with action_cols[0]:
-                if st.button("New Project", type="primary", use_container_width=True):
-                    with st.spinner("Opening project setup..."):
-                        open_new_project()
-            with action_cols[1]:
-                if st.button("Open Workspace", use_container_width=True):
-                    with st.spinner("Opening workspace..."):
-                        open_recent_project("chapters")
-            with action_cols[2]:
-                if st.button("Run Analysis", use_container_width=True):
-                    with st.spinner("Preparing analysis workspace..."):
-                        open_recent_project("world", focus_tab="Insights")
+        # =====================================================================
+        # 1️⃣ HERO HEADER — Full Width Top Section
+        # =====================================================================
+        def hero_new_project() -> None:
+            with st.spinner("Opening project setup..."):
+                open_new_project()
+        
+        def hero_open_workspace() -> None:
+            with st.spinner("Opening workspace..."):
+                open_recent_project("chapters")
+        
+        def hero_run_analysis() -> None:
+            with st.spinner("Preparing analysis workspace..."):
+                open_recent_project("world", focus_tab="Insights")
+        
+        render_hero_header(
+            status_label="🟢 Operational",
+            status_caption=f"💾 {autosave_status}",
+            primary_action=hero_new_project,
+            secondary_action=hero_open_workspace,
+            tertiary_action=hero_run_analysis,
+        )
 
-        render_card("Command Center", _hero_section)
-        st.divider()
+        add_divider_with_spacing(top=3, bottom=3)
 
-        render_section_header("Metrics Overview")
-        metric_cols = st.columns(4)
-        with metric_cols[0]:
-            render_metric("Total Projects", str(len(recent_projects)))
-        with metric_cols[1]:
-            render_metric("Active Workspace", active_project.title if active_project else "None")
-        with metric_cols[2]:
-            render_metric("AI Operations Today", str(ai_ops_today))
-        with metric_cols[3]:
-            render_metric("System Mode", system_mode)
-        st.divider()
+        # =====================================================================
+        # 2️⃣ METRICS OVERVIEW ROW
+        # =====================================================================
+        render_dashboard_section_header("Metrics Overview")
+        
+        metrics = [
+            ("Total Projects", str(len(recent_projects))),
+            ("Active Workspace", active_project.title if active_project else "None"),
+            ("AI Operations Today", str(ai_ops_today)),
+            ("System Mode", system_mode),
+        ]
+        render_metrics_row(metrics)
 
-        render_section_header("Workspace Hub", "Open recent projects or create a new workspace.")
+        add_divider_with_spacing(top=3, bottom=3)
+
+        # =====================================================================
+        # 3️⃣ WORKSPACE HUB SECTION
+        # =====================================================================
+        render_dashboard_section_header(
+            "Workspace Hub",
+            "Open recent projects or create a new workspace."
+        )
+        
         hub_cols = st.columns([2, 1])
+        
+        # Left: Recent Projects
         with hub_cols[0]:
-            def _recent_projects_section() -> None:
+            def _recent_projects_content() -> None:
                 if not recent_projects:
-                    st.info("No projects yet — create your first workspace.")
+                    st.info("📭 No projects yet — create your first workspace.")
                     return
                 for project_entry in recent_projects[:5]:
                     meta = project_entry.get("meta", {})
@@ -3863,20 +3885,39 @@ def _run_ui():
                     with row[2]:
                         if st.button("Open", use_container_width=True, key=f"dash_hub_open_{project_entry['path']}"):
                             _open_project(project_entry["path"])
+            
+            render_workspace_hub_section("Recent Projects", _recent_projects_content)
 
-            render_card("Recent Projects", _recent_projects_section)
-
+        # Right: Create New Project
         with hub_cols[1]:
-            def _new_project_section() -> None:
-                st.caption("Start a fresh narrative workspace with guided setup.")
-                if st.button("Create New Project", type="primary", use_container_width=True):
+            def _new_project_content() -> None:
+                st.html(
+                    """
+                    <div style="text-align: center; padding: 16px 0;">
+                        <div style="font-size: 48px; margin-bottom: 12px;">📝</div>
+                        <div style="font-size: 14px; color: var(--mantis-muted); margin-bottom: 16px;">
+                            Start a fresh narrative workspace with guided setup.
+                        </div>
+                    </div>
+                    """
+                )
+                if st.button("✨ Create New Project", type="primary", use_container_width=True, key="hub_create_new"):
                     open_new_project()
-                st.caption(primary_label)
+                st.html("<div style='height: 8px;'></div>")
+                st.caption(f"💡 Next: {primary_label}")
+            
+            render_workspace_hub_section("Create Workspace", _new_project_content)
 
-            render_card("Create Workspace", _new_project_section)
-        st.divider()
+        add_divider_with_spacing(top=3, bottom=3)
 
-        render_section_header("Feature Access", "Grouped tools for intelligence, writing, insights, and system controls.")
+        # =====================================================================
+        # 4️⃣ FEATURE ACCESS — GROUPED, NOT LISTED
+        # =====================================================================
+        render_dashboard_section_header(
+            "Feature Access",
+            "Grouped tools for intelligence, writing, insights, and system controls."
+        )
+        
         feature_groups = [
             (
                 "🧠 Intelligence",
@@ -3912,21 +3953,18 @@ def _run_ui():
         ]
 
         for group_idx, (group_name, features) in enumerate(feature_groups):
-            with st.expander(group_name, expanded=group_idx == 0):
-                for feature_name, feature_caption, action in features:
-                    feature_cols = st.columns([2.2, 1])
-                    with feature_cols[0]:
-                        st.markdown(f"**{feature_name}**")
-                        st.caption(feature_caption)
-                    with feature_cols[1]:
-                        if st.button(
-                            "Open",
-                            key=f"dashboard_feature_{_slugify(group_name)}_{_slugify(feature_name)}",
-                            use_container_width=True,
-                        ):
-                            with st.spinner(f"Loading {feature_name.lower()}..."):
-                                action()
+            render_feature_group(
+                group_name,
+                features,
+                expanded=(group_idx == 0),
+                key_prefix="dashboard"
+            )
 
+        # =====================================================================
+        # AI PROVIDER CONNECTION STATUS
+        # =====================================================================
+        st.html("<div style='height: 24px;'></div>")
+        
         if not groq_key or not openai_key:
             with card_block("🔑 Connect your AI providers", "Unlock generation, summaries, and entity tools with API access."):
                 cta_left, cta_right = st.columns(2)
