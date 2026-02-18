@@ -103,8 +103,10 @@ def render(ctx: Any = None) -> None:
                             if loaded:
                                 st.session_state.project = loaded
                                 st.toast(f"Loaded project: {project_name}")
+                        except (FileNotFoundError, PermissionError):
+                            st.error(f"Failed to load project '{project_name}'. The project file may be missing or inaccessible.")
                         except Exception as e:
-                            st.error(f"Failed to load project: {e}")
+                            st.error(f"Failed to load project '{project_name}'. The project file may be corrupted.")
                     navigate("chapters")
     
     st.divider()
