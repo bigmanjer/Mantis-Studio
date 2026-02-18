@@ -1743,30 +1743,34 @@ def _run_ui():
     </style>
     """
     )
-    section[data-testid="stSidebar"] details summary {{
+    
+    st.html(
+        """
+    <style>
+    section[data-testid="stSidebar"] details summary {
         color: var(--mantis-text) !important;
         font-weight: 600;
         background: var(--mantis-surface-alt);
         border: 1px solid var(--mantis-card-border);
         border-radius: 12px;
         padding: 6px 10px;
-    }}
-    section[data-testid="stSidebar"] details[open] {{
+    }
+    section[data-testid="stSidebar"] details[open] {
         margin-bottom: 8px;
-    }}
-    div[data-testid="stSidebarNav"] {{ display: none; }}
-    div[data-testid="stToast"] {{ border-radius: 14px !important; }}
+    }
+    div[data-testid="stSidebarNav"] { display: none; }
+    div[data-testid="stToast"] { border-radius: 14px !important; }
 
     /* --- CARD POLISH --- */
-    div[data-testid="stContainer"] {{
+    div[data-testid="stContainer"] {
         background: var(--mantis-card-bg);
         border-radius: 20px !important;
         padding: 22px !important;
         border: 1px solid var(--mantis-card-border) !important;
         box-shadow: var(--mantis-shadow-strong);
         margin-bottom: 18px;
-    }}
-    .mantis-pill {{
+    }
+    .mantis-pill {
         display:inline-flex;
         align-items:center;
         gap:6px;
@@ -1777,51 +1781,51 @@ def _run_ui():
         border: 1px solid var(--mantis-accent-glow);
         color: var(--mantis-text);
         letter-spacing: 0.02em;
-    }}
-    .mantis-hero-caption {{
+    }
+    .mantis-hero-caption {
         font-size:12px;
         color: var(--mantis-muted);
         margin-top:4px;
-    }}
-    div[data-testid="stContainer"] h3 {{
+    }
+    div[data-testid="stContainer"] h3 {
         margin-top: 0;
         margin-bottom: 12px;
         color: var(--mantis-text);
-    }}
-    .mantis-hero {{
+    }
+    .mantis-hero {
         background: var(--mantis-surface);
         border-radius: 22px;
         padding: 22px 24px;
         border: 1px solid var(--mantis-card-border);
         box-shadow: var(--mantis-shadow-strong);
-    }}
-    .mantis-hero-title {{
+    }
+    .mantis-hero-title {
         font-size: 28px;
         font-weight: 700;
         margin-bottom: 6px;
-    }}
-    .mantis-hero-sub {{
+    }
+    .mantis-hero-sub {
         color: var(--mantis-muted);
         font-size: 14px;
-    }}
-    .mantis-page-header {{
+    }
+    .mantis-page-header {
         display: flex;
         justify-content: space-between;
         align-items: flex-start;
         gap: 12px;
-    }}
-    .mantis-page-title {{
+    }
+    .mantis-page-title {
         font-size: 26px;
         font-weight: 700;
         margin: 0;
         color: var(--mantis-text);
-    }}
-    .mantis-page-sub {{
+    }
+    .mantis-page-sub {
         color: var(--mantis-muted);
         margin-top: 4px;
         font-size: 14px;
-    }}
-    .mantis-tag {{
+    }
+    .mantis-tag {
         display:inline-flex;
         align-items:center;
         gap:6px;
@@ -1832,53 +1836,53 @@ def _run_ui():
         background: var(--mantis-accent-soft);
         color: var(--mantis-text);
         border: 1px solid var(--mantis-accent-glow);
-    }}
-    .mantis-kpi-grid {{
+    }
+    .mantis-kpi-grid {
         display:grid;
         grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
         gap:12px;
         margin-top: 14px;
-    }}
-    .mantis-kpi-card {{
+    }
+    .mantis-kpi-card {
         padding: 12px 14px;
         border-radius: 16px;
         background: var(--mantis-surface-alt);
         border: 1px solid var(--mantis-card-border);
-    }}
-    .mantis-kpi-label {{
+    }
+    .mantis-kpi-label {
         font-size:11px;
         text-transform: uppercase;
         letter-spacing: 0.08em;
         color: var(--mantis-muted);
         margin-bottom: 6px;
-    }}
-    .mantis-kpi-value {{
+    }
+    .mantis-kpi-value {
         font-size:20px;
         font-weight:700;
-    }}
-    .mantis-section-title {{
+    }
+    .mantis-section-title {
         font-size:20px;
         font-weight:700;
         margin-bottom: 6px;
-    }}
-    .mantis-section-header {{
+    }
+    .mantis-section-header {
         display:flex;
         align-items:flex-end;
         justify-content:space-between;
         gap:16px;
         margin: 6px 0 14px;
-    }}
-    .mantis-section-caption {{
+    }
+    .mantis-section-caption {
         color: var(--mantis-muted);
         font-size: 13px;
-    }}
-    .mantis-soft {{
+    }
+    .mantis-soft {
         background: var(--mantis-surface-alt);
         border-radius: 16px;
         padding: 14px;
         border: 1px solid var(--mantis-card-border);
-    }}
-    .mantis-stat-tile {{
+    }
+    .mantis-stat-tile {
         display:flex;
         flex-direction:column;
         gap:6px;
@@ -1886,8 +1890,8 @@ def _run_ui():
         border-radius: 16px;
         background: var(--mantis-surface-alt);
         border: 1px solid var(--mantis-card-border);
-    }}
-    .mantis-stat-icon {{
+    }
+    .mantis-stat-icon {
         width: 30px;
         height: 30px;
         border-radius: 10px;
@@ -1897,44 +1901,44 @@ def _run_ui():
         background: var(--mantis-accent-soft);
         border: 1px solid var(--mantis-accent-glow);
         font-size: 14px;
-    }}
-    .mantis-stat-label {{
+    }
+    .mantis-stat-label {
         font-size: 11px;
         text-transform: uppercase;
         letter-spacing: 0.08em;
         color: var(--mantis-muted);
-    }}
-    .mantis-stat-value {{
+    }
+    .mantis-stat-value {
         font-size: 20px;
         font-weight: 700;
         color: var(--mantis-text);
-    }}
-    .mantis-stat-help {{
+    }
+    .mantis-stat-help {
         font-size: 12px;
         color: var(--mantis-muted);
-    }}
+    }
 
     /* --- SIDEBAR POLISH --- */
-    section[data-testid="stSidebar"] {{
+    section[data-testid="stSidebar"] {
         background: var(--mantis-sidebar-bg);
         border-right: 1px solid var(--mantis-sidebar-border);
-    }}
-    section[data-testid="stSidebar"] h3 {{
+    }
+    section[data-testid="stSidebar"] h3 {
         color: var(--mantis-sidebar-title);
         font-weight: 700;
         letter-spacing: 0.04em;
         text-transform: uppercase;
         font-size: 12px;
-    }}
+    }
     section[data-testid="stSidebar"] .stMarkdown,
     section[data-testid="stSidebar"] p,
-    section[data-testid="stSidebar"] label {{
+    section[data-testid="stSidebar"] label {
         color: var(--mantis-text);
-    }}
+    }
 
 
     /* --- SIDEBAR BRAND --- */
-    .mantis-sidebar-brand{{
+    .mantis-sidebar-brand{
         display:flex;
         gap:12px;
         align-items:center;
@@ -1944,8 +1948,8 @@ def _run_ui():
         background: var(--mantis-sidebar-brand-bg);
         border: 1px solid var(--mantis-sidebar-brand-border);
         box-shadow: var(--mantis-shadow-button);
-    }}
-    .mantis-sidebar-logo{{
+    }
+    .mantis-sidebar-logo{
         width:70px;
         height:70px;
         border-radius: 14px;
@@ -1956,13 +1960,13 @@ def _run_ui():
         overflow:hidden;
         box-shadow: inset 0 0 0 1px rgba(0,0,0,0.05), 0 6px 16px rgba(0,0,0,0.2);
         flex: 0 0 auto;
-    }}
-    .mantis-sidebar-logo img{{
+    }
+    .mantis-sidebar-logo img{
         height:48px;
         width:auto;
         display:block;
-    }}
-    .mantis-avatar {{
+    }
+    .mantis-avatar {
         height:44px;
         width:44px;
         border-radius:50%;
@@ -1974,46 +1978,46 @@ def _run_ui():
         font-weight:700;
         font-size:0.9rem;
         border: 1px solid var(--mantis-card-border);
-    }}
-    .mantis-logo-fallback {{
+    }
+    .mantis-logo-fallback {
         font-size: 0.95rem;
         font-weight: 700;
         color: var(--mantis-sidebar-title);
-    }}
-    .mantis-sidebar-title{{
+    }
+    .mantis-sidebar-title{
         font-weight:800;
         font-size:14px;
         color: var(--mantis-text);
         line-height:1.1;
-    }}
-    .mantis-sidebar-sub{{
+    }
+    .mantis-sidebar-sub{
         font-size:12px;
         color: var(--mantis-muted);
         margin-top:2px;
         line-height:1.1;
-    }}
-    .mantis-banner img {{
+    }
+    .mantis-banner img {
         max-height: 180px;
         object-fit: contain;
-    }}
+    }
 
     /* --- NAV RADIO STYLE --- */
-    div[role="radiogroup"] > label {{
+    div[role="radiogroup"] > label {
         background: var(--mantis-surface-alt);
         padding: 10px 12px;
         border-radius: 12px;
         border: 1px solid var(--mantis-card-border);
         margin-bottom: 8px;
-    }}
-    div[role="radiogroup"] > label span {{
+    }
+    div[role="radiogroup"] > label span {
         color: var(--mantis-text);
-    }}
-    div[role="radiogroup"] > label:has(input:checked) {{
+    }
+    div[role="radiogroup"] > label:has(input:checked) {
         border-color: var(--mantis-accent);
         box-shadow: 0 0 0 1px var(--mantis-accent-glow);
-    }}
-</style>
-    """,
+    }
+    </style>
+    """
     )
 
     # --- BRAND HEADER (UI only) ---
