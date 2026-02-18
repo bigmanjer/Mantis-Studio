@@ -3267,6 +3267,7 @@ def _run_ui():
                         # Auto-fetch models after applying key
                         base_url = st.session_state.get(f"{provider}_base_url", "")
                         fetch_fn = fetch_openai_models if provider == "openai" else fetch_groq_models
+                        test_fn = test_openai_connection if provider == "openai" else test_groq_connection
                         models, _err = fetch_fn(base_url, key_value.strip())
                         if models:
                             st.session_state[f"{provider}_model_list"] = models
@@ -3274,6 +3275,13 @@ def _run_ui():
                             st.toast(f"{provider_label} key activated — loaded {len(models)} models.")
                         else:
                             st.toast(f"{provider_label} key activated for this session.")
+                        connection_ok = test_fn(base_url, key_value.strip())
+                        st.session_state[f"{provider}_connection_tested"] = connection_ok
+                        if not connection_ok:
+                            st.toast(
+                                f"{provider_label} connection test failed. Check your API key and base URL.",
+                                icon="⚠️",
+                            )
                         st.rerun()
                     else:
                         st.warning("Please enter an API key first.")
@@ -3310,13 +3318,20 @@ def _run_ui():
                     openai_model = st.text_input(
                         "Model name",
                         value=st.session_state.openai_model,
-                        help="Enter the model name manually, or fetch available models below",
+                        help="Enter the model name manually, or apply your key to auto-fetch available models",
                         label_visibility="collapsed"
                     )
 
                 if openai_model != st.session_state.openai_model:
                     st.session_state.openai_model = openai_model
                     AppConfig.OPENAI_MODEL = openai_model
+                    if openai_key:
+                        st.session_state.openai_connection_tested = test_openai_connection(
+                            st.session_state.openai_base_url,
+                            openai_key,
+                        )
+                        if not st.session_state.openai_connection_tested:
+                            st.toast("OpenAI connection test failed. Check your API key and base URL.", icon="⚠️")
                 
                 with st.expander("⚙️ Advanced Settings", expanded=False):
                     openai_url = st.text_input(
@@ -3327,50 +3342,6 @@ def _run_ui():
                     if openai_url != st.session_state.openai_base_url:
                         st.session_state.openai_base_url = openai_url
                         AppConfig.OPENAI_API_URL = openai_url
-
-                st.markdown("#### Connection Tools")
-                test_cols = st.columns(2)
-                with test_cols[0]:
-                    openai_fetch_cooldown = _cooldown_remaining("openai_fetch_models", 10)
-                    if st.button(
-                        "↻ Fetch Models",
-                        use_container_width=True,
-                        disabled=bool(openai_fetch_cooldown) or not openai_key,
-                        help="Load available models from OpenAI"
-                    ):
-                        _mark_action("openai_fetch_models")
-                        models, error_message = fetch_openai_models(
-                            st.session_state.openai_base_url,
-                            openai_key,
-                        )
-                        if models:
-                            st.session_state.openai_model_list = models
-                            st.session_state.openai_model_tests = {}
-                            st.toast(f"Loaded {len(models)} models.")
-                            st.rerun()
-                        else:
-                            st.session_state.openai_model_list = []
-                            st.session_state.openai_model_tests = {}
-                            st.error(f"Failed to fetch models. {error_message or 'Check your API key and base URL.'}")
-
-                with test_cols[1]:
-                    openai_test_cooldown = _cooldown_remaining("openai_test_connection", 10)
-                    if st.button(
-                        "🔌 Test Connection",
-                        use_container_width=True,
-                        disabled=bool(openai_test_cooldown) or not openai_key,
-                        help="Verify your API key and connection"
-                    ):
-                        _mark_action("openai_test_connection")
-                        ok = test_openai_connection(
-                            st.session_state.openai_base_url,
-                            openai_key,
-                        )
-                        if ok:
-                            st.session_state.openai_connection_tested = True
-                            st.success("✓ Connection successful!")
-                        else:
-                            st.error("✗ Connection failed. Check your API key and base URL.")
 
                 if st.session_state.openai_model_list:
                     with st.expander("🧪 Advanced: Test All Models", expanded=False):
@@ -3438,13 +3409,20 @@ def _run_ui():
                     groq_model = st.text_input(
                         "Model name",
                         value=st.session_state.groq_model,
-                        help="Enter the model name manually, or fetch available models below",
+                        help="Enter the model name manually, or apply your key to auto-fetch available models",
                         label_visibility="collapsed"
                     )
 
                 if groq_model != st.session_state.groq_model:
                     st.session_state.groq_model = groq_model
                     AppConfig.DEFAULT_MODEL = groq_model
+                    if groq_key:
+                        st.session_state.groq_connection_tested = test_groq_connection(
+                            st.session_state.groq_base_url,
+                            groq_key,
+                        )
+                        if not st.session_state.groq_connection_tested:
+                            st.toast("Groq connection test failed. Check your API key and base URL.", icon="⚠️")
                 
                 with st.expander("⚙️ Advanced Settings", expanded=False):
                     groq_url = st.text_input(
@@ -3455,50 +3433,6 @@ def _run_ui():
                     if groq_url != st.session_state.groq_base_url:
                         st.session_state.groq_base_url = groq_url
                         AppConfig.GROQ_API_URL = groq_url
-
-                st.markdown("#### Connection Tools")
-                test_cols = st.columns(2)
-                with test_cols[0]:
-                    groq_fetch_cooldown = _cooldown_remaining("groq_fetch_models", 10)
-                    if st.button(
-                        "↻ Fetch Models",
-                        use_container_width=True,
-                        disabled=bool(groq_fetch_cooldown) or not groq_key,
-                        help="Load available models from Groq"
-                    ):
-                        _mark_action("groq_fetch_models")
-                        models, error_message = fetch_groq_models(
-                            st.session_state.groq_base_url,
-                            groq_key,
-                        )
-                        if models:
-                            st.session_state.groq_model_list = models
-                            st.session_state.groq_model_tests = {}
-                            st.toast(f"Loaded {len(models)} models.")
-                            st.rerun()
-                        else:
-                            st.session_state.groq_model_list = []
-                            st.session_state.groq_model_tests = {}
-                            st.error(f"Failed to fetch models. {error_message or 'Check your API key.'}")
-
-                with test_cols[1]:
-                    groq_test_cooldown = _cooldown_remaining("groq_test_connection", 10)
-                    if st.button(
-                        "🔌 Test Connection",
-                        use_container_width=True,
-                        disabled=bool(groq_test_cooldown) or not groq_key,
-                        help="Verify your API key and connection"
-                    ):
-                        _mark_action("groq_test_connection")
-                        ok = test_groq_connection(
-                            st.session_state.groq_base_url,
-                            groq_key,
-                        )
-                        if ok:
-                            st.session_state.groq_connection_tested = True
-                            st.success("✓ Connection successful!")
-                        else:
-                            st.error("✗ Connection failed. Check your API key.")
 
                 if st.session_state.groq_model_list:
                     with st.expander("🧪 Advanced: Test All Models", expanded=False):
