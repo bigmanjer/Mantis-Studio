@@ -2290,7 +2290,7 @@ def _run_ui():
         config = load_app_config()
         last_seen_version = config.get("last_seen_version", "")
         current_version = AppConfig.VERSION
-        
+
         # Check if this is a new version
         if last_seen_version and last_seen_version != current_version:
             # Show What's New banner
@@ -2337,7 +2337,7 @@ def _run_ui():
         # Show What's New banner if version changed
         if context == "home":
             check_and_show_whats_new()
-        
+
         if context == "home" and st.session_state.get("first_run", True):
             with st.container(border=True):
                 st.markdown("### 👋 Welcome to Mantis Studio!")
