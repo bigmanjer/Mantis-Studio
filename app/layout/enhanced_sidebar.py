@@ -20,39 +20,14 @@ def render_sidebar_brand(version: str) -> None:
     Args:
         version: Application version string
     """
+    st.html('<div class="mantis-sidebar-brand mantis-sidebar-brand--modern">')
+    st.image("assets/mantis_logo_trans.png", use_container_width=True)
     st.html(
         f"""
-        <div class="mantis-sidebar-brand">
-            <div style="
-                width: 40px;
-                height: 40px;
-                border-radius: 12px;
-                background: var(--mantis-sidebar-logo-bg);
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                font-size: 20px;
-            ">
-                🐜
-            </div>
-            <div style="flex: 1;">
-                <div style="
-                    font-family: 'Space Grotesk', sans-serif;
-                    font-size: 16px;
-                    font-weight: 700;
-                    color: var(--mantis-text);
-                    line-height: 1.2;
-                ">
-                    MANTIS Studio
-                </div>
-                <div style="
-                    font-size: 11px;
-                    color: var(--mantis-text-muted);
-                    margin-top: 2px;
-                ">
-                    v{version}
-                </div>
-            </div>
+        <div class="mantis-sidebar-meta">
+            <span class="mantis-sidebar-version">Version {version}</span>
+        </div>
+        <div class="mantis-sidebar-divider"></div>
         </div>
         """
     )

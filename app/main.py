@@ -1940,31 +1940,34 @@ def _run_ui():
     /* --- SIDEBAR BRAND --- */
     .mantis-sidebar-brand{
         display:flex;
-        gap:12px;
+        flex-direction: column;
         align-items:center;
-        padding:14px 12px 12px 12px;
-        margin: 4px 8px 10px 8px;
+        padding:14px 12px 10px;
+        margin: 6px 8px 12px;
         border-radius: 16px;
         background: var(--mantis-sidebar-brand-bg);
         border: 1px solid var(--mantis-sidebar-brand-border);
         box-shadow: var(--mantis-shadow-button);
     }
-    .mantis-sidebar-logo{
-        width:70px;
-        height:70px;
-        border-radius: 14px;
-        background: var(--mantis-sidebar-logo-bg);
-        display:flex;
-        align-items:center;
-        justify-content:center;
-        overflow:hidden;
-        box-shadow: inset 0 0 0 1px rgba(0,0,0,0.05), 0 6px 16px rgba(0,0,0,0.2);
-        flex: 0 0 auto;
+    .mantis-sidebar-brand--modern {
+        gap: 2px;
     }
-    .mantis-sidebar-logo img{
-        height:48px;
-        width:auto;
+    .mantis-sidebar-brand--modern [data-testid="stImage"] {
+        width: 100%;
+        margin: 2px 0 4px;
+    }
+    .mantis-sidebar-brand--modern [data-testid="stImage"] img{
+        width: 100%;
+        max-height: 72px;
         display:block;
+        margin: 0 auto;
+        object-fit: contain;
+        filter: drop-shadow(0 0 8px rgba(34,197,94,0.26));
+        transition: transform 180ms ease, filter 180ms ease;
+    }
+    .mantis-sidebar-brand--modern [data-testid="stImage"] img:hover {
+        transform: scale(1.02);
+        filter: drop-shadow(0 0 10px rgba(34,197,94,0.36));
     }
     .mantis-avatar {
         height:44px;
@@ -1984,17 +1987,29 @@ def _run_ui():
         font-weight: 700;
         color: var(--mantis-sidebar-title);
     }
-    .mantis-sidebar-title{
-        font-weight:800;
-        font-size:14px;
-        color: var(--mantis-text);
-        line-height:1.1;
+    .mantis-sidebar-meta {
+        width: 100%;
+        text-align: center;
+        margin-top: 2px;
+        margin-bottom: 6px;
     }
-    .mantis-sidebar-sub{
-        font-size:12px;
+    .mantis-sidebar-version{
+        font-size:11px;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
         color: var(--mantis-muted);
-        margin-top:2px;
-        line-height:1.1;
+        opacity: 0.9;
+    }
+    .mantis-sidebar-divider {
+        width: 100%;
+        height: 1px;
+        margin-top: 2px;
+        background: linear-gradient(90deg, rgba(34,197,94,0), rgba(34,197,94,0.35), rgba(34,197,94,0));
+    }
+    @media (max-width: 1080px) {
+        .mantis-sidebar-brand--modern [data-testid="stImage"] img{
+            max-height: 64px;
+        }
     }
     .mantis-banner img {
         max-height: 180px;
@@ -2021,7 +2036,7 @@ def _run_ui():
     )
 
     # --- BRAND HEADER (UI only) ---
-    header_logo_b64 = asset_base64("mantis_logo_trans.png")
+    header_logo_b64 = asset_base64("mantis_logo_trans full.png")
     header_logo_html = (
         f'<img src="data:image/png;base64,{header_logo_b64}" alt="MANTIS logo" />'
         if header_logo_b64
