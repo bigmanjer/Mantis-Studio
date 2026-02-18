@@ -2056,34 +2056,57 @@ def _run_ui():
     """
     )
 
-    # --- BRAND HEADER (UI only) ---
-    header_logo_b64 = asset_base64("branding/mantis_lockup.png")
-    header_logo_html = (
-        f'<img src="data:image/png;base64,{header_logo_b64}" alt="MANTIS logo" />'
-        if header_logo_b64
-        else '<span class="mantis-logo-fallback">M</span>'
-    )
     st.html(
-        f"""
-        <div class="mantis-header">
-            <div class="mantis-header-left">
-                <div class="mantis-header-logo">
-                    {header_logo_html}
-                </div>
-                <div style="line-height:1.15;">
-                    <div class="mantis-header-title">
-                        MANTIS Studio — v{AppConfig.VERSION}
-                    </div>
-                    <div class="mantis-header-sub">
-                        Modular AI Narrative Text Intelligence System
-                    </div>
-                </div>
-            </div>
-            <div class="mantis-header-right">
-                <span class="mantis-pill">Workspace</span>
-            </div>
-        </div>
-        """,
+        """
+        <style>
+        :root {
+            --mantis-bg-primary: #0E1117;
+            --mantis-bg-secondary: #161B22;
+            --mantis-accent-enterprise: #19e68c;
+            --mantis-accent-teal: #1dd6d0;
+            --mantis-success: #48d597;
+            --mantis-warning: #f5b544;
+            --mantis-danger: #d16969;
+        }
+        [data-testid="stAppViewContainer"] { background: var(--mantis-bg-primary); }
+        .block-container { max-width: 1440px; padding-top: 0.8rem; }
+        .mantis-topnav-brand { display:flex; flex-direction:column; justify-content:center; }
+        .mantis-topnav-title { font-size:1.1rem; letter-spacing:0.08em; font-weight:800; }
+        .mantis-topnav-sub { font-size:0.78rem; color:var(--mantis-muted); }
+        .mantis-status-badge { margin-top:2px; display:inline-flex; gap:8px; align-items:center; padding:8px 12px; border-radius:999px; font-size:0.8rem; border:1px solid var(--mantis-card-border); }
+        .mantis-status-badge .dot { width:8px; height:8px; border-radius:50%; display:inline-block; }
+        .mantis-status-badge.ready .dot { background: var(--mantis-success); box-shadow: 0 0 12px var(--mantis-success); }
+        .mantis-status-badge.processing .dot { background: var(--mantis-warning); animation: mantisPulse 1.2s infinite; }
+        .mantis-status-badge.limited .dot { background: var(--mantis-danger); }
+        .mantis-enterprise-hero { display:flex; justify-content:space-between; align-items:flex-start; gap:20px; padding: 20px 22px; border-radius:16px; background:linear-gradient(145deg, #111827, #0f131b); border:1px solid #283241; }
+        .mantis-enterprise-hero h1 { margin:0; font-size:2rem; letter-spacing:-0.02em; }
+        .mantis-enterprise-hero p { margin:6px 0 0 0; color:var(--mantis-muted); }
+        .mantis-status-pill { border:1px solid #244c40; background:rgba(25,230,140,0.12); color:#9ef5cb; border-radius:999px; padding:8px 12px; font-size:0.82rem; display:inline-flex; align-items:center; gap:8px; }
+        .mantis-status-pill span { width:8px; height:8px; border-radius:50%; background:#33f0a8; box-shadow:0 0 10px #33f0a8; }
+        .mantis-metric-card { border-radius:14px; padding:16px; border:1px solid var(--mantis-card-border); background:var(--mantis-bg-secondary); min-height:104px; transition:transform .16s ease, border-color .16s ease; }
+        .mantis-metric-card:hover { transform: translateY(-2px); border-color: var(--mantis-accent-teal); }
+        .mantis-metric-label { font-size:0.75rem; text-transform:uppercase; letter-spacing:0.08em; color:var(--mantis-muted); }
+        .mantis-metric-value { margin-top:8px; font-size:1.6rem; font-weight:750; }
+        .mantis-activity-item { display:grid; grid-template-columns: 120px 120px 1fr; gap:12px; padding:10px 0; border-bottom:1px solid #232d3b; }
+        .mantis-activity-time { color:var(--mantis-muted); font-size:0.78rem; }
+        .mantis-activity-status { font-size:0.78rem; color:#9ac4ff; }
+        .mantis-activity-text { font-size:0.9rem; }
+        .mantis-project-chip { border:1px solid var(--mantis-card-border); border-radius:12px; padding:10px 12px; background:#131923; }
+        .mantis-project-chip__title { font-size:0.88rem; font-weight:650; }
+        .mantis-project-chip__meta { font-size:0.74rem; color:var(--mantis-muted); margin-top:4px; }
+        @keyframes mantisPulse { 0%{opacity:1;} 50%{opacity:.3;} 100%{opacity:1;} }
+        </style>
+        """
+    )
+
+    # --- ENTERPRISE TOP NAV ---
+    from app.layout.header import render_top_navbar
+    groq_key, _ = get_effective_key("groq", st.session_state.get("user_id")) if "user_id" in st.session_state else ("", "")
+    openai_key, _ = get_effective_key("openai", st.session_state.get("user_id")) if "user_id" in st.session_state else ("", "")
+    render_top_navbar(
+        version=AppConfig.VERSION,
+        ai_ready=bool(groq_key or openai_key),
+        is_processing=bool(st.session_state.get("ai_streaming") or st.session_state.get("is_processing")),
     )
 
     logger.info("Initializing session state...")
@@ -3535,6 +3558,7 @@ def _run_ui():
             render_feature_group,
             render_dashboard_section_header,
             add_divider_with_spacing,
+            render_activity_feed,
         )
         
         render_welcome_banner("home")
@@ -3676,11 +3700,12 @@ def _run_ui():
                 open_recent_project("world", focus_tab="Insights")
         
         render_hero_header(
-            status_label="🟢 Operational",
-            status_caption=f"💾 {autosave_status}",
+            status_label="AI Ready" if (groq_key or openai_key) else "Limited Mode",
+            status_caption=f"{autosave_status} · Canon {canon_label}",
             primary_action=hero_new_project,
             secondary_action=hero_open_workspace,
             tertiary_action=hero_run_analysis,
+            key_prefix="dashboard",
         )
 
         add_divider_with_spacing(top=3, bottom=3)
@@ -3688,13 +3713,18 @@ def _run_ui():
         # =====================================================================
         # 2️⃣ METRICS OVERVIEW ROW
         # =====================================================================
-        render_dashboard_section_header("Metrics Overview")
-        
+        render_dashboard_section_header("Top Metrics", "Operational overview across projects and AI systems.")
+
+        total_words = 0
+        for project_entry in recent_projects:
+            chapters = (project_entry.get("meta", {}).get("chapters") or {}).values()
+            total_words += sum(int((ch or {}).get("word_count") or 0) for ch in chapters)
+
         metrics = [
-            ("Total Projects", str(len(recent_projects))),
-            ("Active Workspace", active_project.title if active_project else "None"),
-            ("AI Operations Today", str(ai_ops_today)),
-            ("System Mode", system_mode),
+            ("Active Projects", str(len(recent_projects))),
+            ("Words Generated", f"{total_words:,}"),
+            ("AI Modules Active", "2" if (groq_key and openai_key) else "1" if (groq_key or openai_key) else "0"),
+            ("System Health", f"{project_health_percent}%"),
         ]
         render_metrics_row(metrics)
 
@@ -3716,7 +3746,7 @@ def _run_ui():
                 if not recent_projects:
                     st.info("📭 No projects yet — create your first workspace.")
                     return
-                for project_entry in recent_projects[:5]:
+                for row_idx, project_entry in enumerate(recent_projects[:5]):
                     meta = project_entry.get("meta", {})
                     title = meta.get("title") or os.path.basename(project_entry.get("path", "Untitled"))
                     modified = time.strftime(
@@ -3729,7 +3759,7 @@ def _run_ui():
                     with row[1]:
                         st.caption(f"Modified {modified}")
                     with row[2]:
-                        if st.button("Open Workspace", use_container_width=True, key=f"dash_hub_open_{project_entry['path']}"):
+                        if st.button("Open Workspace", use_container_width=True, key=f"dash_hub_open_{row_idx}_{project_entry['path']}_{uuid.uuid4().hex}"):
                             _open_project(project_entry["path"])
             
             render_workspace_hub_section("Recent Projects", _recent_projects_content)
@@ -3868,6 +3898,17 @@ def _run_ui():
                         open_ai_settings()
                 with cta_right:
                     st.caption("Groq and OpenAI are active.")
+
+        add_divider_with_spacing(top=2, bottom=2)
+        events = []
+        if st.session_state.get("last_action"):
+            ts = st.session_state.get("last_action_ts")
+            stamp = time.strftime("%H:%M", time.localtime(ts)) if ts else "now"
+            events.append((stamp, "Info", st.session_state.get("last_action")))
+        if recent_projects:
+            events.append(("Today", "Project", f"{len(recent_projects)} workspaces available"))
+        events.append(("Live", "System", f"{system_mode} mode · {autosave_status.lower()}"))
+        render_activity_feed(events)
 
 
     def render_projects():
@@ -5186,6 +5227,40 @@ def _run_ui():
             return
         curr_entry = chapter_map.get(curr.id, _serialize_chapter(curr))
         locked_chapters = st.session_state.get("locked_chapters", set())
+
+        utility_cols = st.columns([1.1, 1.1, 2.8])
+        with utility_cols[0]:
+            focus_mode = st.toggle(
+                "Focus Mode",
+                value=bool(st.session_state.get("editor_focus_mode", False)),
+                key=f"editor_focus_mode_{curr.id}",
+                help="Distraction-free writing canvas",
+            )
+            st.session_state.editor_focus_mode = focus_mode
+        with utility_cols[1]:
+            export_fmt = st.selectbox(
+                "Export",
+                ["PDF", "DOCX", "TXT"],
+                key=f"editor_export_fmt_{curr.id}",
+                help="Placeholder export menu",
+            )
+            if st.button("Export", key=f"editor_export_btn_{curr.id}", use_container_width=True):
+                st.toast(f"{export_fmt} export is queued.", icon="📦")
+        with utility_cols[2]:
+            target_words = int(curr.target_words or 0)
+            if target_words > 0:
+                progress_value = min(1.0, (curr.word_count or 0) / target_words)
+                st.progress(progress_value, text=f"Word progress: {curr.word_count}/{target_words}")
+            else:
+                st.caption(f"Word count: {curr.word_count} words")
+
+        if st.session_state.get("editor_focus_mode"):
+            st.html("""
+                <style>
+                section[data-testid="stSidebar"] { display:none !important; }
+                .block-container { max-width: 980px !important; }
+                </style>
+            """)
         # --- SAFELY sync programmatic chapter updates into the editor widget (before widget exists)
         ed_key = f"ed_{curr.id}"
         if (
