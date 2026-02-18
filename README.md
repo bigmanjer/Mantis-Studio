@@ -296,14 +296,31 @@ Accessible via footer links or the All Policies page.
 
 ---
 
-## 7. Known Issues & Planned Improvements
+## 7. Troubleshooting & Support
 
-### Current Limitations
+### 🆘 Experiencing Issues?
+
+If you encounter problems like black screens, rendering issues, or errors:
+
+1. **[Black Screen Troubleshooting Guide](docs/TROUBLESHOOTING_BLACK_SCREEN.md)** - Step-by-step fixes for blank screen issues
+2. **[Debug Mode Guide](docs/DEBUG_MODE.md)** - How to enable and use debug features
+3. **[GitHub Issues](https://github.com/bigmanjer/Mantis-Studio/issues)** - Report bugs or search for solutions
+
+### Quick Debug Steps
+
+1. Enable debug mode in sidebar: **Advanced > Enable Debug Mode**
+2. Check terminal logs for error messages
+3. Use the Debug Panel in sidebar to inspect app state
+4. See troubleshooting guides linked above for detailed steps
+
+### Known Issues & Planned Improvements
+
+#### Current Limitations
 
 * Some AI features are experimental
 * View files in `app/views/` are thin wrappers; render logic still lives in `app/main.py` (see `app/README.md` for migration status)
 
-### Recommended Next Steps for Contributors
+#### Recommended Next Steps for Contributors
 
 1. Add in-app tutorial/walkthrough mode
 2. Create sample projects for users to explore
