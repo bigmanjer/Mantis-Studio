@@ -49,7 +49,7 @@ def import_modules() -> int:
     modules = [
         "app.main",
         "app.utils.navigation",
-        "app.ui.layout",
+        "app.layout.layout",
     ]
     for module in modules:
         try:

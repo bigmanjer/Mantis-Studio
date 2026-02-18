@@ -42,12 +42,10 @@ _DEFAULT_MAP.update(EXTENDED_MAP)
 
 
 def get_nav_config(has_project: bool) -> Tuple[List[str], Dict[str, str]]:
-    try:
-        from app.router import get_nav_config as _get_nav_config
-
-        return _get_nav_config(has_project)
-    except Exception:
-        return list(_DEFAULT_NAV_LABELS), dict(_DEFAULT_MAP)
+    # Keep this module dependency-free from routing/layout to avoid
+    # circular imports and make nav config safe to import anywhere.
+    del has_project  # reserved for future nav variants
+    return list(_DEFAULT_NAV_LABELS), dict(_DEFAULT_MAP)
 
 
 def get_nav_items() -> List[Tuple[str, str, str]]:
