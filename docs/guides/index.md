@@ -17,6 +17,7 @@ Welcome to the Mantis Studio documentation hub. This index will help you find th
 ## 📖 Guides
 
 - **[Getting Started](GETTING_STARTED.md)** - Full installation, setup, and first project walkthrough
+- **[Using Custom GitHub Copilot Agent](USING_CUSTOM_AGENT.md)** - How to use the @mantis-engineer agent for development help
 - **[Contributing](CONTRIBUTING.md)** - Development setup, code style, workflow, and pull requests
 - **[Testing](testing.md)** - Writing and running tests, coverage, and best practices
 
@@ -65,8 +66,9 @@ Legal and compliance documents live in the root [`legal/`](../../legal/) directo
 
 ### For Developers
 1. [Contributing Guide](CONTRIBUTING.md) - How to contribute
-2. [Architecture Overview](../architecture/architecture.md) - System design
-3. [Testing Guide](testing.md) - Testing practices
+2. [Using Custom Agent](USING_CUSTOM_AGENT.md) - GitHub Copilot agent for development
+3. [Architecture Overview](../architecture/architecture.md) - System design
+4. [Testing Guide](testing.md) - Testing practices
 
 ### For Product/Design
 1. [Product Roadmap](../planning/ROADMAP.md) - Future plans
@@ -88,6 +90,7 @@ docs/
 │   ├── index.md                      # This file — documentation hub
 │   ├── CONTRIBUTING.md               # Contributing and development workflow
 │   ├── GETTING_STARTED.md            # Complete setup guide
+│   ├── USING_CUSTOM_AGENT.md         # GitHub Copilot custom agent guide
 │   └── testing.md                    # Testing guide
 ├── planning/
 │   ├── ROADMAP.md                    # Product roadmap

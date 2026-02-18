@@ -8,6 +8,7 @@ Thank you for your interest in contributing to MANTIS Studio! This guide will he
 
 - Python 3.10 or later
 - pip (Python package manager)
+- **(Optional)** GitHub Copilot subscription for using the custom agent
 
 ### Getting Started
 
@@ -27,6 +28,61 @@ pip install pytest  # For running tests
 # Run the app
 streamlit run app/main.py
 ```
+
+## 🤖 Using the Custom GitHub Copilot Agent
+
+**Have GitHub Copilot?** Use the `@mantis-engineer` agent for development help!
+
+The custom agent is your AI pair programmer that knows the Mantis Studio codebase inside and out.
+
+### Quick Start with the Agent
+
+1. **Open GitHub Copilot Chat** (in your IDE or on GitHub.com)
+2. **Type** `@mantis-engineer` followed by your question
+3. **Get specialized help** with:
+   - Debugging Streamlit issues
+   - Understanding session state patterns
+   - Refactoring code following project conventions
+   - Adding proper error handling
+   - Performance optimization
+
+### Example Developer Workflows
+
+**Debugging:**
+```
+@mantis-engineer The dashboard page shows blank after navigation. 
+How do I debug this? The terminal shows no errors.
+```
+
+**Refactoring:**
+```
+@mantis-engineer I need to extract this inline code from app/main.py 
+line 2500 to a proper view. What's the step-by-step process?
+```
+
+**Following Patterns:**
+```
+@mantis-engineer Show me an example of a properly structured render 
+function with error handling and key scoping.
+```
+
+**Session State:**
+```
+@mantis-engineer My session state keeps resetting. I'm initializing with:
+st.session_state.my_var = "value"
+What's wrong?
+```
+
+📖 **[Complete Agent Usage Guide →](USING_CUSTOM_AGENT.md)**
+
+The agent knows about:
+- All architectural patterns in the codebase
+- Session state management from `app/session_init.py`
+- Error handling patterns from `app/router.py`
+- UI context utilities from `app/ui_context.py`
+- Common pitfalls and their solutions
+
+---
 
 ## Project Structure
 
