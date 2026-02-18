@@ -332,7 +332,11 @@ def apply_suggestion(project: Project, classified: Dict[str, Any]) -> Tuple[Opti
             Project._merge_aliases(ent, novel_aliases_list, ent.name)
 
         desc_changed = ent.description != original_desc
-        aliases_changed = ent.aliases != original_aliases
+        aliases_changed = {
+            (a or "").strip().lower() for a in ent.aliases
+        } != {
+            (a or "").strip().lower() for a in original_aliases
+        }
         if not desc_changed and not aliases_changed:
             action = "duplicate"
         elif desc_changed:

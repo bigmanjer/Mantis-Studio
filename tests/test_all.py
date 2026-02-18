@@ -2388,7 +2388,10 @@ class TestWorldBibleButtons:
         assert "st.rerun()" in after
 
     def test_apply_suggestion_duplicate_toast_message(self):
-        assert "No new World Bible changes to apply." in self.body
+        idx = self.body.index("✅ Apply")
+        after = self.body[idx : idx + 1400]
+        assert '_action == "duplicate"' in after
+        assert "No new World Bible changes to apply." in after
 
     def test_ignore_suggestion_button_has_key(self):
         assert 'key=f"ignore_suggestion_{idx}"' in self.body
