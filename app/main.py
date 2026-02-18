@@ -3591,13 +3591,12 @@ def _run_ui():
             
             # Debug mode toggle for troubleshooting
             with st.expander("🔧 Advanced", expanded=False):
-                debug_mode = st.checkbox(
+                st.checkbox(
                     "Enable Debug Mode",
-                    value=st.session_state.get("debug", False),
+                    key="debug",
                     help="Show detailed debugging information and logs"
                 )
-                st.session_state.debug = debug_mode
-                if debug_mode:
+                if st.session_state.debug:
                     st.caption("✓ Debug mode active")
                     st.caption("Check terminal for detailed logs")
             
