@@ -311,4 +311,4 @@ The architecture supports extension through:
 
 ---
 
-*For more detailed architectural documentation, see the [architecture/](architecture/) directory.*
+*For more detailed architectural documentation, see the [architecture docs](.) directory.*
