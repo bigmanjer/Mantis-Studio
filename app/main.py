@@ -3737,9 +3737,11 @@ def _run_ui():
                     st.rerun()
                 
                 if st.button("🗑️ Clear Session State", use_container_width=True):
-                    for key in list(st.session_state.keys()):
+                    # Clear only user-defined keys, preserve Streamlit internal state
+                    keys_to_clear = [k for k in st.session_state.keys() if not k.startswith("_")]
+                    for key in keys_to_clear:
                         del st.session_state[key]
-                    st.toast("Session state cleared")
+                    st.toast(f"Cleared {len(keys_to_clear)} session state keys")
                     st.rerun()
 
     def render_home():
@@ -5953,12 +5955,13 @@ def _run_ui():
     except Exception as exc:
         error_msg = f"{type(exc).__name__}: {exc}"
         st.session_state["last_exception"] = error_msg
-        logger.exception("=" * 60)
-        logger.exception("UNHANDLED UI EXCEPTION")
-        logger.exception("=" * 60)
-        logger.exception(f"Page: {st.session_state.get('page', 'unknown')}")
-        logger.exception(f"Error: {error_msg}", exc_info=True)
-        logger.exception("=" * 60)
+        logger.error("=" * 60)
+        logger.error("UNHANDLED UI EXCEPTION")
+        logger.error("=" * 60)
+        logger.error(f"Page: {st.session_state.get('page', 'unknown')}")
+        logger.error(f"Error: {error_msg}")
+        logger.exception("Exception details:", exc_info=True)
+        logger.error("=" * 60)
         
         st.error("⚠️ **Something went wrong while rendering this page.**")
         st.markdown("""
