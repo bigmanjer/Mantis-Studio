@@ -78,26 +78,21 @@ Improved error boundary with:
 - **Comprehensive error logging** with clear section markers
 
 ### 5. Documentation ✅
-Created three new documentation files:
+**Note:** Documentation was later consolidated into a single comprehensive guide.
 
-**docs/DEBUG_MODE.md** (5.7KB)
-- Complete guide for using debug features
+**docs/DEBUGGING.md** (18KB) - Complete consolidated debugging guide
+- Overview and quick start
 - How to enable debug mode (2 methods)
-- What debug mode provides
-- Debug panel sections explained
-- Logging output reference
+- Comprehensive black screen troubleshooting
+- Step-by-step solutions for common issues
+- Debug panel and features explained
+- Visual guide with UI examples
+- Terminal output examples
+- Logging reference and log levels
+- Advanced topics
 - Performance considerations
 - Privacy notes
-- Reporting issues guide
-
-**docs/TROUBLESHOOTING_BLACK_SCREEN.md** (5.4KB)
-- Step-by-step black screen fixes
-- Common causes and solutions
-- Installation verification
-- Browser debugging
-- Clean restart procedures
-- Debug information collection
-- Issue reporting template
+- Issue reporting guide
 - Known issues and workarounds
 
 **Updated README.md**
@@ -182,7 +177,7 @@ Created `/tmp/test_mantis_debug.py` that validates:
    Inspect session state, check last exception
 
 4. **Follow Troubleshooting Guide**
-   See `docs/TROUBLESHOOTING_BLACK_SCREEN.md`
+   See `docs/DEBUGGING.md`
 
 ### For Developers
 
@@ -193,7 +188,7 @@ Created `/tmp/test_mantis_debug.py` that validates:
 
 ## Files Changed
 
-### Modified Files (1)
+### Modified Files (2)
 - `app/main.py` - Core debugging implementation
   - Enhanced logging configuration
   - Startup diagnostics
@@ -201,14 +196,17 @@ Created `/tmp/test_mantis_debug.py` that validates:
   - Debug mode toggle
   - Improved error handling
   - Code review fixes applied
+- `README.md` - Added troubleshooting section with link to consolidated guide
 
-### New Files (3)
-- `docs/DEBUG_MODE.md` - Debug features guide
-- `docs/TROUBLESHOOTING_BLACK_SCREEN.md` - Troubleshooting guide
-- `/tmp/test_mantis_debug.py` - Validation test script
+### New Files (1)
+- `docs/DEBUGGING.md` - Comprehensive consolidated debugging guide (18KB)
+  - Combines debug mode, troubleshooting, and visual guide
+  - Single source of truth for all debugging topics
 
-### Updated Files (1)
-- `README.md` - Added troubleshooting section
+### Removed Files (3)
+- `docs/DEBUG_MODE.md` - Merged into DEBUGGING.md
+- `docs/TROUBLESHOOTING_BLACK_SCREEN.md` - Merged into DEBUGGING.md
+- `docs/DEBUG_VISUAL_GUIDE.md` - Merged into DEBUGGING.md
 
 ## Impact Assessment
 

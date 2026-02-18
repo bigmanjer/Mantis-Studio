@@ -302,16 +302,15 @@ Accessible via footer links or the All Policies page.
 
 If you encounter problems like black screens, rendering issues, or errors:
 
-1. **[Black Screen Troubleshooting Guide](docs/TROUBLESHOOTING_BLACK_SCREEN.md)** - Step-by-step fixes for blank screen issues
-2. **[Debug Mode Guide](docs/DEBUG_MODE.md)** - How to enable and use debug features
-3. **[GitHub Issues](https://github.com/bigmanjer/Mantis-Studio/issues)** - Report bugs or search for solutions
+1. **[📖 Complete Debugging Guide](docs/DEBUGGING.md)** - Comprehensive troubleshooting, debug mode, and visual guide
+2. **[GitHub Issues](https://github.com/bigmanjer/Mantis-Studio/issues)** - Report bugs or search for solutions
 
 ### Quick Debug Steps
 
 1. Enable debug mode in sidebar: **Advanced > Enable Debug Mode**
 2. Check terminal logs for error messages
 3. Use the Debug Panel in sidebar to inspect app state
-4. See troubleshooting guides linked above for detailed steps
+4. See the [debugging guide](docs/DEBUGGING.md) for detailed step-by-step instructions
 
 ### Known Issues & Planned Improvements
 
