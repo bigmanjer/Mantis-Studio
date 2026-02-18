@@ -5948,7 +5948,19 @@ if __name__ == "__main__":
         raise SystemExit(run_repair())
 
     # Default: run the Streamlit UI (Streamlit will execute this script).
-    import streamlit.web.cli as stcli
-
-    sys.argv = ["streamlit", "run", __file__]
-    sys.exit(stcli.main())
+    # Check if we're already running inside Streamlit to avoid double-initialization
+    try:
+        from streamlit import runtime
+        if runtime.exists():
+            # Already running in Streamlit, don't launch again
+            pass
+        else:
+            # Not running in Streamlit yet, launch it
+            import streamlit.web.cli as stcli
+            sys.argv = ["streamlit", "run", __file__]
+            sys.exit(stcli.main())
+    except ImportError:
+        # Fallback if streamlit.runtime doesn't exist
+        import streamlit.web.cli as stcli
+        sys.argv = ["streamlit", "run", __file__]
+        sys.exit(stcli.main())
