@@ -43,6 +43,13 @@ def initialize_session_state(st) -> None:
     This function is idempotent - it only sets values that don't already exist.
     Safe to call on every rerun.
     
+    NOTE: This is the new signature. The legacy version in app/state.py accepted
+    a config_data parameter which is now loaded internally. If migrating from
+    legacy code, simply remove the config_data argument:
+    
+    Before: initialize_session_state(st, config_data)
+    After:  initialize_session_state(st)
+    
     Args:
         st: The streamlit module instance
     """

@@ -5942,18 +5942,18 @@ def _run_ui():
             
             col1, col2 = st.columns(2)
             with col1:
-                if st.button("🏠 Return to Dashboard", use_container_width=True, type="primary", key="error_fallback_home"):
+                if st.button("🏠 Return to Dashboard", use_container_width=True, type="primary", key="main_error_fallback_home"):
                     st.session_state.page = "home"
                     st.rerun()
             with col2:
-                if st.button("🔄 Reload App", use_container_width=True, key="error_fallback_reload"):
+                if st.button("🔄 Reload App", use_container_width=True, key="main_error_fallback_reload"):
                     st.rerun()
         except Exception as fallback_exc:
             # Last resort: even the error UI failed
             logger.critical(f"Error fallback UI failed: {fallback_exc}", exc_info=True)
             try:
                 st.text("Critical error - please refresh the page")
-                if st.button("Refresh", key="error_critical_refresh"):
+                if st.button("Refresh", key="main_error_critical_refresh"):
                     st.rerun()
             except Exception:
                 # Nothing we can do at this point

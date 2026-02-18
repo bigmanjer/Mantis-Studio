@@ -114,11 +114,27 @@ def install_key_helpers(st) -> Tuple[contextmanager, Dict[Tuple[str, str, str], 
     return key_scope, widget_counters
 
 
-def initialize_session_state(st, config_data: Dict[str, str]) -> None:
+def initialize_session_state(st, config_data: Dict[str, str] = None) -> None:
     """Legacy wrapper - now delegates to app.session_init module.
     
     This function is maintained for backward compatibility with existing imports.
     New code should import from app.session_init directly.
+    
+    NOTE: The config_data parameter is now ignored and deprecated.
+    Configuration is loaded automatically by the new implementation.
+    
+    Args:
+        st: Streamlit module instance
+        config_data: DEPRECATED - no longer used, kept for backward compatibility
     """
+    import warnings
+    if config_data is not None:
+        warnings.warn(
+            "The config_data parameter is deprecated and will be removed in a future version. "
+            "Configuration is now loaded automatically.",
+            DeprecationWarning,
+            stacklevel=2
+        )
+    
     from app.session_init import initialize_session_state as init_session
     init_session(st)

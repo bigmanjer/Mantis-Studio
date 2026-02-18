@@ -135,11 +135,11 @@ def render_error_fallback(st, ctx: Any, error_msg: str, exc: Exception) -> None:
         # Action buttons
         col1, col2 = st.columns(2)
         with col1:
-            if st.button("🏠 Return to Dashboard", use_container_width=True, type="primary"):
+            if st.button("🏠 Return to Dashboard", use_container_width=True, type="primary", key="router_error_fallback_home"):
                 st.session_state.page = "home"
                 st.rerun()
         with col2:
-            if st.button("🔄 Reload App", use_container_width=True):
+            if st.button("🔄 Reload App", use_container_width=True, key="router_error_fallback_reload"):
                 st.rerun()
                 
     except Exception as fallback_exc:
@@ -148,7 +148,7 @@ def render_error_fallback(st, ctx: Any, error_msg: str, exc: Exception) -> None:
         try:
             # Absolute minimum UI
             st.text("Critical error - please refresh the page")
-            if st.button("Refresh"):
+            if st.button("Refresh", key="router_error_critical_refresh"):
                 st.rerun()
         except Exception:
             # Nothing we can do at this point
