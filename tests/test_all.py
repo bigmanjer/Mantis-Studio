@@ -2167,7 +2167,7 @@ class TestProjectsPageButtons:
 
 
 class TestAISettingsButtons:
-    """AI Settings page: apply key, clear key, fetch models, test, save."""
+    """AI Settings page: apply key, clear key, and save."""
 
     @pytest.fixture(autouse=True)
     def _load(self):
@@ -2178,7 +2178,7 @@ class TestAISettingsButtons:
 
     def test_apply_key_calls_rerun(self):
         idx = self.body.index("Apply Key")
-        after = self.body[idx : idx + 1200]
+        after = self.body[idx : idx + 1500]
         assert "st.rerun()" in after
 
     def test_clear_key_button_has_key(self):
@@ -2189,15 +2189,11 @@ class TestAISettingsButtons:
         after = self.body[idx : idx + 400]
         assert "st.rerun()" in after
 
-    def test_fetch_models_button_exists(self):
-        assert "Fetch Models" in self.body
+    def test_fetch_models_button_removed(self):
+        assert "↻ Fetch Models" not in self.body
 
-    def test_fetch_models_groq_calls_rerun(self):
-        # Find the groq fetch section
-        assert self.body.count("Fetch Models") >= 2  # groq + openai
-
-    def test_test_connection_button_exists(self):
-        assert "Test Connection" in self.body
+    def test_test_connection_button_removed(self):
+        assert "🔌 Test Connection" not in self.body
 
     def test_test_all_models_button_has_key(self):
         assert "test_all_models_btn" in self.body
@@ -2211,6 +2207,13 @@ class TestAISettingsButtons:
         after = self.body[idx : idx + 500]
         assert "fetch_fn" in after or "fetch_openai_models" in after or "fetch_groq_models" in after, (
             "Apply Key should auto-fetch models after setting key"
+        )
+
+    def test_apply_key_auto_tests_connection(self):
+        idx = self.body.index("Apply Key")
+        after = self.body[idx : idx + 700]
+        assert "test_fn" in after or "test_openai_connection" in after or "test_groq_connection" in after, (
+            "Apply Key should auto-test connection after setting key"
         )
 
 
@@ -2758,7 +2761,7 @@ class TestDeleteConfirmationPairs:
 
 
 class TestApplyKeyAutoFetch:
-    """Pressing Apply Key should automatically fetch models."""
+    """Pressing Apply Key should automatically fetch models and model selection should test connection."""
 
     def test_groq_or_openai_fetch_in_apply_handler(self):
         body = _extract_render_function("render_ai_settings")
@@ -2771,6 +2774,13 @@ class TestApplyKeyAutoFetch:
             or "fetch_groq_models" in handler
             or "fetch_openai_models" in handler
         ), "Apply Key should auto-fetch models"
+
+    def test_model_selection_auto_tests_connection(self):
+        body = _extract_render_function("render_ai_settings")
+        assert "if openai_model != st.session_state.openai_model" in body
+        assert "if groq_model != st.session_state.groq_model" in body
+        assert "test_openai_connection" in body
+        assert "test_groq_connection" in body
 
 
 # ---------------------------------------------------------------------------
