@@ -5949,18 +5949,17 @@ if __name__ == "__main__":
 
     # Default: run the Streamlit UI (Streamlit will execute this script).
     # Check if we're already running inside Streamlit to avoid double-initialization
+    should_launch = True
     try:
         from streamlit import runtime
         if runtime.exists():
             # Already running in Streamlit, don't launch again
-            pass
-        else:
-            # Not running in Streamlit yet, launch it
-            import streamlit.web.cli as stcli
-            sys.argv = ["streamlit", "run", __file__]
-            sys.exit(stcli.main())
+            should_launch = False
     except ImportError:
-        # Fallback if streamlit.runtime doesn't exist
+        # streamlit.runtime doesn't exist in older versions, try to launch anyway
+        pass
+    
+    if should_launch:
         import streamlit.web.cli as stcli
         sys.argv = ["streamlit", "run", __file__]
         sys.exit(stcli.main())
