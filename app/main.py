@@ -311,8 +311,8 @@ def _validate_api_key_format(key: str) -> bool:
     """Basic sanity check for API key format.
 
     Returns ``True`` when the key looks plausible (only printable ASCII,
-    reasonable length).  This is not authoritative – the real validation
-    happens server-side – but it catches obvious mistakes like pasting
+    reasonable length).  This is not authoritative  the real validation
+    happens server-side  but it catches obvious mistakes like pasting
     HTML or binary content into the key field.
     """
     if not key:
@@ -777,7 +777,7 @@ class Project:
             match = pattern.search(self.outline)
             if match:
                 raw_text = match.group(1).strip()
-                split_text = re.split(r" [-–:] ", raw_text, 1)
+                split_text = re.split(r" [-:] ", raw_text, 1)
                 final_title = sanitize_chapter_title(split_text[0].strip())
                 if len(final_title) > 2:
                     title = final_title
@@ -1746,7 +1746,7 @@ def _run_ui():
             st.rerun()
 
     def render_copyright():
-        content = _read_legal_file("copyright.md", "## Copyright\n\n© MANTIS Studio")
+        content = _read_legal_file("copyright.md", "## Copyright\n\n MANTIS Studio")
         st.markdown(content)
         if st.button("Back to All Policies", key=ui_key("copyright", "back")):
             st.session_state.page = "legal"
@@ -2928,14 +2928,14 @@ def _run_ui():
     )
 
     def _format_genre_list(genres: List[str]) -> str:
-        return " · ".join(genres)
+        return "  ".join(genres)
 
     def _parse_genre_list(raw: str) -> List[str]:
         cleaned = re.sub(r"(?i)^(genres?)[:\s-]*", "", (raw or "")).strip()
         if not cleaned:
             return []
         cleaned = cleaned.replace("|", ",")
-        parts = re.split(r"[,\n·/]+", cleaned)
+        parts = re.split(r"[,\n/]+", cleaned)
         return [part.strip() for part in parts if part.strip()]
 
     def _ai_generation_available() -> bool:
@@ -3132,7 +3132,7 @@ def _run_ui():
         ]
         genre_count = min(4, len(genres))
         picks = random.sample(genres, k=genre_count)
-        return " · ".join(picks)
+        return "  ".join(picks)
 
     def test_groq_connection(base_url: str, api_key: str) -> bool:
         headers = {}
@@ -3611,7 +3611,7 @@ def _run_ui():
                         if models:
                             st.session_state[f"{provider}_model_list"] = models
                             st.session_state[f"{provider}_model_tests"] = {}
-                            st.toast(f"{provider_label} key activated — loaded {len(models)} models.")
+                            st.toast(f"{provider_label} key activated  loaded {len(models)} models.")
                         else:
                             st.toast(f"{provider_label} key activated for this session.")
                         st.session_state[f"{provider}_connection_tested"] = False
@@ -3888,7 +3888,7 @@ def _run_ui():
                     with st.expander(label):
                         st.markdown(_read_text_with_encoding_fallback(path))
                 else:
-                    st.caption(f"{label} — not available")
+                    st.caption(f"{label}  not available")
 
     def render_workspace_settings():
         render_page_header(
@@ -5581,7 +5581,7 @@ def _run_ui():
                         if is_collision:
                             issues.append("Name collision")
                         if issues:
-                            st.caption(f"{' • '.join(issues)}")
+                            st.caption(f"{'  '.join(issues)}")
 
                         detail_suffix = e.name
                         detail_label = build_expander_label("Open details", detail_suffix)
@@ -5911,8 +5911,8 @@ def _run_ui():
                     with st.container(border=True):
                         r1, r2 = st.columns([3, 1])
                         with r1:
-                            st.markdown(f"**{ent.name}** • {ent.category}")
-                            st.caption(" • ".join(reasons))
+                            st.markdown(f"**{ent.name}**  {ent.category}")
+                            st.caption("  ".join(reasons))
                         with r2:
                             if st.button("Jump to Entity", key=f"jump_entity_{ent.id}", use_container_width=True):
                                 st.session_state["world_focus_entity"] = ent.id
@@ -6390,7 +6390,7 @@ def _run_ui():
                     continue
                 raw = (match.group(1) or "").strip()
                 raw = re.sub(r"\*\*", "", raw).strip()
-                raw = re.split(r"\s[-–:]\s", raw, 1)[0].strip()
+                raw = re.split(r"\s[-:]\s", raw, 1)[0].strip()
                 cleaned = sanitize_chapter_title(raw)
                 if cleaned:
                     return cleaned
@@ -6561,7 +6561,7 @@ def _run_ui():
                     _update_session_chapter(curr)
                     save_p()
 
-                st.caption(f"Chapter: {curr.word_count} words • Total: {p.get_total_word_count()} words")
+                st.caption(f"Chapter: {curr.word_count} words  Total: {p.get_total_word_count()} words")
 
                 c1, c2 = st.columns([1, 1])
                 with c1:
@@ -6710,7 +6710,7 @@ def _run_ui():
                 if chapter_drafts:
                     st.markdown("#### Draft Versions")
                     for idx, draft in enumerate(chapter_drafts, start=1):
-                        label = f"Draft {idx} • {draft.get('mode', 'Improved')} • {time.strftime('%Y-%m-%d %H:%M', time.localtime(draft.get('timestamp', 0)))}"
+                        label = f"Draft {idx}  {draft.get('mode', 'Improved')}  {time.strftime('%Y-%m-%d %H:%M', time.localtime(draft.get('timestamp', 0)))}"
                         with st.expander(label):
                             st.text_area(
                                 "Draft Text",
@@ -7324,6 +7324,7 @@ if __name__ == "__main__":
         import streamlit.web.cli as stcli
         sys.argv = ["streamlit", "run", __file__]
         sys.exit(stcli.main())
+
 
 
 

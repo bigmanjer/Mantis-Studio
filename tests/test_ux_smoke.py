@@ -1,4 +1,4 @@
-"""Comprehensive UX smoke tests for MANTIS Studio.
+﻿"""Comprehensive UX smoke tests for MANTIS Studio.
 
 These tests validate every page and critical function from the user's
 standpoint without requiring a running Streamlit server.  They exercise
@@ -26,7 +26,7 @@ if str(ROOT) not in sys.path:
 
 
 # ---------------------------------------------------------------------------
-# 1) Critical imports – every module that the UI depends on must import
+# 1) Critical imports  every module that the UI depends on must import
 # ---------------------------------------------------------------------------
 
 class TestCriticalImports:
@@ -42,12 +42,12 @@ class TestCriticalImports:
         mod = importlib.import_module("app.main")
         source = Path(mod.__file__).read_text(encoding="utf-8")
         assert re.search(
-            r"st\.button\([\s\S]*?['\"]➕ Create Chapter 1['\"][\s\S]*?"
+            r"st\.button\([\s\S]*?['\"] Create Chapter 1['\"][\s\S]*?"
             r"key\s*=\s*['\"]editor_create_chapter_1['\"]",
             source,
         )
         assert re.search(
-            r"st\.button\([\s\S]*?['\"]➕ New Chapter['\"][\s\S]*?"
+            r"st\.button\([\s\S]*?['\"] New Chapter['\"][\s\S]*?"
             r"key\s*=\s*['\"]editor_new_chapter['\"]",
             source,
         )
@@ -55,12 +55,12 @@ class TestCriticalImports:
         ctx = importlib.import_module("app.app_context")
         ctx_source = Path(ctx.__file__).read_text(encoding="utf-8")
         assert re.search(
-            r"st\.button\([\s\S]*?['\"]➕ Create Chapter 1['\"][\s\S]*?"
+            r"st\.button\([\s\S]*?['\"] Create Chapter 1['\"][\s\S]*?"
             r"key\s*=\s*['\"]editor_create_chapter_1['\"]",
             ctx_source,
         )
         assert re.search(
-            r"st\.button\([\s\S]*?['\"]➕ New Chapter['\"][\s\S]*?"
+            r"st\.button\([\s\S]*?['\"] New Chapter['\"][\s\S]*?"
             r"key\s*=\s*['\"]editor_new_chapter['\"]",
             ctx_source,
         )
@@ -123,7 +123,7 @@ class TestCriticalImports:
 
 
 # ---------------------------------------------------------------------------
-# 2) Project CRUD – the core data model that all pages rely on
+# 2) Project CRUD  the core data model that all pages rely on
 # ---------------------------------------------------------------------------
 
 class TestProjectCRUD:
@@ -272,7 +272,7 @@ class TestProjectCRUD:
 
 
 # ---------------------------------------------------------------------------
-# 2b) Save – app config atomic write
+# 2b) Save  app config atomic write
 # ---------------------------------------------------------------------------
 
 class TestAppConfigSave:
@@ -307,7 +307,7 @@ class TestAppConfigSave:
 
 
 # ---------------------------------------------------------------------------
-# 3) Export – verify markdown generation (Export page logic)
+# 3) Export  verify markdown generation (Export page logic)
 # ---------------------------------------------------------------------------
 
 class TestExport:
@@ -336,7 +336,7 @@ class TestExport:
 
 
 # ---------------------------------------------------------------------------
-# 4) Navigation – sidebar routing config
+# 4) Navigation  sidebar routing config
 # ---------------------------------------------------------------------------
 
 class TestNavigation:
@@ -355,7 +355,7 @@ class TestNavigation:
 
 
 # ---------------------------------------------------------------------------
-# 4b) Navigation parity – sidebar and footer must stay in sync
+# 4b) Navigation parity  sidebar and footer must stay in sync
 # ---------------------------------------------------------------------------
 
 
@@ -418,7 +418,7 @@ class TestNavigationParity:
 
 
 # ---------------------------------------------------------------------------
-# 5) Auth stub – must not crash the app
+# 5) Auth stub  must not crash the app
 # ---------------------------------------------------------------------------
 
 class TestAuth:
@@ -469,7 +469,7 @@ class TestUtilities:
 
 
 # ---------------------------------------------------------------------------
-# 7) Rewrite presets – used by the Editor page
+# 7) Rewrite presets  used by the Editor page
 # ---------------------------------------------------------------------------
 
 class TestRewritePresets:
@@ -490,7 +490,7 @@ class TestRewritePresets:
 
 
 # ---------------------------------------------------------------------------
-# 8) Entity matching – World Bible fuzzy matching
+# 8) Entity matching  World Bible fuzzy matching
 # ---------------------------------------------------------------------------
 
 class TestEntityMatching:
@@ -521,7 +521,7 @@ class TestEntityMatching:
 
 
 # ---------------------------------------------------------------------------
-# 9) Chapter operations – Editor page logic
+# 9) Chapter operations  Editor page logic
 # ---------------------------------------------------------------------------
 
 class TestChapterOperations:
@@ -557,7 +557,7 @@ class TestChapterOperations:
 
 
 # ---------------------------------------------------------------------------
-# 10) AppConfig – configuration sanity
+# 10) AppConfig  configuration sanity
 # ---------------------------------------------------------------------------
 
 class TestAppConfig:
@@ -585,7 +585,7 @@ class TestAppConfig:
 
 
 # ---------------------------------------------------------------------------
-# 11) Selftest – verify the built-in selftest still works
+# 11) Selftest  verify the built-in selftest still works
 # ---------------------------------------------------------------------------
 
 class TestSelftest:
@@ -597,7 +597,7 @@ class TestSelftest:
 
 
 # ---------------------------------------------------------------------------
-# 12) update_locked_chapters – must be defined (previously missing)
+# 12) update_locked_chapters  must be defined (previously missing)
 # ---------------------------------------------------------------------------
 
 class TestUpdateLockedChapters:
@@ -873,7 +873,7 @@ class TestHelpers:
 
 
 # ---------------------------------------------------------------------------
-# 17) Layout duplicate removal – styles.py must no longer exist
+# 17) Layout duplicate removal  styles.py must no longer exist
 # ---------------------------------------------------------------------------
 
 
@@ -899,7 +899,7 @@ class TestLayoutConsolidation:
 
 
 # ---------------------------------------------------------------------------
-# 18b) Light mode theme quality – comfort and readability
+# 18b) Light mode theme quality  comfort and readability
 # ---------------------------------------------------------------------------
 
 
@@ -948,7 +948,7 @@ class TestLightModeThemeQuality:
 
 
 # ---------------------------------------------------------------------------
-# 18) Input sanitization – AI prompt safety
+# 18) Input sanitization  AI prompt safety
 # ---------------------------------------------------------------------------
 
 
@@ -985,7 +985,7 @@ class TestSanitizeAIInput:
 
 
 # ---------------------------------------------------------------------------
-# 19) Improved error handling – Project.load with corrupt JSON
+# 19) Improved error handling  Project.load with corrupt JSON
 # ---------------------------------------------------------------------------
 
 
@@ -1015,7 +1015,7 @@ class TestProjectLoadErrorHandling:
 
 
 # ---------------------------------------------------------------------------
-# 20) Service module sync – verify service modules match main.py
+# 20) Service module sync  verify service modules match main.py
 # ---------------------------------------------------------------------------
 
 
@@ -1073,7 +1073,7 @@ class TestAPIKeyValidation:
 
     def test_key_with_non_ascii_rejected(self):
         from app.main import _validate_api_key_format
-        assert _validate_api_key_format("sk-abc™def456") is False
+        assert _validate_api_key_format("sk-abcdef456") is False
 
     def test_very_long_key_rejected(self):
         from app.main import _validate_api_key_format
@@ -1081,7 +1081,7 @@ class TestAPIKeyValidation:
 
 
 # ---------------------------------------------------------------------------
-# 22b) API key persistence – keys survive refresh via config file
+# 22b) API key persistence  keys survive refresh via config file
 # ---------------------------------------------------------------------------
 
 
@@ -1155,7 +1155,7 @@ class TestAPIKeyPersistence:
 
 
 # ---------------------------------------------------------------------------
-# 23) HTML rendering – st.html() migration
+# 23) HTML rendering  st.html() migration
 # ---------------------------------------------------------------------------
 
 
@@ -1294,7 +1294,7 @@ class TestQuickActionButtonsStyled:
 
 
 # ---------------------------------------------------------------------------
-# World Bible DB – structured lore intelligence layer
+# World Bible DB  structured lore intelligence layer
 # ---------------------------------------------------------------------------
 
 class TestWorldBibleDB:
@@ -1811,7 +1811,7 @@ class TestWidgetWrapGuard:
     def test_wrap_widget_sets_sentinel(self):
         source = Path(ROOT / "app" / "main.py").read_text(encoding="utf-8")
         assert "_mantis_wrapped" in source, (
-            "_mantis_wrapped sentinel not found – the double-wrap guard is missing"
+            "_mantis_wrapped sentinel not found  the double-wrap guard is missing"
         )
 
     def test_maybe_wrap_checks_sentinel(self):
@@ -1824,7 +1824,7 @@ class TestWidgetWrapGuard:
     def test_state_wrap_widget_sets_sentinel(self):
         source = Path(ROOT / "app" / "state.py").read_text(encoding="utf-8")
         assert "_mantis_wrapped" in source, (
-            "_mantis_wrapped sentinel not found in state.py – "
+            "_mantis_wrapped sentinel not found in state.py  "
             "the double-wrap guard is missing"
         )
 
@@ -1855,3 +1855,4 @@ class TestWidgetWrapGuard:
         assert first_wrapper is second_wrapper, (
             "install_key_helpers double-wrapped selectbox"
         )
+

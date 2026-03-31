@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """
 Version Bumping Script for Mantis Studio
 
@@ -74,7 +74,7 @@ def main():
     # Write new version
     try:
         version_file.write_text(new_version + "\n", encoding='utf-8')
-        print(f"✅ Version bumped: {current_version} → {new_version}")
+        print(f" Version bumped: {current_version}  {new_version}")
     except Exception as e:
         print(f"Error writing VERSION.txt: {e}", file=sys.stderr)
         sys.exit(1)
@@ -82,3 +82,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

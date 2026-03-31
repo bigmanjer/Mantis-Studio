@@ -1,8 +1,8 @@
-"""Intelligent merge engine for World Bible AI suggestions.
+﻿"""Intelligent merge engine for World Bible AI suggestions.
 
 Decides whether a suggestion should update an existing entity, add aliases,
 expand a description, or create a new entry.  Uses semantic similarity
-(``difflib.SequenceMatcher``) — no external ML dependencies required.
+(``difflib.SequenceMatcher``)  no external ML dependencies required.
 
 Decision flow
 -------------
@@ -12,9 +12,9 @@ Decision flow
 3. Compute a *similarity score* between the existing and incoming
    descriptions to decide whether the new text is truly additive.
 4. Classify the suggestion as one of:
-   - ``"update"``      – merge description + aliases into an existing entry
-   - ``"alias_only"``  – only attach new aliases, description is redundant
-   - ``"new"``         – create a brand-new entity
+   - ``"update"``       merge description + aliases into an existing entry
+   - ``"alias_only"``   only attach new aliases, description is redundant
+   - ``"new"``          create a brand-new entity
 5. Attach a *confidence* rating and a human-readable *reason* string so the
    review UI can explain what will happen.
 
@@ -49,7 +49,7 @@ def _bullet_points(text: str) -> List[str]:
     lines = text.strip().splitlines()
     points: List[str] = []
     for line in lines:
-        cleaned = re.sub(r"^[-•*]\s*", "", line).strip()
+        cleaned = re.sub(r"^[-*]\s*", "", line).strip()
         if not cleaned:
             continue
         # If the line looks like a single bullet / short phrase, keep it whole
@@ -72,7 +72,7 @@ def _normalize_bullet(text: str) -> str:
 
 
 def _description_similarity(existing: str, incoming: str) -> float:
-    """Semantic similarity between two descriptions (0.0 – 1.0)."""
+    """Semantic similarity between two descriptions (0.0  1.0)."""
     if not existing or not incoming:
         return 0.0
     return difflib.SequenceMatcher(
@@ -151,13 +151,13 @@ def classify_suggestion(
 
     Returns a *new* dict (does not mutate the input) with these extra keys:
 
-    - ``type``       — ``"update"`` | ``"alias_only"`` | ``"new"`` | ``"duplicate"``
-    - ``entity_id``  — the matched entity's id (if any)
-    - ``match_name`` — the matched entity's canonical name (if any)
-    - ``reason``     — human-readable explanation
-    - ``novel_bullets``  — list of genuinely new description bullet points
-    - ``novel_aliases``  — list of genuinely new aliases
-    - ``confidence``     — a float 0–1
+    - ``type``        ``"update"`` | ``"alias_only"`` | ``"new"`` | ``"duplicate"``
+    - ``entity_id``   the matched entity's id (if any)
+    - ``match_name``  the matched entity's canonical name (if any)
+    - ``reason``      human-readable explanation
+    - ``novel_bullets``   list of genuinely new description bullet points
+    - ``novel_aliases``   list of genuinely new aliases
+    - ``confidence``      a float 01
     """
     name = (suggestion.get("name") or "").strip()
     category = (suggestion.get("category") or "").strip()
@@ -179,7 +179,7 @@ def classify_suggestion(
 
     if not name:
         result["type"] = "new"
-        result["reason"] = "No name provided — manual review required."
+        result["reason"] = "No name provided  manual review required."
         result["novel_bullets"] = _bullet_points(description)
         result["novel_aliases"] = aliases
         return result
@@ -196,7 +196,7 @@ def classify_suggestion(
         result["novel_aliases"] = aliases
         return result
 
-    # --- Existing match found — decide update vs alias-only ---
+    # --- Existing match found  decide update vs alias-only ---
     result["entity_id"] = match.id
     result["match_name"] = match.name
 
@@ -220,11 +220,11 @@ def classify_suggestion(
             f"Description is already covered. {len(novel_a)} new alias(es) to add."
         )
     else:
-        # Everything is already present — this is a duplicate
+        # Everything is already present  this is a duplicate
         result["type"] = "duplicate"
         result["reason"] = (
             f"Matches existing entry '{match.name}'. "
-            "All information is already present — nothing to add."
+            "All information is already present  nothing to add."
         )
 
     # Boost confidence when match is strong
@@ -256,7 +256,7 @@ def merge_description_bullets(entity: Entity, novel_bullets: List[str]) -> None:
     desc = (entity.description or "").strip()
 
     # Convert existing plain text to bullet format if needed
-    if desc and not desc.startswith("-") and not desc.startswith("•"):
+    if desc and not desc.startswith("-") and not desc.startswith(""):
         desc = f"- {desc}"
 
     for bullet in novel_bullets:
@@ -361,3 +361,4 @@ def _create_new(project: Project, classified: Dict[str, Any]) -> Tuple[Optional[
         allow_alias=True,
     )
     return ent, status  # "created" or "matched"
+

@@ -1,4 +1,4 @@
-"""Project models and logic for Mantis Studio.
+﻿"""Project models and logic for Mantis Studio.
 
 Note: This module is part of the new app/ structure.
       Current implementation still uses mantis.core.models for backward compatibility.
@@ -137,7 +137,7 @@ def sanitize_chapter_title(title: str) -> str:
     raw = (title or "").strip()
     if not raw:
         return ""
-    clean = raw.replace("“", "").replace("”", "").replace("’", "")
+    clean = raw.replace("", "").replace("", "").replace("", "")
     clean = clean.replace('"', "").replace("'", "")
     clean = re.sub(r"^\*+|\*+$", "", clean).strip()
     clean = re.sub(r"\s{2,}", " ", clean).strip()
@@ -418,7 +418,7 @@ class Project:
             match = pattern.search(self.outline)
             if match:
                 raw_text = match.group(1).strip()
-                split_text = re.split(r" [-–:] ", raw_text, 1)
+                split_text = re.split(r" [-:] ", raw_text, 1)
                 final_title = sanitize_chapter_title(split_text[0].strip())
                 if len(final_title) > 2:
                     title = final_title
@@ -646,3 +646,4 @@ class Project:
 
         logger.warning("Failed to delete project file: %s", filepath, exc_info=True)
         return False, str(last_error) if last_error else "Unknown delete error."
+

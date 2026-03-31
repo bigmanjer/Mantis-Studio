@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """
 MANTIS Studio - Application Entry
 
@@ -13,7 +13,7 @@ If you're looking to understand how the app works, refer to:
     - mantis/router.py (navigation)
     - mantis/ui/pages/* (view implementations)
 """
-# app/main.py — MANTIS Studio
+# app/main.py  MANTIS Studio
 #
 # Run:
 #   python -m streamlit run app/main.py
@@ -123,10 +123,10 @@ def _run_ui():
         results = st.session_state.get("coherence_results", [])
         issue_count = len(results)
         if issue_count == 0:
-            return "🟢", "Canon Stable"
+            return "", "Canon Stable"
         if issue_count <= 2:
-            return "🟡", "Minor Canon Drift"
-        return "🔴", "High Canon Risk"
+            return "", "Minor Canon Drift"
+        return "", "High Canon Risk"
 
     def detect_hard_canon_violation(project: Project, chapter_index: int, new_text: str) -> List[Dict[str, Any]]:
         hard_rules = (project.memory_hard or project.memory or "").strip()
@@ -176,13 +176,13 @@ def _run_ui():
         st.markdown("## Terms of Service\n\nProvided as-is for creative use.")
 
     def render_copyright():
-        st.markdown("## Copyright\n\n© MANTIS Studio")
+        st.markdown("## Copyright\n\n MANTIS Studio")
 
     def render_help():
         st.markdown("## Help\n\nVisit our [GitHub](https://github.com/bigmanjer/Mantis-Studio/issues) for support.")
 
     icon_path = resolve_asset_path(ASSETS_DIR, "branding/mantis_favicon.png")
-    page_icon = str(icon_path) if icon_path and icon_path.exists() else "🪲"
+    page_icon = str(icon_path) if icon_path and icon_path.exists() else ""
     st.set_page_config(page_title=AppConfig.APP_NAME, page_icon=page_icon, layout="wide")
 
     config_data = load_app_config()
@@ -210,7 +210,7 @@ def _run_ui():
         if not path:
             logger.error("persist_project failed for '%s' (action=%s)", project.title, action)
             try:
-                st.toast("⚠️ Save failed — check file permissions and disk space.", icon="⚠️")
+                st.toast(" Save failed  check file permissions and disk space.", icon="")
             except Exception as e:
                 st.error(f"Save failed for '{project.title}': {e}")
             return False
@@ -566,7 +566,7 @@ def _run_ui():
         ]
         genre_count = min(4, len(genres))
         picks = random.sample(genres, k=genre_count)
-        return " · ".join(picks)
+        return "  ".join(picks)
 
     def test_groq_connection(base_url: str, api_key: str) -> bool:
         headers = {}
@@ -786,12 +786,12 @@ def _run_ui():
             summary = [f"{added} new", f"{matched} existing", f"{flagged} flagged"]
             if suggested:
                 summary.append(f"{suggested} suggested updates")
-            st.toast(f"World Bible updated ✓ ({', '.join(summary)})", icon="🌍")
+            st.toast(f"World Bible updated  ({', '.join(summary)})", icon="")
         else:
             if total_detected > 0:
-                st.toast("Detected entities, but they all matched existing entries.", icon="🤷")
+                st.toast("Detected entities, but they all matched existing entries.", icon="")
             else:
-                st.toast("No entities detected in this text.", icon="🤷")
+                st.toast("No entities detected in this text.", icon="")
 
     query = st.query_params.get("page")
     if query == "privacy":
@@ -824,9 +824,9 @@ def _run_ui():
         render_page_header(
             "AI Tools",
             "Connect providers, choose models, and validate access.",
-            primary_label="💾 Save settings",
+            primary_label=" Save settings",
             primary_action=save_settings_action,
-            secondary_label="↻ Refresh models",
+            secondary_label=" Refresh models",
             secondary_action=refresh_all_models,
             tag="Settings",
             key_prefix="ai_header",
@@ -845,7 +845,7 @@ def _run_ui():
         provider_cols = st.columns(2)
         with provider_cols[0]:
             with st.container(border=True):
-                st.markdown("### 🤖 Groq")
+                st.markdown("###  Groq")
                 groq_url = st.text_input("Groq Base URL", value=st.session_state.groq_base_url)
                 if groq_url != st.session_state.groq_base_url:
                     st.session_state.groq_base_url = groq_url
@@ -860,7 +860,7 @@ def _run_ui():
                 if groq_key != _display_ai_key("groq"):
                     _set_ai_key("groq", groq_key)
 
-                if st.button("↻ Fetch Groq Models", use_container_width=True):
+                if st.button(" Fetch Groq Models", use_container_width=True):
                     models, error_message = fetch_groq_models(
                         st.session_state.groq_base_url,
                         st.session_state.groq_api_key,
@@ -881,7 +881,7 @@ def _run_ui():
                         idx = models.index(st.session_state.groq_model)
                     groq_model = st.selectbox("Groq Model", models, index=idx)
 
-                    if st.button("🧪 Test All Groq Models", use_container_width=True):
+                    if st.button(" Test All Groq Models", use_container_width=True):
                         results = {}
                         total = len(models)
                         progress = st.progress(0)
@@ -921,7 +921,7 @@ def _run_ui():
                 )
                 if not st.session_state.groq_api_key:
                     st.info("No Groq API key yet. Create one above and paste it here to unlock Groq models.")
-                if st.button("🔌 Test Groq Connection", use_container_width=True):
+                if st.button(" Test Groq Connection", use_container_width=True):
                     ok = test_groq_connection(
                         st.session_state.groq_base_url,
                         st.session_state.groq_api_key,
@@ -934,7 +934,7 @@ def _run_ui():
 
         with provider_cols[1]:
             with st.container(border=True):
-                st.markdown("### ✨ OpenAI")
+                st.markdown("###  OpenAI")
                 openai_url = st.text_input("OpenAI Base URL", value=st.session_state.openai_base_url)
                 if openai_url != st.session_state.openai_base_url:
                     st.session_state.openai_base_url = openai_url
@@ -951,7 +951,7 @@ def _run_ui():
                 if not st.session_state.openai_api_key:
                     st.info("No OpenAI API key yet. Create one and paste it here to unlock OpenAI models.")
 
-                if st.button("↻ Fetch OpenAI Models", use_container_width=True):
+                if st.button(" Fetch OpenAI Models", use_container_width=True):
                     models, error_message = fetch_openai_models(
                         st.session_state.openai_base_url,
                         st.session_state.openai_api_key,
@@ -972,7 +972,7 @@ def _run_ui():
                         idx = models.index(st.session_state.openai_model)
                     openai_model = st.selectbox("OpenAI Model", models, index=idx)
 
-                    if st.button("🧪 Test All OpenAI Models", use_container_width=True):
+                    if st.button(" Test All OpenAI Models", use_container_width=True):
                         results = {}
                         total = len(models)
                         progress = st.progress(0)
@@ -1010,7 +1010,7 @@ def _run_ui():
                 st.markdown(
                     "[Create an OpenAI account](https://platform.openai.com/api-keys) to get an API key."
                 )
-                if st.button("🔌 Test OpenAI Connection", use_container_width=True):
+                if st.button(" Test OpenAI Connection", use_container_width=True):
                     ok = test_openai_connection(
                         st.session_state.openai_base_url,
                         st.session_state.openai_api_key,
@@ -1022,22 +1022,22 @@ def _run_ui():
                         st.error("OpenAI connection failed. Check your base URL and key.")
 
         with st.container(border=True):
-            st.markdown("### ✅ Actions")
+            st.markdown("###  Actions")
             action_cols = st.columns(4)
             with action_cols[0]:
                 st.checkbox("Auto-save", key="auto_save")
             with action_cols[1]:
-                if st.button("↻ Refresh Groq Models", use_container_width=True):
+                if st.button(" Refresh Groq Models", use_container_width=True):
                     st.cache_data.clear()
                     refresh_models()
                     st.toast("Model list refreshed")
             with action_cols[2]:
-                if st.button("↻ Refresh OpenAI Models", use_container_width=True):
+                if st.button(" Refresh OpenAI Models", use_container_width=True):
                     st.cache_data.clear()
                     refresh_openai_models()
                     st.toast("OpenAI model list refreshed")
             with action_cols[3]:
-                if st.button("💾 Save AI Settings", use_container_width=True):
+                if st.button(" Save AI Settings", use_container_width=True):
                     save_app_settings()
 
     def render_legal_redirect():
@@ -1067,7 +1067,7 @@ def _run_ui():
                     {sidebar_logo_html}
                 </div>
                 <div>
-                    <div class="mantis-sidebar-title">MANTIS Studio — v{AppConfig.VERSION}</div>
+                    <div class="mantis-sidebar-title">MANTIS Studio  v{AppConfig.VERSION}</div>
                     <div class="mantis-sidebar-sub">Modular AI Narrative Text Intelligence System</div>
                 </div>
             </div>
@@ -1076,22 +1076,22 @@ def _run_ui():
 
             st.markdown("---")
 
-            st.markdown("### 🎨 Appearance")
+            st.markdown("###  Appearance")
             st.selectbox("Theme", ["Dark", "Light"], key="ui_theme")
             st.divider()
 
             if st.session_state.project:
                 p = st.session_state.project
-                st.markdown("### 📖 Project")
+                st.markdown("###  Project")
                 st.caption(p.title)
                 projects_dir = get_active_projects_dir()
                 if projects_dir:
-                    st.caption(f"🗂 Projects folder: `{projects_dir}`")
-                st.caption(f"📚 Total words: {p.get_total_word_count()}")
+                    st.caption(f" Projects folder: `{projects_dir}`")
+                st.caption(f" Total words: {p.get_total_word_count()}")
 
             st.divider()
-            st.markdown("### 🧭 Navigation")
-            st.caption("Dashboard • Projects • Editor • World Bible • Memory • Insights • Export")
+            st.markdown("###  Navigation")
+            st.caption("Dashboard  Projects  Editor  World Bible  Memory  Insights  Export")
 
             nav_labels, pmap = router.get_nav_config(bool(st.session_state.project))
             current_page = st.session_state.page
@@ -1128,11 +1128,11 @@ def _run_ui():
 
                 cA, cB = st.columns(2)
                 with cA:
-                    if st.button("💾 Save", type="primary", use_container_width=True):
+                    if st.button(" Save", type="primary", use_container_width=True):
                         if persist_project(p, action="save"):
                             st.toast("Saved")
                 with cB:
-                    if st.button("✖ Close", use_container_width=True):
+                    if st.button(" Close", use_container_width=True):
                         save_p()
                         st.session_state.project = None
                         st.session_state.page = "home"
@@ -1170,7 +1170,7 @@ def _run_ui():
         weekly_goal = max(1, int(st.session_state.weekly_sessions_goal))
         weekly_count = _weekly_activity_count()
         canon_icon, canon_label = get_canon_health()
-        latest_chapter_label = "You last worked on Chapter — · recently"
+        latest_chapter_label = "You last worked on Chapter   recently"
         latest_chapter_index = None
         latest_chapter_id = None
         latest_ts = None
@@ -1183,18 +1183,18 @@ def _run_ui():
             latest_ts = ch.modified_at or ch.created_at
             latest_chapter_index = ch.index
             latest_chapter_id = ch.id
-            latest_chapter_label = f"Latest: Chapter {ch.index} — {ch.title}"
+            latest_chapter_label = f"Latest: Chapter {ch.index}  {ch.title}"
 
-        primary_label = "✨ Start your story"
+        primary_label = " Start your story"
         primary_target = "projects"
-        if canon_icon == "🔴":
-            primary_label = "🛠 Fix story issues"
+        if canon_icon == "":
+            primary_label = " Fix story issues"
             primary_target = "world"
         elif has_chapter and latest_chapter_index:
-            primary_label = f"▶ Continue Chapter {latest_chapter_index}"
+            primary_label = f" Continue Chapter {latest_chapter_index}"
             primary_target = "chapters"
         elif has_outline:
-            primary_label = "📝 Build your outline"
+            primary_label = " Build your outline"
             primary_target = "outline"
 
         def open_recent_project(target: str, focus_tab: Optional[str] = None) -> None:
@@ -1256,19 +1256,19 @@ def _run_ui():
                     if primary_target == "chapters" and latest_chapter_id:
                         st.session_state.curr_chap_id = latest_chapter_id
                     open_recent_project(primary_target)
-                if st.button("➕ New project", use_container_width=True):
+                if st.button(" New project", use_container_width=True):
                     open_new_project()
                 st.caption(f"Canon health: {canon_icon} {canon_label}.")
 
         kpi_cols = st.columns(4)
         with kpi_cols[0]:
-            stat_tile("Active projects", str(len(recent_projects)), icon="📁")
+            stat_tile("Active projects", str(len(recent_projects)), icon="")
         with kpi_cols[1]:
-            stat_tile("Latest genre", (recent_snapshot or {}).get("genre", "—"), icon="🏷️")
+            stat_tile("Latest genre", (recent_snapshot or {}).get("genre", ""), icon="")
         with kpi_cols[2]:
-            stat_tile("Weekly sessions", f"{weekly_count}/{weekly_goal}", icon="🗓️")
+            stat_tile("Weekly sessions", f"{weekly_count}/{weekly_goal}", icon="")
         with kpi_cols[3]:
-            stat_tile("Writing streak", f"{_activity_streak()} days", icon="🔥")
+            stat_tile("Writing streak", f"{_activity_streak()} days", icon="")
 
         def action_tile(title: str, body: str, button_label: str, on_click: Callable[[], None], key: str) -> None:
             with st.container(border=True):
@@ -1289,10 +1289,10 @@ def _run_ui():
                     open_recent_project(primary_target)
                 action_row = st.columns(2)
                 with action_row[0]:
-                    if st.button("📂 Resume project", use_container_width=True, disabled=not recent_projects):
+                    if st.button(" Resume project", use_container_width=True, disabled=not recent_projects):
                         open_recent_project("chapters")
                 with action_row[1]:
-                    if st.button("🧭 New project", use_container_width=True):
+                    if st.button(" New project", use_container_width=True):
                         open_new_project()
                 st.caption("Suggested action adapts to your recent writing activity.")
 
@@ -1300,25 +1300,25 @@ def _run_ui():
             with st.container(border=True):
                 qa_row_1 = st.columns(3)
                 with qa_row_1[0]:
-                    action_tile("✍️ Editor", "Draft chapters and summaries.", "Open editor", lambda: open_recent_project("chapters"), "qa_editor")
+                    action_tile(" Editor", "Draft chapters and summaries.", "Open editor", lambda: open_recent_project("chapters"), "qa_editor")
                 with qa_row_1[1]:
-                    action_tile("📝 Outline", "Plan beats, arcs, and chapter flow.", "Open outline", lambda: open_recent_project("outline"), "qa_outline")
+                    action_tile(" Outline", "Plan beats, arcs, and chapter flow.", "Open outline", lambda: open_recent_project("outline"), "qa_outline")
                 with qa_row_1[2]:
-                    action_tile("🌍 World Bible", "Characters, places, factions, lore.", "Open world bible", lambda: open_recent_project("world"), "qa_world")
+                    action_tile(" World Bible", "Characters, places, factions, lore.", "Open world bible", lambda: open_recent_project("world"), "qa_world")
 
                 qa_row_2 = st.columns(3)
                 with qa_row_2[0]:
-                    action_tile("🧠 Memory", "Hard canon rules and guidelines.", "Open memory", lambda: open_recent_project("world", focus_tab="Memory"), "qa_memory")
+                    action_tile(" Memory", "Hard canon rules and guidelines.", "Open memory", lambda: open_recent_project("world", focus_tab="Memory"), "qa_memory")
                 with qa_row_2[1]:
-                    action_tile("📊 Insights", "Canon health and analytics.", "Open insights", lambda: open_recent_project("world", focus_tab="Insights"), "qa_insights")
+                    action_tile(" Insights", "Canon health and analytics.", "Open insights", lambda: open_recent_project("world", focus_tab="Insights"), "qa_insights")
                 with qa_row_2[2]:
-                    action_tile("⬇️ Export", "Download your project as markdown.", "Export", open_export, "qa_export")
+                    action_tile(" Export", "Download your project as markdown.", "Export", open_export, "qa_export")
 
             section_header("My projects", "Pick up where you left off or jump into a different world.")
             with st.container(border=True):
                 if not recent_projects:
-                    st.info("📭 No projects yet. Create one to get started.")
-                    if st.button("➕ Create a project", use_container_width=True, type="primary"):
+                    st.info(" No projects yet. Create one to get started.")
+                    if st.button(" Create a project", use_container_width=True, type="primary"):
                         open_new_project()
                 else:
                     header = st.columns([2.4, 1, 1])
@@ -1332,13 +1332,13 @@ def _run_ui():
                     for project_entry in recent_projects[:5]:
                         meta = project_entry.get("meta", {})
                         title = meta.get("title") or os.path.basename(project_entry.get("path", "Untitled"))
-                        genre = meta.get("genre") or "—"
+                        genre = meta.get("genre") or ""
                         chapters = meta.get("chapters") or {}
                         total_words = sum((c.get("word_count") or 0) for c in chapters.values())
                         row = st.columns([2.4, 1, 1])
                         with row[0]:
                             if st.button(
-                                f"📂 {title}",
+                                f" {title}",
                                 use_container_width=True,
                                 key=f"dash_proj_{project_entry.get('path', '')}",
                             ):
@@ -1347,7 +1347,7 @@ def _run_ui():
                                     st.session_state.project = loaded
                                     st.session_state.page = "chapters"
                                     st.rerun()
-                            st.caption(f"{len(chapters)} chapters · {total_words:,} words")
+                            st.caption(f"{len(chapters)} chapters  {total_words:,} words")
                         with row[1]:
                             st.caption(genre)
                         with row[2]:
@@ -1385,7 +1385,7 @@ def _run_ui():
                     st.markdown("**AI Settings**")
                     st.caption("Manage providers, models, and API access.")
                     if st.button(
-                        "⚙️ AI Settings",
+                        " AI Settings",
                         key="dashboard__utilities_ai_settings",
                         use_container_width=True,
                         help="Jump to AI Tools to configure Groq/OpenAI.",
@@ -1395,7 +1395,7 @@ def _run_ui():
                     st.markdown("**Help Docs**")
                     st.caption("Guides, README notes, and updates.")
                     st.link_button(
-                        "📖 Help Docs",
+                        " Help Docs",
                         "https://github.com/bigmanjer/Mantis-Studio",
                         use_container_width=True,
                         help="Open the project documentation in a new tab.",
@@ -1403,7 +1403,7 @@ def _run_ui():
 
 
         if not st.session_state.groq_api_key or not st.session_state.openai_api_key:
-            with card("🔑 Connect your AI providers", "Unlock generation, summaries, and entity tools with API access."):
+            with card(" Connect your AI providers", "Unlock generation, summaries, and entity tools with API access."):
                 cta_left, cta_right = st.columns(2)
                 with cta_left:
                     st.link_button("Create Groq Account", "https://console.groq.com/keys", use_container_width=True)
@@ -1414,10 +1414,10 @@ def _run_ui():
                         use_container_width=True,
                     )
         else:
-            with card("✅ AI providers connected", "Your AI providers are configured and ready to use."):
+            with card(" AI providers connected", "Your AI providers are configured and ready to use."):
                 cta_left, cta_right = st.columns(2)
                 with cta_left:
-                    if st.button("⚙️ Manage AI Settings", use_container_width=True, key="dashboard__ai_connected_settings"):
+                    if st.button(" Manage AI Settings", use_container_width=True, key="dashboard__ai_connected_settings"):
                         open_ai_settings()
                 with cta_right:
                     st.caption("Groq and OpenAI are active.")
@@ -1445,7 +1445,7 @@ def _run_ui():
             "Create, import, and manage your story worlds.",
             primary_label=primary_label,
             primary_action=open_latest_project,
-            secondary_label="⬇️ Import draft",
+            secondary_label=" Import draft",
             secondary_action=lambda: st.toast("Use the importer below to bring in .txt or .md files."),
             tag="Workspace",
             key_prefix="projects_header",
@@ -1466,7 +1466,7 @@ def _run_ui():
                 with c2:
                     g = st.text_input("Genre", placeholder="e.g., Dark Fantasy, Sci-Fi Noir")
                 a = st.text_input("Author (optional)", placeholder="Your name")
-                submitted = st.form_submit_button("🚀 Initialize Project", type="primary", use_container_width=True)
+                submitted = st.form_submit_button(" Initialize Project", type="primary", use_container_width=True)
                 if submitted:
                     if not t:
                         t = _random_project_title()
@@ -1526,7 +1526,7 @@ def _run_ui():
         )
         with st.container(border=True):
             if not recent_projects:
-                st.info("📭 No projects yet. Start a new project above to get going.")
+                st.info(" No projects yet. Start a new project above to get going.")
             else:
                 for project_entry in recent_projects[:30]:
                     full = project_entry["path"]
@@ -1537,7 +1537,7 @@ def _run_ui():
                         genre = meta.get("genre") or ""
                         row1, row2, row3, row4 = st.columns([5, 2, 1.5, 1])
                         with row1:
-                            if st.button(f"📂 {title}", key=f"open_{full}", use_container_width=True):
+                            if st.button(f" {title}", key=f"open_{full}", use_container_width=True):
                                 loaded = load_project_safe(full, context="project")
                                 if loaded:
                                     st.session_state.project = loaded
@@ -1547,11 +1547,11 @@ def _run_ui():
                         with row2:
                             st.caption(genre)
                         with row3:
-                            if st.button("⬇️ Export", key=f"export_{full}", use_container_width=True):
+                            if st.button(" Export", key=f"export_{full}", use_container_width=True):
                                 st.session_state.export_project_path = full
                                 st.rerun()
                         with row4:
-                            if st.button("🗑", key=f"del_{full}", use_container_width=True):
+                            if st.button("", key=f"del_{full}", use_container_width=True):
                                 st.session_state.delete_project_path = full
                                 st.session_state.delete_project_title = title
                     except Exception:
@@ -1563,7 +1563,7 @@ def _run_ui():
                 st.warning(f"Delete **{title}**? This cannot be undone.")
                 d1, d2 = st.columns(2)
                 with d1:
-                    if st.button("🗑 Confirm delete", type="primary", use_container_width=True):
+                    if st.button(" Confirm delete", type="primary", use_container_width=True):
                         Project.delete_file(st.session_state.delete_project_path)
                         if (
                             st.session_state.project
@@ -1594,7 +1594,7 @@ def _run_ui():
                     st.markdown("### Export Project")
                     st.caption("Download a single markdown file containing outline, world bible, and chapters.")
                     st.download_button(
-                        "⬇️ Download .md",
+                        " Download .md",
                         project_to_markdown(export_project),
                         file_name=f"{export_project.title}.md",
                         use_container_width=True,
@@ -1634,7 +1634,7 @@ def _run_ui():
             st.markdown(f"### {export_project.title}")
             st.caption("Download a single markdown file containing outline, world bible, and chapters.")
             st.download_button(
-                "⬇️ Download .md",
+                " Download .md",
                 project_to_markdown(export_project),
                 file_name=f"{export_project.title}.md",
                 use_container_width=True,
@@ -1644,7 +1644,7 @@ def _run_ui():
         p = st.session_state.project
         if not p:
             with st.container(border=True):
-                st.info("📭 No project loaded. Create or open a project to edit an outline.")
+                st.info(" No project loaded. Create or open a project to edit an outline.")
                 if st.button("Go to Projects", use_container_width=True):
                     st.session_state.page = "projects"
                     st.rerun()
@@ -1659,9 +1659,9 @@ def _run_ui():
         render_page_header(
             "Outline",
             "Your blueprint. Generate structure, scan entities, and keep the story plan here.",
-            primary_label="💾 Save outline",
+            primary_label=" Save outline",
             primary_action=save_outline_action,
-            secondary_label="🔍 Scan entities",
+            secondary_label=" Scan entities",
             secondary_action=scan_outline_action,
             tag="Project",
             key_prefix="outline_header",
@@ -1707,7 +1707,7 @@ def _run_ui():
                     save_p()
                     st.session_state["outline_meta_snapshot"] = (p.title or "", p.genre or "")
             with top3:
-                if st.button("💾 Save Project", type="primary", use_container_width=True):
+                if st.button(" Save Project", type="primary", use_container_width=True):
                     if persist_project(p, action="save"):
                         st.toast("Saved")
 
@@ -1718,13 +1718,13 @@ def _run_ui():
 
         with left:
             with st.container(border=True):
-                st.markdown("### 🧩 Blueprint")
+                st.markdown("###  Blueprint")
                 val = st.text_area("Plot Outline", p.outline, height=560, key="out_txt", label_visibility="collapsed")
                 if val != p.outline:
                     p.outline = val
                     save_p()
 
-                if st.button("💾 Save Outline", use_container_width=True):
+                if st.button(" Save Outline", use_container_width=True):
                     if persist_project(p, action="save"):
                         # Automatically scan entities on save so World Bible stays in sync.
                         extract_entities_ui(p.outline or "", "Outline")
@@ -1732,11 +1732,11 @@ def _run_ui():
 
         with right:
             with st.container(border=True):
-                st.markdown("### 🏗️ Architect (AI)")
+                st.markdown("###  Architect (AI)")
                 st.caption("Generate a chapter-by-chapter outline and append it to your blueprint.")
 
                 chaps = st.number_input("Chapters", 1, 50, 12)
-                if st.button("✨ Generate Structure", type="primary", use_container_width=True):
+                if st.button(" Generate Structure", type="primary", use_container_width=True):
                     # use outline_stream_ph defined above
                     full = ""
                     prompt = (
@@ -1763,7 +1763,7 @@ def _run_ui():
         p = st.session_state.project
         if not p:
             with st.container(border=True):
-                st.info("📭 No project loaded. Open or create a project to access the World Bible.")
+                st.info(" No project loaded. Open or create a project to access the World Bible.")
                 if st.button("Go to Projects", use_container_width=True):
                     st.session_state.page = "projects"
                     st.rerun()
@@ -1783,9 +1783,9 @@ def _run_ui():
         render_page_header(
             "World Bible",
             "Track canonical characters, locations, factions, and lore.",
-            primary_label="➕ Add entity",
+            primary_label=" Add entity",
             primary_action=open_add_entity,
-            secondary_label="🔍 Run scan",
+            secondary_label=" Run scan",
             secondary_action=lambda: extract_entities_ui(p.outline or "", "Outline"),
             tag="Canon",
             key_prefix="world_header",
@@ -1931,27 +1931,27 @@ def _run_ui():
         last_scan_ts = st.session_state.get("last_entity_scan") or p.last_modified
         canon_icon, canon_label = get_canon_health()
         canon_class = "good"
-        if canon_icon == "🟡":
+        if canon_icon == "":
             canon_class = "warn"
-        elif canon_icon == "🔴":
+        elif canon_icon == "":
             canon_class = "risk"
 
         with card("World overview", "Live status of your canon database."):
             top_cols = st.columns([1, 1, 1, 1, 1.2])
             with top_cols[0]:
-                stat_tile("Total entities", str(len(entries)), icon="📘")
+                stat_tile("Total entities", str(len(entries)), icon="")
             with top_cols[1]:
-                stat_tile("Orphaned", str(len(orphaned_ids)), icon="🛰️")
+                stat_tile("Orphaned", str(len(orphaned_ids)), icon="")
             with top_cols[2]:
-                stat_tile("Locked", str(len(locked_entities)), icon="🔒")
+                stat_tile("Locked", str(len(locked_entities)), icon="")
             with top_cols[3]:
                 stat_tile(
                     "Last scan",
                     time.strftime("%Y-%m-%d %H:%M", time.localtime(last_scan_ts)),
-                    icon="🕒",
+                    icon="",
                 )
             with top_cols[4]:
-                stat_tile("Canon health", f"{canon_icon} {canon_label}", icon="✅")
+                stat_tile("Canon health", f"{canon_icon} {canon_label}", icon="")
 
         with card("Search & filters", "Refine by status, recency, or canon risk."):
             f1, f2, f3, f4 = st.columns([2.2, 1, 1, 1])
@@ -1987,16 +1987,16 @@ def _run_ui():
 
         review_queue = st.session_state.get("world_bible_review", [])
         if review_queue:
-            with card("🔍 Review AI Suggestions", "AI suggestions are queued for review. Apply to update canon."):
+            with card(" Review AI Suggestions", "AI suggestions are queued for review. Apply to update canon."):
                 for idx, item in enumerate(list(review_queue)):
                     stype = item.get("type", "new")
                     label = f"{item.get('name', 'Unnamed')} | {item.get('category', 'Lore')}"
                     if stype == "update":
-                        label = f"🔄 {label}"
+                        label = f" {label}"
                     elif stype == "alias_only":
-                        label = f"🏷️ {label}"
+                        label = f" {label}"
                     else:
-                        label = f"🆕 {label}"
+                        label = f" {label}"
                     expander_label = build_expander_label(label, str(idx))
                     with st.expander(expander_label):
                         type_labels = {"update": "Update Existing", "alias_only": "Add Aliases", "new": "New Entry"}
@@ -2027,7 +2027,7 @@ def _run_ui():
 
                         c1, c2 = st.columns(2)
                         with c1:
-                            if st.button("✅ Apply", key=f"apply_suggestion_{idx}", use_container_width=True):
+                            if st.button(" Apply", key=f"apply_suggestion_{idx}", use_container_width=True):
                                 from app.services.world_bible_merge import apply_suggestion as _apply_suggestion
                                 applied_ent, _action = _apply_suggestion(p, item)
                                 # Clear cached widget values so the UI
@@ -2045,7 +2045,7 @@ def _run_ui():
                                     st.toast("World Bible updated.")
                                 st.rerun()
                         with c2:
-                            if st.button("🗑 Ignore", key=f"ignore_suggestion_{idx}", use_container_width=True):
+                            if st.button(" Ignore", key=f"ignore_suggestion_{idx}", use_container_width=True):
                                 review_queue.pop(idx)
                                 st.session_state["world_bible_review"] = review_queue
                                 st.toast("Suggestion removed.")
@@ -2060,7 +2060,7 @@ def _run_ui():
                 with top[0]:
                     st.markdown(f"### {category}")
                 with top[2]:
-                    if st.button(f"➕ Add {category}", use_container_width=True):
+                    if st.button(f" Add {category}", use_container_width=True):
                         st.session_state[f"add_open_{category}"] = True
 
                 if st.session_state.get(f"add_open_{category}", False):
@@ -2106,7 +2106,7 @@ def _run_ui():
                     ents = [e for e in ents if e.created_at >= recent_cutoff]
 
                 if not ents:
-                    st.info(f"📭 No {category} entries yet. Add one above or scan entities from your outline/chapters.")
+                    st.info(f" No {category} entries yet. Add one above or scan entities from your outline/chapters.")
                     return
 
                 ents = sorted(ents, key=lambda ent: (ent.name or "").lower())
@@ -2117,13 +2117,13 @@ def _run_ui():
                     is_under_described = e.id in under_described_ids
                     is_collision = e.id in collision_ids
                     if is_orphaned:
-                        status_icon = "💤"
+                        status_icon = ""
                     elif is_collision:
-                        status_icon = "🔴"
+                        status_icon = ""
                     elif is_under_described:
-                        status_icon = "🟡"
+                        status_icon = ""
                     else:
-                        status_icon = "🟢"
+                        status_icon = ""
 
                     highlight = "highlight" if e.id in flagged_entity_ids or e.id == focus_entity else ""
 
@@ -2135,7 +2135,7 @@ def _run_ui():
                                     <div class="world-card-title">{status_icon} {e.name}</div>
                                     <div class="world-card-meta">
                                         <span class="world-badge">{e.category}</span>
-                                        <span class="world-card-metric">📌 {mention_count} mentions</span>
+                                        <span class="world-card-metric"> {mention_count} mentions</span>
                                     </div>
                                 </div>
                             </div>
@@ -2150,7 +2150,7 @@ def _run_ui():
                         if is_collision:
                             issues.append("Name collision")
                         if issues:
-                            st.caption(f"⚠️ {' • '.join(issues)}")
+                            st.caption(f" {'  '.join(issues)}")
 
                         detail_suffix = e.name
                         detail_label = build_expander_label("Open details", detail_suffix)
@@ -2181,7 +2181,7 @@ def _run_ui():
                                     list(options.keys()),
                                     key=f"jump_select_{e.id}",
                                 )
-                                if st.button("📖 Jump to Chapter", key=f"jump_{e.id}", use_container_width=True):
+                                if st.button(" Jump to Chapter", key=f"jump_{e.id}", use_container_width=True):
                                     st.session_state.page = "chapters"
                                     st.session_state.curr_chap_id = options[sel]
                                     st.session_state._force_nav = True
@@ -2209,7 +2209,7 @@ def _run_ui():
                                             st.session_state.delete_entity_id = None
                                             st.session_state.delete_entity_name = None
                                             st.rerun()
-                                elif st.button("🗑 Delete", key=f"del_{e.id}", use_container_width=True):
+                                elif st.button(" Delete", key=f"del_{e.id}", use_container_width=True):
                                     st.session_state.delete_entity_id = e.id
                                     st.session_state.delete_entity_name = e.name
                             with d2:
@@ -2224,9 +2224,9 @@ def _run_ui():
         elif selected_tab == "Lore":
             render_cat("Lore")
         elif selected_tab == "Memory":
-            st.markdown("### 🧠 World Memory")
+            st.markdown("###  World Memory")
             st.caption("Keep canon notes, timelines, and facts the AI should always know.")
-            st.markdown("#### 🔒 Hard Canon Rules")
+            st.markdown("####  Hard Canon Rules")
             hard_key = f"world_memory_hard_{p.id}"
             hard_default = p.memory_hard or p.memory
             hard_val = st.text_area("Hard Canon Rules", hard_default, height=160, key=hard_key)
@@ -2234,25 +2234,25 @@ def _run_ui():
                 p.memory_hard = hard_val
                 save_p()
 
-            st.markdown("#### 🧭 Soft Guidelines")
+            st.markdown("####  Soft Guidelines")
             soft_key = f"world_memory_soft_{p.id}"
             soft_val = st.text_area("Soft Guidelines", p.memory_soft, height=160, key=soft_key)
             if soft_val != p.memory_soft:
                 p.memory_soft = soft_val
                 save_p()
 
-            st.markdown("#### 🧠 Project Memory")
+            st.markdown("####  Project Memory")
             memory_key = f"world_memory_{p.id}"
             memory_val = st.text_area("Memory", p.memory, height=320, key=memory_key)
             if memory_val != p.memory:
                 p.memory = memory_val
                 save_p()
-            if st.button("💾 Save Memory", use_container_width=True):
+            if st.button(" Save Memory", use_container_width=True):
                 if persist_project(p, action="save"):
                     st.toast("Memory saved")
 
             st.divider()
-            st.markdown("#### 🔍 Coherence Check")
+            st.markdown("####  Coherence Check")
             scope_cols = st.columns(3)
             with scope_cols[0]:
                 scope_outline = st.checkbox("Outline", value=True, key=f"coh_outline_{p.id}")
@@ -2261,7 +2261,7 @@ def _run_ui():
             with scope_cols[2]:
                 scope_chapters = st.checkbox("Chapters", value=True, key=f"coh_chapters_{p.id}")
 
-            if st.button("🔍 Run Coherence Check", use_container_width=True):
+            if st.button(" Run Coherence Check", use_container_width=True):
                 compiled_world_bible = "\n".join(
                     f"{e.name} ({e.category}): {e.description}"
                     for e in p.world_db.values()
@@ -2305,7 +2305,7 @@ def _run_ui():
 
             results = st.session_state.get("coherence_results", [])
             if results:
-                st.markdown("#### 🧩 Coherence Issues")
+                st.markdown("####  Coherence Issues")
                 for idx, issue in enumerate(list(results)):
                     with st.container(border=True):
                         chapter_idx = issue.get("chapter_index", "?")
@@ -2317,7 +2317,7 @@ def _run_ui():
 
                         a1, a2 = st.columns(2)
                         with a1:
-                            if st.button("✅ Apply Fix", key=f"coh_apply_{idx}", use_container_width=True):
+                            if st.button(" Apply Fix", key=f"coh_apply_{idx}", use_container_width=True):
                                 target_excerpt = issue.get("target_excerpt", "")
                                 try:
                                     chapter_num = int(chapter_idx)
@@ -2359,14 +2359,14 @@ def _run_ui():
                                 else:
                                     st.warning("Target excerpt not found in chapter content.")
                         with a2:
-                            if st.button("🗑 Ignore", key=f"coh_ignore_{idx}", use_container_width=True):
+                            if st.button(" Ignore", key=f"coh_ignore_{idx}", use_container_width=True):
                                 results.pop(idx)
                                 st.session_state["coherence_results"] = results
                                 update_locked_chapters()
                                 st.toast("Issue ignored.")
                                 st.rerun()
         elif selected_tab == "Insights":
-            st.markdown("### 📊 World Bible Insights")
+            st.markdown("###  World Bible Insights")
             st.caption("Quick stats on your current canon database.")
             entries = list(p.world_db.values())
             total_entries = len(entries)
@@ -2390,9 +2390,9 @@ def _run_ui():
 
             st.divider()
             if not st.session_state.get("is_premium", False):
-                st.info("🔒 Canon history is a Premium feature.")
+                st.info(" Canon history is a Premium feature.")
             else:
-                st.markdown("### 🧠 Canon Health History")
+                st.markdown("###  Canon Health History")
                 for entry in st.session_state.get("canon_health_log", []):
                     st.caption(
                         f"{time.strftime('%Y-%m-%d %H:%M', time.localtime(entry['timestamp']))} "
@@ -2400,13 +2400,13 @@ def _run_ui():
                     )
 
             st.divider()
-            st.markdown("### ⏱ Timeline Heatmap")
+            st.markdown("###  Timeline Heatmap")
             for chap in p.get_ordered_chapters():
                 intensity = min(1.0, chap.word_count / 2000)
                 st.progress(intensity, text=f"Chapter {chap.index}: {chap.word_count} words")
 
             st.divider()
-            st.markdown("#### 📌 Entity Utilization")
+            st.markdown("####  Entity Utilization")
             utilization_rows = []
             for ent in entries:
                 aliases = [ent.name] + (ent.aliases or [])
@@ -2426,7 +2426,7 @@ def _run_ui():
                 st.info("No entities yet to analyze.")
 
             st.divider()
-            st.markdown("#### 🚩 Flagged Entities")
+            st.markdown("####  Flagged Entities")
             flagged_entities = [ent for ent in entries if ent.id in flagged_entity_ids]
             if flagged_entities:
                 for ent in flagged_entities:
@@ -2440,8 +2440,8 @@ def _run_ui():
                     with st.container(border=True):
                         r1, r2 = st.columns([3, 1])
                         with r1:
-                            st.markdown(f"**{ent.name}** • {ent.category}")
-                            st.caption(" • ".join(reasons))
+                            st.markdown(f"**{ent.name}**  {ent.category}")
+                            st.caption("  ".join(reasons))
                         with r2:
                             if st.button("Jump to Entity", key=f"jump_entity_{ent.id}", use_container_width=True):
                                 st.session_state["world_focus_entity"] = ent.id
@@ -2451,7 +2451,7 @@ def _run_ui():
                 st.success("No flagged entities right now.")
 
             st.divider()
-            st.markdown("#### ⚠️ Canon Risk Flags")
+            st.markdown("####  Canon Risk Flags")
             coherence_results = st.session_state.get("coherence_results", [])
             high_canon_drift = len(coherence_results) > 0
             alias_collision = any(len(names) > 1 for names in normalized_name_map.values())
@@ -2477,7 +2477,7 @@ def _run_ui():
                 st.success("No canon risk flags detected.")
 
             st.divider()
-            st.markdown("#### ✅ AI Readiness Score")
+            st.markdown("####  AI Readiness Score")
             readiness = 0
             if (p.memory or "").strip():
                 readiness += 20
@@ -2495,7 +2495,7 @@ def _run_ui():
         p = st.session_state.project
         if not p:
             with st.container(border=True):
-                st.info("📭 No project loaded. Create or open a project to start writing.")
+                st.info(" No project loaded. Create or open a project to start writing.")
                 if st.button("Go to Projects", use_container_width=True):
                     st.session_state.page = "projects"
                     st.rerun()
@@ -2517,7 +2517,7 @@ def _run_ui():
                 match = pat.search(p.outline or "")
                 if match:
                     raw = match.group(1).strip()
-                    title = sanitize_chapter_title(re.split(r" [-–:] ", raw, 1)[0].strip()) or title
+                    title = sanitize_chapter_title(re.split(r" [-:] ", raw, 1)[0].strip()) or title
             p.add_chapter(title)
             _persist_chapter_update()
 
@@ -2530,9 +2530,9 @@ def _run_ui():
 
         if not chaps:
             with st.container(border=True):
-                st.info("📭 No chapters yet.\n\nCreate your first chapter — or let MANTIS write one from your outline.")
+                st.info(" No chapters yet.\n\nCreate your first chapter  or let MANTIS write one from your outline.")
                 if st.button(
-                    "➕ Create Chapter 1",
+                    " Create Chapter 1",
                     type="primary",
                     use_container_width=True,
                     key="editor_create_chapter_1"
@@ -2561,7 +2561,7 @@ def _run_ui():
             match = pat.search(p.outline or "")
             if match:
                 raw = match.group(1).strip()
-                clean = re.split(r" [-–:] ", raw, 1)[0].strip()
+                clean = re.split(r" [-:] ", raw, 1)[0].strip()
                 if len(clean) > 2:
                     curr.title = sanitize_chapter_title(clean)
                     persist_project(p)
@@ -2570,7 +2570,7 @@ def _run_ui():
 
         with col_nav:
             with st.container(border=True):
-                st.markdown("### 📍 Chapters")
+                st.markdown("###  Chapters")
                 for c in chaps:
                     lbl = f"{c.index}. {(c.title or 'Untitled')[:18]}"
                     if st.button(
@@ -2585,7 +2585,7 @@ def _run_ui():
 
                 st.divider()
                 if st.button(
-                    "➕ New Chapter",
+                    " New Chapter",
                     use_container_width=True,
                     help="Create a new chapter in this project.",
                     key="editor_new_chapter"
@@ -2595,7 +2595,7 @@ def _run_ui():
                     match = pat.search(p.outline or "")
                     if match:
                         raw = match.group(1).strip()
-                        title = sanitize_chapter_title(re.split(r" [-–:] ", raw, 1)[0].strip())
+                        title = sanitize_chapter_title(re.split(r" [-:] ", raw, 1)[0].strip())
                     else:
                         title = f"Chapter {next_idx}"
                     p.add_chapter(sanitize_chapter_title(title))
@@ -2620,7 +2620,7 @@ def _run_ui():
                                 st.session_state.delete_chapter_id = None
                                 st.session_state.delete_chapter_title = None
                                 st.rerun()
-                    elif st.button("🗑 Delete Chapter", use_container_width=True, key=f"editor_del_{curr.id}"):
+                    elif st.button(" Delete Chapter", use_container_width=True, key=f"editor_del_{curr.id}"):
                         st.session_state.delete_chapter_id = curr.id
                         st.session_state.delete_chapter_title = curr.title
 
@@ -2669,20 +2669,20 @@ def _run_ui():
                 if wb_refs:
                     names = ", ".join(r["name"] for r in wb_refs[:5])
                     suffix = f" (+{len(wb_refs) - 5} more)" if len(wb_refs) > 5 else ""
-                    st.info(f"📖 World Bible references detected: {names}{suffix}")
+                    st.info(f" World Bible references detected: {names}{suffix}")
 
                 autosave_state = "On" if st.session_state.auto_save else "Manual"
                 try:
                     last_edit = datetime.datetime.fromtimestamp(curr.modified_at).strftime("%b %d, %H:%M")
                 except (TypeError, ValueError, OSError):
                     last_edit = "Unknown"
-                st.caption(f"🕒 Last edited: {last_edit} • 💾 Auto-save: {autosave_state}")
-                st.caption(f"📝 Chapter: {curr.word_count} words • 📚 Total: {p.get_total_word_count()} words")
+                st.caption(f" Last edited: {last_edit}   Auto-save: {autosave_state}")
+                st.caption(f" Chapter: {curr.word_count} words   Total: {p.get_total_word_count()} words")
 
                 c1, c2 = st.columns([1, 1])
                 with c1:
                     if st.button(
-                        "💾 Save & Scan Entities",
+                        " Save & Scan Entities",
                         type="primary",
                         use_container_width=True,
                         help="Save this chapter and scan for new World Bible entities.",
@@ -2694,7 +2694,7 @@ def _run_ui():
                             st.toast("Chapter Saved & Entities Scanned")
                 with c2:
                     if st.button(
-                        "📝 Generate Summary",
+                        " Generate Summary",
                         use_container_width=True,
                         help="Create or refresh the chapter summary.",
                     ):
@@ -2725,7 +2725,7 @@ def _run_ui():
                         return ""
                     return full
 
-                with st.expander("✨ Improve Draft"):
+                with st.expander(" Improve Draft"):
                     rewrite_locked = curr.index in locked_chapters
                     style = st.selectbox(
                         "How to improve?",
@@ -2741,7 +2741,7 @@ def _run_ui():
                             key=f"editor_improve__instructions_{curr.id}",
                         )
                     if rewrite_locked:
-                        st.caption("🔒 Rewrite tools are disabled for locked chapters.")
+                        st.caption(" Rewrite tools are disabled for locked chapters.")
                     if st.button(
                         "Generate Improvement",
                         use_container_width=True,
@@ -2760,7 +2760,7 @@ def _run_ui():
                             st.rerun()
 
                 if st.button(
-                    "↩️ Undo last AI apply",
+                    " Undo last AI apply",
                     use_container_width=True,
                     key=f"editor_improve__undo_{curr.id}",
                     help="Restore the previous chapter text, if available.",
@@ -2783,7 +2783,7 @@ def _run_ui():
                 if chapter_drafts:
                     st.markdown("#### Draft Versions")
                     for idx, draft in enumerate(chapter_drafts, start=1):
-                        label = f"Draft {idx} • {draft.get('mode', 'Improved')} • {time.strftime('%Y-%m-%d %H:%M', time.localtime(draft.get('timestamp', 0)))}"
+                        label = f"Draft {idx}  {draft.get('mode', 'Improved')}  {time.strftime('%Y-%m-%d %H:%M', time.localtime(draft.get('timestamp', 0)))}"
                         with st.expander(label):
                             st.text_area(
                                 "Draft Text",
@@ -2811,24 +2811,24 @@ def _run_ui():
 
         with col_ai:
             with st.container(border=True):
-                st.markdown("### 🤖 Assistant")
+                st.markdown("###  Assistant")
                 st.caption("Generate new prose from your outline + previous context.")
 
                 canon_icon, canon_label = get_canon_health()
                 st.caption(
                     "Canon status: "
-                    f"{canon_icon} {canon_label} • Legend: Canon Stable / Minor Canon Drift / High Canon Risk"
+                    f"{canon_icon} {canon_label}  Legend: Canon Stable / Minor Canon Drift / High Canon Risk"
                 )
-                canon_blocked = canon_icon == "🔴"
+                canon_blocked = canon_icon == ""
                 if canon_blocked:
                     st.button(
-                        "🚫 Auto-Write Disabled (Canon Risk)",
+                        " Auto-Write Disabled (Canon Risk)",
                         disabled=True,
                         use_container_width=True,
-                        help="Resolve canon issues in World Bible → Memory before generating.",
+                        help="Resolve canon issues in World Bible  Memory before generating.",
                     )
                 elif st.button(
-                    "✨ Auto-Write Chapter",
+                    " Auto-Write Chapter",
                     type="primary",
                     use_container_width=True,
                     help="Generate a new draft using your outline and chapter context.",
@@ -2875,7 +2875,7 @@ def _run_ui():
         pending_for_chapter = pending_text and pending_meta.get("chapter_id") == curr.id
         if pending_for_chapter:
             with st.container(border=True):
-                st.markdown("### ✨ Review Changes")
+                st.markdown("###  Review Changes")
                 diff_toggle = st.toggle(
                     "Diff view",
                     value=False,
@@ -3201,3 +3201,4 @@ def run_app() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(run_app())
+

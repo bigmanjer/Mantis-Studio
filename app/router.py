@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import logging
 from typing import Any, Callable, Dict, List, Tuple
@@ -111,7 +111,7 @@ def render_error_fallback(st, ctx: Any, error_msg: str, exc: Exception) -> None:
     This ensures the app never shows a blank page.
     """
     try:
-        st.error("⚠️ **Something went wrong while rendering this page.**")
+        st.error(" **Something went wrong while rendering this page.**")
         
         st.markdown("""
         ### Troubleshooting Steps:
@@ -122,7 +122,7 @@ def render_error_fallback(st, ctx: Any, error_msg: str, exc: Exception) -> None:
         """)
         
         # Show error details in expander
-        with st.expander("🔍 Error Details (Click to expand)", expanded=False):
+        with st.expander(" Error Details (Click to expand)", expanded=False):
             st.code(error_msg, language="text")
             
             if ctx.debug_enabled():
@@ -132,11 +132,11 @@ def render_error_fallback(st, ctx: Any, error_msg: str, exc: Exception) -> None:
         # Action buttons
         col1, col2 = st.columns(2)
         with col1:
-            if st.button("🏠 Return to Dashboard", use_container_width=True, type="primary", key="router_error_fallback_home"):
+            if st.button(" Return to Dashboard", use_container_width=True, type="primary", key="router_error_fallback_home"):
                 st.session_state.page = "home"
                 st.rerun()
         with col2:
-            if st.button("🔄 Reload App", use_container_width=True, key="router_error_fallback_reload"):
+            if st.button(" Reload App", use_container_width=True, key="router_error_fallback_reload"):
                 st.rerun()
                 
     except Exception as fallback_exc:
@@ -150,3 +150,4 @@ def render_error_fallback(st, ctx: Any, error_msg: str, exc: Exception) -> None:
         except Exception:
             # Nothing we can do at this point
             pass
+

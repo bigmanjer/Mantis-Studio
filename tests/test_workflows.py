@@ -1,4 +1,4 @@
-"""End-to-end workflow tests for critical user journeys.
+﻿"""End-to-end workflow tests for critical user journeys.
 
 These tests validate complete user workflows from start to finish,
 ensuring that all components work together correctly.
@@ -40,7 +40,7 @@ class TestProjectLifecycleWorkflow:
         return str(storage_dir)
 
     def test_complete_project_workflow(self, temp_storage):
-        """Test: Create project → Add chapters → Add entities → Save → Load → Export."""
+        """Test: Create project  Add chapters  Add entities  Save  Load  Export."""
         # Step 1: Create a new project
         project = Project.create(
             "My Novel",
@@ -134,7 +134,7 @@ class TestChapterEditingWorkflow:
         return project
 
     def test_chapter_edit_and_revision_history(self, project_with_chapters):
-        """Test: Edit chapter → Save revision → Restore previous version."""
+        """Test: Edit chapter  Save revision  Restore previous version."""
         project = project_with_chapters
         
         # Get first chapter
@@ -161,7 +161,7 @@ class TestChapterEditingWorkflow:
             assert chapter.content == previous_text
 
     def test_chapter_deletion_and_reordering(self, project_with_chapters):
-        """Test: Delete middle chapter → Verify reordering → Add new chapter."""
+        """Test: Delete middle chapter  Verify reordering  Add new chapter."""
         project = project_with_chapters
         
         # Add a third chapter
@@ -184,7 +184,7 @@ class TestChapterEditingWorkflow:
         assert ordered[1].index == 2  # Should be reordered
 
     def test_chapter_word_count_tracking(self, project_with_chapters):
-        """Test: Add/edit chapters → Verify word counts → Check project total."""
+        """Test: Add/edit chapters  Verify word counts  Check project total."""
         project = project_with_chapters
         
         # Initial word count
@@ -216,7 +216,7 @@ class TestWorldBibleWorkflow:
         return project
 
     def test_entity_crud_operations(self, project_with_entities):
-        """Test: Create → Read → Update → Delete entities."""
+        """Test: Create  Read  Update  Delete entities."""
         project = project_with_entities
         
         # Create
@@ -245,7 +245,7 @@ class TestWorldBibleWorkflow:
         assert len(project.world_db) == 2
 
     def test_entity_deduplication(self, project_with_entities):
-        """Test: Add duplicate entity → Verify it's merged, not duplicated."""
+        """Test: Add duplicate entity  Verify it's merged, not duplicated."""
         project = project_with_entities
         initial_count = len(project.world_db)
         
@@ -307,7 +307,7 @@ class TestExportWorkflow:
         return project
 
     def test_export_includes_all_content(self, complete_project):
-        """Test: Export project → Verify all content is included."""
+        """Test: Export project  Verify all content is included."""
         project = complete_project
         markdown = export_to_markdown(project)
         
@@ -341,7 +341,7 @@ class TestExportWorkflow:
         assert exported_words >= project_word_count
 
     def test_export_empty_project(self, tmp_path):
-        """Test: Export empty project → Should not crash."""
+        """Test: Export empty project  Should not crash."""
         storage_dir = tmp_path / "projects"
         storage_dir.mkdir(exist_ok=True)
         
@@ -386,7 +386,7 @@ class TestProjectSaveLoadConsistency:
         return project
 
     def test_save_and_load_preserves_all_data(self, complex_project):
-        """Test: Save → Load → Verify all data is preserved."""
+        """Test: Save  Load  Verify all data is preserved."""
         project = complex_project
         
         # Save
@@ -409,7 +409,7 @@ class TestProjectSaveLoadConsistency:
         assert len(loaded.world_db) == len(project.world_db)
 
     def test_multiple_save_cycles(self, complex_project, tmp_path):
-        """Test: Save → Modify → Save → Load → Verify changes."""
+        """Test: Save  Modify  Save  Load  Verify changes."""
         project = complex_project
         
         # First save
@@ -430,7 +430,7 @@ class TestProjectSaveLoadConsistency:
         assert chapters[2].title == "Chapter 3"
 
     def test_concurrent_projects_isolated(self, tmp_path):
-        """Test: Create multiple projects → Verify they don't interfere."""
+        """Test: Create multiple projects  Verify they don't interfere."""
         storage_dir = tmp_path / "projects"
         storage_dir.mkdir(exist_ok=True)
         
@@ -460,7 +460,7 @@ class TestImportWorkflow:
     """Test importing content from text files."""
 
     def test_import_text_with_chapter_markers(self, tmp_path):
-        """Test: Import text file → Verify chapters created correctly."""
+        """Test: Import text file  Verify chapters created correctly."""
         storage_dir = tmp_path / "projects"
         storage_dir.mkdir(exist_ok=True)
         
@@ -490,7 +490,7 @@ Final chapter content.
         assert len(project.chapters) >= count
 
     def test_import_plain_text(self, tmp_path):
-        """Test: Import plain text → Creates single chapter."""
+        """Test: Import plain text  Creates single chapter."""
         storage_dir = tmp_path / "projects"
         storage_dir.mkdir(exist_ok=True)
         
@@ -502,3 +502,4 @@ Final chapter content.
         
         # Should import as a single unit
         assert count >= 0
+

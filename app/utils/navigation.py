@@ -3,29 +3,29 @@
 from typing import Dict, List, Tuple
 
 NAV_ITEMS: List[Tuple[str, str, str]] = [
-    ("Dashboard", "home", "🏠"),
-    ("Projects", "projects", "📁"),
-    ("Outline", "outline", "🧭"),
-    ("Draft", "chapters", "✍️"),
-    ("World Bible", "world", "🌍"),
-    ("AI Settings", "ai", "🤖"),
+    ("Dashboard", "home", ""),
+    ("Projects", "projects", ""),
+    ("Outline", "outline", ""),
+    ("Draft", "chapters", ""),
+    ("World Bible", "world", ""),
+    ("AI Settings", "ai", ""),
 ]
 
 NAV_SECTIONS: List[Tuple[str, List[Tuple[str, str, str]]]] = [
     ("Workflow", [
-        ("Dashboard", "home", "🏠"),
-        ("Projects", "projects", "📁"),
-        ("Outline", "outline", "🧭"),
-        ("Draft", "chapters", "✍️"),
-        ("World Bible", "world", "🌍"),
+        ("Dashboard", "home", ""),
+        ("Projects", "projects", ""),
+        ("Outline", "outline", ""),
+        ("Draft", "chapters", ""),
+        ("World Bible", "world", ""),
     ]),
     ("Intelligence", [
-        ("Memory", "memory", "🧠"),
-        ("Insights", "insights", "📊"),
+        ("Memory", "memory", ""),
+        ("Insights", "insights", ""),
     ]),
     ("Settings", [
-        ("AI Settings", "ai", "🤖"),
-        ("Workspace Settings", "workspace", "⚙️"),
+        ("AI Settings", "ai", ""),
+        ("Workspace Settings", "workspace", ""),
     ]),
 ]
 
@@ -61,3 +61,4 @@ __all__ = [
     "get_nav_items",
     "get_nav_sections",
 ]
+

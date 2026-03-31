@@ -1,4 +1,4 @@
-"""World Bible database layer for MANTIS Studio.
+﻿"""World Bible database layer for MANTIS Studio.
 
 Provides a structured "mini database" for world-building entities with
 CRUD helpers, search, tagging, consistency checking, and canon conflict
@@ -53,7 +53,7 @@ def _empty_db() -> Dict[str, Dict[str, Dict[str, Any]]]:
 def ensure_world_bible_db(session_state: Any) -> Dict[str, Any]:
     """Guarantee ``session_state["world_bible_db"]`` exists and is valid.
 
-    Safe to call on every rerun — uses ``setdefault`` so existing data
+    Safe to call on every rerun  uses ``setdefault`` so existing data
     is never overwritten.
     """
     db = session_state.setdefault("world_bible_db", _empty_db())
@@ -260,7 +260,7 @@ def get_entries_by_tag(
 
 
 # ---------------------------------------------------------------------------
-# Consistency checking (local — no API key required)
+# Consistency checking (local  no API key required)
 # ---------------------------------------------------------------------------
 
 def check_world_bible_consistency(
@@ -274,7 +274,7 @@ def check_world_bible_consistency(
 
         "Character referenced but not in World Bible: Marcus"
 
-    This function works entirely offline — it uses world-bible data
+    This function works entirely offline  it uses world-bible data
     stored in *session_state* and never calls an external API.
     """
     db = _resolve_db(session_state)
@@ -396,7 +396,7 @@ def validate_world_bible_db(*, session_state: Any) -> Dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
-# Editor integration – world-bible-aware scanning
+# Editor integration  world-bible-aware scanning
 # ---------------------------------------------------------------------------
 
 def scan_editor_for_world_bible_references(
@@ -654,3 +654,4 @@ def _snapshot_version(session_state: Any, max_versions: int = 20) -> None:
     # Keep only the most recent snapshots
     if len(versions) > max_versions:
         session_state["world_bible_versions"] = versions[-max_versions:]
+

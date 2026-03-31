@@ -1,4 +1,4 @@
-"""UI Context and utilities for Mantis Studio views.
+﻿"""UI Context and utilities for Mantis Studio views.
 
 This module provides shared utilities and helpers that all views need,
 extracted from the main _run_ui() function to enable modular view development.
@@ -132,13 +132,13 @@ class UIContext:
         if not path:
             logger.error(f"persist_project failed for '{project.title}' (action={action})")
             try:
-                self.st.toast("⚠️ Save failed — check file permissions and disk space.", icon="⚠️")
+                self.st.toast(" Save failed  check file permissions and disk space.", icon="")
             except Exception as e:
                 self.st.error(f"Save failed for '{project.title}': {e}")
             return False
         
         try:
-            self.st.toast(f"✅ {action.capitalize()} successful!", icon="✅")
+            self.st.toast(f" {action.capitalize()} successful!", icon="")
         except Exception:
             pass  # Non-critical
         return True
@@ -151,7 +151,7 @@ class UIContext:
         except Exception as e:
             logger.error(f"Failed to load project from {path}: {e}", exc_info=True)
             try:
-                self.st.error(f"⚠️ Failed to load project: {e}")
+                self.st.error(f" Failed to load project: {e}")
             except Exception:
                 pass
             return None
@@ -203,3 +203,4 @@ class UIContext:
 def create_ui_context(st) -> UIContext:
     """Factory function to create UI context."""
     return UIContext(st)
+

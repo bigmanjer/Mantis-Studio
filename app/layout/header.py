@@ -1,4 +1,4 @@
-"""Enterprise top navigation bar for MANTIS Studio."""
+﻿"""Enterprise top navigation bar for MANTIS Studio."""
 
 from __future__ import annotations
 
@@ -35,15 +35,16 @@ def render_top_navbar(version: str, ai_ready: bool, is_processing: bool = False)
             f"""
             <div class="mantis-topnav-brand">
                 <div class="mantis-topnav-title">MANTIS</div>
-                <div class="mantis-topnav-sub">{module} · v{version}</div>
+                <div class="mantis-topnav-sub">{module}  v{version}</div>
             </div>
             """
         )
     with cols[1]:
         st.html(
-            '<div style="height:38px;border:1px solid var(--mantis-card-border);border-radius:10px;display:flex;align-items:center;padding:0 12px;color:var(--mantis-muted);background:#0f141d;">🔎 Search projects, chapters, entities...</div>'
+            '<div style="height:38px;border:1px solid var(--mantis-card-border);border-radius:10px;display:flex;align-items:center;padding:0 12px;color:var(--mantis-muted);background:#0f141d;"> Search projects, chapters, entities...</div>'
         )
     with cols[2]:
         st.html(f'<div class="mantis-status-badge {status_class}"><span class="dot"></span>{status_label}</div>')
     with cols[3]:
         st.html('<div class="mantis-avatar">U</div>')
+

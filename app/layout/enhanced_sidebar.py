@@ -163,9 +163,9 @@ def render_project_actions(
             ):
                 try:
                     save_callback()
-                    st.toast("Project saved", icon="✅")
+                    st.toast("Project saved", icon="")
                 except Exception as exc:
-                    st.toast(f"Save failed: {str(exc)}", icon="⚠")
+                    st.toast(f"Save failed: {str(exc)}", icon="")
 
     with col2:
         with key_scope("sidebar_close_btn"):
@@ -231,3 +231,4 @@ def render_enhanced_sidebar(
 
 
 __all__ = ["render_enhanced_sidebar"]
+

@@ -1,4 +1,4 @@
-@echo off
+﻿@echo off
 setlocal EnableExtensions EnableDelayedExpansion
 chcp 65001 >nul
 title MANTIS STUDIO - NEON TECH-NOIR LAUNCHER (FAST MODE)
@@ -8,7 +8,7 @@ cd /d "%~dp0"
 :: CONFIG
 :: ============================================================== 
 set "PROGRESS_STEPS=10"
-set "BLOCK=█"
+set "BLOCK="
 set "LOG_RETENTION_DAYS=7"
 
 :: ============================================================== 
@@ -217,16 +217,17 @@ exit /b
 :banner
 cls
 echo.
-echo  ╔═══════════════════════════════════════════════════════════════╗
-echo  ║                                                               ║
-echo  ║       ███╗   ███╗ █████╗ ███╗   ██╗████████╗██╗███████╗       ║
-echo  ║       ████╗ ████║██╔══██╗████╗  ██║╚══██╔══╝██║██╔════╝       ║
-echo  ║       ██ ████ ██║███████║██ ██╗ ██║   ██║   ██║██║            ║
-echo  ║       ██╔████╔██║███████║██╔╗██ ██║   ██║   ██║███████╗       ║
-echo  ║       ██║╚██╔╝██║██╔══██║██║╚██╗██║   ██║   ██║╚════██║       ║
-echo  ║       ██║ ╚═╝ ██║██║  ██║██║ ╚████║   ██║   ██║     ██║       ║
-echo  ║       ██║     ██║██║  ██║██║  ╚███║   ██║   ██║███████║       ║
-echo  ║                                                               ║
-echo  ║         Modular AI Narrative Text Intelligence System         ║
-echo  ╚═══════════════════════════════════════════════════════════════╝
+echo  
+echo                                                                 
+echo                        
+echo                   
+echo                               
+echo                       
+echo                      
+echo                                
+echo                               
+echo                                                                 
+echo           Modular AI Narrative Text Intelligence System         
+echo  
 exit /b
+

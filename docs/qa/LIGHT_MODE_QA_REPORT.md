@@ -1,4 +1,4 @@
-# Light Mode QA Report
+﻿# Light Mode QA Report
 
 Date: 2026-03-30
 
@@ -77,7 +77,7 @@ Light mode has been comprehensively audited and hardened with centralized stylin
 ## Additional user-reported screenshot fixes (2026-03-30 follow-up)
 - Fixed unreadable dark expander headers in Light mode by adding high-priority Light selectors for expander summary/header foreground/background/border.
 - Fixed AI provider radio option readability (labels no longer fade/vanish on Light backgrounds).
-- Normalized chapter status captions to plain separators (`|`) to remove mojibake artifacts like `•` in Draft/Outline stats.
+- Normalized chapter status captions to plain separators (`|`) to remove mojibake artifacts like `` in Draft/Outline stats.
 - Re-captured verification screenshots:
   - `artifacts/light_mode_deep_audit_final/outline_after_refactor.png`
   - `artifacts/light_mode_deep_audit_final/draft_after_refactor.png`
@@ -88,3 +88,4 @@ Light mode has been comprehensively audited and hardened with centralized stylin
 - Removed mojibake separators and action labels in AI suggestion review cards.
 - Corrected high-confidence behavior so matched suggestions auto-apply at/above configured threshold.
 - Improved entity extraction prompt quality to include relationship and objective context for stronger narrative canon details.
+

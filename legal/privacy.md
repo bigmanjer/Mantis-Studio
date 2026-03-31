@@ -1,8 +1,8 @@
-# Privacy Policy
+﻿# Privacy Policy
 
 Effective date: 2024-01-01
 
-This Privacy Policy explains how MANTIS Studio (“we,” “us,” or “our”) collects, uses, and shares information when you use MANTIS Studio (“Service”).
+This Privacy Policy explains how MANTIS Studio (we, us, or our) collects, uses, and shares information when you use MANTIS Studio (Service).
 
 ## 1. Information We Collect
 - **Account information:** email address and authentication details (if applicable).
@@ -40,3 +40,4 @@ We may update this Policy. Continued use of the Service after updates means you 
 
 ## 9. Contact
 Privacy questions: privacy@mantis-studio.example
+

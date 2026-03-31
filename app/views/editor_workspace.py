@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from typing import Any, Callable, Dict, List
 
@@ -27,7 +27,7 @@ def render_editor_utility_bar(
                 key=f"editor_export_btn_{current_chapter.id}",
                 use_container_width=True,
             ):
-                st.toast(f"{export_fmt} export is queued.", icon="📦")
+                st.toast(f"{export_fmt} export is queued.", icon="")
         with utility_cols[1]:
             st.caption("Draft metrics")
             st.caption(f"Current chapter: {current_chapter.word_count} words")
@@ -82,7 +82,7 @@ def render_chapter_sidebar(
     on_cancel_delete: Callable[[], None],
 ) -> None:
     with st.container(border=True):
-        st.markdown("### 📍 Chapters")
+        st.markdown("###  Chapters")
         for chapter in chapters:
             chapter_id = chapter.get("id")
             chapter_words = int(chapter.get("word_count") or 0)
@@ -97,7 +97,7 @@ def render_chapter_sidebar(
 
         st.divider()
         if st.button(
-            "➕ New Chapter",
+            " New Chapter",
             use_container_width=True,
             help="Create a new chapter in this project.",
             key="editor_new_chapter",
@@ -123,10 +123,11 @@ def render_chapter_sidebar(
                 ):
                     on_cancel_delete()
         elif st.button(
-            "🗑 Delete Chapter",
+            " Delete Chapter",
             use_container_width=True,
             key=f"editor_del_{current_chapter_id}",
         ):
             st.session_state.delete_chapter_id = current_chapter_id
             st.session_state.delete_chapter_title = current_title
             st.rerun()
+

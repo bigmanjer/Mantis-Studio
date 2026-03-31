@@ -1,61 +1,61 @@
-# 🐜 Mantis Studio
+﻿#  Mantis Studio
 
-> **MANTIS** — **M**odular **A**I **N**arrative **T**ext **I**ntelligence **S**ystem
+> **MANTIS**  **M**odular **A**I **N**arrative **T**ext **I**ntelligence **S**ystem
 
-**Mantis Studio** is an all‑in‑one AI‑assisted writing and story‑development environment built with **Streamlit**. It is designed to take a project from *idea → outline → chapters → world‑building → export*, while maintaining persistent memory and structured data across sessions.
+**Mantis Studio** is an allinone AIassisted writing and storydevelopment environment built with **Streamlit**. It is designed to take a project from *idea  outline  chapters  worldbuilding  export*, while maintaining persistent memory and structured data across sessions.
 
 
 ---
 
-## 🚀 Quick Start (For First-Time Users)
+##  Quick Start (For First-Time Users)
 
 **New to Mantis Studio?** Start here!
 
-1. **[📖 Getting Started Guide](docs/HANDBOOK.md)** ← Complete step-by-step installation and setup
+1. **[ Getting Started Guide](docs/HANDBOOK.md)**  Complete step-by-step installation and setup
 2. **Prerequisites**: Python 3.10+, basic command line knowledge
 3. **Installation**: `pip install -r requirements.txt` then `streamlit run app/main.py`
 4. **First Project**: Use the sidebar to create a new project, build your outline, and start writing!
 
-💡 **Just want to try it?** The app works locally without any external setup.
+ **Just want to try it?** The app works locally without any external setup.
 
 ---
 
-## 🤖 GitHub Copilot Custom Agent
+##  GitHub Copilot Custom Agent
 
 **Have GitHub Copilot?** This repository includes a specialized **mantis-engineer** agent!
 
 The agent provides expert assistance with:
-- 🐛 Debugging Streamlit issues (blank pages, state resets, key collisions)
-- 🔧 Refactoring and code organization
-- 💾 Session state management patterns
-- 🚀 Deployment and production readiness
+-  Debugging Streamlit issues (blank pages, state resets, key collisions)
+-  Refactoring and code organization
+-  Session state management patterns
+-  Deployment and production readiness
 
 **To use the agent:**
 1. Open GitHub Copilot Chat
 2. Type `@mantis-engineer` followed by your question
 3. Example: `@mantis-engineer How do I fix session state resets?`
 
-📖 **[Complete Agent Usage Guide →](docs/HANDBOOK.md)** | 🚀 **[Quick Reference →](docs/HANDBOOK.md)**
+ **[Complete Agent Usage Guide ](docs/HANDBOOK.md)** |  **[Quick Reference ](docs/HANDBOOK.md)**
 
 ---
 
-## 📚 What This Document Covers
+##  What This Document Covers
 
-This README explains **what the app does, how it is structured, what every major button/section is supposed to do, and how the UI flows from a user’s point of view**.
+This README explains **what the app does, how it is structured, what every major button/section is supposed to do, and how the UI flows from a users point of view**.
 
 ---
 
-## 1. High‑Level Purpose
+## 1. HighLevel Purpose
 
 Mantis Studio is meant to replace scattered tools (notes apps, docs, AI chats, spreadsheets) with **one guided creative workspace**:
 
 * Centralized project management
-* AI‑assisted outlining and drafting
-* Structured world‑building (characters, locations, lore)
+* AIassisted outlining and drafting
+* Structured worldbuilding (characters, locations, lore)
 * Persistent memory and insights
 * Clean export for manuscripts or planning docs
 
-The app is **state‑driven**, not page‑driven. All navigation feeds a single app shell (`app/main.py`).
+The app is **statedriven**, not pagedriven. All navigation feeds a single app shell (`app/main.py`).
 
 ---
 
@@ -64,14 +64,14 @@ The app is **state‑driven**, not page‑driven. All navigation feeds a single 
 | Layer | Technology |
 | ----- | ---------- |
 | **Language** | Python 3.10+ |
-| **UI Framework** | Streamlit ≥ 1.30.0 |
+| **UI Framework** | Streamlit  1.30.0 |
 | **State Management** | Streamlit Session State for routing and persistence |
 | **Data & Visualization** | Pandas, Plotly, Pillow |
 | **HTTP** | Requests |
-| **Backend (optional)** | Supabase ≥ 2.5.0 |
-| **Configuration** | python‑dotenv |
+| **Backend (optional)** | Supabase  2.5.0 |
+| **Configuration** | pythondotenv |
 | **Storage** | Local JSON / serialized storage (project data) |
-| **Auth (optional)** | OIDC — Google / Microsoft / Apple (if configured) |
+| **Auth (optional)** | OIDC  Google / Microsoft / Apple (if configured) |
 | **CI/CD** | GitHub Actions for version bumping |
 
 ---
@@ -114,17 +114,17 @@ This file:
 
 | Button                | Purpose                                           |
 | --------------------- | ------------------------------------------------- |
-| 🏠 **Dashboard**      | Overview of the current project status             |
-| 📁 **Projects**       | Create, load, rename, or delete projects           |
-| ✍️ **Write**          | High‑level story outlining and beat planning       |
-| 🧩 **Editor**         | Scene‑level writing & chapter drafting             |
-| 🌍 **World Bible**    | Structured lore & entities (characters, locations) |
-| ⬇️ **Export**         | Generate files (DOCX / PDF / TXT)                  |
-| 🤖 **AI Settings**    | Configure AI provider, model, and preferences      |
+|  **Dashboard**      | Overview of the current project status             |
+|  **Projects**       | Create, load, rename, or delete projects           |
+|  **Write**          | Highlevel story outlining and beat planning       |
+|  **Editor**         | Scenelevel writing & chapter drafting             |
+|  **World Bible**    | Structured lore & entities (characters, locations) |
+|  **Export**         | Generate files (DOCX / PDF / TXT)                  |
+|  **AI Settings**    | Configure AI provider, model, and preferences      |
 
 ---
 
-## 5. Section‑by‑Section Breakdown
+## 5. SectionbySection Breakdown
 
 ### 5.1 Dashboard
 
@@ -150,10 +150,10 @@ A quick snapshot of the project.
 
 **Core Actions:**
 
-* ➕ Create new project
-* 📂 Load existing project
-* ✏️ Rename project
-* 🗑️ Delete project
+*  Create new project
+*  Load existing project
+*  Rename project
+*  Delete project
 
 **Data Stored Per Project:**
 
@@ -171,8 +171,8 @@ A quick snapshot of the project.
 **Features:**
 
 * Act / section breakdown
-* Beat‑level planning
-* AI‑assisted expansion
+* Beatlevel planning
+* AIassisted expansion
 
 **Buttons:**
 
@@ -195,14 +195,14 @@ A quick snapshot of the project.
 **Data Flow:**
 
 ```
-Outline → Chapter → Saved Draft → Export
+Outline  Chapter  Saved Draft  Export
 ```
 
 ---
 
 ### 5.5 World Bible
 
-**Purpose:** Canon‑safe world building.
+**Purpose:** Canonsafe world building.
 
 **Entity Types:**
 
@@ -276,10 +276,10 @@ Accessible via footer links or the All Policies page.
 
 ## 6. Recent Improvements (Version 91.6)
 
-### ✅ User Experience Enhancements
+###  User Experience Enhancements
 
 **New Documentation:**
-- ✨ Comprehensive [Getting Started Guide](docs/HANDBOOK.md) added
+-  Comprehensive [Getting Started Guide](docs/HANDBOOK.md) added
   - Step-by-step installation for all platforms (Windows/Mac/Linux)
   - First project walkthrough
   - AI setup instructions with screenshots
@@ -287,19 +287,19 @@ Accessible via footer links or the All Policies page.
   - FAQ for new users
 
 **README Improvements:**
-- 🚀 Added Quick Start section at the top for impatient users
-- 📖 Clear prerequisites and installation steps
-- 🔗 Prominent links to detailed guides
+-  Added Quick Start section at the top for impatient users
+-  Clear prerequisites and installation steps
+-  Prominent links to detailed guides
 
 **In-App Improvements:**
-- 👋 First-time welcome screen on Dashboard
+-  First-time welcome screen on Dashboard
   - Clear getting started instructions
   - Quick tips for navigation
   - Direct link to create first project
-- 💡 Context-aware help tooltips throughout the app
-- 📝 Better descriptions for confusing features (World Bible, etc.)
+-  Context-aware help tooltips throughout the app
+-  Better descriptions for confusing features (World Bible, etc.)
 
-### 🎯 What Changed
+###  What Changed
 
 **For First-Time Users:**
 1. **Before**: Confusing empty dashboard with no guidance
@@ -317,11 +317,11 @@ Accessible via footer links or the All Policies page.
 
 ## 7. Troubleshooting & Support
 
-### 🆘 Experiencing Issues?
+###  Experiencing Issues?
 
 If you encounter problems like black screens, rendering issues, or errors:
 
-1. **[📖 Complete Debugging Guide](docs/HANDBOOK.md)** - Comprehensive troubleshooting, debug mode, and visual guide
+1. **[ Complete Debugging Guide](docs/HANDBOOK.md)** - Comprehensive troubleshooting, debug mode, and visual guide
 2. **[GitHub Issues](https://github.com/bigmanjer/Mantis-Studio/issues)** - Report bugs or search for solutions
 
 ### Quick Debug Steps
@@ -358,8 +358,8 @@ If you encounter problems like black screens, rendering issues, or errors:
 The version increments with each merge following these rules:
 
 1. **Minor version** increments by 1 on each merged pull request to `main`
-   - Example: 91.0 → 91.1 → 91.2
-   - Rolls over at 10: 91.9 → 92.0
+   - Example: 91.0  91.1  91.2
+   - Rolls over at 10: 91.9  92.0
 
 2. **Major bumps** are handled via the Version Bump workflow dispatch inputs
 
@@ -390,8 +390,8 @@ For minor or major bumps, use the Version Bump workflow dispatch inputs.
 * Novelists
 * Screenwriters
 * Game writers
-* World‑builders
-* AI‑assisted creative workflows
+* Worldbuilders
+* AIassisted creative workflows
 
 ---
 
@@ -399,72 +399,72 @@ For minor or major bumps, use the Version Bump workflow dispatch inputs.
 
 The codebase follows a **single-entry, state-driven architecture** as outlined below. See `app/README.md` for migration status and future enhancements.
 
-### ✅ Directory Structure
+###  Directory Structure
 
 ```
 Mantis-Studio/
-│
-├── app/main.py              # Single entrypoint (routing + layout)
-│
-├── app/
-│   ├── state.py             # Session state schema + defaults
-│   ├── router.py            # Central navigation logic
-│   ├── app_context.py       # App context reference
-│   │
-│   ├── layout/
-│   │   ├── sidebar.py       # Sidebar UI
-│   │   ├── header.py        # App header + version
-│   │   └── layout.py        # Layout utilities
-│   │
-│   ├── views/               # UI screens (one file each)
-│   │   ├── dashboard.py
-│   │   ├── projects.py
-│   │   ├── outline.py
-│   │   ├── editor.py
-│   │   ├── world_bible.py
-│   │   ├── ai_tools.py
-│   │   ├── export.py
-│   │   └── legal.py
-│   │
-│   ├── components/          # Reusable UI blocks
-│   │   ├── buttons.py
-│   │   ├── forms.py
-│   │   ├── editors.py
-│   │   └── ui.py
-│   │
-│   ├── services/            # Business logic (no UI)
-│   │   ├── projects.py
-│   │   ├── storage.py
-│   │   ├── ai.py
-│   │   ├── export.py
-│   │   ├── world_bible.py
-│   │   ├── world_bible_db.py
-│   │   └── world_bible_merge.py
-│   │
-│   ├── ui/                  # Additional UI utilities
-│   │   ├── components.py
-│   │   ├── layout.py
-│   │   └── theme.py
-│   │
-│   ├── config/
-│   │   └── settings.py
-│   │
-│   └── utils/
-│       ├── versioning.py
-│       ├── helpers.py
-│       ├── auth.py
-│       ├── keys.py
-│       └── navigation.py    # Centralized NAV_ITEMS config
-│
-├── docs/                    # Documentation (see Section 11)
-├── legal/                   # Policy documents (see Section 5.8)
-├── scripts/                 # Utility scripts (see Section 12)
-├── tests/                   # Automated tests
-├── assets/                  # Brand assets & CSS
-│
-├── VERSION.txt
-├── requirements.txt
-└── LICENSE.md
+
+ app/main.py              # Single entrypoint (routing + layout)
+
+ app/
+    state.py             # Session state schema + defaults
+    router.py            # Central navigation logic
+    app_context.py       # App context reference
+   
+    layout/
+       sidebar.py       # Sidebar UI
+       header.py        # App header + version
+       layout.py        # Layout utilities
+   
+    views/               # UI screens (one file each)
+       dashboard.py
+       projects.py
+       outline.py
+       editor.py
+       world_bible.py
+       ai_tools.py
+       export.py
+       legal.py
+   
+    components/          # Reusable UI blocks
+       buttons.py
+       forms.py
+       editors.py
+       ui.py
+   
+    services/            # Business logic (no UI)
+       projects.py
+       storage.py
+       ai.py
+       export.py
+       world_bible.py
+       world_bible_db.py
+       world_bible_merge.py
+   
+    ui/                  # Additional UI utilities
+       components.py
+       layout.py
+       theme.py
+   
+    config/
+       settings.py
+   
+    utils/
+        versioning.py
+        helpers.py
+        auth.py
+        keys.py
+        navigation.py    # Centralized NAV_ITEMS config
+
+ docs/                    # Documentation (see Section 11)
+ legal/                   # Policy documents (see Section 5.8)
+ scripts/                 # Utility scripts (see Section 12)
+ tests/                   # Automated tests
+ assets/                  # Brand assets & CSS
+
+ VERSION.txt
+ requirements.txt
+ LICENSE.md
 ```
 
 ### Design Principles
@@ -479,14 +479,14 @@ Mantis-Studio/
 
 ## 10. Getting Started & Next Steps
 
-### 👋 New Users
+###  New Users
 **First time here?** Check out the **[Getting Started Guide](docs/HANDBOOK.md)** for:
 - Step-by-step installation
 - Your first project walkthrough  
 - AI setup instructions
 - Troubleshooting help
 
-### 🔧 For Developers
+###  For Developers
 Recommended technical improvements:
 
 1. Extract render logic from `app/main.py` into respective view files
@@ -530,9 +530,9 @@ Helper scripts are located in the `scripts/` directory:
 
 ## 13. Project Vision
 
-Mantis Studio aims to be a **professional‑grade creative OS**, not just another AI chat wrapper.
+Mantis Studio aims to be a **professionalgrade creative OS**, not just another AI chat wrapper.
 
-The foundation is solid — the next step is tightening execution.
+The foundation is solid  the next step is tightening execution.
 
 ---
 
@@ -545,11 +545,11 @@ The foundation is solid — the next step is tightening execution.
 ### 1) Critical bugs (must-fix)
 - **Startup crash when config contains non-numeric preferences**
   - **Root cause:** `initialize_session_state()` casted numeric config values with `int()` directly, which raises `ValueError` if the JSON file stores an empty string or malformed value.
-  - **Location:** `app/state.py` (lines 95–118).
+  - **Location:** `app/state.py` (lines 95118).
   - **Corrected implementation:** added a `_safe_int()` helper with fallback defaults to prevent session-state initialization crashes.
 - **Project load fails with missing file path**
   - **Root cause:** `Project.load()` opened the file without handling `FileNotFoundError`, causing an unhandled exception if the saved path is deleted or moved.
-  - **Location:** `app/main.py` (lines 816–829) and `app/services/projects.py` (lines 487–500).
+  - **Location:** `app/main.py` (lines 816829) and `app/services/projects.py` (lines 487500).
   - **Corrected implementation:** wrap file open in `try/except FileNotFoundError`, log the error, and raise a clear `ValueError` for UI-friendly handling.
 
 ### 2) Structural improvements
@@ -561,22 +561,22 @@ The foundation is solid — the next step is tightening execution.
   - **Issue:** view logic still lives in `app/main.py`, while `app/views/` is thin.
   - **Recommendation:** progressively move per-page render functions into `app/views/` and keep `app/main.py` focused on orchestration only.
 - **UX flow friction**
-  - **Issue:** new users land on a dashboard with no guided “next action” for creating a first project and must discover AI configuration manually.
-  - **Recommendation:** add a first-run wizard (project creation + API key onboarding) and contextual CTA buttons (e.g., “Create first outline”).
+  - **Issue:** new users land on a dashboard with no guided next action for creating a first project and must discover AI configuration manually.
+  - **Recommendation:** add a first-run wizard (project creation + API key onboarding) and contextual CTA buttons (e.g., Create first outline).
 
 ### 3) Performance optimizations
 - **Avoid quadratic string concatenation in AI responses**
-  - **Root cause:** `AIEngine.generate()` appended to a Python string in a loop, which becomes O(n²) on large outputs.
-  - **Location:** `app/services/ai.py` (lines 160–164).
+  - **Root cause:** `AIEngine.generate()` appended to a Python string in a loop, which becomes O(n) on large outputs.
+  - **Location:** `app/services/ai.py` (lines 160164).
   - **Corrected implementation:** collect chunks into a list and `''.join()` (implemented).
 - **Cache expensive requests**
-  - Use `st.cache_data` for model-list probes and long-running entity scans so repeated reruns don’t re-fetch data.
+  - Use `st.cache_data` for model-list probes and long-running entity scans so repeated reruns dont re-fetch data.
 - **Batch state updates**
   - Consolidate repeated `st.session_state` writes in write-heavy flows (chapter editor, world bible review) to reduce reruns.
 
 ### 4) Modern feature additions
 1. **Workflow automation pipelines**
-   - **User value:** run “outline → draft → revision → export” as a single pipeline.
+   - **User value:** run outline  draft  revision  export as a single pipeline.
    - **Architecture fit:** add `app/services/pipelines.py` and persist steps in project metadata.
    - **Implementation:** define a pipeline schema, queue steps, and use background tasks to update the UI.
 2. **Plugin / extension system**
@@ -602,15 +602,15 @@ The foundation is solid — the next step is tightening execution.
   - UI polish and quick actions lag behind modern SaaS editors.
 
 ### 6) Prioritized upgrade roadmap (short / mid / long term)
-- **Short term (0–2 months):**
+- **Short term (02 months):**
   - Finish view extraction from `app/main.py`.
   - Add first-run onboarding wizard and inline guidance.
   - Standardize error handling (user-safe toasts + logged errors).
-- **Mid term (2–6 months):**
+- **Mid term (26 months):**
   - Introduce snapshot-based version history.
-  - Add pipeline automation (outline → draft → export).
+  - Add pipeline automation (outline  draft  export).
   - Begin plugin/extension system design.
-- **Long term (6–12 months):**
+- **Long term (612 months):**
   - Collaboration + cloud sync layer.
   - Marketplace-ready plugin ecosystem.
   - Deep integrations (Notion, Google Docs, Obsidian).
@@ -630,17 +630,17 @@ Current repository structure:
 ```text
 /
 +-- app/
-�   +-- main.py
-�   +-- router.py
-�   +-- state.py
-�   +-- session_init.py
-�   +-- config/
-�   +-- models/
-�   +-- services/
-�   +-- views/
-�   +-- components/
-�   +-- layout/
-�   +-- utils/
+   +-- main.py
+   +-- router.py
+   +-- state.py
+   +-- session_init.py
+   +-- config/
+   +-- models/
+   +-- services/
+   +-- views/
+   +-- components/
+   +-- layout/
+   +-- utils/
 +-- assets/
 +-- docs/
 +-- legal/
@@ -672,6 +672,7 @@ Notes:
 - ssets/ - Static branding and styles
 
 For documentation navigation, see docs/README.md.
+
 
 
 

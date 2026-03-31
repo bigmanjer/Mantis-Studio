@@ -1,4 +1,4 @@
-"""Centralized session state initialization for Mantis Studio.
+﻿"""Centralized session state initialization for Mantis Studio.
 
 This module provides defensive initialization of all session state variables
 to prevent unexpected resets and ensure consistent state across reruns.
@@ -63,7 +63,7 @@ def initialize_session_state(st) -> None:
             config_data = {}
             # Non-blocking warning - app continues with defaults
             try:
-                st.warning("⚠️ Configuration file not accessible. Using defaults.")
+                st.warning(" Configuration file not accessible. Using defaults.")
             except Exception:
                 pass  # Ignore if st.warning fails
         
@@ -202,7 +202,7 @@ def initialize_session_state(st) -> None:
         st.session_state.setdefault("initialized", True)
         st.session_state.setdefault("last_exception", str(e))
         try:
-            st.error("⚠️ Failed to initialize application state. Some features may not work correctly.")
+            st.error(" Failed to initialize application state. Some features may not work correctly.")
         except Exception:
             pass  # If even st.error fails, just continue
 
@@ -225,3 +225,4 @@ def queue_widget_update(st, key: str, value: Any) -> None:
         pending[key] = value
     except Exception as e:
         logger.warning(f"Failed to queue widget update for {key}: {e}")
+

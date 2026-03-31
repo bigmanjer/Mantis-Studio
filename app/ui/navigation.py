@@ -1,4 +1,4 @@
-"""Enhanced navigation components for Mantis Studio.
+﻿"""Enhanced navigation components for Mantis Studio.
 
 This module provides:
 - Sidebar navigation with visual hierarchy
@@ -166,7 +166,7 @@ def help_tooltip(
     
     html = f"""
     <div class="mantis-help-tooltip">
-        <div class="mantis-help-icon">💡</div>
+        <div class="mantis-help-icon"></div>
         <div class="mantis-help-content">
             {title_html}
             <div class="mantis-help-text">{text}</div>
@@ -287,7 +287,7 @@ def quick_action_card(
 def empty_state(
     title: str,
     description: str,
-    icon: str = "📭",
+    icon: str = "",
     action_label: Optional[str] = None,
     on_action: Optional[Callable] = None,
     key: Optional[str] = None,
@@ -348,3 +348,4 @@ def empty_state(
     if action_label and on_action:
         if st.button(action_label, key=key, type="primary"):
             on_action()
+

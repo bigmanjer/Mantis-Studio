@@ -1,4 +1,4 @@
-# Contributing to MANTIS Studio
+﻿# Contributing to MANTIS Studio
 
 Thank you for your interest in contributing to MANTIS Studio! This guide will help you get started.
 
@@ -32,21 +32,21 @@ streamlit run app/main.py
 
 ```
 app/
-├── main.py              # Main Streamlit entry point (state-driven navigation)
-├── app_context.py       # Alternative implementation (reference only)
-├── config/              # Application settings and configuration
-│   └── settings.py      # AppConfig, env vars, logging setup
-├── views/               # UI screens (dashboard, projects, editor, etc.)
-├── components/          # Reusable UI blocks (buttons, forms, editors)
-├── services/            # Business logic (AI, projects, export, storage)
-│   ├── ai.py            # AI engine and LLM integration
-│   ├── projects.py      # Project/Chapter/Entity data models
-│   ├── storage.py       # File locking and storage helpers
-│   ├── export.py        # Markdown export
-│   └── world_bible*.py  # World Bible database and merge logic
-├── layout/              # Sidebar, header, layout components
-├── ui/                  # UI utilities, theme, and component helpers
-└── utils/               # Navigation, auth, keys, versioning helpers
+ main.py              # Main Streamlit entry point (state-driven navigation)
+ app_context.py       # Alternative implementation (reference only)
+ config/              # Application settings and configuration
+    settings.py      # AppConfig, env vars, logging setup
+ views/               # UI screens (dashboard, projects, editor, etc.)
+ components/          # Reusable UI blocks (buttons, forms, editors)
+ services/            # Business logic (AI, projects, export, storage)
+    ai.py            # AI engine and LLM integration
+    projects.py      # Project/Chapter/Entity data models
+    storage.py       # File locking and storage helpers
+    export.py        # Markdown export
+    world_bible*.py  # World Bible database and merge logic
+ layout/              # Sidebar, header, layout components
+ ui/                  # UI utilities, theme, and component helpers
+ utils/               # Navigation, auth, keys, versioning helpers
 ```
 
 ## Running Tests
@@ -72,10 +72,10 @@ python scripts/smoke_test.py
 ## Making Changes
 
 1. **Create a branch** from `main` for your changes.
-2. **Keep changes focused** — one feature or fix per pull request.
+2. **Keep changes focused**  one feature or fix per pull request.
 3. **Run existing tests** before and after your changes to make sure nothing breaks.
 4. **Add tests** for new functionality when possible.
-5. **Follow existing code style** — use type hints, docstrings, and consistent naming.
+5. **Follow existing code style**  use type hints, docstrings, and consistent naming.
 
 ## Code Style
 
@@ -89,7 +89,7 @@ python scripts/smoke_test.py
 
 1. Push your branch and open a pull request against `main`.
 2. Describe what the PR does and link any related issues.
-3. CI will automatically run tests — make sure they pass.
+3. CI will automatically run tests  make sure they pass.
 4. A maintainer will review and merge when ready.
 
 ## Reporting Issues
@@ -100,3 +100,4 @@ python scripts/smoke_test.py
 ## License
 
 By contributing, you agree that your contributions will be licensed under the project's existing license.
+

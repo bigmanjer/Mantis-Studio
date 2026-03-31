@@ -1,5 +1,5 @@
-/* ==========================================================================
-   MANTIS Studio — Unified Button System
+﻿/* ==========================================================================
+   MANTIS Studio  Unified Button System
    ==========================================================================
    All buttons and button-like elements derive their visual language from
    the "Editor" button in the Dashboard Quick Actions section.
@@ -12,15 +12,15 @@
       automatically inherits these values.
 
    ARCHITECTURE:
-   1. Base button          → .stButton > button
-   2. Primary variant      → .stButton > button[kind="primary"]
-   3. Link buttons         → .stLinkButton > a
-   4. CTA tile cards       → .mantis-cta-tile
-   5. Action cards         → .mantis-action-card
+   1. Base button           .stButton > button
+   2. Primary variant       .stButton > button[kind="primary"]
+   3. Link buttons          .stLinkButton > a
+   4. CTA tile cards        .mantis-cta-tile
+   5. Action cards          .mantis-action-card
    ========================================================================== */
 
 /* --------------------------------------------------------------------------
-   §1  BASE BUTTON — matches the "Editor" Quick-Action button exactly
+   1  BASE BUTTON  matches the "Editor" Quick-Action button exactly
    -------------------------------------------------------------------------- */
 .stButton > button {
     border-radius: 16px !important;
@@ -41,7 +41,7 @@
                 background 0.18s ease !important;
 }
 
-/* Hover — subtle lift + accent border + glow */
+/* Hover  subtle lift + accent border + glow */
 .stButton > button:hover {
     transform: translateY(-1px);
     border-color: var(--mantis-button-hover-border) !important;
@@ -49,14 +49,14 @@
                 0 0 12px var(--mantis-accent-glow, rgba(34, 197, 94, 0.18));
 }
 
-/* Active / pressed — snap back for tactile feedback */
+/* Active / pressed  snap back for tactile feedback */
 .stButton > button:active {
     transform: translateY(0) scale(0.98);
     box-shadow: none;
     transition-duration: 0.06s !important;
 }
 
-/* Focus — visible ring for keyboard navigation (a11y) */
+/* Focus  visible ring for keyboard navigation (a11y) */
 .stButton > button:focus-visible {
     outline: 2px solid var(--mantis-accent, #22c55e) !important;
     outline-offset: 2px !important;
@@ -104,7 +104,7 @@
     color: var(--mantis-muted, #6c7c73) !important;
 }
 /* --------------------------------------------------------------------------
-   §2  PRIMARY BUTTON — green gradient variant
+   2  PRIMARY BUTTON  green gradient variant
    -------------------------------------------------------------------------- */
 .stButton > button[kind="primary"] {
     background: var(--mantis-primary-bg) !important;
@@ -136,7 +136,7 @@
 }
 
 /* --------------------------------------------------------------------------
-   §3  LINK BUTTONS — visually match regular buttons
+   3  LINK BUTTONS  visually match regular buttons
    -------------------------------------------------------------------------- */
 .stLinkButton > a {
     border-radius: 16px !important;
@@ -180,7 +180,7 @@
 }
 
 /* --------------------------------------------------------------------------
-   §4  CTA TILE — card-style button with icon + subtitle (Quick Actions)
+   4  CTA TILE  card-style button with icon + subtitle (Quick Actions)
    -------------------------------------------------------------------------- */
 .mantis-cta-tile {
     padding: 16px 18px;
@@ -225,7 +225,7 @@
 }
 
 /* --------------------------------------------------------------------------
-   §5  ACTION CARD — enhanced card with title, description, and action button
+   5  ACTION CARD  enhanced card with title, description, and action button
    -------------------------------------------------------------------------- */
 .mantis-action-card {
     padding: 18px 20px;
@@ -256,14 +256,14 @@
 }
 
 /* --------------------------------------------------------------------------
-   §6  BUTTON HIERARCHY — unified with navigation buttons theme
+   6  BUTTON HIERARCHY  unified with navigation buttons theme
    --------------------------------------------------------------------------
    All action-category buttons now derive their visual language from the
    same CSS custom properties used by the navigation / base button system
-   (§1-§2), ensuring consistent look-and-feel across the entire app.
+   (1-2), ensuring consistent look-and-feel across the entire app.
    -------------------------------------------------------------------------- */
 
-/* PRIMARY — main actions (Save, Create, Confirm) */
+/* PRIMARY  main actions (Save, Create, Confirm) */
 .mantis-btn-primary > button {
     background: var(--mantis-primary-bg) !important;
     color: #ffffff !important;
@@ -283,7 +283,7 @@
                 0 0 16px var(--mantis-accent-glow, rgba(34, 197, 94, 0.25));
 }
 
-/* SECONDARY — tool actions (Open Editor, Open Memory, Export) */
+/* SECONDARY  tool actions (Open Editor, Open Memory, Export) */
 .mantis-btn-secondary > button {
     background: var(--mantis-button-bg) !important;
     color: var(--mantis-text) !important;
@@ -302,7 +302,7 @@
                 0 0 12px var(--mantis-accent-glow, rgba(34, 197, 94, 0.18));
 }
 
-/* GHOST — sidebar/navigation buttons */
+/* GHOST  sidebar/navigation buttons */
 .mantis-btn-ghost > button {
     background: var(--mantis-surface-alt, transparent) !important;
     color: var(--mantis-text) !important;
@@ -320,7 +320,7 @@
     transform: none;
 }
 
-/* DANGER — destructive actions (Delete, Reset) */
+/* DANGER  destructive actions (Delete, Reset) */
 .mantis-btn-danger > button {
     background: var(--mantis-button-bg) !important;
     color: var(--mantis-warning, #e53935) !important;
@@ -339,7 +339,7 @@
 }
 
 /* --------------------------------------------------------------------------
-   §7  REDUCED MOTION — respect user preference (a11y)
+   7  REDUCED MOTION  respect user preference (a11y)
    -------------------------------------------------------------------------- */
 @media (prefers-reduced-motion: reduce) {
     .stButton > button,
@@ -368,3 +368,4 @@
         transform: none !important;
     }
 }
+

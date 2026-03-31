@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from contextlib import nullcontext
 
@@ -90,7 +90,7 @@ def test_render_navigation_section_routes_and_reruns(monkeypatch):
 
     sidebar.render_navigation_section(
         section_name="Test",
-        nav_items=[("Memory", "memory", "🧠")],
+        nav_items=[("Memory", "memory", "")],
         current_page="home",
         world_focus="",
         expanded=True,
@@ -101,3 +101,4 @@ def test_render_navigation_section_routes_and_reruns(monkeypatch):
     assert fake_st.session_state["world_focus_tab"] == "Memory"
     assert fake_st.session_state["page"] == "world"
     assert fake_st.rerun_called is True
+

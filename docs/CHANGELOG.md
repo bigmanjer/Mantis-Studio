@@ -1,4 +1,4 @@
-## [91.3] - 2026-03-30
+﻿## [91.3] - 2026-03-30
 
 ### Fixed
 - Eliminated remaining mojibake separators in World Bible UI labels (`Open details | Name`, review labels use `|` separators).
@@ -44,47 +44,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Light mode hardening (phase 2): added high-priority button text/background overrides (including sidebar buttons and primary/disabled variants) plus explicit sidebar project-chip text color enforcement for reliable readability.
 
 ### Changed
-- ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€¦Ã‚Â½Ãƒâ€šÃ‚Â¨ Replaced in-app branding assets with slices generated from `assets/NEW MANTIS BRANDING.png`, including a new emblem, wordmark, full lockup, and favicon set (1x + 2x) generated at runtime from the source board.
-- ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€šÃ‚Â§Ãƒâ€šÃ‚Â­ Updated Streamlit branding references for page icon, header logo, sidebar logo, and home-header emblem to use generated `branding/*` assets.
-- ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒâ€šÃ‚Â Tuned header logo sizing for the wider lockup image so branding renders cleanly at default viewport widths.
-- ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€¦Ã‚Â½ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂºÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â Refined header/sidebar brand containers and logo treatment (transparent extraction + themed glow frames) so the new brand system feels native to the product UI instead of pasted-in artboards.
+-  Replaced in-app branding assets with slices generated from `assets/NEW MANTIS BRANDING.png`, including a new emblem, wordmark, full lockup, and favicon set (1x + 2x) generated at runtime from the source board.
+-  Updated Streamlit branding references for page icon, header logo, sidebar logo, and home-header emblem to use generated `branding/*` assets.
+-  Tuned header logo sizing for the wider lockup image so branding renders cleanly at default viewport widths.
+-  Refined header/sidebar brand containers and logo treatment (transparent extraction + themed glow frames) so the new brand system feels native to the product UI instead of pasted-in artboards.
 
 ### Branding asset map
-- `assets/branding/mantis_favicon.png` ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ Streamlit `page_icon` metadata
-- `assets/branding/mantis_wordmark.png` ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ `app_context` header logo
-- `assets/branding/mantis_lockup.png` ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ `main.py` top brand header
-- `assets/branding/mantis_emblem.png` ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ sidebar brand + compact header icon
+- `assets/branding/mantis_favicon.png`  Streamlit `page_icon` metadata
+- `assets/branding/mantis_wordmark.png`  `app_context` header logo
+- `assets/branding/mantis_lockup.png`  `main.py` top brand header
+- `assets/branding/mantis_emblem.png`  sidebar brand + compact header icon
 
 ### Changelog output
 - Images sliced at runtime: 8 outputs (`mantis_emblem`, `mantis_wordmark`, `mantis_lockup`, `mantis_favicon`, each with 1x and 2x variants).
 - Code files updated: `app/app_context.py`, `app/main.py`, `app/layout/enhanced_sidebar.py`, `app/utils/branding_assets.py`.
 
 ### Fixed
-- ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€šÃ‚Â§Ãƒâ€šÃ‚Â© Eliminated binary image slices from git history moving forward by generating derived branding assets on demand, which avoids PR tooling failures on binary diffs.
+-  Eliminated binary image slices from git history moving forward by generating derived branding assets on demand, which avoids PR tooling failures on binary diffs.
 
 ---
 
 ## [91.6] - 2026-02-18
 
 ### Added
-- ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“Ãƒâ€šÃ‚Â¨ **In-app "What's New" notification system**: Users now see a friendly notification banner when the app version updates
+-  **In-app "What's New" notification system**: Users now see a friendly notification banner when the app version updates
   - Shows key changes and improvements in each version
   - Includes direct link to full changelog
   - Dismissible with persistent memory of last seen version
   - Helps users understand what changed between updates
-- ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒâ€¦Ã‚Â  Version tracking in user config to detect when app has been updated
+-  Version tracking in user config to detect when app has been updated
 
 ### Changed
-- ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒâ€šÃ‚Â Updated CHANGELOG.md to document all versions from 90.7 to 91.6
-- ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“ Updated README.md to reflect current version (91.6) throughout documentation
-- ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€¦Ã‚Â½Ãƒâ€šÃ‚Â¯ Improved transparency about version changes and updates
+-  Updated CHANGELOG.md to document all versions from 90.7 to 91.6
+-  Updated README.md to reflect current version (91.6) throughout documentation
+-  Improved transparency about version changes and updates
 
 ### Fixed
-- ÃƒÆ’Ã‚Â¢Ãƒâ€šÃ‚ÂÃƒâ€¦Ã¢â‚¬â„¢ **Major UX Issue**: Users can now see what changed between versions
+-  **Major UX Issue**: Users can now see what changed between versions
   - Previously, users reported "merged 4 times now with no changed from users point of view"
   - Version number was incrementing but changes were invisible to users
   - Now users get a clear notification when version changes
-- ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒâ€¦Ã‚Â¡ Documentation version inconsistencies corrected
+-  Documentation version inconsistencies corrected
 
 ### Impact
 This release directly addresses user feedback about version changes being invisible. Users will now be informed whenever the app updates, creating better awareness and transparency about ongoing improvements.
@@ -197,6 +197,7 @@ This release directly addresses user feedback about version changes being invisi
 - **88.x** - Debugging and troubleshooting framework.
 - **87.x** - User experience enhancements.
 - See [`../VERSION.txt`](../VERSION.txt) for the current version.
+
 
 
 

@@ -1,4 +1,4 @@
----
+﻿---
 # GitHub Copilot Custom Agent Configuration for Mantis Studio
 # This agent specializes in debugging Streamlit issues, refactoring app/main.py,
 # stabilizing session_state, and improving deployment reliability.
@@ -44,32 +44,32 @@ instructions: |
   
   **Initialization (app/session_init.py):**
   ```python
-  # ✅ CORRECT - Idempotent, preserves existing values
+  #  CORRECT - Idempotent, preserves existing values
   def initialize_session_state(st):
       st.session_state.setdefault("page", "home")
       st.session_state.setdefault("project", None)
       st.session_state.setdefault("user_id", None)
   
-  # ❌ WRONG - Overwrites existing state
+  #  WRONG - Overwrites existing state
   def bad_initialization(st):
       st.session_state.page = "home"  # Loses user's current page!
   ```
   
   **State Access:**
   ```python
-  # ✅ CORRECT - Safe access with defaults
+  #  CORRECT - Safe access with defaults
   current_page = st.session_state.get("page", "home")
   
-  # ❌ WRONG - Can raise KeyError
+  #  WRONG - Can raise KeyError
   current_page = st.session_state["page"]
   ```
   
   **State Mutation:**
   ```python
-  # ✅ CORRECT - Direct assignment for updates
+  #  CORRECT - Direct assignment for updates
   st.session_state.page = "projects"
   
-  # ❌ WRONG - Don't use setdefault for updates
+  #  WRONG - Don't use setdefault for updates
   st.session_state.setdefault("page", "projects")  # Won't change if already set!
   ```
 
@@ -92,28 +92,28 @@ instructions: |
   - Delegate state initialization to app/session_init.py
   
   **Refactoring Checklist:**
-  1. ✅ Session initialization extracted to app/session_init.py
-  2. ✅ Router handles page rendering with error handling
-  3. ✅ UI context provides shared utilities
-  4. 🎯 Continue extracting embedded view logic to app/views/
-  5. 🎯 Move utility functions to app/utils/
-  6. 🎯 Extract inline components to app/components/
+  1.  Session initialization extracted to app/session_init.py
+  2.  Router handles page rendering with error handling
+  3.  UI context provides shared utilities
+  4.  Continue extracting embedded view logic to app/views/
+  5.  Move utility functions to app/utils/
+  6.  Extract inline components to app/components/
 
   **Code Organization Pattern:**
   ```
   app/main.py (orchestration only)
-  ├── Initialize session state (app/session_init)
-  ├── Check authentication
-  ├── Render sidebar (app/layout/)
-  └── Route to view (app/router → app/views/)
+   Initialize session state (app/session_init)
+   Check authentication
+   Render sidebar (app/layout/)
+   Route to view (app/router  app/views/)
   ```
 
   ### Anti-Patterns to Avoid:
-  - ❌ Inline view logic in main.py (use app/views/)
-  - ❌ Direct database calls in main.py (use app/services/)
-  - ❌ Hardcoded configurations (use app/config/)
-  - ❌ Duplicate initialization code
-  - ❌ Business logic in render functions
+  -  Inline view logic in main.py (use app/views/)
+  -  Direct database calls in main.py (use app/services/)
+  -  Hardcoded configurations (use app/config/)
+  -  Duplicate initialization code
+  -  Business logic in render functions
 
   ## 4. Deployment Reliability
 
@@ -121,7 +121,7 @@ instructions: |
   
   **Error Handling for Production:**
   ```python
-  # ✅ CORRECT - Production-ready error handling
+  #  CORRECT - Production-ready error handling
   try:
       render_current_page(st, ctx)
   except Exception as exc:
@@ -133,7 +133,7 @@ instructions: |
   
   **Config Loading Safety:**
   ```python
-  # ✅ CORRECT - Fail gracefully if config missing
+  #  CORRECT - Fail gracefully if config missing
   try:
       config = load_app_config()
   except Exception as exc:
@@ -143,7 +143,7 @@ instructions: |
   
   **File I/O Robustness:**
   ```python
-  # ✅ CORRECT - Handle missing/corrupt files
+  #  CORRECT - Handle missing/corrupt files
   def load_project_safe(path: Path) -> Optional[Project]:
       try:
           return Project.load(path)
@@ -156,14 +156,14 @@ instructions: |
   ```
 
   ### Deployment Checklist:
-  - ✅ All exceptions caught and handled gracefully
-  - ✅ Fallback UI available for all error scenarios
-  - ✅ Config loading never crashes the app
-  - ✅ File operations handle missing/corrupt files
-  - ✅ No infinite rerun loops
-  - ✅ Widget keys properly scoped to avoid collisions
-  - ✅ Session state properly initialized
-  - ✅ Logging enabled for production debugging
+  -  All exceptions caught and handled gracefully
+  -  Fallback UI available for all error scenarios
+  -  Config loading never crashes the app
+  -  File operations handle missing/corrupt files
+  -  No infinite rerun loops
+  -  Widget keys properly scoped to avoid collisions
+  -  Session state properly initialized
+  -  Logging enabled for production debugging
 
   ### Debug Mode Support:
   Users can enable debug mode via:
@@ -179,12 +179,12 @@ instructions: |
 
   ### String Building Best Practices:
   ```python
-  # ❌ WRONG - Inefficient concatenation (O(n²))
+  #  WRONG - Inefficient concatenation (O(n))
   result = ""
   for item in items:
       result += f"{item}\n"
   
-  # ✅ CORRECT - List + join (O(n))
+  #  CORRECT - List + join (O(n))
   parts = [f"{item}" for item in items]
   result = "\n".join(parts + [""]) if parts else ""  # Consistent trailing newline
   # Or simpler: result = "\n".join(parts) + "\n" if parts else ""
@@ -238,7 +238,7 @@ instructions: |
   - [ ] Logging: Appropriate log levels used (debug, info, warning, error)
   - [ ] Type hints: Functions have proper type annotations
   - [ ] Docstrings: Public functions documented
-  - [ ] Performance: No O(n²) string concatenation
+  - [ ] Performance: No O(n) string concatenation
   - [ ] Config: No hardcoded values, use app/config/
   - [ ] Tests: Unit tests exist for business logic
 
@@ -340,12 +340,12 @@ conversation_starters:
   - "How do I test my changes before deploying?"
 
 welcome_message: |
-  👋 Hello! I'm the Mantis Studio Engineering Agent, specialized in:
+   Hello! I'm the Mantis Studio Engineering Agent, specialized in:
   
-  🐛 **Debugging Streamlit Issues** - Blank pages, state resets, key collisions
-  🔧 **Refactoring app/main.py** - Extracting logic, improving organization  
-  💾 **Stabilizing session_state** - Proper initialization, safe access patterns
-  🚀 **Deployment Reliability** - Error handling, config safety, production readiness
+   **Debugging Streamlit Issues** - Blank pages, state resets, key collisions
+   **Refactoring app/main.py** - Extracting logic, improving organization  
+   **Stabilizing session_state** - Proper initialization, safe access patterns
+   **Deployment Reliability** - Error handling, config safety, production readiness
   
   I have deep knowledge of the Mantis Studio codebase, Streamlit best practices,
   and the patterns established in recent stabilization work.
@@ -354,3 +354,4 @@ welcome_message: |
 
 # Note: The 'tools' field can be used to enable specific capabilities
 # For now, we rely on default GitHub Copilot tools for file access and code generation
+

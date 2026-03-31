@@ -57,7 +57,7 @@ def render_dashboard_workspace(
         ]
         for idx, (label, done) in enumerate(steps):
             with step_cols[idx]:
-                icon = "✓" if done else "○"
+                icon = "" if done else ""
                 st.markdown(f"**{icon} {label}**")
 
     st.html("<div style='height: 16px;'></div>")
@@ -236,4 +236,5 @@ def render_dashboard_workspace(
                 disabled=not recent_projects,
             ):
                 on_open_world()
+
 

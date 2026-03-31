@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import re
 from collections import defaultdict
@@ -233,8 +233,9 @@ def render_world_relationships(
                 issues = [i for i in issues if "low detail" in i.lower()]
             if not issues:
                 continue
-            with st.expander(f"Chapter {chapter_idx} · {len(issues)} conflict(s)"):
+            with st.expander(f"Chapter {chapter_idx}  {len(issues)} conflict(s)"):
                 for issue in issues[:8]:
                     st.markdown(f"- {issue}")
                 if len(issues) > 8:
                     st.caption(f"+ {len(issues) - 8} more")
+

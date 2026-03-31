@@ -1,8 +1,8 @@
-# Terms of Service
+﻿# Terms of Service
 
 Effective date: 2024-01-01
 
-These Terms of Service (“Terms”) govern access to and use of MANTIS Studio (“Service”). By using the Service, you agree to these Terms.
+These Terms of Service (Terms) govern access to and use of MANTIS Studio (Service). By using the Service, you agree to these Terms.
 
 ## 1. Eligibility
 You must be legally able to form a binding contract to use the Service.
@@ -27,7 +27,7 @@ You retain ownership of content you submit. You grant MANTIS Studio a non-exclus
 The Service may integrate third-party APIs or services. Your use of third-party services is subject to their terms and policies.
 
 ## 7. Disclaimers
-The Service is provided “as is” without warranties of any kind. MANTIS Studio disclaims all warranties, express or implied.
+The Service is provided as is without warranties of any kind. MANTIS Studio disclaims all warranties, express or implied.
 
 ## 8. Limitation of Liability
 To the maximum extent permitted by law, MANTIS Studio will not be liable for indirect, incidental, special, consequential, or punitive damages, or any loss of profits, data, or goodwill.
@@ -40,3 +40,4 @@ We may update these Terms from time to time. Continued use of the Service consti
 
 ## 11. Contact
 Questions about these Terms: legal@mantis-studio.example
+

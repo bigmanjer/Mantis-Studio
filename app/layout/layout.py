@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import base64
 from pathlib import Path
@@ -605,7 +605,7 @@ def render_header(version: str, logo_b64: str) -> None:
                 </div>
                 <div style="line-height:1.15;">
                     <div class="mantis-header-title">
-                        MANTIS Studio — v{version}
+                        MANTIS Studio  v{version}
                     </div>
                     <div class="mantis-header-sub">
                         Modular AI Narrative Text Intelligence System
@@ -629,8 +629,8 @@ def _build_footer_nav_links() -> str:
     """Generate footer navigation ``<li>`` items from the centralized config.
 
     The links mirror the sidebar navigation defined in
-    ``app/utils/navigation.py → NAV_SECTIONS``.  To add or remove a nav entry
-    edit **only** that list — the footer updates automatically.
+    ``app/utils/navigation.py  NAV_SECTIONS``.  To add or remove a nav entry
+    edit **only** that list  the footer updates automatically.
     """
     from app.utils.navigation import get_nav_sections
 
@@ -672,7 +672,7 @@ def render_footer(
     st.html(
         f"""
     <style>
-    /* ── Footer container ── */
+    /*  Footer container  */
     .mantis-footer {{
         margin-top: 4rem;
         border-top: 1px solid var(--mantis-divider, #143023);
@@ -680,7 +680,7 @@ def render_footer(
         padding: 2.5rem 1.5rem 0;
     }}
 
-    /* ── Back-to-top ── */
+    /*  Back-to-top  */
     .mantis-footer-top {{
         display: flex;
         justify-content: flex-end;
@@ -710,7 +710,7 @@ def render_footer(
         border-radius: 999px;
     }}
 
-    /* ── Grid ── */
+    /*  Grid  */
     .mantis-footer-grid {{
         display: grid;
         grid-template-columns: 1.6fr 1fr 1fr 1fr;
@@ -719,7 +719,7 @@ def render_footer(
         margin: 0 auto;
     }}
 
-    /* ── Section headings ── */
+    /*  Section headings  */
     .mantis-footer-section h4 {{
         font-family: 'Space Grotesk', sans-serif;
         font-size: 0.7rem;
@@ -732,7 +732,7 @@ def render_footer(
         border-bottom: 1px solid var(--mantis-divider, #143023);
     }}
 
-    /* ── Lists ── */
+    /*  Lists  */
     .mantis-footer-section ul {{
         list-style: none;
         margin: 0;
@@ -742,7 +742,7 @@ def render_footer(
         margin-bottom: 0.45rem;
     }}
 
-    /* ── Links ── */
+    /*  Links  */
     .mantis-footer-section a {{
         color: var(--mantis-text, #ecfdf5);
         text-decoration: none;
@@ -773,7 +773,7 @@ def render_footer(
         opacity: 0.55;
     }}
 
-    /* ── Brand ── */
+    /*  Brand  */
     .mantis-footer-brand {{
         font-size: 0.85rem;
         color: var(--mantis-muted, #9CA3AF);
@@ -801,7 +801,7 @@ def render_footer(
         filter: drop-shadow(0 8px 16px rgba(0,0,0,0.32));
     }}
 
-    /* ── Bottom bar ── */
+    /*  Bottom bar  */
     .mantis-footer-bottom {{
         max-width: 960px;
         margin: 2rem auto 0;
@@ -829,7 +829,7 @@ def render_footer(
         border-radius: 2px;
     }}
 
-    /* ── Responsive ── */
+    /*  Responsive  */
     @media (max-width: 768px) {{
         .mantis-footer {{ padding: 2rem 1rem 0; }}
         .mantis-footer-grid {{
@@ -929,3 +929,4 @@ def render_footer(
         """,
         height=0,
     )
+

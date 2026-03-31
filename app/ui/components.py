@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from contextlib import contextmanager
 from collections.abc import Generator
@@ -101,7 +101,7 @@ def card_block(title: Optional[str] = None, subtitle: Optional[str] = None) -> G
 
 
 def card_start(title: Optional[str] = None, subtitle: Optional[str] = None) -> None:
-    """Deprecated — kept for backward compatibility.
+    """Deprecated  kept for backward compatibility.
 
     Prefer :func:`card_block` context manager instead.  This now
     delegates to ``st.container(border=True)`` so the opening markup
@@ -115,7 +115,7 @@ def card_start(title: Optional[str] = None, subtitle: Optional[str] = None) -> N
 
 
 def card_end() -> None:
-    """Deprecated — kept for backward compatibility."""
+    """Deprecated  kept for backward compatibility."""
     st.html("</div>")
 
 
@@ -126,7 +126,7 @@ def cta_tile(title: str, body: str, *, icon: Optional[str] = None, subtitle: Opt
     Supports optional icon and subtitle for enhanced card layouts.
 
     Args:
-        title: Primary label, may include an emoji prefix (e.g. "✍️ Editor").
+        title: Primary label, may include an emoji prefix (e.g. " Editor").
         body: Short description shown below the title.
         icon: Optional standalone icon rendered above the title.
         subtitle: Optional secondary text below *body*.
@@ -233,7 +233,7 @@ def loading_indicator(message: str = "Loading...") -> None:
     st.html(
         f"""
         <div style="text-align:center; padding:40px 20px;">
-            <div class="mantis-muted" style="font-size:14px;">⏳ {message}</div>
+            <div class="mantis-muted" style="font-size:14px;"> {message}</div>
         </div>
         """
     )
@@ -258,7 +258,7 @@ def success_message(message: str) -> None:
             gap: 10px;
             margin: 12px 0;
         ">
-            <span style="font-size:20px;">✓</span>
+            <span style="font-size:20px;"></span>
             <span>{message}</span>
         </div>
         """
@@ -284,7 +284,7 @@ def error_message(message: str) -> None:
             gap: 10px;
             margin: 12px 0;
         ">
-            <span style="font-size:20px;">⚠</span>
+            <span style="font-size:20px;"></span>
             <span>{message}</span>
         </div>
         """
@@ -310,8 +310,9 @@ def info_message(message: str) -> None:
             gap: 10px;
             margin: 12px 0;
         ">
-            <span style="font-size:20px;">ℹ</span>
+            <span style="font-size:20px;"></span>
             <span>{message}</span>
         </div>
         """
     )
+

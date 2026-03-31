@@ -1,4 +1,4 @@
-"""Dashboard-specific UI components for MANTIS Studio enterprise console."""
+﻿"""Dashboard-specific UI components for MANTIS Studio enterprise console."""
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -42,10 +42,10 @@ def render_hero_header(
     action_cols = st.columns(4)
     instance = uuid.uuid4().hex
     actions = [
-        ("✨ New Project", "new_project", primary_action, "primary"),
-        ("📝 Continue Writing", "continue", secondary_action, "secondary"),
-        ("🧠 Analyze Text", "analyze", tertiary_action, "secondary"),
-        ("⬇️ Export", "export", None, "secondary"),
+        (" New Project", "new_project", primary_action, "primary"),
+        (" Continue Writing", "continue", secondary_action, "secondary"),
+        (" Analyze Text", "analyze", tertiary_action, "secondary"),
+        (" Export", "export", None, "secondary"),
     ]
     for idx, (label, slug, callback, btn_type) in enumerate(actions):
         with action_cols[idx]:
@@ -133,3 +133,4 @@ def add_divider_with_spacing(top: int = 3, bottom: int = 3) -> None:
     add_vertical_space(top)
     st.divider()
     add_vertical_space(bottom)
+

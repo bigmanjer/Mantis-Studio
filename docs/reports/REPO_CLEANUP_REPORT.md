@@ -1,4 +1,4 @@
-# REPO CLEANUP REPORT
+ï»¿# REPO CLEANUP REPORT
 
 Date: 2026-03-31
 Repository: Mantis-Studio
@@ -85,24 +85,24 @@ Working copy: `C:\Users\BIGMANJER\Documents\Playground\mantis testing`
 - `app/README.md`
   - Rewritten to reflect actual active architecture and runtime policy.
 - `README.md`
-  - Added “Repository Cleanup Status (2026-03-31)” section.
+  - Added Repository Cleanup Status (2026-03-31) section.
 
 ## 5) Final Architecture Tree
 
 ```text
 /
 +-- app/
-¦   +-- main.py
-¦   +-- router.py
-¦   +-- state.py
-¦   +-- session_init.py
-¦   +-- config/
-¦   +-- models/
-¦   +-- services/
-¦   +-- views/
-¦   +-- components/
-¦   +-- layout/
-¦   +-- utils/
+   +-- main.py
+   +-- router.py
+   +-- state.py
+   +-- session_init.py
+   +-- config/
+   +-- models/
+   +-- services/
+   +-- views/
+   +-- components/
+   +-- layout/
+   +-- utils/
 +-- assets/
 +-- docs/
 +-- legal/
@@ -155,3 +155,4 @@ Working copy: `C:\Users\BIGMANJER\Documents\Playground\mantis testing`
   - `app/services/projects.py` (`Project.load`)
 - Added fallback text reader in `app/main.py` for legal/policy markdown rendering paths.
 - Purpose: prevent runtime crashes from legacy Windows-encoded files (`UnicodeDecodeError` like byte `0x96`).
+

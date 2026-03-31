@@ -1,4 +1,4 @@
-"""Enhanced UI feedback components for Mantis Studio.
+﻿"""Enhanced UI feedback components for Mantis Studio.
 
 This module provides:
 - Loading states with spinners and progress indicators
@@ -92,7 +92,7 @@ def step_indicator(
         elif is_future:
             step_class += " mantis-step-future"
         
-        icon = "✓" if is_completed else str(i + 1)
+        icon = "" if is_completed else str(i + 1)
         
         steps_html.append(f"""
         <div class="{step_class}">
@@ -315,13 +315,13 @@ def feedback_message(
         dismissible: Whether the message can be dismissed
     """
     default_icons = {
-        "success": "✓",
-        "error": "✗",
-        "warning": "⚠",
-        "info": "ℹ",
+        "success": "",
+        "error": "",
+        "warning": "",
+        "info": "",
     }
     
-    icon_display = icon or default_icons.get(message_type, "ℹ")
+    icon_display = icon or default_icons.get(message_type, "")
     
     type_classes = {
         "success": "mantis-feedback-success",
@@ -421,7 +421,7 @@ def page_header(
     """
     breadcrumbs_html = ""
     if breadcrumbs:
-        crumbs = " › ".join(f'<span class="mantis-breadcrumb-item">{crumb}</span>' for crumb in breadcrumbs)
+        crumbs = "  ".join(f'<span class="mantis-breadcrumb-item">{crumb}</span>' for crumb in breadcrumbs)
         breadcrumbs_html = f'<div class="mantis-breadcrumbs">{crumbs}</div>'
     
     icon_html = f'<span class="mantis-page-icon">{icon}</span>' if icon else ''
@@ -476,3 +476,4 @@ def page_header(
     </style>
     """
     st.html(html)
+
