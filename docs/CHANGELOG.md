@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Stability
+- Editor layout cleanup: tightened chapter navigation into a single-row control cluster, cleaned sidebar chapter labels/buttons, and reduced visual clutter in editor controls.
+- Editor warning fix: removed Streamlit `text_area` value/session-state conflict that caused "widget ... default value but also had its value set via Session State API" warnings.
 - Editor cleanup: removed chapter export controls from the Editor utility bar to keep export actions centralized outside drafting.
 - Navigation naming alignment: standardized workflow navigation and top header labels to use `Editor` consistently (removed `Draft` vs `Editor` mismatch).
 - Outline workflow upgrade: added outline diagnostics (word count, planned chapters, last-updated), quick links to Editor/World Bible, and structure checks.

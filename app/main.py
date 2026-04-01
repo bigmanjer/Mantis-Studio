@@ -6523,7 +6523,7 @@ def _run_ui():
         )
 
         with st.container(border=True):
-            nav_cols = st.columns([1, 1, 2])
+            nav_cols = st.columns([1, 1, 2.2, 0.9])
             with nav_cols[0]:
                 if st.button(
                     "Previous chapter",
@@ -6554,8 +6554,9 @@ def _run_ui():
                     ),
                     key=f"editor_jump_select_{p.id}",
                 )
+            with nav_cols[3]:
                 if st.button(
-                    "Go to selected",
+                    "Go",
                     use_container_width=True,
                     disabled=jump_target == curr.id,
                     key=f"editor_jump_go_{p.id}",
@@ -6629,12 +6630,14 @@ def _run_ui():
                     _update_session_chapter(curr)
                     save_p()
 
+                if ed_key not in st.session_state:
+                    st.session_state[ed_key] = curr_entry.get("content", curr.content)
+
                 val = st.text_area(
                     "Chapter Content",
-                    curr_entry.get("content", curr.content),
                     height=680,
                     label_visibility="collapsed",
-                    key=f"ed_{curr.id}",
+                    key=ed_key,
                     help="Write your chapter content here. Changes are auto-saved."
                 )
                 if val != curr.content:

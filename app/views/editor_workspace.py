@@ -69,11 +69,13 @@ def render_chapter_sidebar(
     on_cancel_delete: Callable[[], None],
 ) -> None:
     with st.container(border=True):
-        st.markdown("###  Chapters")
+        st.markdown("### Chapters")
         for chapter in chapters:
             chapter_id = chapter.get("id")
             chapter_words = int(chapter.get("word_count") or 0)
-            label = f"{chapter.get('index', 0)}. {(chapter.get('title') or 'Untitled')[:18]} ({chapter_words})"
+            raw_title = chapter.get("title") or "Untitled"
+            short_title = raw_title if len(raw_title) <= 22 else f"{raw_title[:19]}..."
+            label = f"{chapter.get('index', 0)}. {short_title} ({chapter_words})"
             if st.button(
                 label,
                 key=f"n_{chapter_id}",
@@ -84,7 +86,7 @@ def render_chapter_sidebar(
 
         st.divider()
         if st.button(
-            " New Chapter",
+            "New Chapter",
             use_container_width=True,
             help="Create a new chapter in this project.",
             key="editor_new_chapter",
@@ -110,7 +112,7 @@ def render_chapter_sidebar(
                 ):
                     on_cancel_delete()
         elif st.button(
-            " Delete Chapter",
+            "Delete Chapter",
             use_container_width=True,
             key=f"editor_del_{current_chapter_id}",
         ):
