@@ -2620,6 +2620,7 @@ def _run_ui():
                     st.rerun()
 
         with auth_tabs[1]:
+            st.caption("Username must be 3+ characters. Password must be 8+ characters.")
             signup_username = st.text_input("Username", key="auth_signup_username")
             signup_display_name = st.text_input("Display name", key="auth_signup_display_name")
             signup_password = st.text_input("Password", type="password", key="auth_signup_password")
@@ -4170,6 +4171,47 @@ def _run_ui():
                                 )
                                 if ok:
                                     st.toast("Role updated.")
+                                    st.rerun()
+                                else:
+                                    st.error(msg)
+
+                    with st.expander("Create account (admin)", expanded=False):
+                        st.caption("Create a new local user account without signing out.")
+                        admin_new_username = st.text_input(
+                            "Username",
+                            key="workspace_admin_create_username",
+                        )
+                        admin_new_display_name = st.text_input(
+                            "Display name",
+                            key="workspace_admin_create_display_name",
+                        )
+                        admin_new_password = st.text_input(
+                            "Password",
+                            type="password",
+                            key="workspace_admin_create_password",
+                        )
+                        admin_new_password_confirm = st.text_input(
+                            "Confirm password",
+                            type="password",
+                            key="workspace_admin_create_password_confirm",
+                        )
+                        if st.button(
+                            "Create user account",
+                            type="primary",
+                            use_container_width=True,
+                            key="workspace_admin_create_user_btn",
+                        ):
+                            if admin_new_password != admin_new_password_confirm:
+                                st.error("Passwords do not match.")
+                            else:
+                                ok, msg, _ = register_user(
+                                    admin_new_username,
+                                    admin_new_password,
+                                    display_name=admin_new_display_name,
+                                    base_projects_dir=AppConfig.PROJECTS_DIR,
+                                )
+                                if ok:
+                                    st.toast("User account created.")
                                     st.rerun()
                                 else:
                                     st.error(msg)
