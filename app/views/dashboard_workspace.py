@@ -59,7 +59,14 @@ def render_dashboard_workspace(
         workflow_percent = int((completed_steps / total_steps) * 100) if total_steps else 0
         next_step = next((label for label, done in steps if not done), "Complete")
 
-        st.progress(workflow_percent / 100.0)
+        st.markdown(
+            f"""
+            <div style="width:100%;height:12px;background:#d9e3db;border-radius:999px;overflow:hidden;">
+                <div style="width:{workflow_percent}%;height:100%;background:#2e7d32;"></div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
         st.caption(
             f"{completed_steps}/{total_steps} stages complete ({workflow_percent}%). Current target: {next_step}."
         )
