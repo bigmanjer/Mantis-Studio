@@ -70,6 +70,8 @@ def initialize_session_state(st) -> None:
         # Core navigation and state
         st.session_state.setdefault("page", "home")
         st.session_state.setdefault("user_id", None)
+        st.session_state.setdefault("username", "")
+        st.session_state.setdefault("display_name", "")
         st.session_state.setdefault("projects_dir", None)
         st.session_state.setdefault("project", None)
         st.session_state.setdefault("first_run", True)

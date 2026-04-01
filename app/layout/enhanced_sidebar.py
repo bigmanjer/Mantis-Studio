@@ -178,6 +178,27 @@ def render_project_actions(
                 close_callback()
 
 
+def render_account_panel(
+    *,
+    current_username: Optional[str],
+    on_logout: Optional[Callable[[], None]],
+    key_scope: Callable[[str], Any],
+) -> None:
+    if not current_username:
+        return
+    st.divider()
+    st.html("<div class='mantis-nav-section'>Account</div>")
+    st.caption(f"Signed in as {current_username}")
+    with key_scope("sidebar_logout_btn"):
+        if st.button(
+            "Sign out",
+            key="sidebar_sign_out",
+            use_container_width=True,
+        ):
+            if callable(on_logout):
+                on_logout()
+
+
 def render_enhanced_sidebar(
     version: str,
     project: Optional[Any],
@@ -189,6 +210,8 @@ def render_enhanced_sidebar(
     save_project_callback: Callable = None,
     close_project_callback: Callable = None,
     on_theme_change: Optional[Callable[[str], None]] = None,
+    current_username: Optional[str] = None,
+    on_logout: Optional[Callable[[], None]] = None,
 ) -> None:
     del debug_enabled
     from app.utils.navigation import get_nav_sections
@@ -228,6 +251,11 @@ def render_enhanced_sidebar(
                     key_scope,
                 )
             render_project_actions(project, save_project_callback, close_project_callback, key_scope)
+            render_account_panel(
+                current_username=current_username,
+                on_logout=on_logout,
+                key_scope=safe_scope,
+            )
 
 
 __all__ = ["render_enhanced_sidebar"]

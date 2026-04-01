@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Stability
+- Account system: added local user sign-in/sign-up flow with secure password hashing, per-user workspace directories under `projects/users/<user_id>`, and sidebar sign-out control.
 - Editor layout cleanup: tightened chapter navigation into a single-row control cluster, cleaned sidebar chapter labels/buttons, and reduced visual clutter in editor controls.
 - Editor warning fix: removed Streamlit `text_area` value/session-state conflict that caused "widget ... default value but also had its value set via Session State API" warnings.
 - Editor cleanup: removed chapter export controls from the Editor utility bar to keep export actions centralized outside drafting.

@@ -1518,6 +1518,14 @@ def _run_ui():
     from app.ui.ui_layout import render_card, render_metric, render_section_header
     from app.layout.layout import render_footer
     from app.utils.keys import ui_key
+    from app.utils.auth import (
+        apply_login_to_session,
+        authenticate_user,
+        get_user_projects_dir,
+        is_authenticated as auth_is_authenticated,
+        logout_session as auth_logout_session,
+        register_user,
+    )
     # Import enhanced UI feedback components
     from app.ui.feedback import (
         loading_state,
@@ -2321,6 +2329,8 @@ def _run_ui():
     logger.debug(f"Loaded app config: {list(config_data.keys())}")
     
     init_state("user_id", None)
+    init_state("username", "")
+    init_state("display_name", "")
     init_state("projects_dir", None)
     init_state("project", None)
     init_state("page", "home")
@@ -2568,15 +2578,88 @@ def _run_ui():
                 tags.append("Project active")
             render_tag_list(tags)
 
-    # Local-first: use the default projects directory
-    if not st.session_state.get("projects_dir"):
-        st.session_state.projects_dir = AppConfig.PROJECTS_DIR
-        logger.info(f"Projects directory set to: {AppConfig.PROJECTS_DIR}")
+    def _path_is_within(path: str, parent_dir: str) -> bool:
+        try:
+            resolved_path = os.path.abspath(path or "")
+            resolved_parent = os.path.abspath(parent_dir or "")
+            return os.path.commonpath([resolved_path, resolved_parent]) == resolved_parent
+        except Exception:
+            return False
+
+    def _render_auth_gate() -> bool:
+        if auth_is_authenticated(st.session_state):
+            return True
+
+        st.markdown("## Account Access")
+        st.caption("Sign in or create an account to access your personal workspace.")
+        auth_tabs = st.tabs(["Sign in", "Create account"])
+
+        with auth_tabs[0]:
+            login_username = st.text_input("Username", key="auth_login_username")
+            login_password = st.text_input("Password", type="password", key="auth_login_password")
+            if st.button("Sign in", type="primary", use_container_width=True, key="auth_login_submit"):
+                ok, msg, user = authenticate_user(
+                    login_username,
+                    login_password,
+                    base_projects_dir=AppConfig.PROJECTS_DIR,
+                )
+                if not ok or not user:
+                    st.error(msg)
+                else:
+                    apply_login_to_session(st.session_state, user, AppConfig.PROJECTS_DIR)
+                    st.session_state.project = None
+                    st.session_state.page = "home"
+                    st.session_state.projects_refresh_token = int(st.session_state.get("projects_refresh_token", 0)) + 1
+                    st.success("Signed in.")
+                    st.rerun()
+
+        with auth_tabs[1]:
+            signup_username = st.text_input("Username", key="auth_signup_username")
+            signup_display_name = st.text_input("Display name", key="auth_signup_display_name")
+            signup_password = st.text_input("Password", type="password", key="auth_signup_password")
+            signup_confirm = st.text_input("Confirm password", type="password", key="auth_signup_confirm")
+            if st.button("Create account", type="primary", use_container_width=True, key="auth_signup_submit"):
+                if signup_password != signup_confirm:
+                    st.error("Passwords do not match.")
+                else:
+                    ok, msg, user = register_user(
+                        signup_username,
+                        signup_password,
+                        display_name=signup_display_name,
+                        base_projects_dir=AppConfig.PROJECTS_DIR,
+                    )
+                    if not ok or not user:
+                        st.error(msg)
+                    else:
+                        apply_login_to_session(st.session_state, user, AppConfig.PROJECTS_DIR)
+                        st.session_state.project = None
+                        st.session_state.page = "home"
+                        st.session_state.projects_refresh_token = int(st.session_state.get("projects_refresh_token", 0)) + 1
+                        st.success("Account created and signed in.")
+                        st.rerun()
+        return False
+
+    if not _render_auth_gate():
+        return
+
+    active_user_projects_dir = get_user_projects_dir(
+        st.session_state.get("user_id"),
+        AppConfig.PROJECTS_DIR,
+    )
+    if st.session_state.get("projects_dir") != active_user_projects_dir:
+        st.session_state.projects_dir = active_user_projects_dir
+        logger.info(f"Projects directory set to user workspace: {active_user_projects_dir}")
+
+    if st.session_state.get("project"):
+        current_path = st.session_state.project.filepath or ""
+        if current_path and not _path_is_within(current_path, active_user_projects_dir):
+            st.session_state.project = None
+            logger.info("Cleared project from another workspace after user switch.")
 
     # Restore the last active project from config if none is loaded
     if not st.session_state.get("project"):
         last_path = config_data.get("last_project_path", "")
-        if last_path and os.path.isfile(last_path):
+        if last_path and os.path.isfile(last_path) and _path_is_within(last_path, active_user_projects_dir):
             try:
                 st.session_state.project = Project.load(last_path)
                 logger.info(f"Restored last project: {st.session_state.project.title}")
@@ -4017,6 +4100,16 @@ def _run_ui():
         st.session_state.page = "home"
         st.rerun()
 
+    def logout_callback():
+        """Callback for signing out the active user."""
+        config = load_app_config()
+        config.pop("last_project_path", None)
+        save_app_config(config)
+        auth_logout_session(st.session_state)
+        st.session_state.project = None
+        st.session_state.page = "home"
+        st.rerun()
+
     def on_sidebar_theme_change(theme_name: str):
         """Persist sidebar theme changes immediately."""
         resolved = "Light" if str(theme_name).strip().lower() == "light" else "Dark"
@@ -4036,6 +4129,8 @@ def _run_ui():
             save_project_callback=save_project_callback,
             close_project_callback=close_project_callback,
             on_theme_change=on_sidebar_theme_change,
+            current_username=st.session_state.get("display_name") or st.session_state.get("username"),
+            on_logout=logout_callback,
         )
     else:
         st.html(

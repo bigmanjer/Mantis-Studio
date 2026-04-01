@@ -14,7 +14,8 @@
 1. **[ Getting Started Guide](docs/HANDBOOK.md)**  Complete step-by-step installation and setup
 2. **Prerequisites**: Python 3.10+, basic command line knowledge
 3. **Installation**: `pip install -r requirements.txt` then `streamlit run app/main.py`
-4. **First Project**: Use the sidebar to create a new project, build your outline, and start writing!
+4. **Sign in / Create Account**: Create a local account on first launch.
+5. **First Project**: Use the sidebar to create a new project, build your outline, and start writing.
 
  **Just want to try it?** The app works locally without any external setup.
 
@@ -71,7 +72,7 @@ The app is **statedriven**, not pagedriven. All navigation feeds a single app sh
 | **Backend (optional)** | Supabase  2.5.0 |
 | **Configuration** | pythondotenv |
 | **Storage** | Local JSON / serialized storage (project data) |
-| **Auth (optional)** | OIDC  Google / Microsoft / Apple (if configured) |
+| **Auth** | Local account system (username/password) |
 | **CI/CD** | GitHub Actions for version bumping |
 
 ---
@@ -116,10 +117,9 @@ This file:
 | --------------------- | ------------------------------------------------- |
 |  **Dashboard**      | Overview of the current project status             |
 |  **Projects**       | Create, load, rename, or delete projects           |
-|  **Write**          | Highlevel story outlining and beat planning       |
+|  **Outline**        | High-level story outlining and beat planning       |
 |  **Editor**         | Scenelevel writing & chapter drafting             |
 |  **World Bible**    | Structured lore & entities (characters, locations) |
-|  **Export**         | Generate files (DOCX / PDF / TXT)                  |
 |  **AI Settings**    | Configure AI provider, model, and preferences      |
 
 ---
