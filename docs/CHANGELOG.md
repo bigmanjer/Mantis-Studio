@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Stability
+- Account role management: admins can now promote/demote users between `member` and `admin`, with safeguards to prevent removing the last admin.
 - Account admin controls: added admin-only user management in Workspace Settings (user list, enable/disable account, and password reset).
 - Account roles: first created account is now seeded as `admin`; later accounts default to `member`.
 - Account system: added local user sign-in/sign-up flow with secure password hashing, per-user workspace directories under `projects/users/<user_id>`, and sidebar sign-out control.

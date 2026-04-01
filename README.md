@@ -95,6 +95,7 @@ This file:
 Account notes:
 * The first created account is automatically assigned the `admin` role.
 * Admins can manage users from **Settings -> Workspace Settings -> User Administration**.
+* Admins can promote/demote roles, reset passwords, and enable/disable accounts.
 
 ---
 

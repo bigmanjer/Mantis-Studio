@@ -1528,6 +1528,7 @@ def _run_ui():
         register_user,
         reset_user_password as auth_reset_user_password,
         set_user_disabled as auth_set_user_disabled,
+        set_user_role as auth_set_user_role,
     )
     # Import enhanced UI feedback components
     from app.ui.feedback import (
@@ -4104,7 +4105,7 @@ def _run_ui():
                     selected_user = next((u for u in users if u.get("id") == selected_user_id), None)
 
                     if selected_user:
-                        action_cols = st.columns([1, 1])
+                        action_cols = st.columns([1, 1, 1.15])
                         with action_cols[0]:
                             target_disabled = bool(selected_user.get("disabled", False))
                             disable_label = "Enable user" if target_disabled else "Disable user"
@@ -4145,6 +4146,30 @@ def _run_ui():
                                 )
                                 if ok:
                                     st.toast("Password reset.")
+                                    st.rerun()
+                                else:
+                                    st.error(msg)
+
+                        with action_cols[2]:
+                            role_choice = st.selectbox(
+                                "Role",
+                                options=["member", "admin"],
+                                index=1 if str(selected_user.get("role", "member")).lower() == "admin" else 0,
+                                key="workspace_admin_role_choice",
+                            )
+                            if st.button(
+                                "Apply role change",
+                                use_container_width=True,
+                                key="workspace_admin_apply_role_btn",
+                            ):
+                                ok, msg = auth_set_user_role(
+                                    actor_user_id=st.session_state.get("user_id"),
+                                    target_user_id=selected_user_id,
+                                    role=role_choice,
+                                    base_projects_dir=AppConfig.PROJECTS_DIR,
+                                )
+                                if ok:
+                                    st.toast("Role updated.")
                                     st.rerun()
                                 else:
                                     st.error(msg)

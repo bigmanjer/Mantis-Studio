@@ -220,6 +220,10 @@ def _is_admin_user(users: list[Dict[str, Any]], user_id: str) -> bool:
     return str(user.get("role", "member")).lower() == "admin"
 
 
+def _admin_count(users: list[Dict[str, Any]]) -> int:
+    return sum(1 for user in users if str(user.get("role", "member")).lower() == "admin")
+
+
 def set_user_disabled(
     *,
     actor_user_id: str,
@@ -262,3 +266,38 @@ def reset_user_password(
     target["password_hash"] = password_hash
     _save_accounts(base_projects_dir, data)
     return True, "Password reset."
+
+
+def set_user_role(
+    *,
+    actor_user_id: str,
+    target_user_id: str,
+    role: str,
+    base_projects_dir: str = "projects",
+) -> Tuple[bool, str]:
+    desired_role = str(role or "").strip().lower()
+    if desired_role not in {"admin", "member"}:
+        return False, "Invalid role."
+
+    data = _load_accounts(base_projects_dir)
+    users = data.get("users", [])
+    if not _is_admin_user(users, actor_user_id):
+        return False, "Admin access required."
+
+    target = _find_user(users, target_user_id)
+    if not target:
+        return False, "User not found."
+
+    current_role = str(target.get("role", "member")).lower()
+    if current_role == desired_role:
+        return True, "Role unchanged."
+
+    if current_role == "admin" and desired_role != "admin":
+        if _admin_count(users) <= 1:
+            return False, "At least one admin account is required."
+        if target.get("id") == actor_user_id:
+            return False, "You cannot demote your currently signed-in admin account."
+
+    target["role"] = desired_role
+    _save_accounts(base_projects_dir, data)
+    return True, "Role updated."
