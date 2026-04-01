@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Stability
+- Auth compatibility fix: login now accepts legacy PBKDF2 account hashes and auto-migrates them to SHA-256 on successful sign-in.
 - Auth UX upgrade: redesigned onboarding screen with a consumer-style split layout and a `Continue as guest` path so users can enter the app before signing in.
 - Guest conversion flow: guests can now open `Sign in / Create account` from the sidebar and upgrade sessions without feeling blocked.
 - Account creation UX: added clearer signup requirements on the auth screen and an admin-side "Create account" panel in Workspace Settings.

@@ -13,6 +13,7 @@ from typing import Any, Dict, Optional, Tuple
 
 ACCOUNTS_FILENAME = ".mantis_users.json"
 PBKDF2_ROUNDS = 200_000
+DEFAULT_PASSWORD_ALGO = "sha256"
 
 
 def _accounts_path(base_projects_dir: str) -> Path:
@@ -58,16 +59,38 @@ def _save_accounts(base_projects_dir: str, data: Dict[str, Any]) -> None:
     os.replace(tmp, path)
 
 
-def _hash_password(password: str, salt_hex: str) -> str:
+def _hash_password(password: str, salt_hex: str, algo: str = DEFAULT_PASSWORD_ALGO) -> str:
     password_bytes = (password or "").encode("utf-8")
     salt_bytes = bytes.fromhex(salt_hex)
-    digest = hashlib.pbkdf2_hmac("sha256", password_bytes, salt_bytes, PBKDF2_ROUNDS)
+    normalized_algo = "sha1" if str(algo or "").lower() == "sha1" else "sha256"
+    digest = hashlib.pbkdf2_hmac(normalized_algo, password_bytes, salt_bytes, PBKDF2_ROUNDS)
     return digest.hex()
 
 
-def _new_password_record(password: str) -> Tuple[str, str]:
+def _new_password_record(password: str, algo: str = DEFAULT_PASSWORD_ALGO) -> Tuple[str, str]:
     salt_hex = os.urandom(16).hex()
-    return salt_hex, _hash_password(password, salt_hex)
+    return salt_hex, _hash_password(password, salt_hex, algo=algo)
+
+
+def _verify_password(password: str, user: Dict[str, Any]) -> Tuple[bool, bool]:
+    """Return (is_valid, needs_upgrade)."""
+    salt_hex = user.get("password_salt", "")
+    expected_hash = user.get("password_hash", "")
+    if not salt_hex or not expected_hash:
+        return False, False
+
+    declared_algo = str(user.get("password_algo", DEFAULT_PASSWORD_ALGO)).lower()
+    current_hash = _hash_password(password, salt_hex, algo=declared_algo)
+    if hmac.compare_digest(current_hash, expected_hash):
+        needs_upgrade = declared_algo != DEFAULT_PASSWORD_ALGO
+        return True, needs_upgrade
+
+    # Backward compatibility: some accounts were written using SHA-1 PBKDF2.
+    legacy_hash = _hash_password(password, salt_hex, algo="sha1")
+    if hmac.compare_digest(legacy_hash, expected_hash):
+        return True, True
+
+    return False, False
 
 
 def _sanitize_user_payload(user: Dict[str, Any]) -> Dict[str, Any]:
@@ -111,6 +134,7 @@ def register_user(
         "display_name": (display_name or "").strip() or username_clean,
         "role": role,
         "username_key": username_key,
+        "password_algo": DEFAULT_PASSWORD_ALGO,
         "password_salt": salt_hex,
         "password_hash": password_hash,
         "created_at": now,
@@ -139,13 +163,14 @@ def authenticate_user(
             continue
         if bool(user.get("disabled", False)):
             return False, "Account is disabled.", None
-        salt_hex = user.get("password_salt", "")
-        expected_hash = user.get("password_hash", "")
-        if not salt_hex or not expected_hash:
-            return False, "Account record is invalid.", None
-        actual_hash = _hash_password(password, salt_hex)
-        if not hmac.compare_digest(actual_hash, expected_hash):
+        is_valid, needs_upgrade = _verify_password(password, user)
+        if not is_valid:
             return False, "Invalid username or password.", None
+        if needs_upgrade:
+            # Silent in-place migration to current hashing standard.
+            salt_hex = user.get("password_salt", "")
+            user["password_algo"] = DEFAULT_PASSWORD_ALGO
+            user["password_hash"] = _hash_password(password, salt_hex, algo=DEFAULT_PASSWORD_ALGO)
         user["last_login"] = time.time()
         _save_accounts(base_projects_dir, data)
         return True, "Signed in.", _sanitize_user_payload(user)
@@ -262,6 +287,7 @@ def reset_user_password(
     if not target:
         return False, "User not found."
     salt_hex, password_hash = _new_password_record(new_password)
+    target["password_algo"] = DEFAULT_PASSWORD_ALGO
     target["password_salt"] = salt_hex
     target["password_hash"] = password_hash
     _save_accounts(base_projects_dir, data)
