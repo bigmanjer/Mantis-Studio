@@ -14,21 +14,8 @@ def render_editor_utility_bar(
     on_word_target_change: Callable[[int], None],
 ) -> None:
     with st.container(border=True):
-        utility_cols = st.columns([1.0, 1.15, 1.0, 0.95])
+        utility_cols = st.columns([1.15, 1.0, 0.95])
         with utility_cols[0]:
-            export_fmt = st.selectbox(
-                "Export",
-                ["PDF", "DOCX", "TXT"],
-                key=f"editor_export_fmt_{current_chapter.id}",
-                help="Export only the current draft context.",
-            )
-            if st.button(
-                "Export chapter",
-                key=f"editor_export_btn_{current_chapter.id}",
-                use_container_width=True,
-            ):
-                st.toast(f"{export_fmt} export is queued.", icon="")
-        with utility_cols[1]:
             st.caption("Draft metrics")
             st.caption(f"Current chapter: {current_chapter.word_count} words")
             st.caption(f"Project total: {project.get_total_word_count()} words")
@@ -38,7 +25,7 @@ def render_editor_utility_bar(
                 else "Manual save mode"
             )
             st.caption(save_state)
-        with utility_cols[2]:
+        with utility_cols[1]:
             st.caption("Quick jump")
             jump_cols = st.columns(2)
             with jump_cols[0]:
@@ -55,7 +42,7 @@ def render_editor_utility_bar(
                     key=f"editor_jump_world_{current_chapter.id}",
                 ):
                     on_open_world()
-        with utility_cols[3]:
+        with utility_cols[2]:
             avg_target = st.number_input(
                 "AI avg/chapter",
                 min_value=200,

@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Stability
+- Editor cleanup: removed chapter export controls from the Editor utility bar to keep export actions centralized outside drafting.
 - Navigation naming alignment: standardized workflow navigation and top header labels to use `Editor` consistently (removed `Draft` vs `Editor` mismatch).
 - Outline workflow upgrade: added outline diagnostics (word count, planned chapters, last-updated), quick links to Editor/World Bible, and structure checks.
 - Editor workflow upgrade: added previous/next navigation, chapter jump selector with explicit confirm action, and in-page find/replace for current chapter.
