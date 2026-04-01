@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Stability
+- Dashboard workflow progress UI polish: added stage completion progress bar, explicit done/pending stage labels, and a "Current target" hint for the next incomplete step.
 - Encoding hardening: project JSON and legal text readers now fall back from UTF-8 to CP1252/Latin-1 to avoid decode crashes on legacy Windows-encoded files.
 - Repository hygiene: completed deep app/legal verification, normalized legal filenames to lowercase (`brand_ip_clarity.md`, `trademark_path.md`), and updated all in-repo references.
 - Workspace cleanup: removed older duplicate local repo copies from `C:\Users\BIGMANJER\Documents\Playground` and cleaned stale `__pycache__` plus temporary Streamlit log artifacts from the active repo.

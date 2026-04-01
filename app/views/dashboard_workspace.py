@@ -46,7 +46,6 @@ def render_dashboard_workspace(
 
     with st.container(border=True):
         st.markdown("#### Workflow progress")
-        step_cols = st.columns(6)
         steps = [
             ("Idea", bool(recent_projects)),
             ("Outline", bool(has_outline)),
@@ -55,10 +54,21 @@ def render_dashboard_workspace(
             ("Revision", False),
             ("Export", False),
         ]
+        completed_steps = sum(1 for _, done in steps if done)
+        total_steps = len(steps)
+        workflow_percent = int((completed_steps / total_steps) * 100) if total_steps else 0
+        next_step = next((label for label, done in steps if not done), "Complete")
+
+        st.progress(workflow_percent / 100.0)
+        st.caption(
+            f"{completed_steps}/{total_steps} stages complete ({workflow_percent}%). Current target: {next_step}."
+        )
+
+        step_cols = st.columns(total_steps)
         for idx, (label, done) in enumerate(steps):
             with step_cols[idx]:
-                status = "[x]" if done else "[ ]"
-                st.write(f"{status} {label}")
+                st.markdown(f"**{label}**")
+                st.caption("Done" if done else "Pending")
 
     st.html("<div style='height: 16px;'></div>")
 
