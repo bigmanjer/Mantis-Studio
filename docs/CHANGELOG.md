@@ -19,6 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Stability
+- Navigation naming alignment: standardized workflow navigation and top header labels to use `Editor` consistently (removed `Draft` vs `Editor` mismatch).
+- Outline workflow upgrade: added outline diagnostics (word count, planned chapters, last-updated), quick links to Editor/World Bible, and structure checks.
+- Editor workflow upgrade: added previous/next navigation, chapter jump selector with explicit confirm action, and in-page find/replace for current chapter.
 - Dashboard workflow progress UI polish: added stage completion progress bar, explicit done/pending stage labels, and a "Current target" hint for the next incomplete step.
 - Dashboard workflow progress style: set the dashboard completion bar to a green fill for clearer visual status.
 - Encoding hardening: project JSON and legal text readers now fall back from UTF-8 to CP1252/Latin-1 to avoid decode crashes on legacy Windows-encoded files.

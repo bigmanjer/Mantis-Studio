@@ -9,8 +9,8 @@ import streamlit as st
 _PAGE_LABELS: Dict[str, str] = {
     "home": "Dashboard",
     "projects": "Projects",
-    "outline": "Modules",
-    "chapters": "Modules",
+    "outline": "Outline",
+    "chapters": "Editor",
     "world": "Intelligence",
     "export": "Exports",
     "ai": "Settings",

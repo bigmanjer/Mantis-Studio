@@ -4931,6 +4931,34 @@ def _run_ui():
                         st.toast("Saved")
                         st.rerun()
 
+        outline_text = (p.outline or "").strip()
+        outline_word_count = len(re.findall(r"\b\w+\b", outline_text))
+        planned_chapter_count = len(
+            re.findall(r"(?im)^\s*(?:chapter\s+\d+|(?:\d+[\.\)]))", outline_text)
+        )
+        try:
+            outline_last_updated = datetime.datetime.fromtimestamp(float(p.last_modified)).strftime("%Y-%m-%d %H:%M")
+        except Exception:
+            outline_last_updated = "Unknown"
+
+        with st.container(border=True):
+            metric_cols = st.columns([1, 1, 1.2, 1, 1])
+            with metric_cols[0]:
+                st.metric("Outline words", f"{outline_word_count:,}")
+            with metric_cols[1]:
+                st.metric("Planned chapters", str(planned_chapter_count))
+            with metric_cols[2]:
+                st.caption("Last updated")
+                st.caption(outline_last_updated)
+            with metric_cols[3]:
+                if st.button("Open Editor", use_container_width=True, key="outline_open_editor"):
+                    st.session_state.page = "chapters"
+                    st.rerun()
+            with metric_cols[4]:
+                if st.button("Open World Bible", use_container_width=True, key="outline_open_world"):
+                    st.session_state.page = "world"
+                    st.rerun()
+
         left, right = st.columns([2.1, 1])
 
         # Placeholder for streaming AI-generated outline; lives below the editor, like chapters.
@@ -5090,6 +5118,15 @@ def _run_ui():
             with st.container(border=True):
                 st.markdown("### Architect (AI)")
                 st.caption("Generate a chapter-by-chapter outline and append it to your blueprint.")
+
+                with st.expander("Structure checks", expanded=False):
+                    checks = [
+                        ("Outline has content", bool(outline_text)),
+                        ("Contains chapter markers", planned_chapter_count >= 1),
+                        ("Has meaningful length", outline_word_count >= 120),
+                    ]
+                    for label, ok in checks:
+                        st.caption(f"{'[x]' if ok else '[ ]'} {label}")
 
                 init_state("outline_chapter_target", 12)
                 chaps = st.number_input(
@@ -6464,6 +6501,9 @@ def _run_ui():
             return
         curr_entry = chapter_map.get(curr.id, _serialize_chapter(curr))
         locked_chapters = st.session_state.get("locked_chapters", set())
+        ordered_chapters = p.get_ordered_chapters()
+        ordered_chapter_ids = [chapter.id for chapter in ordered_chapters]
+        chapter_position = ordered_chapter_ids.index(curr.id) if curr.id in ordered_chapter_ids else 0
 
         render_editor_utility_bar(
             project=p,
@@ -6481,6 +6521,47 @@ def _run_ui():
                 save_p(),
             ),
         )
+
+        with st.container(border=True):
+            nav_cols = st.columns([1, 1, 2])
+            with nav_cols[0]:
+                if st.button(
+                    "Previous chapter",
+                    use_container_width=True,
+                    disabled=chapter_position <= 0,
+                    key=f"editor_prev_chapter_{p.id}",
+                ):
+                    _set_active_chapter(ordered_chapter_ids[chapter_position - 1])
+                    st.rerun()
+            with nav_cols[1]:
+                if st.button(
+                    "Next chapter",
+                    use_container_width=True,
+                    disabled=chapter_position >= (len(ordered_chapter_ids) - 1),
+                    key=f"editor_next_chapter_{p.id}",
+                ):
+                    _set_active_chapter(ordered_chapter_ids[chapter_position + 1])
+                    st.rerun()
+            with nav_cols[2]:
+                jump_target = st.selectbox(
+                    "Jump to chapter",
+                    options=ordered_chapter_ids,
+                    index=chapter_position,
+                    format_func=lambda chapter_id: (
+                        f"Chapter {p.chapters[chapter_id].index}: {p.chapters[chapter_id].title}"
+                        if chapter_id in p.chapters
+                        else chapter_id
+                    ),
+                    key=f"editor_jump_select_{p.id}",
+                )
+                if st.button(
+                    "Go to selected",
+                    use_container_width=True,
+                    disabled=jump_target == curr.id,
+                    key=f"editor_jump_go_{p.id}",
+                ):
+                    _set_active_chapter(jump_target)
+                    st.rerun()
         # --- SAFELY sync programmatic chapter updates into the editor widget (before widget exists)
         ed_key = f"ed_{curr.id}"
         if (
@@ -6562,6 +6643,38 @@ def _run_ui():
                     save_p()
 
                 st.caption(f"Chapter: {curr.word_count} words  Total: {p.get_total_word_count()} words")
+
+                with st.expander("Find and replace (current chapter)", expanded=False):
+                    find_text = st.text_input(
+                        "Find",
+                        key=f"editor_find_{curr.id}",
+                        placeholder="Text to locate",
+                    )
+                    replace_text = st.text_input(
+                        "Replace with",
+                        key=f"editor_replace_{curr.id}",
+                        placeholder="Replacement text",
+                    )
+                    match_count = (curr.content or "").count(find_text) if find_text else 0
+                    st.caption(f"Exact matches: {match_count}")
+                    if st.button(
+                        "Apply replace all",
+                        use_container_width=True,
+                        disabled=not find_text or match_count == 0,
+                        key=f"editor_replace_apply_{curr.id}",
+                    ):
+                        st.session_state.chapter_text_prev = {
+                            "chapter_id": curr.id,
+                            "text": curr.content or "",
+                        }
+                        replaced = (curr.content or "").replace(find_text, replace_text)
+                        curr.update_content(replaced, "Find/Replace")
+                        _update_session_chapter(curr)
+                        persist_project(p)
+                        st.session_state._chapter_sync_id = curr.id
+                        st.session_state._chapter_sync_text = replaced
+                        st.toast(f"Replaced {match_count} matches.")
+                        st.rerun()
 
                 c1, c2 = st.columns([1, 1])
                 with c1:
