@@ -93,6 +93,7 @@ This file:
 * Routes all navigation internally (NOT Streamlit multipage routing)
 
 Account notes:
+* Users can continue as **Guest** and sign in later from the sidebar account panel.
 * The first created account is automatically assigned the `admin` role.
 * Admins can manage users from **Settings -> Workspace Settings -> User Administration**.
 * Admins can promote/demote roles, reset passwords, and enable/disable accounts.

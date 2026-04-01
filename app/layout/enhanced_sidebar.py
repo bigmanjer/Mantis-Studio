@@ -181,6 +181,8 @@ def render_project_actions(
 def render_account_panel(
     *,
     current_username: Optional[str],
+    is_guest: bool,
+    on_open_auth: Optional[Callable[[], None]],
     on_logout: Optional[Callable[[], None]],
     key_scope: Callable[[str], Any],
 ) -> None:
@@ -188,10 +190,22 @@ def render_account_panel(
         return
     st.divider()
     st.html("<div class='mantis-nav-section'>Account</div>")
-    st.caption(f"Signed in as {current_username}")
+    if is_guest:
+        st.caption("Guest session")
+    else:
+        st.caption(f"Signed in as {current_username}")
+    if is_guest:
+        with key_scope("sidebar_auth_btn"):
+            if st.button(
+                "Sign in / Create account",
+                key="sidebar_open_auth",
+                use_container_width=True,
+            ):
+                if callable(on_open_auth):
+                    on_open_auth()
     with key_scope("sidebar_logout_btn"):
         if st.button(
-            "Sign out",
+            "End session" if is_guest else "Sign out",
             key="sidebar_sign_out",
             use_container_width=True,
         ):
@@ -211,6 +225,8 @@ def render_enhanced_sidebar(
     close_project_callback: Callable = None,
     on_theme_change: Optional[Callable[[str], None]] = None,
     current_username: Optional[str] = None,
+    is_guest: bool = False,
+    on_open_auth: Optional[Callable[[], None]] = None,
     on_logout: Optional[Callable[[], None]] = None,
 ) -> None:
     del debug_enabled
@@ -253,6 +269,8 @@ def render_enhanced_sidebar(
             render_project_actions(project, save_project_callback, close_project_callback, key_scope)
             render_account_panel(
                 current_username=current_username,
+                is_guest=is_guest,
+                on_open_auth=on_open_auth,
                 on_logout=on_logout,
                 key_scope=safe_scope,
             )

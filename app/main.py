@@ -2337,6 +2337,9 @@ def _run_ui():
     init_state("display_name", "")
     init_state("user_role", "member")
     init_state("is_admin", False)
+    init_state("guest_mode", False)
+    init_state("guest_id", "")
+    init_state("show_auth_gate", False)
     init_state("projects_dir", None)
     init_state("project", None)
     init_state("page", "home")
@@ -2592,66 +2595,125 @@ def _run_ui():
         except Exception:
             return False
 
+    def _get_guest_projects_dir() -> str:
+        guest_id = st.session_state.get("guest_id") or f"guest_{uuid.uuid4().hex[:10]}"
+        st.session_state["guest_id"] = guest_id
+        target = os.path.join(AppConfig.PROJECTS_DIR, "guests", guest_id)
+        os.makedirs(target, exist_ok=True)
+        return target
+
+    def _start_guest_session() -> None:
+        st.session_state["guest_mode"] = True
+        st.session_state["show_auth_gate"] = False
+        st.session_state["user_id"] = None
+        st.session_state["username"] = "Guest"
+        st.session_state["display_name"] = "Guest"
+        st.session_state["user_role"] = "guest"
+        st.session_state["is_admin"] = False
+        st.session_state["projects_dir"] = _get_guest_projects_dir()
+        st.session_state["project"] = None
+        st.session_state["page"] = "home"
+        st.session_state["projects_refresh_token"] = int(st.session_state.get("projects_refresh_token", 0)) + 1
+
+    def _open_auth_from_app() -> None:
+        st.session_state["guest_mode"] = False
+        st.session_state["show_auth_gate"] = True
+        st.session_state["project"] = None
+        st.session_state["page"] = "home"
+        st.rerun()
+
     def _render_auth_gate() -> bool:
         if auth_is_authenticated(st.session_state):
             return True
+        if st.session_state.get("guest_mode") and not st.session_state.get("show_auth_gate"):
+            return True
 
-        st.markdown("## Account Access")
-        st.caption("Sign in or create an account to access your personal workspace.")
-        auth_tabs = st.tabs(["Sign in", "Create account"])
+        st.markdown("## Welcome to MANTIS Studio")
+        st.caption("Start writing instantly as a guest, or create an account for persistent personal workspaces.")
+        hero_col, auth_col = st.columns([1.2, 1.8])
 
-        with auth_tabs[0]:
-            login_username = st.text_input("Username", key="auth_login_username")
-            login_password = st.text_input("Password", type="password", key="auth_login_password")
-            if st.button("Sign in", type="primary", use_container_width=True, key="auth_login_submit"):
-                ok, msg, user = authenticate_user(
-                    login_username,
-                    login_password,
-                    base_projects_dir=AppConfig.PROJECTS_DIR,
+        with hero_col:
+            with st.container(border=True):
+                st.markdown("### Start in seconds")
+                st.caption("No signup required to explore the workflow.")
+                st.markdown(
+                    """
+                    - Continue as guest for immediate access
+                    - Create an account when you are ready
+                    - Sign in anytime from the sidebar account panel
+                    """
                 )
-                if not ok or not user:
-                    st.error(msg)
-                else:
-                    apply_login_to_session(st.session_state, user, AppConfig.PROJECTS_DIR)
-                    st.session_state.project = None
-                    st.session_state.page = "home"
-                    st.session_state.projects_refresh_token = int(st.session_state.get("projects_refresh_token", 0)) + 1
-                    st.success("Signed in.")
+                if st.button(
+                    "Continue as guest",
+                    use_container_width=True,
+                    key="auth_continue_guest",
+                ):
+                    _start_guest_session()
                     st.rerun()
 
-        with auth_tabs[1]:
-            st.caption("Username must be 3+ characters. Password must be 8+ characters.")
-            signup_username = st.text_input("Username", key="auth_signup_username")
-            signup_display_name = st.text_input("Display name", key="auth_signup_display_name")
-            signup_password = st.text_input("Password", type="password", key="auth_signup_password")
-            signup_confirm = st.text_input("Confirm password", type="password", key="auth_signup_confirm")
-            if st.button("Create account", type="primary", use_container_width=True, key="auth_signup_submit"):
-                if signup_password != signup_confirm:
-                    st.error("Passwords do not match.")
-                else:
-                    ok, msg, user = register_user(
-                        signup_username,
-                        signup_password,
-                        display_name=signup_display_name,
+        with auth_col:
+            auth_tabs = st.tabs(["Sign in", "Create account"])
+
+            with auth_tabs[0]:
+                login_username = st.text_input("Username", key="auth_login_username")
+                login_password = st.text_input("Password", type="password", key="auth_login_password")
+                if st.button("Sign in", type="primary", use_container_width=True, key="auth_login_submit"):
+                    ok, msg, user = authenticate_user(
+                        login_username,
+                        login_password,
                         base_projects_dir=AppConfig.PROJECTS_DIR,
                     )
                     if not ok or not user:
                         st.error(msg)
                     else:
                         apply_login_to_session(st.session_state, user, AppConfig.PROJECTS_DIR)
+                        st.session_state["guest_mode"] = False
+                        st.session_state["show_auth_gate"] = False
                         st.session_state.project = None
                         st.session_state.page = "home"
                         st.session_state.projects_refresh_token = int(st.session_state.get("projects_refresh_token", 0)) + 1
-                        st.success("Account created and signed in.")
+                        st.success("Signed in.")
                         st.rerun()
+
+            with auth_tabs[1]:
+                st.caption("Username must be 3+ characters. Password must be 8+ characters.")
+                signup_username = st.text_input("Username", key="auth_signup_username")
+                signup_display_name = st.text_input("Display name", key="auth_signup_display_name")
+                signup_password = st.text_input("Password", type="password", key="auth_signup_password")
+                signup_confirm = st.text_input("Confirm password", type="password", key="auth_signup_confirm")
+                if st.button("Create account", type="primary", use_container_width=True, key="auth_signup_submit"):
+                    if signup_password != signup_confirm:
+                        st.error("Passwords do not match.")
+                    else:
+                        ok, msg, user = register_user(
+                            signup_username,
+                            signup_password,
+                            display_name=signup_display_name,
+                            base_projects_dir=AppConfig.PROJECTS_DIR,
+                        )
+                        if not ok or not user:
+                            st.error(msg)
+                        else:
+                            apply_login_to_session(st.session_state, user, AppConfig.PROJECTS_DIR)
+                            st.session_state["guest_mode"] = False
+                            st.session_state["show_auth_gate"] = False
+                            st.session_state.project = None
+                            st.session_state.page = "home"
+                            st.session_state.projects_refresh_token = int(st.session_state.get("projects_refresh_token", 0)) + 1
+                            st.success("Account created and signed in.")
+                            st.rerun()
         return False
 
     if not _render_auth_gate():
         return
 
-    active_user_projects_dir = get_user_projects_dir(
-        st.session_state.get("user_id"),
-        AppConfig.PROJECTS_DIR,
+    active_user_projects_dir = (
+        _get_guest_projects_dir()
+        if st.session_state.get("guest_mode")
+        else get_user_projects_dir(
+            st.session_state.get("user_id"),
+            AppConfig.PROJECTS_DIR,
+        )
     )
     if st.session_state.get("projects_dir") != active_user_projects_dir:
         st.session_state.projects_dir = active_user_projects_dir
@@ -4264,9 +4326,20 @@ def _run_ui():
         config = load_app_config()
         config.pop("last_project_path", None)
         save_app_config(config)
+        was_guest = bool(st.session_state.get("guest_mode"))
         auth_logout_session(st.session_state)
+        st.session_state["guest_mode"] = False
+        st.session_state["guest_id"] = ""
+        st.session_state["show_auth_gate"] = True
+        st.session_state["username"] = ""
+        st.session_state["display_name"] = ""
+        st.session_state["user_role"] = "member"
+        st.session_state["is_admin"] = False
         st.session_state.project = None
         st.session_state.page = "home"
+        st.session_state.projects_refresh_token = int(st.session_state.get("projects_refresh_token", 0)) + 1
+        if was_guest:
+            st.toast("Guest session ended.")
         st.rerun()
 
     def on_sidebar_theme_change(theme_name: str):
@@ -4289,6 +4362,8 @@ def _run_ui():
             close_project_callback=close_project_callback,
             on_theme_change=on_sidebar_theme_change,
             current_username=st.session_state.get("display_name") or st.session_state.get("username"),
+            is_guest=bool(st.session_state.get("guest_mode")),
+            on_open_auth=_open_auth_from_app,
             on_logout=logout_callback,
         )
     else:
