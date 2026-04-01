@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Stability
+- Auth screen visual redesign: upgraded onboarding to a centered two-panel experience with a branded hero card, clearer messaging hierarchy, and improved desktop/mobile composition.
 - Dashboard-first onboarding: app now opens directly into Dashboard as guest by default, with sign-in/sign-up available on demand from the sidebar.
 - Logout UX: signing out now returns users to guest dashboard instead of forcing the auth gate first.
 - Auth compatibility fix: login now accepts legacy PBKDF2 account hashes and auto-migrates them to SHA-256 on successful sign-in.

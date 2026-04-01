@@ -2631,21 +2631,72 @@ def _run_ui():
         if st.session_state.get("guest_mode") and not st.session_state.get("show_auth_gate"):
             return True
 
-        st.markdown("## Welcome to MANTIS Studio")
-        st.caption("Start writing instantly as a guest, or create an account for persistent personal workspaces.")
-        hero_col, auth_col = st.columns([1.2, 1.8])
+        st.markdown(
+            """
+            <style>
+            .mantis-auth-hero {
+                padding: 1.15rem 1rem;
+                border-radius: 14px;
+                border: 1px solid var(--mantis-card-border);
+                background: linear-gradient(145deg, rgba(46,125,50,0.16), rgba(15,20,29,0.18));
+            }
+            .mantis-auth-kicker {
+                letter-spacing: 0.06em;
+                text-transform: uppercase;
+                font-size: 0.74rem;
+                color: var(--mantis-muted);
+                margin-bottom: 0.35rem;
+            }
+            .mantis-auth-title {
+                font-size: clamp(1.7rem, 2.8vw, 2.5rem);
+                line-height: 1.1;
+                margin: 0 0 0.6rem 0;
+                font-weight: 700;
+            }
+            .mantis-auth-sub {
+                color: var(--mantis-muted);
+                margin-bottom: 0.8rem;
+            }
+            .mantis-auth-points {
+                margin: 0.5rem 0 0.85rem 0;
+                padding-left: 1.1rem;
+            }
+            .mantis-auth-points li {
+                margin-bottom: 0.38rem;
+            }
+            .mantis-auth-panel-title {
+                margin-bottom: 0.1rem;
+            }
+            .mantis-auth-panel-sub {
+                color: var(--mantis-muted);
+                margin-bottom: 0.55rem;
+            }
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
 
-        with hero_col:
-            with st.container(border=True):
-                st.markdown("### Start in seconds")
-                st.caption("No signup required to explore the workflow.")
+        _, center, _ = st.columns([0.08, 1, 0.08])
+        with center:
+            hero_col, auth_col = st.columns([1.12, 1], vertical_alignment="top")
+
+            with hero_col:
                 st.markdown(
                     """
-                    - Continue as guest for immediate access
-                    - Create an account when you are ready
-                    - Sign in anytime from the sidebar account panel
-                    """
+                    <div class="mantis-auth-hero">
+                        <div class="mantis-auth-kicker">Narrative Studio</div>
+                        <h2 class="mantis-auth-title">Welcome to MANTIS Studio</h2>
+                        <div class="mantis-auth-sub">Write now, upgrade later. Start as guest in one click, then create an account when you want persistence and identity.</div>
+                        <ul class="mantis-auth-points">
+                            <li>No signup required for instant access</li>
+                            <li>Sign in or register from anywhere in the app</li>
+                            <li>Designed for low-friction onboarding</li>
+                        </ul>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
                 )
+                st.html("<div style='height:10px;'></div>")
                 if st.button(
                     "Continue as guest",
                     use_container_width=True,
@@ -2654,57 +2705,60 @@ def _run_ui():
                     _start_guest_session()
                     st.rerun()
 
-        with auth_col:
-            auth_tabs = st.tabs(["Sign in", "Create account"])
+            with auth_col:
+                with st.container(border=True):
+                    st.markdown("### Access Account")
+                    st.caption("Sign in to restore your workspace or create a new account.")
+                    auth_tabs = st.tabs(["Sign in", "Create account"])
 
-            with auth_tabs[0]:
-                login_username = st.text_input("Username", key="auth_login_username")
-                login_password = st.text_input("Password", type="password", key="auth_login_password")
-                if st.button("Sign in", type="primary", use_container_width=True, key="auth_login_submit"):
-                    ok, msg, user = authenticate_user(
-                        login_username,
-                        login_password,
-                        base_projects_dir=AppConfig.PROJECTS_DIR,
-                    )
-                    if not ok or not user:
-                        st.error(msg)
-                    else:
-                        apply_login_to_session(st.session_state, user, AppConfig.PROJECTS_DIR)
-                        st.session_state["guest_mode"] = False
-                        st.session_state["show_auth_gate"] = False
-                        st.session_state.project = None
-                        st.session_state.page = "home"
-                        st.session_state.projects_refresh_token = int(st.session_state.get("projects_refresh_token", 0)) + 1
-                        st.success("Signed in.")
-                        st.rerun()
+                    with auth_tabs[0]:
+                        login_username = st.text_input("Username", key="auth_login_username")
+                        login_password = st.text_input("Password", type="password", key="auth_login_password")
+                        if st.button("Sign in", type="primary", use_container_width=True, key="auth_login_submit"):
+                            ok, msg, user = authenticate_user(
+                                login_username,
+                                login_password,
+                                base_projects_dir=AppConfig.PROJECTS_DIR,
+                            )
+                            if not ok or not user:
+                                st.error(msg)
+                            else:
+                                apply_login_to_session(st.session_state, user, AppConfig.PROJECTS_DIR)
+                                st.session_state["guest_mode"] = False
+                                st.session_state["show_auth_gate"] = False
+                                st.session_state.project = None
+                                st.session_state.page = "home"
+                                st.session_state.projects_refresh_token = int(st.session_state.get("projects_refresh_token", 0)) + 1
+                                st.success("Signed in.")
+                                st.rerun()
 
-            with auth_tabs[1]:
-                st.caption("Username must be 3+ characters. Password must be 8+ characters.")
-                signup_username = st.text_input("Username", key="auth_signup_username")
-                signup_display_name = st.text_input("Display name", key="auth_signup_display_name")
-                signup_password = st.text_input("Password", type="password", key="auth_signup_password")
-                signup_confirm = st.text_input("Confirm password", type="password", key="auth_signup_confirm")
-                if st.button("Create account", type="primary", use_container_width=True, key="auth_signup_submit"):
-                    if signup_password != signup_confirm:
-                        st.error("Passwords do not match.")
-                    else:
-                        ok, msg, user = register_user(
-                            signup_username,
-                            signup_password,
-                            display_name=signup_display_name,
-                            base_projects_dir=AppConfig.PROJECTS_DIR,
-                        )
-                        if not ok or not user:
-                            st.error(msg)
-                        else:
-                            apply_login_to_session(st.session_state, user, AppConfig.PROJECTS_DIR)
-                            st.session_state["guest_mode"] = False
-                            st.session_state["show_auth_gate"] = False
-                            st.session_state.project = None
-                            st.session_state.page = "home"
-                            st.session_state.projects_refresh_token = int(st.session_state.get("projects_refresh_token", 0)) + 1
-                            st.success("Account created and signed in.")
-                            st.rerun()
+                    with auth_tabs[1]:
+                        st.caption("Username must be 3+ characters. Password must be 8+ characters.")
+                        signup_username = st.text_input("Username", key="auth_signup_username")
+                        signup_display_name = st.text_input("Display name", key="auth_signup_display_name")
+                        signup_password = st.text_input("Password", type="password", key="auth_signup_password")
+                        signup_confirm = st.text_input("Confirm password", type="password", key="auth_signup_confirm")
+                        if st.button("Create account", type="primary", use_container_width=True, key="auth_signup_submit"):
+                            if signup_password != signup_confirm:
+                                st.error("Passwords do not match.")
+                            else:
+                                ok, msg, user = register_user(
+                                    signup_username,
+                                    signup_password,
+                                    display_name=signup_display_name,
+                                    base_projects_dir=AppConfig.PROJECTS_DIR,
+                                )
+                                if not ok or not user:
+                                    st.error(msg)
+                                else:
+                                    apply_login_to_session(st.session_state, user, AppConfig.PROJECTS_DIR)
+                                    st.session_state["guest_mode"] = False
+                                    st.session_state["show_auth_gate"] = False
+                                    st.session_state.project = None
+                                    st.session_state.page = "home"
+                                    st.session_state.projects_refresh_token = int(st.session_state.get("projects_refresh_token", 0)) + 1
+                                    st.success("Account created and signed in.")
+                                    st.rerun()
         return False
 
     if not _render_auth_gate():
