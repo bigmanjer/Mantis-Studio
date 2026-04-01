@@ -2625,6 +2625,9 @@ def _run_ui():
     def _render_auth_gate() -> bool:
         if auth_is_authenticated(st.session_state):
             return True
+        if (not st.session_state.get("guest_mode")) and (not st.session_state.get("show_auth_gate")):
+            _start_guest_session()
+            return True
         if st.session_state.get("guest_mode") and not st.session_state.get("show_auth_gate"):
             return True
 
@@ -4328,18 +4331,17 @@ def _run_ui():
         save_app_config(config)
         was_guest = bool(st.session_state.get("guest_mode"))
         auth_logout_session(st.session_state)
-        st.session_state["guest_mode"] = False
         st.session_state["guest_id"] = ""
-        st.session_state["show_auth_gate"] = True
+        st.session_state["show_auth_gate"] = False
         st.session_state["username"] = ""
         st.session_state["display_name"] = ""
         st.session_state["user_role"] = "member"
         st.session_state["is_admin"] = False
-        st.session_state.project = None
-        st.session_state.page = "home"
-        st.session_state.projects_refresh_token = int(st.session_state.get("projects_refresh_token", 0)) + 1
+        _start_guest_session()
         if was_guest:
             st.toast("Guest session ended.")
+        else:
+            st.toast("Signed out. Continuing as guest.")
         st.rerun()
 
     def on_sidebar_theme_change(theme_name: str):
