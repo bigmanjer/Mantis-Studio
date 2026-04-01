@@ -72,7 +72,7 @@ The app is **statedriven**, not pagedriven. All navigation feeds a single app sh
 | **Backend (optional)** | Supabase  2.5.0 |
 | **Configuration** | pythondotenv |
 | **Storage** | Local JSON / serialized storage (project data) |
-| **Auth** | Local account system (username/password) |
+| **Auth** | Local account system (username/password) with admin controls |
 | **CI/CD** | GitHub Actions for version bumping |
 
 ---
@@ -91,6 +91,10 @@ This file:
 * Handles authentication gating
 * Renders the global layout (sidebar + main panel)
 * Routes all navigation internally (NOT Streamlit multipage routing)
+
+Account notes:
+* The first created account is automatically assigned the `admin` role.
+* Admins can manage users from **Settings -> Workspace Settings -> User Administration**.
 
 ---
 

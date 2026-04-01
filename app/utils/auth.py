@@ -75,6 +75,8 @@ def _sanitize_user_payload(user: Dict[str, Any]) -> Dict[str, Any]:
         "id": user.get("id"),
         "username": user.get("username", ""),
         "display_name": user.get("display_name") or user.get("username", ""),
+        "role": user.get("role", "member"),
+        "disabled": bool(user.get("disabled", False)),
         "created_at": float(user.get("created_at") or time.time()),
         "last_login": float(user.get("last_login") or time.time()),
     }
@@ -101,11 +103,13 @@ def register_user(
             return False, "Username already exists.", None
 
     now = time.time()
+    role = "admin" if len(users) == 0 else "member"
     salt_hex, password_hash = _new_password_record(password)
     user = {
         "id": str(uuid.uuid4()),
         "username": username_clean,
         "display_name": (display_name or "").strip() or username_clean,
+        "role": role,
         "username_key": username_key,
         "password_salt": salt_hex,
         "password_hash": password_hash,
@@ -160,6 +164,8 @@ def apply_login_to_session(session_state: Any, user: Dict[str, Any], base_projec
     session_state["user_id"] = user.get("id")
     session_state["username"] = user.get("username", "")
     session_state["display_name"] = user.get("display_name") or user.get("username", "")
+    session_state["user_role"] = user.get("role", "member")
+    session_state["is_admin"] = str(session_state["user_role"]).lower() == "admin"
     session_state["projects_dir"] = get_user_projects_dir(session_state["user_id"], base_projects_dir)
 
 
@@ -168,6 +174,8 @@ def logout_session(session_state: Any) -> None:
         "user_id",
         "username",
         "display_name",
+        "user_role",
+        "is_admin",
         "project",
         "projects_dir",
         "last_project_path",
@@ -186,5 +194,71 @@ def get_current_user(session_state: Any) -> Optional[Dict[str, Any]]:
         "id": session_state.get("user_id"),
         "username": session_state.get("username", ""),
         "display_name": session_state.get("display_name") or session_state.get("username", ""),
+        "role": session_state.get("user_role", "member"),
+        "is_admin": bool(session_state.get("is_admin", False)),
     }
 
+
+def list_users(*, base_projects_dir: str = "projects") -> list[Dict[str, Any]]:
+    data = _load_accounts(base_projects_dir)
+    users = data.get("users", [])
+    sanitized = [_sanitize_user_payload(u) for u in users]
+    return sorted(sanitized, key=lambda item: (item.get("username") or "").lower())
+
+
+def _find_user(users: list[Dict[str, Any]], user_id: str) -> Optional[Dict[str, Any]]:
+    for user in users:
+        if user.get("id") == user_id:
+            return user
+    return None
+
+
+def _is_admin_user(users: list[Dict[str, Any]], user_id: str) -> bool:
+    user = _find_user(users, user_id)
+    if not user:
+        return False
+    return str(user.get("role", "member")).lower() == "admin"
+
+
+def set_user_disabled(
+    *,
+    actor_user_id: str,
+    target_user_id: str,
+    disabled: bool,
+    base_projects_dir: str = "projects",
+) -> Tuple[bool, str]:
+    data = _load_accounts(base_projects_dir)
+    users = data.get("users", [])
+    if not _is_admin_user(users, actor_user_id):
+        return False, "Admin access required."
+    target = _find_user(users, target_user_id)
+    if not target:
+        return False, "User not found."
+    if target.get("id") == actor_user_id and disabled:
+        return False, "You cannot disable your own admin account."
+    target["disabled"] = bool(disabled)
+    _save_accounts(base_projects_dir, data)
+    return True, "User updated."
+
+
+def reset_user_password(
+    *,
+    actor_user_id: str,
+    target_user_id: str,
+    new_password: str,
+    base_projects_dir: str = "projects",
+) -> Tuple[bool, str]:
+    if len(new_password or "") < 8:
+        return False, "Password must be at least 8 characters."
+    data = _load_accounts(base_projects_dir)
+    users = data.get("users", [])
+    if not _is_admin_user(users, actor_user_id):
+        return False, "Admin access required."
+    target = _find_user(users, target_user_id)
+    if not target:
+        return False, "User not found."
+    salt_hex, password_hash = _new_password_record(new_password)
+    target["password_salt"] = salt_hex
+    target["password_hash"] = password_hash
+    _save_accounts(base_projects_dir, data)
+    return True, "Password reset."

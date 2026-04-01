@@ -72,6 +72,8 @@ def initialize_session_state(st) -> None:
         st.session_state.setdefault("user_id", None)
         st.session_state.setdefault("username", "")
         st.session_state.setdefault("display_name", "")
+        st.session_state.setdefault("user_role", "member")
+        st.session_state.setdefault("is_admin", False)
         st.session_state.setdefault("projects_dir", None)
         st.session_state.setdefault("project", None)
         st.session_state.setdefault("first_run", True)

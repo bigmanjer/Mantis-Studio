@@ -1523,8 +1523,11 @@ def _run_ui():
         authenticate_user,
         get_user_projects_dir,
         is_authenticated as auth_is_authenticated,
+        list_users as auth_list_users,
         logout_session as auth_logout_session,
         register_user,
+        reset_user_password as auth_reset_user_password,
+        set_user_disabled as auth_set_user_disabled,
     )
     # Import enhanced UI feedback components
     from app.ui.feedback import (
@@ -2331,6 +2334,8 @@ def _run_ui():
     init_state("user_id", None)
     init_state("username", "")
     init_state("display_name", "")
+    init_state("user_role", "member")
+    init_state("is_admin", False)
     init_state("projects_dir", None)
     init_state("project", None)
     init_state("page", "home")
@@ -4060,6 +4065,93 @@ def _run_ui():
                     step=0.005,
                     key="workspace_memory_hard_threshold",
                 )
+
+        if bool(st.session_state.get("is_admin", False)):
+            with st.container(border=True):
+                st.markdown("### User Administration")
+                st.caption("Admin-only controls for managing local accounts.")
+                users = auth_list_users(base_projects_dir=AppConfig.PROJECTS_DIR)
+                if not users:
+                    st.info("No accounts found.")
+                else:
+                    st.dataframe(
+                        [
+                            {
+                                "Username": user.get("username", ""),
+                                "Display": user.get("display_name", ""),
+                                "Role": user.get("role", "member"),
+                                "Status": "Disabled" if user.get("disabled") else "Active",
+                            }
+                            for user in users
+                        ],
+                        use_container_width=True,
+                        hide_index=True,
+                    )
+
+                    selected_user_id = st.selectbox(
+                        "Manage user",
+                        options=[user.get("id") for user in users],
+                        format_func=lambda user_id: next(
+                            (
+                                f"{u.get('username')} ({'disabled' if u.get('disabled') else 'active'})"
+                                for u in users
+                                if u.get("id") == user_id
+                            ),
+                            user_id,
+                        ),
+                        key="workspace_admin_selected_user",
+                    )
+                    selected_user = next((u for u in users if u.get("id") == selected_user_id), None)
+
+                    if selected_user:
+                        action_cols = st.columns([1, 1])
+                        with action_cols[0]:
+                            target_disabled = bool(selected_user.get("disabled", False))
+                            disable_label = "Enable user" if target_disabled else "Disable user"
+                            if st.button(
+                                disable_label,
+                                use_container_width=True,
+                                key="workspace_admin_toggle_disabled",
+                            ):
+                                ok, msg = auth_set_user_disabled(
+                                    actor_user_id=st.session_state.get("user_id"),
+                                    target_user_id=selected_user_id,
+                                    disabled=not target_disabled,
+                                    base_projects_dir=AppConfig.PROJECTS_DIR,
+                                )
+                                if ok:
+                                    st.toast("User status updated.")
+                                    st.rerun()
+                                else:
+                                    st.error(msg)
+
+                        with action_cols[1]:
+                            reset_pass = st.text_input(
+                                "Reset password",
+                                type="password",
+                                key="workspace_admin_reset_password",
+                                placeholder="Minimum 8 characters",
+                            )
+                            if st.button(
+                                "Apply password reset",
+                                use_container_width=True,
+                                key="workspace_admin_reset_password_btn",
+                            ):
+                                ok, msg = auth_reset_user_password(
+                                    actor_user_id=st.session_state.get("user_id"),
+                                    target_user_id=selected_user_id,
+                                    new_password=reset_pass,
+                                    base_projects_dir=AppConfig.PROJECTS_DIR,
+                                )
+                                if ok:
+                                    st.toast("Password reset.")
+                                    st.rerun()
+                                else:
+                                    st.error(msg)
+        else:
+            with st.container(border=True):
+                st.markdown("### User Administration")
+                st.caption("Admin access required.")
 
         if st.button("Save Workspace Settings", type="primary", use_container_width=True, key="workspace_save"):
             data = load_app_config()
