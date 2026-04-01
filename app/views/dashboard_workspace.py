@@ -57,8 +57,8 @@ def render_dashboard_workspace(
         ]
         for idx, (label, done) in enumerate(steps):
             with step_cols[idx]:
-                icon = "" if done else ""
-                st.markdown(f"**{icon} {label}**")
+                status = "[x]" if done else "[ ]"
+                st.write(f"{status} {label}")
 
     st.html("<div style='height: 16px;'></div>")
 
