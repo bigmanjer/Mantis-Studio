@@ -5,6 +5,7 @@ import secrets
 import time
 from typing import Any, Dict, Tuple
 from urllib.parse import parse_qs, urlencode, urlparse
+import os
 
 import requests
 
@@ -18,6 +19,38 @@ GOOGLE_TOKENINFO_URL = "https://oauth2.googleapis.com/tokeninfo"
 DEFAULT_GOOGLE_SCOPES = "openid email profile"
 HOSTED_GOOGLE_REDIRECT_URI = "https://mantisstudio.streamlit.app/?oauth_provider=google"
 LOCAL_GOOGLE_REDIRECT_URI = "http://localhost:8501/?oauth_provider=google"
+GOOGLE_SECRET_ENV_VARS = (
+    "MANTIS_GOOGLE_CLIENT_SECRET",
+    "GOOGLE_CLIENT_SECRET",
+)
+GOOGLE_SECRET_STREAMLIT_KEYS = (
+    "google_client_secret",
+    "oauth_google_client_secret",
+)
+
+
+def _read_streamlit_secret(key: str) -> str:
+    try:
+        import streamlit as st
+    except Exception:
+        return ""
+    try:
+        value = st.secrets.get(key, "")
+    except Exception:
+        return ""
+    return str(value or "").strip()
+
+
+def _get_external_google_client_secret() -> Tuple[str, str]:
+    for env_var in GOOGLE_SECRET_ENV_VARS:
+        value = os.getenv(env_var, "").strip()
+        if value:
+            return value, env_var
+    for key in GOOGLE_SECRET_STREAMLIT_KEYS:
+        value = _read_streamlit_secret(key)
+        if value:
+            return value, f"Streamlit secrets: {key}"
+    return "", ""
 
 
 def _validate_google_redirect_uri(redirect_uri: str) -> Tuple[bool, str]:
@@ -46,7 +79,10 @@ def _validate_google_redirect_uri(redirect_uri: str) -> Tuple[bool, str]:
 
 def get_google_oauth_config() -> Dict[str, Any]:
     data = load_app_config()
-    secret = reveal_secret(data.get("oauth_google_client_secret_protected") or {})
+    protected_secret = reveal_secret(data.get("oauth_google_client_secret_protected") or {})
+    external_secret, external_source = _get_external_google_client_secret()
+    secret = protected_secret or external_secret
+    secret_source = "protected storage" if protected_secret else external_source
     return {
         "enabled": bool(data.get("oauth_google_enabled", False)),
         "client_id": data.get("oauth_google_client_id", ""),
@@ -54,6 +90,8 @@ def get_google_oauth_config() -> Dict[str, Any]:
         "redirect_uri": data.get("oauth_google_redirect_uri", ""),
         "scopes": data.get("oauth_google_scopes", DEFAULT_GOOGLE_SCOPES) or DEFAULT_GOOGLE_SCOPES,
         "secret_saved": bool(secret),
+        "secret_source": secret_source,
+        "external_secret": bool(external_secret),
         "protected_storage": protected_storage_available(),
     }
 
@@ -82,7 +120,13 @@ def save_google_oauth_config(
         data.pop("oauth_google_client_secret_protected", None)
     elif client_secret:
         if not protected_storage_available():
-            return False, "Protected secret storage is unavailable, so the client secret was not saved."
+            save_app_config(data)
+            return (
+                False,
+                "Protected secret storage is unavailable, so the client secret was not saved. "
+                "Set MANTIS_GOOGLE_CLIENT_SECRET or a Streamlit secret named "
+                "google_client_secret instead.",
+            )
         data["oauth_google_client_secret_protected"] = protect_secret(client_secret.strip())
     save_app_config(data)
     return True, "Google OAuth settings saved."

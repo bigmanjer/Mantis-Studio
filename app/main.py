@@ -4665,8 +4665,12 @@ def _run_ui():
                     st.success("Google OAuth is ready.")
                 else:
                     st.info(ready_msg)
-                if not google_cfg.get("protected_storage"):
-                    st.warning("Protected local secret storage is unavailable. Client secrets cannot be saved safely on this system.")
+                if not google_cfg.get("protected_storage") and not google_cfg.get("external_secret"):
+                    st.warning(
+                        "Protected local secret storage is unavailable. Client secrets cannot be "
+                        "saved safely on this system. Set MANTIS_GOOGLE_CLIENT_SECRET or a "
+                        "Streamlit secret named google_client_secret."
+                    )
 
                 oauth_cols = st.columns([1, 1])
                 with oauth_cols[0]:
@@ -4703,7 +4707,10 @@ def _run_ui():
                         value="",
                         placeholder="Saved" if google_cfg.get("secret_saved") else "Paste client secret",
                         key="workspace_google_client_secret",
-                        help="Stored with Windows DPAPI for the current Windows user.",
+                        help=(
+                            "Stored with Windows DPAPI on Windows. Hosted apps should use "
+                            "MANTIS_GOOGLE_CLIENT_SECRET or Streamlit secrets."
+                        ),
                     )
                     clear_google_secret = st.checkbox(
                         "Clear saved Google secret",
@@ -4711,7 +4718,7 @@ def _run_ui():
                         key="workspace_google_clear_secret",
                     )
                     st.caption(
-                        "Secret status: saved with protected storage."
+                        f"Secret status: available from {google_cfg.get('secret_source')}."
                         if google_cfg.get("secret_saved")
                         else "Secret status: not saved."
                     )

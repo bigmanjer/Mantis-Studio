@@ -33,6 +33,16 @@ The client secret is protected locally with Windows DPAPI when running on
 Windows. If protected storage is unavailable, MANTIS refuses to persist the
 secret instead of writing it as plaintext config.
 
+For hosted deployments such as Streamlit Cloud, store the secret outside the
+app config instead:
+
+- Environment variable: `MANTIS_GOOGLE_CLIENT_SECRET`
+- Streamlit secret: `google_client_secret`
+- Alternate Streamlit secret: `oauth_google_client_secret`
+
+When one of these secure external secrets is present, MANTIS uses it for Google
+OAuth and does not need to save the secret from Workspace Settings.
+
 ## Account Linking
 
 Google accounts are linked by verified email address. If a matching local
@@ -51,3 +61,6 @@ The built-in `ADMIN` account cannot be claimed through OAuth.
   that Google sent the user back to the app.
 - `redirect_uri_mismatch` from Google means the URI saved in MANTIS and the URI
   in Google Cloud do not match exactly.
+- `Protected secret storage is unavailable` means the app cannot safely save the
+  secret to local config. Use `MANTIS_GOOGLE_CLIENT_SECRET` or Streamlit
+  `google_client_secret` instead.

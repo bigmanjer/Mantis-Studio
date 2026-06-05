@@ -1082,6 +1082,12 @@ class TestOAuthAndRepoStructure:
         assert "oauth_provider" in source
         assert "redirect URI must be a full URL" in source
 
+    def test_google_oauth_supports_external_secret_sources(self):
+        source = (ROOT / "app" / "services" / "oauth.py").read_text(encoding="utf-8")
+        assert "MANTIS_GOOGLE_CLIENT_SECRET" in source
+        assert "google_client_secret" in source
+        assert "oauth_google_client_secret" in source
+
 
 # ---------------------------------------------------------------------------
 # 18b) Light mode theme quality  comfort and readability
