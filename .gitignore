@@ -1,0 +1,20 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+**/__pycache__/
+logs/
+artifacts/
+projects/
+!projects/.gitkeep
+!projects/.backups/.gitkeep
+
+# Test coverage
+.coverage
+htmlcov/
+.pytest_cache/
+**/.pytest_cache/
+*.egg-info/
+
+# Runtime-generated branding slices
+assets/.generated_branding/
