@@ -4596,6 +4596,7 @@ def _run_ui():
                     "Google Client ID",
                     value=google_cfg.get("client_id", ""),
                     key="user_admin_google_client_id",
+                    help="Can also be provided as MANTIS_GOOGLE_CLIENT_ID or Streamlit secret google_client_id.",
                 )
                 google_redirect_uri = st.text_input(
                     "Redirect URI",
@@ -4604,10 +4605,11 @@ def _run_ui():
                     key="user_admin_google_redirect_uri",
                     help=(
                         "Add this exact full URL to Google Authorized redirect URIs. "
-                        "Hosted: https://mantisstudio.streamlit.app/?oauth_provider=google. "
-                        "Local: http://localhost:8501/?oauth_provider=google."
-                    ),
-                )
+                            "Hosted: https://mantisstudio.streamlit.app/?oauth_provider=google. "
+                            "Local: http://localhost:8501/?oauth_provider=google. "
+                            "Can also be provided as MANTIS_GOOGLE_REDIRECT_URI or Streamlit secret google_redirect_uri."
+                        ),
+                    )
             with oauth_cols[1]:
                 google_scopes = st.text_input(
                     "Scopes",

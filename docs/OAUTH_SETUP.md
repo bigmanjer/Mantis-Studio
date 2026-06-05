@@ -33,15 +33,21 @@ The client secret is protected locally with Windows DPAPI when running on
 Windows. If protected storage is unavailable, MANTIS refuses to persist the
 secret instead of writing it as plaintext config.
 
-For hosted deployments such as Streamlit Cloud, store the secret outside the
+For hosted deployments such as Streamlit Cloud, store OAuth values outside the
 app config instead:
 
+- Environment variable: `MANTIS_GOOGLE_CLIENT_ID`
+- Streamlit secret: `google_client_id`
 - Environment variable: `MANTIS_GOOGLE_CLIENT_SECRET`
 - Streamlit secret: `google_client_secret`
 - Alternate Streamlit secret: `oauth_google_client_secret`
+- Optional environment variable: `MANTIS_GOOGLE_REDIRECT_URI`
+- Optional Streamlit secret: `google_redirect_uri`
 
-When one of these secure external secrets is present, MANTIS uses it for Google
-OAuth and does not need to save the secret from User Settings.
+When these external values are present, MANTIS uses them for Google OAuth and
+does not need to save credentials from User Settings. If no redirect URI is
+saved, MANTIS defaults to
+`https://mantisstudio.streamlit.app/?oauth_provider=google`.
 
 ## Account Linking
 
@@ -53,8 +59,8 @@ The built-in `ADMIN` account cannot be claimed through OAuth.
 
 ## Troubleshooting
 
-- `Google OAuth missing: redirect URI` means the super admin has not saved a
-  redirect URI in User Settings.
+- `Google OAuth missing: redirect URI` means no saved or external redirect URI
+  was available. Hosted builds default to the Streamlit callback URL above.
 - `redirect URI must be a full URL` means the value is missing `http://` or
   `https://`.
 - `redirect URI must include ?oauth_provider=google` means MANTIS cannot tell

@@ -23,9 +23,25 @@ GOOGLE_SECRET_ENV_VARS = (
     "MANTIS_GOOGLE_CLIENT_SECRET",
     "GOOGLE_CLIENT_SECRET",
 )
+GOOGLE_CLIENT_ID_ENV_VARS = (
+    "MANTIS_GOOGLE_CLIENT_ID",
+    "GOOGLE_CLIENT_ID",
+)
+GOOGLE_REDIRECT_URI_ENV_VARS = (
+    "MANTIS_GOOGLE_REDIRECT_URI",
+    "GOOGLE_REDIRECT_URI",
+)
 GOOGLE_SECRET_STREAMLIT_KEYS = (
     "google_client_secret",
     "oauth_google_client_secret",
+)
+GOOGLE_CLIENT_ID_STREAMLIT_KEYS = (
+    "google_client_id",
+    "oauth_google_client_id",
+)
+GOOGLE_REDIRECT_URI_STREAMLIT_KEYS = (
+    "google_redirect_uri",
+    "oauth_google_redirect_uri",
 )
 
 
@@ -47,6 +63,18 @@ def _get_external_google_client_secret() -> Tuple[str, str]:
         if value:
             return value, env_var
     for key in GOOGLE_SECRET_STREAMLIT_KEYS:
+        value = _read_streamlit_secret(key)
+        if value:
+            return value, f"Streamlit secrets: {key}"
+    return "", ""
+
+
+def _get_external_value(env_vars: Tuple[str, ...], streamlit_keys: Tuple[str, ...]) -> Tuple[str, str]:
+    for env_var in env_vars:
+        value = os.getenv(env_var, "").strip()
+        if value:
+            return value, env_var
+    for key in streamlit_keys:
         value = _read_streamlit_secret(key)
         if value:
             return value, f"Streamlit secrets: {key}"
@@ -81,16 +109,30 @@ def get_google_oauth_config() -> Dict[str, Any]:
     data = load_app_config()
     protected_secret = reveal_secret(data.get("oauth_google_client_secret_protected") or {})
     external_secret, external_source = _get_external_google_client_secret()
+    external_client_id, client_id_source = _get_external_value(
+        GOOGLE_CLIENT_ID_ENV_VARS,
+        GOOGLE_CLIENT_ID_STREAMLIT_KEYS,
+    )
+    external_redirect_uri, redirect_uri_source = _get_external_value(
+        GOOGLE_REDIRECT_URI_ENV_VARS,
+        GOOGLE_REDIRECT_URI_STREAMLIT_KEYS,
+    )
     secret = protected_secret or external_secret
     secret_source = "protected storage" if protected_secret else external_source
+    client_id = str(data.get("oauth_google_client_id") or external_client_id or "").strip()
+    redirect_uri = str(
+        data.get("oauth_google_redirect_uri") or external_redirect_uri or HOSTED_GOOGLE_REDIRECT_URI
+    ).strip()
     return {
-        "enabled": bool(data.get("oauth_google_enabled", False)),
-        "client_id": data.get("oauth_google_client_id", ""),
+        "enabled": bool(data.get("oauth_google_enabled", False) or external_client_id),
+        "client_id": client_id,
         "client_secret": secret,
-        "redirect_uri": data.get("oauth_google_redirect_uri", ""),
+        "redirect_uri": redirect_uri,
         "scopes": data.get("oauth_google_scopes", DEFAULT_GOOGLE_SCOPES) or DEFAULT_GOOGLE_SCOPES,
         "secret_saved": bool(secret),
         "secret_source": secret_source,
+        "client_id_source": "saved config" if data.get("oauth_google_client_id") else client_id_source,
+        "redirect_uri_source": "saved config" if data.get("oauth_google_redirect_uri") else (redirect_uri_source or "hosted default"),
         "external_secret": bool(external_secret),
         "protected_storage": protected_storage_available(),
     }
@@ -105,7 +147,7 @@ def save_google_oauth_config(
     scopes: str = DEFAULT_GOOGLE_SCOPES,
     clear_secret: bool = False,
 ) -> Tuple[bool, str]:
-    redirect_uri_clean = (redirect_uri or "").strip()
+    redirect_uri_clean = (redirect_uri or HOSTED_GOOGLE_REDIRECT_URI).strip()
     if enabled:
         ok, msg = _validate_google_redirect_uri(redirect_uri_clean)
         if not ok:
@@ -121,11 +163,14 @@ def save_google_oauth_config(
     elif client_secret:
         if not protected_storage_available():
             save_app_config(data)
+            external_secret, _external_source = _get_external_google_client_secret()
+            if external_secret:
+                return True, "Google OAuth settings saved. Using external Google client secret."
             return (
                 False,
                 "Protected secret storage is unavailable, so the client secret was not saved. "
-                "Set MANTIS_GOOGLE_CLIENT_SECRET or a Streamlit secret named "
-                "google_client_secret instead.",
+                "Add google_client_secret in Streamlit Cloud secrets, then leave "
+                "the Client Secret field blank when saving settings.",
             )
         data["oauth_google_client_secret_protected"] = protect_secret(client_secret.strip())
     save_app_config(data)

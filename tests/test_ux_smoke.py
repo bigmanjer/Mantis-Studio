@@ -1087,6 +1087,10 @@ class TestOAuthAndRepoStructure:
         assert "MANTIS_GOOGLE_CLIENT_SECRET" in source
         assert "google_client_secret" in source
         assert "oauth_google_client_secret" in source
+        assert "MANTIS_GOOGLE_CLIENT_ID" in source
+        assert "google_client_id" in source
+        assert "MANTIS_GOOGLE_REDIRECT_URI" in source
+        assert "google_redirect_uri" in source
 
 
 # ---------------------------------------------------------------------------
