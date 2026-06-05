@@ -1967,6 +1967,12 @@ class TestMantisModelAndArchitectUX:
         assert "World Bible is the story encyclopedia" in source
         assert "Style Guide" in source
 
+    def test_insights_uses_canon_intelligence_panel(self):
+        source = (ROOT / "app" / "main.py").read_text(encoding="utf-8")
+        assert "analyze_chapter_canon" in source
+        assert "build_context_packet" in source
+        assert "### Canon Intelligence" in source
+
     def test_editor_utility_bar_no_duplicate_quick_jump(self):
         source = (ROOT / "app" / "views" / "editor_workspace.py").read_text(encoding="utf-8")
         assert "Quick jump" not in source

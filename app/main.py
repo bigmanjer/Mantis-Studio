@@ -7175,6 +7175,8 @@ def _run_ui():
                             st.rerun()
 
     def render_insights():
+        from app.services.canon_intelligence import analyze_chapter_canon, build_context_packet
+
         p = st.session_state.project
         if not p:
             render_no_project_state("Insights", "empty_insights")
@@ -7252,9 +7254,19 @@ def _run_ui():
         weekly_sessions = _weekly_activity_count()
         streak = _activity_streak()
         memory_size = len((p.memory_hard or "").strip()) + len((p.memory_soft or "").strip()) + len((p.memory or "").strip())
+        latest_chapter = max(chapters, key=lambda c: (c.modified_at or c.created_at or 0), default=None)
+        latest_text = (latest_chapter.content or "") if latest_chapter else ""
+        canon_report = analyze_chapter_canon(
+            p,
+            latest_text,
+            chapter_id=latest_chapter.id if latest_chapter else "",
+            chapter_title=latest_chapter.title if latest_chapter else "Latest chapter",
+        ) if latest_text.strip() else None
+        context_packet = build_context_packet(p, latest_text) if latest_text.strip() else {"entities": []}
 
         metric_cols = st.columns(5)
-        metric_cols[0].metric("Canon issues", len(coherence_results))
+        intelligence_conflicts = len(canon_report.conflicts) if canon_report else 0
+        metric_cols[0].metric("Canon issues", len(coherence_results) + intelligence_conflicts)
         metric_cols[1].metric("Flagged entities", len(flagged_entity_ids))
         metric_cols[2].metric("Drafted chapters", f"{active_chapters}/{chapter_count}")
         metric_cols[3].metric("Avg words/chapter", avg_words)
@@ -7267,6 +7279,8 @@ def _run_ui():
                 risk_items = []
                 if coherence_results:
                     risk_items.append(f"Coherence issues open: {len(coherence_results)}")
+                if canon_report and canon_report.conflicts:
+                    risk_items.append(f"Latest chapter canon conflicts: {len(canon_report.conflicts)}")
                 if len(flagged_entity_ids) > 0:
                     risk_items.append(f"Entities need review: {len(flagged_entity_ids)}")
                 if len(review_queue) > 0:
@@ -7300,6 +7314,8 @@ def _run_ui():
                     st.info("Create an outline so chapter generation has structure.")
                 elif chapter_count == 0:
                     st.info("Create Chapter 1 from your outline.")
+                elif canon_report and canon_report.conflicts:
+                    st.info("Review latest-chapter canon conflicts before drafting forward.")
                 elif coherence_results:
                     st.info("Resolve coherence issues before major rewrites.")
                 elif len(flagged_entity_ids) > 0:
@@ -7313,9 +7329,8 @@ def _run_ui():
                 st.metric("Sessions (7d)", f"{weekly_sessions}")
                 st.metric("Streak", f"{streak} days")
                 st.metric("Total words", total_words)
-                latest = max(chapters, key=lambda c: (c.modified_at or c.created_at or 0), default=None)
-                if latest:
-                    st.caption(f"Last touchpoint: Chapter {latest.index} - {latest.title}")
+                if latest_chapter:
+                    st.caption(f"Last touchpoint: Chapter {latest_chapter.index} - {latest_chapter.title}")
                 else:
                     st.caption("Last touchpoint: none yet")
 
@@ -7333,6 +7348,58 @@ def _run_ui():
                 st.metric("Readiness score", f"{readiness}%")
                 for label, ok in checks:
                     st.caption(f"{'Ready' if ok else 'Needs work'}: {label}")
+
+        st.divider()
+        st.markdown("### Canon Intelligence")
+        if not latest_chapter or not latest_text.strip():
+            st.info("Draft a chapter to generate deterministic canon signals.")
+        elif not canon_report:
+            st.info("No canon signals available yet.")
+        else:
+            intel_cols = st.columns(4)
+            intel_cols[0].metric("Risk score", f"{canon_report.risk_score}%")
+            intel_cols[1].metric("Facts", len(canon_report.facts))
+            intel_cols[2].metric("Relations", len(canon_report.relationships))
+            intel_cols[3].metric("Events", len(canon_report.events))
+            st.caption(
+                f"Analyzed: Chapter {latest_chapter.index} - {latest_chapter.title}. "
+                f"Context entities loaded: {len(context_packet.get('entities', []))}."
+            )
+
+            if canon_report.conflicts:
+                st.markdown("#### Conflicts")
+                for conflict in canon_report.conflicts[:5]:
+                    st.warning(
+                        f"{conflict.subject}: {conflict.issue}. "
+                        f"Existing: {conflict.existing}. Incoming: {conflict.incoming}."
+                    )
+                    st.caption(f"Evidence: {conflict.evidence.quote}")
+            else:
+                st.success("No deterministic conflicts detected in the latest chapter.")
+
+            signal_rows = []
+            for fact in canon_report.facts[:6]:
+                signal_rows.append({
+                    "Type": "Fact",
+                    "Signal": f"{fact.subject} {fact.attribute} = {fact.value}",
+                    "Confidence": f"{fact.confidence:.2f}",
+                })
+            for rel in canon_report.relationships[:6]:
+                signal_rows.append({
+                    "Type": "Relationship",
+                    "Signal": f"{rel.source} {rel.relation} {rel.target}",
+                    "Confidence": f"{rel.confidence:.2f}",
+                })
+            for event in canon_report.events[:4]:
+                signal_rows.append({
+                    "Type": "Timeline",
+                    "Signal": event.summary[:120],
+                    "Confidence": f"{event.confidence:.2f}",
+                })
+            if signal_rows:
+                st.dataframe(signal_rows, use_container_width=True, hide_index=True)
+            else:
+                st.caption("No extractable facts, relationships, or timeline events found in the latest chapter.")
 
         st.divider()
         st.markdown("### Entity Coverage Focus")

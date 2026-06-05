@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Stability
+- Canon intelligence foundation: added deterministic chapter analysis for extracted facts, relationships, timeline events, memory suggestions, and canon conflicts, then surfaced latest-chapter signals in Insights.
 - Settings IA cleanup: moved super-admin OAuth and user administration controls from Workspace Settings into User Settings.
 - Repository replacement: published the local `mantis testing` workspace to the existing `bigmanjer/Mantis-Studio` GitHub repository, updated contributor clone guidance for the `mantis testing` checkout folder, and bumped the app version to `134.0`.
 - Full repository audit: added `scripts/full_repo_audit.py` as the canonical compile/selftest/healthcheck/pytest/static-report runner.
