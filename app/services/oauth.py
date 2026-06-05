@@ -17,6 +17,7 @@ GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
 GOOGLE_TOKENINFO_URL = "https://oauth2.googleapis.com/tokeninfo"
 DEFAULT_GOOGLE_SCOPES = "openid email profile"
+DEFAULT_GOOGLE_CLIENT_ID = "1089899786902-85r6u83hstmskkjbniva160d29fdko4c.apps.googleusercontent.com"
 HOSTED_GOOGLE_REDIRECT_URI = "https://mantisstudio.streamlit.app/?oauth_provider=google"
 LOCAL_GOOGLE_REDIRECT_URI = "http://localhost:8501/?oauth_provider=google"
 GOOGLE_SECRET_ENV_VARS = (
@@ -119,19 +120,19 @@ def get_google_oauth_config() -> Dict[str, Any]:
     )
     secret = protected_secret or external_secret
     secret_source = "protected storage" if protected_secret else external_source
-    client_id = str(data.get("oauth_google_client_id") or external_client_id or "").strip()
+    client_id = str(data.get("oauth_google_client_id") or external_client_id or DEFAULT_GOOGLE_CLIENT_ID).strip()
     redirect_uri = str(
         data.get("oauth_google_redirect_uri") or external_redirect_uri or HOSTED_GOOGLE_REDIRECT_URI
     ).strip()
     return {
-        "enabled": bool(data.get("oauth_google_enabled", False) or external_client_id),
+        "enabled": bool(data.get("oauth_google_enabled", True)),
         "client_id": client_id,
         "client_secret": secret,
         "redirect_uri": redirect_uri,
         "scopes": data.get("oauth_google_scopes", DEFAULT_GOOGLE_SCOPES) or DEFAULT_GOOGLE_SCOPES,
         "secret_saved": bool(secret),
         "secret_source": secret_source,
-        "client_id_source": "saved config" if data.get("oauth_google_client_id") else client_id_source,
+        "client_id_source": "saved config" if data.get("oauth_google_client_id") else (client_id_source or "app default"),
         "redirect_uri_source": "saved config" if data.get("oauth_google_redirect_uri") else (redirect_uri_source or "hosted default"),
         "external_secret": bool(external_secret),
         "protected_storage": protected_storage_available(),

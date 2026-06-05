@@ -1065,10 +1065,12 @@ class TestOAuthAndRepoStructure:
         assert "build_google_authorization_url" in source
         assert "complete_google_oauth" in source
         assert "authenticate_oauth_user" in source
-        assert "OAuth Sign-In" in source
         assert "oauth_provider" in source
-        assert "Google Client Secret" in source
-        assert "https://mantisstudio.streamlit.app/?oauth_provider=google" in source
+        assert "Google Client Secret" not in source
+        assert "user_admin_google_client_secret" not in source
+        oauth_source = (ROOT / "app" / "services" / "oauth.py").read_text(encoding="utf-8")
+        assert "https://mantisstudio.streamlit.app/?oauth_provider=google" in oauth_source
+        assert "DEFAULT_GOOGLE_CLIENT_ID" in oauth_source
 
     def test_secret_store_refuses_plaintext_fallback(self):
         source = (ROOT / "app" / "security" / "secret_store.py").read_text(encoding="utf-8")
@@ -1087,6 +1089,7 @@ class TestOAuthAndRepoStructure:
         assert "MANTIS_GOOGLE_CLIENT_SECRET" in source
         assert "google_client_secret" in source
         assert "oauth_google_client_secret" in source
+        assert "DEFAULT_GOOGLE_CLIENT_ID" in source
         assert "MANTIS_GOOGLE_CLIENT_ID" in source
         assert "google_client_id" in source
         assert "MANTIS_GOOGLE_REDIRECT_URI" in source

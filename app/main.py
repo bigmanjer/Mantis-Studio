@@ -1542,7 +1542,6 @@ def _run_ui():
         complete_google_oauth,
         get_google_oauth_config,
         is_google_oauth_ready,
-        save_google_oauth_config,
     )
     # Import enhanced UI feedback components
     from app.ui.feedback import (
@@ -4569,95 +4568,6 @@ def _run_ui():
                 st.button("Microsoft not configured", disabled=True, use_container_width=True, key="user_microsoft_disabled")
 
     def render_super_admin_settings():
-        with st.container(border=True):
-            st.markdown("### OAuth Sign-In")
-            st.caption("Configure Google sign-in. Only the built-in ADMIN account can change OAuth credentials.")
-            google_cfg = get_google_oauth_config()
-            ready, ready_msg, _ = is_google_oauth_ready()
-            if ready:
-                st.success("Google OAuth is ready.")
-            else:
-                st.info(ready_msg)
-            if not google_cfg.get("protected_storage") and not google_cfg.get("external_secret"):
-                st.warning(
-                    "Protected local secret storage is unavailable. Client secrets cannot be "
-                    "saved safely on this system. Set MANTIS_GOOGLE_CLIENT_SECRET or a "
-                    "Streamlit secret named google_client_secret."
-                )
-
-            oauth_cols = st.columns([1, 1])
-            with oauth_cols[0]:
-                google_enabled = st.toggle(
-                    "Enable Google sign-in",
-                    value=bool(google_cfg.get("enabled")),
-                    key="user_admin_google_oauth_enabled",
-                )
-                google_client_id = st.text_input(
-                    "Google Client ID",
-                    value=google_cfg.get("client_id", ""),
-                    key="user_admin_google_client_id",
-                    help="Can also be provided as MANTIS_GOOGLE_CLIENT_ID or Streamlit secret google_client_id.",
-                )
-                google_redirect_uri = st.text_input(
-                    "Redirect URI",
-                    value=google_cfg.get("redirect_uri", ""),
-                    placeholder="https://mantisstudio.streamlit.app/?oauth_provider=google",
-                    key="user_admin_google_redirect_uri",
-                    help=(
-                        "Add this exact full URL to Google Authorized redirect URIs. "
-                            "Hosted: https://mantisstudio.streamlit.app/?oauth_provider=google. "
-                            "Local: http://localhost:8501/?oauth_provider=google. "
-                            "Can also be provided as MANTIS_GOOGLE_REDIRECT_URI or Streamlit secret google_redirect_uri."
-                        ),
-                    )
-            with oauth_cols[1]:
-                google_scopes = st.text_input(
-                    "Scopes",
-                    value=google_cfg.get("scopes", "openid email profile"),
-                    key="user_admin_google_scopes",
-                )
-                google_secret = st.text_input(
-                    "Google Client Secret",
-                    type="password",
-                    value="",
-                    placeholder="Saved" if google_cfg.get("secret_saved") else "Paste client secret",
-                    key="user_admin_google_client_secret",
-                    help=(
-                        "Stored with Windows DPAPI on Windows. Hosted apps should use "
-                        "MANTIS_GOOGLE_CLIENT_SECRET or Streamlit secrets."
-                    ),
-                )
-                clear_google_secret = st.checkbox(
-                    "Clear saved Google secret",
-                    value=False,
-                    key="user_admin_google_clear_secret",
-                )
-                st.caption(
-                    f"Secret status: available from {google_cfg.get('secret_source')}."
-                    if google_cfg.get("secret_saved")
-                    else "Secret status: not saved."
-                )
-
-            if st.button(
-                "Save Google OAuth Settings",
-                type="primary",
-                use_container_width=True,
-                key="user_admin_save_google_oauth",
-            ):
-                ok, msg = save_google_oauth_config(
-                    enabled=google_enabled,
-                    client_id=google_client_id,
-                    client_secret=google_secret,
-                    redirect_uri=google_redirect_uri,
-                    scopes=google_scopes,
-                    clear_secret=clear_google_secret,
-                )
-                if ok:
-                    st.toast("Google OAuth settings saved.")
-                    st.rerun()
-                else:
-                    st.error(msg)
-
         with st.container(border=True):
             st.markdown("### Super Admin Control Center")
             st.caption("Only the built-in ADMIN account can manage users, roles, password resets, and account status.")

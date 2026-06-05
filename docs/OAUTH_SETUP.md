@@ -20,33 +20,33 @@ code flow.
    Do not enter only `mantisstudio.streamlit.app`; Google requires the full
    URL, including `https://` and `?oauth_provider=google`.
 
-5. Sign in as the built-in `ADMIN` account.
-6. Open `User Settings -> OAuth Sign-In`.
-7. Enable Google sign-in and paste:
-   - Google Client ID
-   - Google Client Secret
-   - Redirect URI
-   - Scopes: `openid email profile`
-8. Save settings.
+5. Add the Google client secret to deployment secrets.
+6. Restart or redeploy the app.
 
 The client secret is protected locally with Windows DPAPI when running on
 Windows. If protected storage is unavailable, MANTIS refuses to persist the
 secret instead of writing it as plaintext config.
 
-For hosted deployments such as Streamlit Cloud, store OAuth values outside the
-app config instead:
+Google OAuth is deployment-configured. There is no Super Admin menu for client
+secrets because hosted apps must not save secrets through the UI.
 
-- Environment variable: `MANTIS_GOOGLE_CLIENT_ID`
-- Streamlit secret: `google_client_id`
+The public Google client ID and hosted redirect URI are app defaults. For hosted
+deployments such as Streamlit Cloud, store the client secret outside the app
+config:
+
 - Environment variable: `MANTIS_GOOGLE_CLIENT_SECRET`
 - Streamlit secret: `google_client_secret`
 - Alternate Streamlit secret: `oauth_google_client_secret`
+
+Optional overrides are still available for alternate deployments:
+
+- Environment variable: `MANTIS_GOOGLE_CLIENT_ID`
+- Streamlit secret: `google_client_id`
 - Optional environment variable: `MANTIS_GOOGLE_REDIRECT_URI`
 - Optional Streamlit secret: `google_redirect_uri`
 
-When these external values are present, MANTIS uses them for Google OAuth and
-does not need to save credentials from User Settings. If no redirect URI is
-saved, MANTIS defaults to
+When these external values are present, MANTIS uses them for Google OAuth. If no
+redirect URI is saved, MANTIS defaults to
 `https://mantisstudio.streamlit.app/?oauth_provider=google`.
 
 ## Account Linking
