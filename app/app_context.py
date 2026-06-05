@@ -61,6 +61,8 @@ from app.services.export import project_to_markdown
 from app.services.projects import Chapter, Entity, Project, sanitize_chapter_title
 # Local-first architecture: projects stored in default directory
 from app.services.world_bible import queue_world_bible_suggestion
+from app.services.world_bible_merge import apply_suggestion as apply_world_bible_suggestion
+from app.services.world_bible_merge import classify_suggestion as classify_world_bible_suggestion
 from app.services.ai import AIEngine, AnalysisEngine, REWRITE_PRESETS, StoryEngine, rewrite_prompt
 from app.state import initialize_session_state, install_key_helpers, ui_key
 from app.utils.branding_assets import read_asset_bytes, resolve_asset_path
@@ -698,6 +700,7 @@ def _run_ui():
         matched = 0
         flagged = 0
         suggested = 0
+        auto_applied = 0
 
         for e in ents:
             name = (e.get("name") or "").strip()
@@ -732,6 +735,7 @@ def _run_ui():
                         },
                         project=p,
                     )
+                    suggested += 1
                 else:
                     queue_world_bible_suggestion(
                         {
@@ -748,42 +752,35 @@ def _run_ui():
                 flagged += 1
                 continue
 
-            ent, status = p.upsert_entity(
-                name,
-                category,
-                desc,
-                aliases=aliases if isinstance(aliases, list) else None,
-                allow_merge=False,
-                allow_alias=True,
-            )
+            suggestion_payload = {
+                "type": "new",
+                "name": name,
+                "category": Project._normalize_category(category),
+                "description": desc,
+                "aliases": aliases,
+                "confidence": confidence,
+                "source": label,
+            }
+            classified = classify_world_bible_suggestion(p, suggestion_payload)
+            ent, status = apply_world_bible_suggestion(p, classified)
             if ent is None:
                 continue
 
             if status == "created":
                 added += 1
+            elif status in {"updated", "alias_added"}:
+                matched += 1
+                auto_applied += 1
             else:
                 matched += 1
-                if desc:
-                    queue_world_bible_suggestion(
-                        {
-                            "type": "update",
-                            "entity_id": ent.id,
-                            "name": ent.name,
-                            "category": ent.category,
-                            "description": desc,
-                            "aliases": aliases,
-                            "confidence": confidence,
-                            "source": label,
-                        },
-                        project=p,
-                    )
-                    suggested += 1
 
         persist_project(p)
         st.session_state["last_entity_scan"] = time.time()
 
-        if added > 0 or matched > 0 or flagged > 0:
+        if added > 0 or matched > 0 or flagged > 0 or auto_applied > 0:
             summary = [f"{added} new", f"{matched} existing", f"{flagged} flagged"]
+            if auto_applied:
+                summary.append(f"{auto_applied} auto-applied")
             if suggested:
                 summary.append(f"{suggested} suggested updates")
             st.toast(f"World Bible updated  ({', '.join(summary)})", icon="")
@@ -1933,7 +1930,7 @@ def _run_ui():
             with f4:
                 show_recent = st.checkbox("Recently added", key="world_filter_recent")
 
-        tab_options = ["Characters", "Locations", "Factions", "Lore", "Memory", "Insights"]
+        tab_options = ["Characters", "Locations", "Factions", "Items", "Lore", "Memory", "Insights"]
         focus_tab = st.session_state.pop("world_focus_tab", None)
         if focus_tab not in tab_options:
             focus_tab = None
@@ -1947,6 +1944,16 @@ def _run_ui():
             horizontal=True,
             key="world_tabs",
         )
+
+        def _world_tab_for_category(category: str) -> str:
+            normalized = Project._normalize_category(category)
+            return {
+                "Character": "Characters",
+                "Location": "Locations",
+                "Faction": "Factions",
+                "Item": "Items",
+                "Lore": "Lore",
+            }.get(normalized, "Lore")
 
         review_queue = st.session_state.get("world_bible_review", [])
         if review_queue:
@@ -1999,6 +2006,8 @@ def _run_ui():
                                 if applied_ent is not None:
                                     st.session_state.pop(f"desc_{applied_ent.id}", None)
                                     st.session_state.pop(f"aliases_{applied_ent.id}", None)
+                                    st.session_state["world_focus_entity"] = applied_ent.id
+                                    st.session_state["world_tabs"] = _world_tab_for_category(applied_ent.category)
                                 review_queue.pop(idx)
                                 st.session_state["world_bible_review"] = review_queue
                                 persist_project(p)
@@ -2184,6 +2193,8 @@ def _run_ui():
             render_cat("Location")
         elif selected_tab == "Factions":
             render_cat("Faction")
+        elif selected_tab == "Items":
+            render_cat("Item")
         elif selected_tab == "Lore":
             render_cat("Lore")
         elif selected_tab == "Memory":

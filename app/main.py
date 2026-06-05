@@ -95,7 +95,7 @@ def get_app_version() -> str:
         # Never block app start on version metadata.
         pass
 
-    return "134.0"
+    return "134.1"
 
 
 def _safe_int_env(env_var: str, default: int) -> int:
@@ -3843,6 +3843,8 @@ def _run_ui():
         model = get_ai_model()
         raw_text = text or ""
         p = st.session_state.project
+        from app.services.world_bible_merge import apply_suggestion as _apply_suggestion
+        from app.services.world_bible_merge import classify_suggestion as _classify_suggestion
 
         try:
             ents = AnalysisEngine.extract_entities(raw_text, model)
@@ -3855,6 +3857,7 @@ def _run_ui():
         matched = 0
         flagged = 0
         suggested = 0
+        auto_applied = 0
         memory_soft_added = 0
         memory_hard_added = 0
         world_threshold = float(
@@ -3912,6 +3915,7 @@ def _run_ui():
                             "chapter_id": chapter_id,
                         }
                     )
+                    suggested += 1
                 else:
                     _queue_world_bible_suggestion(
                         {
@@ -3929,38 +3933,30 @@ def _run_ui():
                 flagged += 1
                 continue
 
-            ent, status = p.upsert_entity(
-                name,
-                category,
-                desc,
-                aliases=aliases if isinstance(aliases, list) else None,
-                allow_merge=False,
-                allow_alias=True,
-            )
+            suggestion_payload = {
+                "type": "new",
+                "name": name,
+                "category": Project._normalize_category(category),
+                "description": desc,
+                "aliases": aliases,
+                "confidence": confidence,
+                "source": label,
+                "source_excerpt": source_excerpt,
+                "chapter_id": chapter_id,
+            }
+            classified = _classify_suggestion(p, suggestion_payload)
+            ent, status = _apply_suggestion(p, classified)
             if ent is None:
                 continue
             _append_entity_source_ref(ent, label, source_excerpt, chapter_id)
 
             if status == "created":
                 added += 1
+            elif status in {"updated", "alias_added"}:
+                matched += 1
+                auto_applied += 1
             else:
                 matched += 1
-                if desc:
-                    _queue_world_bible_suggestion(
-                        {
-                            "type": "update",
-                            "entity_id": ent.id,
-                            "name": ent.name,
-                            "category": ent.category,
-                            "description": desc,
-                            "aliases": aliases,
-                            "confidence": confidence,
-                            "source": label,
-                            "source_excerpt": source_excerpt,
-                            "chapter_id": chapter_id,
-                        }
-                    )
-                    suggested += 1
 
             # High-confidence facts can be promoted into memory automatically.
             memory_line = ""
@@ -3980,8 +3976,10 @@ def _run_ui():
         persist_project(p)
         st.session_state["last_entity_scan"] = time.time()
 
-        if added > 0 or matched > 0 or flagged > 0 or memory_soft_added > 0 or memory_hard_added > 0:
+        if added > 0 or matched > 0 or flagged > 0 or auto_applied > 0 or memory_soft_added > 0 or memory_hard_added > 0:
             summary = [f"{added} new", f"{matched} existing", f"{flagged} flagged"]
+            if auto_applied:
+                summary.append(f"{auto_applied} auto-applied")
             if suggested:
                 summary.append(f"{suggested} suggested updates")
             if memory_soft_added:
@@ -3996,6 +3994,7 @@ def _run_ui():
                 "matched": matched,
                 "flagged": flagged,
                 "suggested": suggested,
+                "auto_applied": auto_applied,
                 "memory_soft_added": memory_soft_added,
                 "memory_hard_added": memory_hard_added,
                 "total_detected": total_detected,
@@ -4010,6 +4009,7 @@ def _run_ui():
                     "matched": matched,
                     "flagged": flagged,
                     "suggested": suggested,
+                    "auto_applied": auto_applied,
                     "memory_soft_added": 0,
                     "memory_hard_added": 0,
                     "total_detected": total_detected,
@@ -4023,6 +4023,7 @@ def _run_ui():
                     "matched": 0,
                     "flagged": 0,
                     "suggested": 0,
+                    "auto_applied": 0,
                     "memory_soft_added": 0,
                     "memory_hard_added": 0,
                     "total_detected": 0,
@@ -5785,6 +5786,7 @@ def _run_ui():
                                     "Outline saved and scanned: "
                                     f"{scan_result.get('added', 0)} new, "
                                     f"{scan_result.get('matched', 0)} existing, "
+                                    f"{scan_result.get('auto_applied', 0)} auto-applied, "
                                     f"{scan_result.get('flagged', 0)} flagged."
                                 )
                             elif scan_result.get("status") == "matched_only":
@@ -6234,10 +6236,10 @@ def _run_ui():
             with top_cols[4]:
                 stat_tile("Canon health", f"{canon_icon} {canon_label}", icon="\u2705")
 
-        with card("Canon scanner", "Review every chapter against the current World Bible and queue safe updates."):
+        with card("Canon scanner", "Review every chapter against the current World Bible and apply safe updates."):
             scan_cols = st.columns([2.2, 1])
             with scan_cols[0]:
-                st.caption("Scans chapter text, matches it against existing entries, and queues new details with source excerpts for review.")
+                st.caption("Scans chapter text, auto-applies high-confidence canon, and queues uncertain details with source excerpts for review.")
             with scan_cols[1]:
                 scan_all_disabled = not bool(chapters) or not bool(get_active_key_status()[1])
                 if st.button(
@@ -6246,9 +6248,9 @@ def _run_ui():
                     type="primary",
                     disabled=scan_all_disabled,
                     key=f"world_scan_all_chapters_{p.id}",
-                    help="Requires chapters and an AI key. Suggestions are queued for review before applying.",
+                    help="Requires chapters and an AI key. High-confidence suggestions apply automatically; uncertain suggestions are queued for review.",
                 ):
-                    totals = {"added": 0, "matched": 0, "flagged": 0, "suggested": 0, "total_detected": 0}
+                    totals = {"added": 0, "matched": 0, "flagged": 0, "suggested": 0, "auto_applied": 0, "total_detected": 0}
                     progress = st.progress(0)
                     ordered = p.get_ordered_chapters()
                     for idx, chapter in enumerate(ordered, start=1):
@@ -6270,7 +6272,8 @@ def _run_ui():
                     st.success(
                         "Chapter scan complete: "
                         f"{totals['total_detected']} detected, {totals['added']} new, "
-                        f"{totals['matched']} matched, {totals['flagged']} queued for review."
+                        f"{totals['matched']} matched, {totals['auto_applied']} auto-applied, "
+                        f"{totals['flagged']} queued for review."
                     )
                     st.rerun()
 
@@ -6305,7 +6308,7 @@ def _run_ui():
             mention_counts=mention_counts,
         )
 
-        tab_options = ["Characters", "Locations", "Factions", "Lore"]
+        tab_options = ["Characters", "Locations", "Factions", "Items", "Lore"]
         default_tab = st.session_state.get("world_tabs", tab_options[0])
         if default_tab not in tab_options:
             default_tab = tab_options[0]
@@ -6316,6 +6319,16 @@ def _run_ui():
             horizontal=True,
             key="world_tabs",
         )
+
+        def _world_tab_for_category(category: str) -> str:
+            normalized = Project._normalize_category(category)
+            return {
+                "Character": "Characters",
+                "Location": "Locations",
+                "Faction": "Factions",
+                "Item": "Items",
+                "Lore": "Lore",
+            }.get(normalized, "Lore")
 
         review_queue = st.session_state.get("world_bible_review", [])
         if review_queue:
@@ -6371,6 +6384,8 @@ def _run_ui():
                                 if applied_ent is not None:
                                     st.session_state.pop(f"desc_{applied_ent.id}", None)
                                     st.session_state.pop(f"aliases_{applied_ent.id}", None)
+                                    st.session_state["world_focus_entity"] = applied_ent.id
+                                    st.session_state["world_tabs"] = _world_tab_for_category(applied_ent.category)
                                 review_queue.pop(idx)
                                 st.session_state["world_bible_review"] = review_queue
                                 persist_project(p)
@@ -6644,6 +6659,8 @@ def _run_ui():
             render_cat("Location")
         elif selected_tab == "Factions":
             render_cat("Faction")
+        elif selected_tab == "Items":
+            render_cat("Item")
         elif selected_tab == "Lore":
             render_cat("Lore")
         elif selected_tab == "Memory":
@@ -7800,6 +7817,7 @@ def _run_ui():
                                         "Chapter saved and scanned: "
                                         f"{scan_result.get('added', 0)} new, "
                                         f"{scan_result.get('matched', 0)} existing, "
+                                        f"{scan_result.get('auto_applied', 0)} auto-applied, "
                                         f"{scan_result.get('flagged', 0)} flagged."
                                     )
                                 elif scan_result.get("status") == "matched_only":

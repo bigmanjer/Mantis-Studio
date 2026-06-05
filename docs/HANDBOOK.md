@@ -111,7 +111,7 @@ Rule:
   - `Hide Sidebar` when visible
   - `Show Sidebar` when collapsed
 
-- World Bible auto-apply default confidence is now `0.83` (83%).
+- World Bible auto-apply default confidence is now `0.83` (83%); suggestions at or above the threshold apply automatically, while lower-confidence suggestions remain queued for review.
 - Footer "Back to top" uses a multi-container scroll handler for Streamlit containers.
 - Query-param page routing now includes a loop guard to prevent repeated rerun redirects.
 - Page changes trigger an auto-scroll to top so navigation always lands at the page start.
@@ -130,4 +130,3 @@ Rule:
 - Navigation/top landing hardening: sidebar page clicks now increment a scroll nonce, and page render runs a repeated multi-target scroll-to-top routine so page transitions always land at the top (not footer).
 - Light mode consistency pass: legacy dark-hardcoded dashboard utility styles were converted to theme-token-driven colors.
 - Docs policy: when behavior changes in routing/state/theme/footer, update `HANDBOOK.md` and `CHANGELOG.md` in the same change set.
-

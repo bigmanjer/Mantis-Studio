@@ -1973,6 +1973,26 @@ class TestMantisModelAndArchitectUX:
         assert "build_context_packet" in source
         assert "### Canon Intelligence" in source
 
+    def test_high_confidence_world_bible_updates_auto_apply(self):
+        source = (ROOT / "app" / "main.py").read_text(encoding="utf-8")
+        threshold_gate = source.index("if confidence < world_threshold:")
+        auto_apply_call = source.index("ent, status = _apply_suggestion(p, classified)")
+        assert threshold_gate < auto_apply_call
+        assert "auto_applied += 1" in source
+        assert "High-confidence suggestions apply automatically" in source
+
+    def test_world_bible_apply_focuses_updated_entity(self):
+        source = (ROOT / "app" / "main.py").read_text(encoding="utf-8")
+        assert 'st.session_state["world_focus_entity"] = applied_ent.id' in source
+        assert 'st.session_state["world_tabs"] = _world_tab_for_category(applied_ent.category)' in source
+        assert '"Item": "Items"' in source
+
+    def test_world_bible_items_tab_is_visible(self):
+        source = (ROOT / "app" / "main.py").read_text(encoding="utf-8")
+        assert 'tab_options = ["Characters", "Locations", "Factions", "Items", "Lore"]' in source
+        assert 'elif selected_tab == "Items":' in source
+        assert 'render_cat("Item")' in source
+
     def test_editor_utility_bar_no_duplicate_quick_jump(self):
         source = (ROOT / "app" / "views" / "editor_workspace.py").read_text(encoding="utf-8")
         assert "Quick jump" not in source
