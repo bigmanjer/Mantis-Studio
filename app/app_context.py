@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """
 MANTIS Studio - Application Entry
 
@@ -179,7 +179,7 @@ def _run_ui():
         st.markdown("## Copyright\n\n MANTIS Studio")
 
     def render_help():
-        st.markdown("## Help\n\nVisit our [GitHub](https://github.com/bigmanjer/mantis-testing/issues) for support.")
+        st.markdown("## Help\n\nVisit our [GitHub](https://github.com/bigmanjer/Mantis-Studio/issues) for support.")
 
     icon_path = resolve_asset_path(ASSETS_DIR, "branding/mantis_favicon.png")
     page_icon = str(icon_path) if icon_path and icon_path.exists() else ""
@@ -1396,7 +1396,7 @@ def _run_ui():
                     st.caption("Guides, README notes, and updates.")
                     st.link_button(
                         " Help Docs",
-                        "https://github.com/bigmanjer/mantis-testing",
+                        "https://github.com/bigmanjer/Mantis-Studio",
                         use_container_width=True,
                         help="Open the project documentation in a new tab.",
                     )

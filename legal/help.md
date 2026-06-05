@@ -1,4 +1,4 @@
-﻿# Help & Getting Started
+# Help & Getting Started
 
 Welcome to MANTIS Studio! This guide covers common questions and how to get the most out of your creative writing workspace.
 
@@ -26,5 +26,5 @@ Your data is stored locally. See our [Privacy Policy](?page=privacy) for full de
 
 ## Need More Help?
 
-- **Report a bug or request a feature:** [GitHub Issues](https://github.com/bigmanjer/mantis-testing/issues)
+- **Report a bug or request a feature:** [GitHub Issues](https://github.com/bigmanjer/Mantis-Studio/issues)
 - **Contact support:** [support@mantis-studio.example](mailto:support@mantis-studio.example)

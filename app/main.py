@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """
 MANTIS Studio - Main Entry Point
 
@@ -154,7 +154,7 @@ class AppConfig:
     WORLD_MEMORY_AUTO_HARD = _safe_bool_env("MANTIS_WORLD_MEMORY_AUTO_HARD", False)
     
     # Documentation URLs
-    GETTING_STARTED_URL = "https://github.com/bigmanjer/mantis-testing/blob/main/docs/HANDBOOK.md"
+    GETTING_STARTED_URL = "https://github.com/bigmanjer/Mantis-Studio/blob/main/docs/HANDBOOK.md"
 
 
 os.makedirs(AppConfig.PROJECTS_DIR, exist_ok=True)
@@ -2488,7 +2488,7 @@ def _run_ui():
                 - This fix ensures you always know when the app updates and what's new
                 - All future updates will show clear release notes
                 
-                **See the [full changelog](https://github.com/bigmanjer/mantis-testing/blob/main/docs/CHANGELOG.md) for complete details**
+                **See the [full changelog](https://github.com/bigmanjer/Mantis-Studio/blob/main/docs/CHANGELOG.md) for complete details**
                 """)
                 
                 col1, col2 = st.columns([1, 1])
@@ -2500,7 +2500,7 @@ def _run_ui():
                         st.rerun()
                 with col2:
                     if st.button("View Full Changelog", use_container_width=True):
-                        webbrowser.open("https://github.com/bigmanjer/mantis-testing/blob/main/docs/CHANGELOG.md")
+                        webbrowser.open("https://github.com/bigmanjer/Mantis-Studio/blob/main/docs/CHANGELOG.md")
                         config["last_seen_version"] = current_version
                         save_app_config(config)
                         st.rerun()

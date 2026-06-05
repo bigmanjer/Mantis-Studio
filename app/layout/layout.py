@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import base64
 from pathlib import Path
@@ -648,7 +648,7 @@ def _build_footer_nav_links() -> str:
 
 def render_footer(
     version: str,
-    support_url: str = "https://github.com/bigmanjer/mantis-testing/issues",
+    support_url: str = "https://github.com/bigmanjer/Mantis-Studio/issues",
     contact_email: str = "support@mantis-studio.example",
 ) -> None:
     nav_links_html = _build_footer_nav_links()

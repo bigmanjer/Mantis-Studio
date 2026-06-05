@@ -128,4 +128,4 @@ python scripts/full_repo_audit.py
 
 - Help: [legal/help.md](legal/help.md)
 - Contact: [legal/contact.md](legal/contact.md)
-- Issues: [GitHub Issues](https://github.com/bigmanjer/mantis-testing/issues)
+- Issues: [GitHub Issues](https://github.com/bigmanjer/Mantis-Studio/issues)

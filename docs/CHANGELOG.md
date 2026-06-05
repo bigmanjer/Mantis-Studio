@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Stability
-- Repository identity update: replaced public `bigmanjer/Mantis-Studio` links with `bigmanjer/mantis-testing`, updated contributor clone guidance for the `mantis testing` checkout folder, and bumped the app version to `134.0`.
+- Repository replacement: published the local `mantis testing` workspace to the existing `bigmanjer/Mantis-Studio` GitHub repository, updated contributor clone guidance for the `mantis testing` checkout folder, and bumped the app version to `134.0`.
 - Full repository audit: added `scripts/full_repo_audit.py` as the canonical compile/selftest/healthcheck/pytest/static-report runner.
 - Test gate restored: full suite now passes with `245 passed` using the real Python 3.14 install.
 - Documentation consolidation: replaced the oversized root README with a concise landing page and moved audit/cleanup detail into `docs/reports/`.

@@ -1,4 +1,4 @@
-﻿# Contributing to MANTIS Studio
+# Contributing to MANTIS Studio
 
 Thank you for your interest in contributing to MANTIS Studio! This guide will help you get started.
 
@@ -13,7 +13,7 @@ Thank you for your interest in contributing to MANTIS Studio! This guide will he
 
 ```bash
 # Clone the repository
-git clone https://github.com/bigmanjer/mantis-testing.git "mantis testing"
+git clone https://github.com/bigmanjer/Mantis-Studio.git "mantis testing"
 cd "mantis testing"
 
 # Create a virtual environment
@@ -101,7 +101,7 @@ python scripts/smoke_test.py
 
 ## Reporting Issues
 
-- Use [GitHub Issues](https://github.com/bigmanjer/mantis-testing/issues) to report bugs or request features.
+- Use [GitHub Issues](https://github.com/bigmanjer/Mantis-Studio/issues) to report bugs or request features.
 - Include steps to reproduce, expected vs. actual behavior, and your Python/Streamlit version.
 
 ## License
