@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Stability
+- Settings IA cleanup: moved super-admin OAuth and user administration controls from Workspace Settings into User Settings.
 - Repository replacement: published the local `mantis testing` workspace to the existing `bigmanjer/Mantis-Studio` GitHub repository, updated contributor clone guidance for the `mantis testing` checkout folder, and bumped the app version to `134.0`.
 - Full repository audit: added `scripts/full_repo_audit.py` as the canonical compile/selftest/healthcheck/pytest/static-report runner.
 - Test gate restored: full suite now passes with `245 passed` using the real Python 3.14 install.
@@ -18,9 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Auth compatibility fix: login now accepts legacy PBKDF2 account hashes and auto-migrates them to SHA-256 on successful sign-in.
 - Auth UX upgrade: redesigned onboarding screen with a consumer-style split layout and a `Continue as guest` path so users can enter the app before signing in.
 - Guest conversion flow: guests can now open `Sign in / Create account` from the sidebar and upgrade sessions without feeling blocked.
-- Account creation UX: added clearer signup requirements on the auth screen and an admin-side "Create account" panel in Workspace Settings.
+- Account creation UX: added clearer signup requirements on the auth screen and an admin-side "Create account" panel in User Settings.
 - Account role management: admins can now promote/demote users between `member` and `admin`, with safeguards to prevent removing the last admin.
-- Account admin controls: added admin-only user management in Workspace Settings (user list, enable/disable account, and password reset).
+- Account admin controls: added admin-only user management in User Settings (user list, enable/disable account, and password reset).
 - Account roles: first created account is now seeded as `admin`; later accounts default to `member`.
 - Account system: added local user sign-in/sign-up flow with secure password hashing, per-user workspace directories under `projects/users/<user_id>`, and sidebar sign-out control.
 - Editor layout cleanup: tightened chapter navigation into a single-row control cluster, cleaned sidebar chapter labels/buttons, and reduced visual clutter in editor controls.

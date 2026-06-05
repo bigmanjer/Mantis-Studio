@@ -2829,7 +2829,7 @@ def _run_ui():
                         if st.button("Continue with Google", use_container_width=True, key="auth_google_btn"):
                             ok, msg, auth_url = build_google_authorization_url(st.session_state)
                             if not ok:
-                                st.info(f"{msg} Ask the super admin to configure Google OAuth in Workspace Settings.")
+                                st.info(f"{msg} Ask the super admin to configure Google OAuth in User Settings.")
                             else:
                                 components.html(
                                     f"""
@@ -4514,6 +4514,7 @@ def _run_ui():
             if is_super_admin:
                 st.caption("The built-in ADMIN password is fixed by security policy.")
                 st.info("Use the configured ADMIN credentials for this account. Other account passwords can be reset from the Super Admin Control Center.")
+                render_super_admin_settings()
                 return
             st.caption("Password changes require your current password and issue a new one-time recovery code.")
             current_pass = st.text_input(
@@ -4567,6 +4568,247 @@ def _run_ui():
             with provider_cols[1]:
                 st.button("Microsoft not configured", disabled=True, use_container_width=True, key="user_microsoft_disabled")
 
+    def render_super_admin_settings():
+        with st.container(border=True):
+            st.markdown("### OAuth Sign-In")
+            st.caption("Configure Google sign-in. Only the built-in ADMIN account can change OAuth credentials.")
+            google_cfg = get_google_oauth_config()
+            ready, ready_msg, _ = is_google_oauth_ready()
+            if ready:
+                st.success("Google OAuth is ready.")
+            else:
+                st.info(ready_msg)
+            if not google_cfg.get("protected_storage") and not google_cfg.get("external_secret"):
+                st.warning(
+                    "Protected local secret storage is unavailable. Client secrets cannot be "
+                    "saved safely on this system. Set MANTIS_GOOGLE_CLIENT_SECRET or a "
+                    "Streamlit secret named google_client_secret."
+                )
+
+            oauth_cols = st.columns([1, 1])
+            with oauth_cols[0]:
+                google_enabled = st.toggle(
+                    "Enable Google sign-in",
+                    value=bool(google_cfg.get("enabled")),
+                    key="user_admin_google_oauth_enabled",
+                )
+                google_client_id = st.text_input(
+                    "Google Client ID",
+                    value=google_cfg.get("client_id", ""),
+                    key="user_admin_google_client_id",
+                )
+                google_redirect_uri = st.text_input(
+                    "Redirect URI",
+                    value=google_cfg.get("redirect_uri", ""),
+                    placeholder="https://mantisstudio.streamlit.app/?oauth_provider=google",
+                    key="user_admin_google_redirect_uri",
+                    help=(
+                        "Add this exact full URL to Google Authorized redirect URIs. "
+                        "Hosted: https://mantisstudio.streamlit.app/?oauth_provider=google. "
+                        "Local: http://localhost:8501/?oauth_provider=google."
+                    ),
+                )
+            with oauth_cols[1]:
+                google_scopes = st.text_input(
+                    "Scopes",
+                    value=google_cfg.get("scopes", "openid email profile"),
+                    key="user_admin_google_scopes",
+                )
+                google_secret = st.text_input(
+                    "Google Client Secret",
+                    type="password",
+                    value="",
+                    placeholder="Saved" if google_cfg.get("secret_saved") else "Paste client secret",
+                    key="user_admin_google_client_secret",
+                    help=(
+                        "Stored with Windows DPAPI on Windows. Hosted apps should use "
+                        "MANTIS_GOOGLE_CLIENT_SECRET or Streamlit secrets."
+                    ),
+                )
+                clear_google_secret = st.checkbox(
+                    "Clear saved Google secret",
+                    value=False,
+                    key="user_admin_google_clear_secret",
+                )
+                st.caption(
+                    f"Secret status: available from {google_cfg.get('secret_source')}."
+                    if google_cfg.get("secret_saved")
+                    else "Secret status: not saved."
+                )
+
+            if st.button(
+                "Save Google OAuth Settings",
+                type="primary",
+                use_container_width=True,
+                key="user_admin_save_google_oauth",
+            ):
+                ok, msg = save_google_oauth_config(
+                    enabled=google_enabled,
+                    client_id=google_client_id,
+                    client_secret=google_secret,
+                    redirect_uri=google_redirect_uri,
+                    scopes=google_scopes,
+                    clear_secret=clear_google_secret,
+                )
+                if ok:
+                    st.toast("Google OAuth settings saved.")
+                    st.rerun()
+                else:
+                    st.error(msg)
+
+        with st.container(border=True):
+            st.markdown("### Super Admin Control Center")
+            st.caption("Only the built-in ADMIN account can manage users, roles, password resets, and account status.")
+            users = auth_list_users(base_projects_dir=AppConfig.PROJECTS_DIR)
+            if not users:
+                st.info("No accounts found.")
+            else:
+                st.dataframe(
+                    [
+                        {
+                            "Email": user.get("email", ""),
+                            "Username": user.get("username", ""),
+                            "Display": user.get("display_name", ""),
+                            "Role": user.get("role", "member"),
+                            "Privilege": "Super admin" if user.get("is_super_admin") else "Standard",
+                            "Status": "Disabled" if user.get("disabled") else "Active",
+                        }
+                        for user in users
+                    ],
+                    use_container_width=True,
+                    hide_index=True,
+                )
+
+                selected_user_id = st.selectbox(
+                    "Manage user",
+                    options=[user.get("id") for user in users],
+                    format_func=lambda user_id: next(
+                        (
+                            f"{u.get('email')} ({'disabled' if u.get('disabled') else 'active'})"
+                            for u in users
+                            if u.get("id") == user_id
+                        ),
+                        user_id,
+                    ),
+                    key="user_admin_selected_user",
+                )
+                selected_user = next((u for u in users if u.get("id") == selected_user_id), None)
+
+                if selected_user:
+                    action_cols = st.columns([1, 1, 1.15])
+                    with action_cols[0]:
+                        target_disabled = bool(selected_user.get("disabled", False))
+                        disable_label = "Enable user" if target_disabled else "Disable user"
+                        if st.button(
+                            disable_label,
+                            use_container_width=True,
+                            key="user_admin_toggle_disabled",
+                        ):
+                            ok, msg = auth_set_user_disabled(
+                                actor_user_id=st.session_state.get("user_id"),
+                                target_user_id=selected_user_id,
+                                disabled=not target_disabled,
+                                base_projects_dir=AppConfig.PROJECTS_DIR,
+                            )
+                            if ok:
+                                st.toast("User status updated.")
+                                st.rerun()
+                            else:
+                                st.error(msg)
+
+                    with action_cols[1]:
+                        reset_pass = st.text_input(
+                            "Reset password",
+                            type="password",
+                            key="user_admin_reset_password",
+                            placeholder="Minimum 10 chars, mixed case, number",
+                        )
+                        if st.button(
+                            "Apply password reset",
+                            use_container_width=True,
+                            key="user_admin_reset_password_btn",
+                        ):
+                            ok, msg = auth_reset_user_password(
+                                actor_user_id=st.session_state.get("user_id"),
+                                target_user_id=selected_user_id,
+                                new_password=reset_pass,
+                                base_projects_dir=AppConfig.PROJECTS_DIR,
+                            )
+                            if ok:
+                                if "New recovery code:" in msg:
+                                    prefix, _, code = msg.partition("New recovery code:")
+                                    st.toast(prefix.strip())
+                                    st.warning(f"Give this recovery code to the user now: {code.strip()}")
+                                else:
+                                    st.toast("Password reset.")
+                                    st.rerun()
+                            else:
+                                st.error(msg)
+
+                    with action_cols[2]:
+                        role_choice = st.selectbox(
+                            "Role",
+                            options=["member", "admin"],
+                            index=1 if str(selected_user.get("role", "member")).lower() == "admin" else 0,
+                            key="user_admin_role_choice",
+                        )
+                        if st.button(
+                            "Apply role change",
+                            use_container_width=True,
+                            key="user_admin_apply_role_btn",
+                        ):
+                            ok, msg = auth_set_user_role(
+                                actor_user_id=st.session_state.get("user_id"),
+                                target_user_id=selected_user_id,
+                                role=role_choice,
+                                base_projects_dir=AppConfig.PROJECTS_DIR,
+                            )
+                            if ok:
+                                st.toast("Role updated.")
+                                st.rerun()
+                            else:
+                                st.error(msg)
+
+                with st.expander("Create account (admin)", expanded=False):
+                    st.caption("Create a new local user account without signing out.")
+                    admin_new_display_name = st.text_input(
+                        "Display name",
+                        key="user_admin_create_display_name",
+                    )
+                    admin_new_email = st.text_input(
+                        "Email",
+                        key="user_admin_create_email",
+                    )
+                    admin_new_password = st.text_input(
+                        "Password",
+                        type="password",
+                        key="user_admin_create_password",
+                    )
+                    admin_new_password_confirm = st.text_input(
+                        "Confirm password",
+                        type="password",
+                        key="user_admin_create_password_confirm",
+                    )
+                    if st.button(
+                        "Create user account",
+                        type="primary",
+                        use_container_width=True,
+                        key="user_admin_create_user_btn",
+                    ):
+                        if admin_new_password != admin_new_password_confirm:
+                            st.error("Passwords do not match.")
+                        else:
+                            ok, msg, _ = register_user(
+                                admin_new_email,
+                                admin_new_password,
+                                display_name=admin_new_display_name,
+                                base_projects_dir=AppConfig.PROJECTS_DIR,
+                            )
+                            if ok:
+                                st.toast("User account created.")
+                                st.rerun()
+                            else:
+                                st.error(msg)
     def render_workspace_settings():
         render_page_header(
             "Workspace Settings",
@@ -4654,252 +4896,6 @@ def _run_ui():
                     step=0.005,
                     key="workspace_memory_hard_threshold",
                 )
-
-        if bool(st.session_state.get("is_super_admin", False)):
-            with st.container(border=True):
-                st.markdown("### OAuth Sign-In")
-                st.caption("Configure Google sign-in. Only the built-in ADMIN account can change OAuth credentials.")
-                google_cfg = get_google_oauth_config()
-                ready, ready_msg, _ = is_google_oauth_ready()
-                if ready:
-                    st.success("Google OAuth is ready.")
-                else:
-                    st.info(ready_msg)
-                if not google_cfg.get("protected_storage") and not google_cfg.get("external_secret"):
-                    st.warning(
-                        "Protected local secret storage is unavailable. Client secrets cannot be "
-                        "saved safely on this system. Set MANTIS_GOOGLE_CLIENT_SECRET or a "
-                        "Streamlit secret named google_client_secret."
-                    )
-
-                oauth_cols = st.columns([1, 1])
-                with oauth_cols[0]:
-                    google_enabled = st.toggle(
-                        "Enable Google sign-in",
-                        value=bool(google_cfg.get("enabled")),
-                        key="workspace_google_oauth_enabled",
-                    )
-                    google_client_id = st.text_input(
-                        "Google Client ID",
-                        value=google_cfg.get("client_id", ""),
-                        key="workspace_google_client_id",
-                    )
-                    google_redirect_uri = st.text_input(
-                        "Redirect URI",
-                        value=google_cfg.get("redirect_uri", ""),
-                        placeholder="https://mantisstudio.streamlit.app/?oauth_provider=google",
-                        key="workspace_google_redirect_uri",
-                        help=(
-                            "Add this exact full URL to Google Authorized redirect URIs. "
-                            "Hosted: https://mantisstudio.streamlit.app/?oauth_provider=google. "
-                            "Local: http://localhost:8501/?oauth_provider=google."
-                        ),
-                    )
-                with oauth_cols[1]:
-                    google_scopes = st.text_input(
-                        "Scopes",
-                        value=google_cfg.get("scopes", "openid email profile"),
-                        key="workspace_google_scopes",
-                    )
-                    google_secret = st.text_input(
-                        "Google Client Secret",
-                        type="password",
-                        value="",
-                        placeholder="Saved" if google_cfg.get("secret_saved") else "Paste client secret",
-                        key="workspace_google_client_secret",
-                        help=(
-                            "Stored with Windows DPAPI on Windows. Hosted apps should use "
-                            "MANTIS_GOOGLE_CLIENT_SECRET or Streamlit secrets."
-                        ),
-                    )
-                    clear_google_secret = st.checkbox(
-                        "Clear saved Google secret",
-                        value=False,
-                        key="workspace_google_clear_secret",
-                    )
-                    st.caption(
-                        f"Secret status: available from {google_cfg.get('secret_source')}."
-                        if google_cfg.get("secret_saved")
-                        else "Secret status: not saved."
-                    )
-
-                if st.button(
-                    "Save Google OAuth Settings",
-                    type="primary",
-                    use_container_width=True,
-                    key="workspace_save_google_oauth",
-                ):
-                    ok, msg = save_google_oauth_config(
-                        enabled=google_enabled,
-                        client_id=google_client_id,
-                        client_secret=google_secret,
-                        redirect_uri=google_redirect_uri,
-                        scopes=google_scopes,
-                        clear_secret=clear_google_secret,
-                    )
-                    if ok:
-                        st.toast("Google OAuth settings saved.")
-                        st.rerun()
-                    else:
-                        st.error(msg)
-
-            with st.container(border=True):
-                st.markdown("### Super Admin Control Center")
-                st.caption("Only the built-in ADMIN account can manage users, roles, password resets, and account status.")
-                users = auth_list_users(base_projects_dir=AppConfig.PROJECTS_DIR)
-                if not users:
-                    st.info("No accounts found.")
-                else:
-                    st.dataframe(
-                        [
-                            {
-                                "Email": user.get("email", ""),
-                                "Username": user.get("username", ""),
-                                "Display": user.get("display_name", ""),
-                                "Role": user.get("role", "member"),
-                                "Privilege": "Super admin" if user.get("is_super_admin") else "Standard",
-                                "Status": "Disabled" if user.get("disabled") else "Active",
-                            }
-                            for user in users
-                        ],
-                        use_container_width=True,
-                        hide_index=True,
-                    )
-
-                    selected_user_id = st.selectbox(
-                        "Manage user",
-                        options=[user.get("id") for user in users],
-                        format_func=lambda user_id: next(
-                            (
-                                f"{u.get('email')} ({'disabled' if u.get('disabled') else 'active'})"
-                                for u in users
-                                if u.get("id") == user_id
-                            ),
-                            user_id,
-                        ),
-                        key="workspace_admin_selected_user",
-                    )
-                    selected_user = next((u for u in users if u.get("id") == selected_user_id), None)
-
-                    if selected_user:
-                        action_cols = st.columns([1, 1, 1.15])
-                        with action_cols[0]:
-                            target_disabled = bool(selected_user.get("disabled", False))
-                            disable_label = "Enable user" if target_disabled else "Disable user"
-                            if st.button(
-                                disable_label,
-                                use_container_width=True,
-                                key="workspace_admin_toggle_disabled",
-                            ):
-                                ok, msg = auth_set_user_disabled(
-                                    actor_user_id=st.session_state.get("user_id"),
-                                    target_user_id=selected_user_id,
-                                    disabled=not target_disabled,
-                                    base_projects_dir=AppConfig.PROJECTS_DIR,
-                                )
-                                if ok:
-                                    st.toast("User status updated.")
-                                    st.rerun()
-                                else:
-                                    st.error(msg)
-
-                        with action_cols[1]:
-                            reset_pass = st.text_input(
-                                "Reset password",
-                                type="password",
-                                key="workspace_admin_reset_password",
-                                placeholder="Minimum 10 chars, mixed case, number",
-                            )
-                            if st.button(
-                                "Apply password reset",
-                                use_container_width=True,
-                                key="workspace_admin_reset_password_btn",
-                            ):
-                                ok, msg = auth_reset_user_password(
-                                    actor_user_id=st.session_state.get("user_id"),
-                                    target_user_id=selected_user_id,
-                                    new_password=reset_pass,
-                                    base_projects_dir=AppConfig.PROJECTS_DIR,
-                                )
-                                if ok:
-                                    if "New recovery code:" in msg:
-                                        prefix, _, code = msg.partition("New recovery code:")
-                                        st.toast(prefix.strip())
-                                        st.warning(f"Give this recovery code to the user now: {code.strip()}")
-                                    else:
-                                        st.toast("Password reset.")
-                                        st.rerun()
-                                else:
-                                    st.error(msg)
-
-                        with action_cols[2]:
-                            role_choice = st.selectbox(
-                                "Role",
-                                options=["member", "admin"],
-                                index=1 if str(selected_user.get("role", "member")).lower() == "admin" else 0,
-                                key="workspace_admin_role_choice",
-                            )
-                            if st.button(
-                                "Apply role change",
-                                use_container_width=True,
-                                key="workspace_admin_apply_role_btn",
-                            ):
-                                ok, msg = auth_set_user_role(
-                                    actor_user_id=st.session_state.get("user_id"),
-                                    target_user_id=selected_user_id,
-                                    role=role_choice,
-                                    base_projects_dir=AppConfig.PROJECTS_DIR,
-                                )
-                                if ok:
-                                    st.toast("Role updated.")
-                                    st.rerun()
-                                else:
-                                    st.error(msg)
-
-                    with st.expander("Create account (admin)", expanded=False):
-                        st.caption("Create a new local user account without signing out.")
-                        admin_new_display_name = st.text_input(
-                            "Display name",
-                            key="workspace_admin_create_display_name",
-                        )
-                        admin_new_email = st.text_input(
-                            "Email",
-                            key="workspace_admin_create_email",
-                        )
-                        admin_new_password = st.text_input(
-                            "Password",
-                            type="password",
-                            key="workspace_admin_create_password",
-                        )
-                        admin_new_password_confirm = st.text_input(
-                            "Confirm password",
-                            type="password",
-                            key="workspace_admin_create_password_confirm",
-                        )
-                        if st.button(
-                            "Create user account",
-                            type="primary",
-                            use_container_width=True,
-                            key="workspace_admin_create_user_btn",
-                        ):
-                            if admin_new_password != admin_new_password_confirm:
-                                st.error("Passwords do not match.")
-                            else:
-                                ok, msg, _ = register_user(
-                                    admin_new_email,
-                                    admin_new_password,
-                                    display_name=admin_new_display_name,
-                                    base_projects_dir=AppConfig.PROJECTS_DIR,
-                                )
-                                if ok:
-                                    st.toast("User account created.")
-                                    st.rerun()
-                                else:
-                                    st.error(msg)
-        else:
-            with st.container(border=True):
-                st.markdown("### User Administration")
-                st.caption("Only the built-in ADMIN account can manage users and roles.")
 
         if st.button("Save Workspace Settings", type="primary", use_container_width=True, key="workspace_save"):
             data = load_app_config()

@@ -8,7 +8,7 @@ code flow.
 1. Open Google Cloud Console and create or select a project.
 2. Configure the OAuth consent screen.
 3. Create an OAuth client of type Web application.
-4. Add the exact redirect URI shown in MANTIS Workspace Settings.
+4. Add the exact redirect URI shown in MANTIS User Settings.
    For the hosted Streamlit app this is:
 
    `https://mantisstudio.streamlit.app/?oauth_provider=google`
@@ -21,7 +21,7 @@ code flow.
    URL, including `https://` and `?oauth_provider=google`.
 
 5. Sign in as the built-in `ADMIN` account.
-6. Open `Workspace Settings -> OAuth Sign-In`.
+6. Open `User Settings -> OAuth Sign-In`.
 7. Enable Google sign-in and paste:
    - Google Client ID
    - Google Client Secret
@@ -41,7 +41,7 @@ app config instead:
 - Alternate Streamlit secret: `oauth_google_client_secret`
 
 When one of these secure external secrets is present, MANTIS uses it for Google
-OAuth and does not need to save the secret from Workspace Settings.
+OAuth and does not need to save the secret from User Settings.
 
 ## Account Linking
 
@@ -54,7 +54,7 @@ The built-in `ADMIN` account cannot be claimed through OAuth.
 ## Troubleshooting
 
 - `Google OAuth missing: redirect URI` means the super admin has not saved a
-  redirect URI in Workspace Settings.
+  redirect URI in User Settings.
 - `redirect URI must be a full URL` means the value is missing `http://` or
   `https://`.
 - `redirect URI must include ?oauth_provider=google` means MANTIS cannot tell

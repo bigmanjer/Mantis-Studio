@@ -84,13 +84,14 @@ def render_dashboard_workspace(
             st.markdown("#### Current focus")
             st.markdown(f"### {project_title}")
             st.caption(latest_chapter_label)
+            st.markdown("#### Quick jump")
             action_row = st.columns(5)
             with action_row[0]:
                 if st.button(
                     "Continue writing",
                     use_container_width=True,
                     disabled=not recent_projects,
-                    key="dashboard_resume_writing",
+                    key="qa_chapters",
                 ):
                     on_resume_writing()
             with action_row[1]:
@@ -98,7 +99,7 @@ def render_dashboard_workspace(
                     "Open outline",
                     use_container_width=True,
                     disabled=not recent_projects,
-                    key="dashboard_open_outline",
+                    key="qa_outline",
                 ):
                     on_open_outline()
             with action_row[2]:
@@ -106,7 +107,7 @@ def render_dashboard_workspace(
                     "World Bible",
                     use_container_width=True,
                     disabled=not recent_projects,
-                    key="dashboard_focus_world",
+                    key="qa_world",
                 ):
                     on_open_world()
             with action_row[3]:
@@ -114,7 +115,7 @@ def render_dashboard_workspace(
                     "Memory",
                     use_container_width=True,
                     disabled=not recent_projects,
-                    key="dashboard_focus_memory",
+                    key="qa_memory",
                 ):
                     on_open_memory()
             with action_row[4]:
@@ -132,7 +133,7 @@ def render_dashboard_workspace(
                     "Insights",
                     use_container_width=True,
                     disabled=not recent_projects,
-                    key="dashboard_focus_insights",
+                    key="qa_insights",
                 ):
                     on_open_insights()
 
