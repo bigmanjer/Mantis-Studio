@@ -1973,6 +1973,14 @@ class TestMantisModelAndArchitectUX:
         assert "build_context_packet" in source
         assert "### Canon Intelligence" in source
 
+    def test_insights_contains_actionable_coherence_panel(self):
+        source = (ROOT / "app" / "main.py").read_text(encoding="utf-8")
+        assert "def render_coherence_panel" in source
+        assert 'render_coherence_panel(p, key_prefix="insights", title="Coherence Check")' in source
+        assert "What Apply Fix will do" in source
+        assert "replace the exact target text" in source
+        assert "append the suggested rewrite to the end of this chapter" in source
+
     def test_high_confidence_world_bible_updates_auto_apply(self):
         source = (ROOT / "app" / "main.py").read_text(encoding="utf-8")
         threshold_gate = source.index("if confidence < world_threshold:")

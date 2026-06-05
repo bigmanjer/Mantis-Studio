@@ -95,7 +95,7 @@ def get_app_version() -> str:
         # Never block app start on version metadata.
         pass
 
-    return "134.1"
+    return "134.2"
 
 
 def _safe_int_env(env_var: str, default: int) -> int:
@@ -1747,6 +1747,208 @@ def _run_ui():
             except (TypeError, ValueError):
                 pass
         st.session_state["locked_chapters"] = locked
+
+    def _coherence_issue_chapter(project: Project, issue: Dict[str, Any]) -> Optional[Chapter]:
+        try:
+            chapter_num = int(issue.get("chapter_index", -1))
+        except (TypeError, ValueError):
+            return None
+        for chapter in project.get_ordered_chapters():
+            if chapter.index == chapter_num:
+                return chapter
+        return None
+
+    def _coherence_fix_plan(project: Project, issue: Dict[str, Any]) -> Dict[str, Any]:
+        chapter = _coherence_issue_chapter(project, issue)
+        target_excerpt = (issue.get("target_excerpt") or "").strip()
+        suggested_rewrite = (issue.get("suggested_rewrite") or "").strip()
+        chapter_text = (chapter.content or "") if chapter else ""
+        can_replace = bool(chapter and target_excerpt and target_excerpt in chapter_text)
+        can_append = bool(chapter and suggested_rewrite and not can_replace)
+        if can_replace:
+            action = "replace"
+            effect = "Apply Fix will replace the exact target text in this chapter with the suggested rewrite."
+        elif can_append:
+            action = "append"
+            effect = "Apply Fix cannot find the exact target text, so it will append the suggested rewrite to the end of this chapter."
+        elif chapter:
+            action = "blocked"
+            effect = "Apply Fix is unavailable because the issue has no usable suggested rewrite."
+        else:
+            action = "blocked"
+            effect = "Apply Fix is unavailable because MANTIS cannot find the referenced chapter."
+        return {
+            "chapter": chapter,
+            "target_excerpt": target_excerpt,
+            "suggested_rewrite": suggested_rewrite,
+            "action": action,
+            "effect": effect,
+        }
+
+    def _apply_coherence_issue(project: Project, results: List[Dict[str, Any]], idx: int) -> str:
+        if idx < 0 or idx >= len(results):
+            return "Issue no longer exists."
+        issue = results[idx]
+        plan = _coherence_fix_plan(project, issue)
+        chapter = plan["chapter"]
+        if not chapter:
+            return "Chapter not found for this issue."
+        if plan["action"] == "replace":
+            updated = (chapter.content or "").replace(
+                plan["target_excerpt"],
+                plan["suggested_rewrite"],
+                1,
+            )
+            chapter.update_content(updated, "Coherence Fix")
+        elif plan["action"] == "append":
+            insertion = plan["suggested_rewrite"].strip()
+            if not insertion:
+                return "No suggested rewrite to apply."
+            spacer = "\n\n" if (chapter.content or "").strip() else ""
+            updated = f"{(chapter.content or '').rstrip()}{spacer}{insertion}"
+            chapter.update_content(updated, "Coherence Fix (Appended)")
+        else:
+            return plan["effect"]
+        persist_project(project)
+        results.pop(idx)
+        st.session_state["coherence_results"] = results
+        update_locked_chapters()
+        return "Applied fix." if plan["action"] == "replace" else "Applied fix by appending it to the chapter."
+
+    def render_coherence_panel(project: Project, *, key_prefix: str, title: str = "Coherence Check") -> None:
+        st.markdown(f"### {title}")
+        st.caption("Compare outline, World Bible, memory, and chapters for contradictions. Each result shows what Apply Fix will actually change.")
+        scope_cols = st.columns(3)
+        with scope_cols[0]:
+            scope_outline = st.checkbox("Outline", value=True, key=f"{key_prefix}_coh_outline_{project.id}")
+        with scope_cols[1]:
+            scope_world = st.checkbox("World Bible", value=True, key=f"{key_prefix}_coh_world_{project.id}")
+        with scope_cols[2]:
+            scope_chapters = st.checkbox("Chapters", value=True, key=f"{key_prefix}_coh_chapters_{project.id}")
+
+        provider, active_key, _ = get_active_key_status()
+        coherence_cooldown = _cooldown_remaining(f"coherence_{project.id}", 15)
+        coherence_label = (
+            f"Run Coherence Check ({coherence_cooldown}s)"
+            if coherence_cooldown
+            else "Run Coherence Check"
+        )
+        if not active_key:
+            st.info(f"Add a {_provider_label(provider)} API key in AI Settings to run coherence checks.")
+        if st.button(
+            coherence_label,
+            use_container_width=True,
+            disabled=bool(coherence_cooldown) or not active_key,
+            key=f"{key_prefix}_coh_run_{project.id}",
+        ):
+            if not (scope_outline or scope_world or scope_chapters):
+                st.warning("Choose at least one scope (Outline, World Bible, or Chapters).")
+                st.stop()
+            model_name = get_ai_model()
+            if not model_name:
+                st.warning("Choose an AI model in AI Settings first.")
+                st.session_state.page = "ai"
+                st.rerun()
+            _mark_action(f"coherence_{project.id}")
+            compiled_world_bible = "\n".join(
+                f"{e.name} ({e.category}): {e.description}"
+                for e in project.world_db.values()
+            )
+            chapter_payload = [
+                {
+                    "chapter_index": c.index,
+                    "summary": c.summary,
+                    "excerpt": (c.content or "")[:800],
+                }
+                for c in project.get_ordered_chapters()
+            ]
+            with st.spinner("Running coherence check..."):
+                results = AnalysisEngine.coherence_check(
+                    memory=project.memory,
+                    author_note=project.author_note,
+                    style_guide=project.style_guide,
+                    outline=project.outline if scope_outline else "",
+                    world_bible=compiled_world_bible if scope_world else "",
+                    chapters=chapter_payload if scope_chapters else [],
+                    model=model_name,
+                )
+            st.session_state["coherence_results"] = results or []
+            canon_icon, _canon_label = get_canon_health()
+            st.session_state.setdefault("canon_health_log", [])
+            st.session_state["canon_health_log"].append(
+                {
+                    "timestamp": time.time(),
+                    "status": canon_icon,
+                    "issue_count": len(st.session_state.get("coherence_results", [])),
+                }
+            )
+            st.session_state["canon_health_log"] = st.session_state["canon_health_log"][-30:]
+            st.toast("Coherence issues found." if results else "No coherence issues detected.")
+            st.rerun()
+
+        results = st.session_state.get("coherence_results", [])
+        if not results:
+            st.success("No open coherence issues.")
+            return
+
+        st.markdown("#### Open Coherence Issues")
+        for idx, issue in enumerate(list(results)):
+            plan = _coherence_fix_plan(project, issue)
+            chapter = plan["chapter"]
+            chapter_label = (
+                f"Chapter {chapter.index}: {chapter.title}"
+                if chapter
+                else f"Chapter {issue.get('chapter_index', '?')}"
+            )
+            with st.container(border=True):
+                st.markdown(f"**{chapter_label}**")
+                st.markdown(f"**Problem:** {issue.get('issue', 'Unspecified issue')}")
+                st.caption(f"Confidence: {issue.get('confidence', 'unknown')}")
+                st.markdown("**Why it matters**")
+                st.write("This can make future AI output follow the wrong canon, timeline, or character state.")
+                if plan["target_excerpt"]:
+                    st.markdown("**Current text MANTIS will look for**")
+                    st.code(plan["target_excerpt"], language="text")
+                else:
+                    st.warning("This issue did not include an exact target excerpt.")
+                if plan["suggested_rewrite"]:
+                    st.markdown("**Suggested replacement**")
+                    st.code(plan["suggested_rewrite"], language="text")
+                else:
+                    st.warning("This issue did not include a suggested rewrite.")
+                st.markdown("**What Apply Fix will do**")
+                if plan["action"] == "append":
+                    st.warning(plan["effect"])
+                elif plan["action"] == "blocked":
+                    st.error(plan["effect"])
+                else:
+                    st.info(plan["effect"])
+
+                a1, a2, a3 = st.columns(3)
+                with a1:
+                    if st.button(
+                        "Apply Fix",
+                        key=f"{key_prefix}_coh_apply_{idx}",
+                        use_container_width=True,
+                        disabled=plan["action"] == "blocked",
+                    ):
+                        message = _apply_coherence_issue(project, results, idx)
+                        st.toast(message)
+                        st.rerun()
+                with a2:
+                    if st.button("Open Chapter", key=f"{key_prefix}_coh_open_{idx}", use_container_width=True, disabled=chapter is None):
+                        st.session_state.page = "chapters"
+                        st.session_state.curr_chap_id = chapter.id
+                        st.session_state.active_chapter_id = chapter.id
+                        st.session_state._force_nav = True
+                        st.rerun()
+                with a3:
+                    if st.button("Ignore", key=f"{key_prefix}_coh_ignore_{idx}", use_container_width=True):
+                        results.pop(idx)
+                        st.session_state["coherence_results"] = results
+                        update_locked_chapters()
+                        st.toast("Issue ignored.")
+                        st.rerun()
 
     LEGAL_DIR = Path(__file__).resolve().parents[1] / "legal"
 
@@ -7339,6 +7541,9 @@ def _run_ui():
                     st.info("Review flagged entities to stabilize canon.")
                 else:
                     st.success("Keep drafting. Your project health is strong.")
+
+            with st.container(border=True):
+                render_coherence_panel(p, key_prefix="insights", title="Coherence Check")
 
         with right:
             with st.container(border=True):

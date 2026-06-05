@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Stability
+- Insights workflow: added the full Coherence Check panel to Insights with explicit target text, suggested replacement, and a clear explanation of whether Apply Fix will replace or append.
 - Canon scanner fix: high-confidence World Bible suggestions now auto-apply once they meet the configured threshold, while lower-confidence suggestions stay queued for review.
 - Canon intelligence foundation: added deterministic chapter analysis for extracted facts, relationships, timeline events, memory suggestions, and canon conflicts, then surfaced latest-chapter signals in Insights.
 - Settings IA cleanup: moved super-admin OAuth and user administration controls from Workspace Settings into User Settings.

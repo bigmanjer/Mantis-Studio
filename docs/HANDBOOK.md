@@ -112,6 +112,7 @@ Rule:
   - `Show Sidebar` when collapsed
 
 - World Bible auto-apply default confidence is now `0.83` (83%); suggestions at or above the threshold apply automatically, while lower-confidence suggestions remain queued for review.
+- Insights includes Coherence Check as a primary risk workflow. Each coherence issue must explain the problem, target text, suggested replacement, and whether Apply Fix replaces exact text or appends the rewrite.
 - Footer "Back to top" uses a multi-container scroll handler for Streamlit containers.
 - Query-param page routing now includes a loop guard to prevent repeated rerun redirects.
 - Page changes trigger an auto-scroll to top so navigation always lands at the page start.

@@ -60,7 +60,7 @@ def get_app_version() -> str:
         # Never block app start on version metadata.
         pass
 
-    return "134.1"
+    return "134.2"
 
 
 class AppConfig:
