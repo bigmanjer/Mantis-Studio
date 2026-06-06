@@ -9,44 +9,12 @@ def render_editor_utility_bar(
     *,
     project: Any,
     current_chapter: Any,
-    on_open_outline: Callable[[], None],
-    on_open_world: Callable[[], None],
-    on_word_target_change: Callable[[int], None],
-) -> None:
-    with st.container(border=True):
-        utility_cols = st.columns([1.25, 1.25, 1.0])
-        with utility_cols[0]:
-            st.markdown("#### Draft status")
-            st.metric("Chapter words", f"{current_chapter.word_count:,}")
-        with utility_cols[1]:
-            st.markdown("#### Project total")
-            st.metric("All chapters", f"{project.get_total_word_count():,}")
-            save_state = (
-                "Autosave enabled"
-                if st.session_state.get("auto_save", True)
-                else "Manual save mode"
-            )
-            st.caption(save_state)
-        with utility_cols[2]:
-            avg_target = st.number_input(
-                "AI avg/chapter",
-                min_value=200,
-                max_value=6000,
-                step=50,
-                value=int(project.default_word_count or 1000),
-                key=f"editor_default_word_avg_{project.id}",
-                help="Fallback length target for AI chapter generation.",
-            )
-            if int(avg_target) != int(project.default_word_count or 1000):
-                on_word_target_change(int(avg_target))
-            st.caption("Fallback target")
-
-
-def render_chapter_sidebar(
-    *,
     chapters: List[Dict[str, Any]],
-    current_chapter_id: str,
     on_select: Callable[[str], None],
+    on_previous: Callable[[], None],
+    on_next: Callable[[], None],
+    previous_disabled: bool,
+    next_disabled: bool,
     on_create_next: Callable[[], None],
     on_delete_current: Callable[[], None],
     delete_pending: bool,
@@ -54,53 +22,77 @@ def render_chapter_sidebar(
     on_cancel_delete: Callable[[], None],
 ) -> None:
     with st.container(border=True):
-        st.markdown("### Chapters")
-        for chapter in chapters:
-            chapter_id = chapter.get("id")
-            chapter_words = int(chapter.get("word_count") or 0)
-            raw_title = chapter.get("title") or "Untitled"
-            short_title = raw_title if len(raw_title) <= 22 else f"{raw_title[:19]}..."
-            label = f"{chapter.get('index', 0)}. {short_title} ({chapter_words})"
+        st.markdown("### Chapter Flow")
+        chapter_ids = [chapter.get("id") for chapter in chapters if chapter.get("id")]
+        current_index = chapter_ids.index(current_chapter.id) if current_chapter.id in chapter_ids else 0
+        chapter_lookup = {chapter.get("id"): chapter for chapter in chapters if chapter.get("id")}
+
+        def _chapter_label(chapter_id: str) -> str:
+            chapter = chapter_lookup.get(chapter_id, {})
+            index = chapter.get("index", 0)
+            title = chapter.get("title") or "Untitled"
+            words = int(chapter.get("word_count") or 0)
+            return f"{index}. {title} ({words:,} words)"
+
+        flow_cols = st.columns([0.85, 0.85, 3.4, 1.0, 1.0])
+        with flow_cols[0]:
             if st.button(
-                label,
-                key=f"n_{chapter_id}",
-                type="primary" if chapter_id == current_chapter_id else "secondary",
+                "Previous",
                 use_container_width=True,
+                disabled=previous_disabled,
+                key=f"editor_flow_prev_{current_chapter.id}",
             ):
-                on_select(chapter_id)
-
-        st.divider()
-        if st.button(
-            "New Chapter",
-            use_container_width=True,
-            help="Create a new chapter in this project.",
-            key="editor_new_chapter",
-        ):
-            on_create_next()
-
+                on_previous()
+        with flow_cols[1]:
+            if st.button(
+                "Next",
+                use_container_width=True,
+                disabled=next_disabled,
+                key=f"editor_flow_next_{current_chapter.id}",
+            ):
+                on_next()
+        with flow_cols[2]:
+            selected_chapter_id = st.selectbox(
+                "Chapter",
+                chapter_ids,
+                index=current_index,
+                format_func=_chapter_label,
+                key=f"editor_chapter_flow_select_{project.id}_{current_chapter.id}",
+            )
+            if selected_chapter_id != current_chapter.id:
+                on_select(selected_chapter_id)
+        with flow_cols[3]:
+            if st.button(
+                "New",
+                use_container_width=True,
+                key="editor_flow_new_chapter",
+                help="Create a new chapter in this project.",
+            ):
+                on_create_next()
+        with flow_cols[4]:
+            if st.button(
+                "Delete",
+                use_container_width=True,
+                key=f"editor_flow_delete_{current_chapter.id}",
+            ):
+                st.session_state.delete_chapter_id = current_chapter.id
+                st.session_state.delete_chapter_title = current_title
+                st.rerun()
         if delete_pending:
             st.warning(f"Delete **{current_title}**?")
-            cdel1, cdel2 = st.columns(2)
-            with cdel1:
+            confirm_cols = st.columns([1, 1, 5])
+            with confirm_cols[0]:
                 if st.button(
                     "Yes",
                     type="primary",
                     use_container_width=True,
-                    key="editor_del_ch_confirm",
+                    key="editor_flow_del_confirm",
                 ):
                     on_delete_current()
-            with cdel2:
+            with confirm_cols[1]:
                 if st.button(
                     "No",
                     use_container_width=True,
-                    key="editor_del_ch_cancel",
+                    key="editor_flow_del_cancel",
                 ):
                     on_cancel_delete()
-        elif st.button(
-            "Delete Chapter",
-            use_container_width=True,
-            key=f"editor_del_{current_chapter_id}",
-        ):
-            st.session_state.delete_chapter_id = current_chapter_id
-            st.session_state.delete_chapter_title = current_title
-            st.rerun()

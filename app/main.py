@@ -41,7 +41,6 @@ import shutil
 import sys
 import time
 import uuid
-import webbrowser
 from collections.abc import Generator
 from dataclasses import asdict, dataclass, field, fields
 from pathlib import Path
@@ -95,7 +94,7 @@ def get_app_version() -> str:
         # Never block app start on version metadata.
         pass
 
-    return "134.2"
+    return "135.4"
 
 
 def _safe_int_env(env_var: str, default: int) -> int:
@@ -155,6 +154,7 @@ class AppConfig:
     
     # Documentation URLs
     GETTING_STARTED_URL = "https://github.com/bigmanjer/Mantis-Studio/blob/main/docs/HANDBOOK.md"
+    CHANGELOG_URL = "https://github.com/bigmanjer/Mantis-Studio/blob/main/docs/CHANGELOG.md"
 
 
 os.makedirs(AppConfig.PROJECTS_DIR, exist_ok=True)
@@ -1516,7 +1516,7 @@ def _run_ui():
     import streamlit.components.v1 as components
     from contextlib import contextmanager
     from pathlib import Path
-    from app.components.ui import action_card, card, primary_button, section_header, stat_tile
+    from app.components.buttons import action_card, card, primary_button, section_header, stat_tile
     from app.ui.components import card_block, cta_tile, empty_state, header_bar, render_tag_list
     from app.ui.ui_layout import render_card, render_metric, render_section_header
     from app.layout.layout import render_footer
@@ -1758,24 +1758,134 @@ def _run_ui():
                 return chapter
         return None
 
+    def _normalized_text_with_map(text: str) -> tuple[str, List[int]]:
+        normalized = []
+        index_map = []
+        in_space = False
+        for idx, char in enumerate(text or ""):
+            if char.isspace():
+                if normalized and not in_space:
+                    normalized.append(" ")
+                    index_map.append(idx)
+                in_space = True
+                continue
+            normalized.append(char)
+            index_map.append(idx)
+            in_space = False
+        while normalized and normalized[-1] == " ":
+            normalized.pop()
+            index_map.pop()
+        return "".join(normalized), index_map
+
+    def _normalized_replacement_span(chapter_text: str, target_excerpt: str) -> Optional[tuple[int, int]]:
+        haystack, index_map = _normalized_text_with_map(chapter_text)
+        needle, _ = _normalized_text_with_map(target_excerpt)
+        if not haystack or not needle:
+            return None
+        match_at = haystack.lower().find(needle.lower())
+        if match_at < 0:
+            return None
+        start = index_map[match_at]
+        end_map_index = min(match_at + len(needle) - 1, len(index_map) - 1)
+        end = index_map[end_map_index] + 1
+        return start, end
+
+    def _candidate_text_spans(text: str) -> List[tuple[int, int]]:
+        spans: List[tuple[int, int]] = []
+        seen = set()
+        for match in re.finditer(r"\S(?:.*?)(?=\n\s*\n|$)", text or "", flags=re.DOTALL):
+            start, end = match.span()
+            key = (start, end)
+            if key not in seen:
+                spans.append(key)
+                seen.add(key)
+        sentence_spans = [
+            match.span()
+            for match in re.finditer(r"[^.!?\n]+[.!?]?", text or "")
+            if match.group(0).strip()
+        ]
+        for group_size in (1, 2, 3):
+            for idx in range(0, max(0, len(sentence_spans) - group_size + 1)):
+                start = sentence_spans[idx][0]
+                end = sentence_spans[idx + group_size - 1][1]
+                key = (start, end)
+                if key not in seen:
+                    spans.append(key)
+                    seen.add(key)
+        return spans
+
+    def _fuzzy_replacement_span(chapter_text: str, target_excerpt: str) -> Optional[tuple[int, int, float]]:
+        target_norm, _ = _normalized_text_with_map(target_excerpt.lower())
+        if len(target_norm) < 24:
+            return None
+        best: Optional[tuple[int, int, float]] = None
+        for start, end in _candidate_text_spans(chapter_text):
+            candidate = chapter_text[start:end].strip()
+            candidate_norm, _ = _normalized_text_with_map(candidate.lower())
+            if not candidate_norm:
+                continue
+            score = difflib.SequenceMatcher(None, target_norm, candidate_norm).ratio()
+            if best is None or score > best[2]:
+                best = (start, end, score)
+        if best and best[2] >= 0.72:
+            return best
+        return None
+
     def _coherence_fix_plan(project: Project, issue: Dict[str, Any]) -> Dict[str, Any]:
         chapter = _coherence_issue_chapter(project, issue)
         target_excerpt = (issue.get("target_excerpt") or "").strip()
         suggested_rewrite = (issue.get("suggested_rewrite") or "").strip()
         chapter_text = (chapter.content or "") if chapter else ""
+        if chapter and not suggested_rewrite:
+            return {
+                "chapter": chapter,
+                "target_excerpt": target_excerpt,
+                "suggested_rewrite": suggested_rewrite,
+                "action": "blocked",
+                "effect": "Apply Fix is unavailable because the issue has no usable suggested rewrite.",
+                "start": None,
+                "end": None,
+                "match_score": 0.0,
+                "matched_text": "",
+            }
         can_replace = bool(chapter and target_excerpt and target_excerpt in chapter_text)
-        can_append = bool(chapter and suggested_rewrite and not can_replace)
+        normalized_span = (
+            _normalized_replacement_span(chapter_text, target_excerpt)
+            if chapter and target_excerpt
+            else None
+        )
+        fuzzy_span = (
+            _fuzzy_replacement_span(chapter_text, target_excerpt)
+            if chapter and target_excerpt and not can_replace and not normalized_span
+            else None
+        )
         if can_replace:
             action = "replace"
             effect = "Apply Fix will replace the exact target text in this chapter with the suggested rewrite."
-        elif can_append:
-            action = "append"
-            effect = "Apply Fix cannot find the exact target text, so it will append the suggested rewrite to the end of this chapter."
+            start = chapter_text.find(target_excerpt)
+            end = start + len(target_excerpt)
+            match_score = 1.0
+        elif normalized_span:
+            action = "replace_normalized"
+            effect = "Apply Fix will replace the matching passage after normalizing line breaks and spacing."
+            start, end = normalized_span
+            match_score = 1.0
+        elif fuzzy_span:
+            action = "replace_fuzzy"
+            start, end, match_score = fuzzy_span
+            effect = f"Apply Fix will replace the closest matching passage MANTIS found (match {match_score:.0%})."
         elif chapter:
             action = "blocked"
-            effect = "Apply Fix is unavailable because the issue has no usable suggested rewrite."
+            start = end = None
+            match_score = 0.0
+            if suggested_rewrite:
+                effect = "Apply Fix is blocked because MANTIS could not confidently locate the passage to replace. Use Open Chapter and the copy-ready replacement below."
+            else:
+                effect = "Apply Fix is unavailable because the issue has no usable suggested rewrite."
         else:
             action = "blocked"
+            start = end = None
+            match_score = 0.0
             effect = "Apply Fix is unavailable because MANTIS cannot find the referenced chapter."
         return {
             "chapter": chapter,
@@ -1783,6 +1893,10 @@ def _run_ui():
             "suggested_rewrite": suggested_rewrite,
             "action": action,
             "effect": effect,
+            "start": start,
+            "end": end,
+            "match_score": match_score,
+            "matched_text": chapter_text[start:end].strip() if start is not None and end is not None else "",
         }
 
     def _apply_coherence_issue(project: Project, results: List[Dict[str, Any]], idx: int) -> str:
@@ -1793,27 +1907,21 @@ def _run_ui():
         chapter = plan["chapter"]
         if not chapter:
             return "Chapter not found for this issue."
-        if plan["action"] == "replace":
-            updated = (chapter.content or "").replace(
-                plan["target_excerpt"],
-                plan["suggested_rewrite"],
-                1,
-            )
+        if plan["action"] in {"replace", "replace_normalized", "replace_fuzzy"}:
+            start = plan.get("start")
+            end = plan.get("end")
+            if start is None or end is None:
+                return "MANTIS could not locate the passage to replace."
+            original = chapter.content or ""
+            updated = f"{original[:start]}{plan['suggested_rewrite']}{original[end:]}"
             chapter.update_content(updated, "Coherence Fix")
-        elif plan["action"] == "append":
-            insertion = plan["suggested_rewrite"].strip()
-            if not insertion:
-                return "No suggested rewrite to apply."
-            spacer = "\n\n" if (chapter.content or "").strip() else ""
-            updated = f"{(chapter.content or '').rstrip()}{spacer}{insertion}"
-            chapter.update_content(updated, "Coherence Fix (Appended)")
         else:
             return plan["effect"]
         persist_project(project)
         results.pop(idx)
         st.session_state["coherence_results"] = results
         update_locked_chapters()
-        return "Applied fix." if plan["action"] == "replace" else "Applied fix by appending it to the chapter."
+        return "Applied fix."
 
     def render_coherence_panel(project: Project, *, key_prefix: str, title: str = "Coherence Check") -> None:
         st.markdown(f"### {title}")
@@ -1906,20 +2014,28 @@ def _run_ui():
                 st.caption(f"Confidence: {issue.get('confidence', 'unknown')}")
                 st.markdown("**Why it matters**")
                 st.write("This can make future AI output follow the wrong canon, timeline, or character state.")
-                if plan["target_excerpt"]:
-                    st.markdown("**Current text MANTIS will look for**")
+                if plan["matched_text"]:
+                    st.markdown("**Current text MANTIS will replace**")
+                    st.code(plan["matched_text"], language="text")
+                elif plan["target_excerpt"]:
+                    st.markdown("**Target text from the issue**")
                     st.code(plan["target_excerpt"], language="text")
                 else:
                     st.warning("This issue did not include an exact target excerpt.")
                 if plan["suggested_rewrite"]:
                     st.markdown("**Suggested replacement**")
                     st.code(plan["suggested_rewrite"], language="text")
+                    if plan["action"] == "blocked":
+                        st.text_area(
+                            "Copy-ready replacement",
+                            value=plan["suggested_rewrite"],
+                            height=120,
+                            key=f"{key_prefix}_coh_copy_text_{idx}",
+                        )
                 else:
                     st.warning("This issue did not include a suggested rewrite.")
                 st.markdown("**What Apply Fix will do**")
-                if plan["action"] == "append":
-                    st.warning(plan["effect"])
-                elif plan["action"] == "blocked":
+                if plan["action"] == "blocked":
                     st.error(plan["effect"])
                 else:
                     st.info(plan["effect"])
@@ -2607,11 +2723,7 @@ def _run_ui():
     init_state("groq_model_list", [])
     init_state("groq_model_tests", {})
     init_state("_force_nav", False)
-    init_state("_scroll_top_nonce", 0)
-    init_state("_last_scroll_top_nonce", -1)
     init_state("_last_rendered_page", "")
-    init_state("memory_auto_soft_enabled", bool(config_data.get("memory_auto_soft_enabled", AppConfig.WORLD_MEMORY_AUTO_SOFT)))
-    init_state("memory_auto_soft_threshold", float(config_data.get("memory_auto_soft_threshold", AppConfig.WORLD_MEMORY_SOFT_CONFIDENCE)))
     init_state("memory_auto_hard_enabled", bool(config_data.get("memory_auto_hard_enabled", AppConfig.WORLD_MEMORY_AUTO_HARD)))
     init_state("memory_auto_hard_threshold", float(config_data.get("memory_auto_hard_threshold", AppConfig.WORLD_MEMORY_HARD_CONFIDENCE)))
 
@@ -2632,15 +2744,10 @@ def _run_ui():
         except Exception:
             return bool(st.session_state.get("debug"))
 
-    def _mark_scroll_top() -> None:
-        st.session_state["_scroll_top_nonce"] = int(st.session_state.get("_scroll_top_nonce", 0)) + 1
-        st.session_state["_scroll_top_pending"] = True
-
     def navigate_to_page(page_key: str, *, rerun: bool = True) -> None:
         current_page = st.session_state.get("page")
         if page_key != current_page:
             st.session_state.page = page_key
-        _mark_scroll_top()
         if rerun:
             st.rerun()
 
@@ -2663,91 +2770,54 @@ def _run_ui():
         save_app_config(config)
         return True
 
-    def check_and_show_whats_new() -> None:
-        """Check if app version has changed and show What's New notification."""
-        config = load_app_config()
-        last_seen_version = config.get("last_seen_version", "")
-        current_version = AppConfig.VERSION
+    def _release_highlights() -> List[tuple[str, str]]:
+        return [
+            ("Editor", "Chapter Flow now uses a compact chapter dropdown with Previous, Next, New, and Delete actions."),
+            ("Editor", "Find and replace now defaults to the first exact match, has optional all-match scope, and shows Undo replacement only after use."),
+            ("Insights", "Canon Scanner, queued canon suggestions, and Coherence Check now live in Insights so risk review happens in one place."),
+            ("Insights", "Relationship graph moved out of World Bible and into Insights with the rest of project health review."),
+            ("Canon Intelligence", "Latest-chapter analysis now catches more real facts, events, relationships, locations, roles, and items while ignoring transient eye/body motions."),
+            ("Navigation", "Insights now appears before Memory in sidebar, footer, and dashboard quick actions."),
+            ("Cleanup", "Legacy duplicate runtime and UI compatibility shims were removed so the app has fewer competing code paths."),
+        ]
 
-        # Check if this is a new version
-        if last_seen_version and last_seen_version != current_version:
-            # Show What's New banner
-            with st.container(border=True):
-                st.markdown("### What's New in Mantis Studio")
-                st.markdown(f"""
-                **Version {current_version} is now available!** (Updated from {last_seen_version})
-                
-                **What Changed:**
-                - **NEW**: You can now see what changed between versions!
-                  - This notification system was added to address user feedback
-                  - Version updates are now visible and transparent
-                - **Improved**: Complete changelog documentation for all recent versions
-                - **Enhanced**: Better version tracking and update notifications
-                
-                **Why This Matters:**
-                - You previously reported: "merged 4 times now with no changed from users point of view"
-                - This fix ensures you always know when the app updates and what's new
-                - All future updates will show clear release notes
-                
-                **See the [full changelog](https://github.com/bigmanjer/Mantis-Studio/blob/main/docs/CHANGELOG.md) for complete details**
-                """)
-                
-                col1, col2 = st.columns([1, 1])
-                with col1:
-                    if st.button("Got it, thanks!", use_container_width=True, type="primary"):
-                        # Update last seen version
-                        config["last_seen_version"] = current_version
-                        save_app_config(config)
-                        st.rerun()
-                with col2:
-                    if st.button("View Full Changelog", use_container_width=True):
-                        webbrowser.open("https://github.com/bigmanjer/Mantis-Studio/blob/main/docs/CHANGELOG.md")
-                        config["last_seen_version"] = current_version
-                        save_app_config(config)
-                        st.rerun()
-        elif not last_seen_version:
-            # First time user - set version silently
-            config["last_seen_version"] = current_version
-            save_app_config(config)
+    def render_release_summary(*, compact: bool = False) -> None:
+        st.markdown("**Latest update highlights**" if compact else "**What changed:**")
+        max_items = 4 if compact else len(_release_highlights())
+        for area, summary in _release_highlights()[:max_items]:
+            st.markdown(f"- **{area}:** {summary}")
+        st.caption("For complete details, open the changelog.")
 
     def render_welcome_banner(context: str) -> None:
         """Show helpful context-aware guidance for first-time users."""
-        # Show What's New banner if version changed
-        if context == "home":
-            check_and_show_whats_new()
-
         if context == "home" and st.session_state.get("first_run", True):
             provider, active_key, _ = get_active_key_status()
             with st.container(border=True):
                 st.markdown("### Welcome to MANTIS Studio")
-                st.caption("Plan your story. Write your draft. Keep canon consistent.")
-                col_a, col_b = st.columns(2)
-                with col_a:
-                    st.markdown("**Start here**")
-                    st.markdown(
-                        f"""
-                        - Create your first project from **Projects**
-                        - Build an outline before drafting chapters
-                        - Follow the [Getting Started Guide]({AppConfig.GETTING_STARTED_URL})
-                        - Projects auto-save locally to your workspace
-                        """
-                    )
-                with col_b:
-                    st.markdown("**Core workflow**")
-                    st.markdown(
-                        """
-                        1. Outline your narrative structure  
-                        2. Draft chapters in the editor  
-                        3. Use World Bible to track canon  
-                        4. Export when the manuscript is ready
-                        """
-                    )
+                st.caption("Plan the story, draft chapters, and keep canon stable from one workspace.")
+                intro_cols = st.columns(3)
+                with intro_cols[0]:
+                    st.markdown("**1. Start**")
+                    st.markdown("Create a project, set the premise, and outline the major beats.")
+                with intro_cols[1]:
+                    st.markdown("**2. Write**")
+                    st.markdown("Draft chapters in Editor. Save Chapter scans useful canon into the World Bible.")
+                with intro_cols[2]:
+                    st.markdown("**3. Review**")
+                    st.markdown("Use Insights to review risks, canon suggestions, coherence, and story health.")
                 if not active_key:
                     st.info(
                         f"AI is optional to start. Connect {_provider_label(provider)} in AI Settings when you're ready for generation and summaries."
                     )
                 else:
                     st.success("AI is connected. Generation, summaries, and entity scans are ready.")
+                st.divider()
+                render_release_summary(compact=True)
+                docs_cols = st.columns([1, 1])
+                with docs_cols[0]:
+                    st.link_button("Getting Started Guide", AppConfig.GETTING_STARTED_URL, use_container_width=True)
+                with docs_cols[1]:
+                    st.link_button("Open changelog", AppConfig.CHANGELOG_URL, use_container_width=True)
                 col1, col2, col3 = st.columns(3)
                 with col1:
                     if st.button("Create my first project", use_container_width=True, type="primary", key="welcome_create_first"):
@@ -2770,6 +2840,26 @@ def _run_ui():
 
     def render_app_footer() -> None:
         render_footer(AppConfig.VERSION)
+
+    def _render_page_position_reset() -> None:
+        """Reset the app shell to the top once when the active page changes."""
+        components.html(
+            """
+            <script>
+            (function () {
+                try {
+                    const win = window.parent || window;
+                    const doc = win.document || document;
+                    const top = doc.getElementById("mantis-top");
+                    if (top && typeof top.scrollIntoView === "function") {
+                        top.scrollIntoView({ block: "start", inline: "nearest" });
+                    }
+                } catch (_) {}
+            })();
+            </script>
+            """,
+            height=0,
+        )
 
     def _render_header_bar(recent_projects: List[Dict[str, Any]]) -> None:
         logo_bytes = load_first_asset_bytes(
@@ -2921,20 +3011,38 @@ def _run_ui():
         if st.session_state.get("guest_mode") and not st.session_state.get("show_auth_gate"):
             return True
 
+        auth_lockup = asset_base64("branding/mantis_lockup.png")
+        auth_lockup_img = (
+            f'<img class="mantis-auth-logo" src="data:image/png;base64,{auth_lockup}" alt="MANTIS Studio" />'
+            if auth_lockup
+            else '<div class="mantis-auth-wordmark">MANTIS Studio</div>'
+        )
+
         st.html(
             """
             <style>
+            .mantis-auth-shell {
+                padding-top: 0.15rem;
+            }
             .mantis-auth-hero {
-                min-height: 430px;
-                padding: 1.35rem 1.2rem;
-                border-radius: 18px;
-                border: 1px solid var(--mantis-card-border);
-                background:
-                    radial-gradient(circle at 18% 18%, rgba(35,247,192,0.22), transparent 34%),
-                    linear-gradient(145deg, rgba(46,125,50,0.18), rgba(15,20,29,0.22));
+                padding: 0.95rem 1rem 0.8rem;
                 display: flex;
                 flex-direction: column;
                 justify-content: space-between;
+                gap: 0.85rem;
+            }
+            .mantis-auth-logo {
+                width: min(265px, 76%);
+                max-height: 96px;
+                object-fit: contain;
+                object-position: left center;
+                display: block;
+                margin-bottom: 0.75rem;
+            }
+            .mantis-auth-wordmark {
+                font-size: 1.25rem;
+                font-weight: 800;
+                margin-bottom: 0.8rem;
             }
             .mantis-auth-kicker {
                 letter-spacing: 0.06em;
@@ -2944,40 +3052,81 @@ def _run_ui():
                 margin-bottom: 0.35rem;
             }
             .mantis-auth-title {
-                font-size: clamp(2rem, 3vw, 3rem);
-                line-height: 1.1;
-                margin: 0 0 0.6rem 0;
+                font-size: clamp(2.15rem, 3.45vw, 3.15rem);
+                line-height: 1.04;
+                margin: 0 0 0.45rem 0;
                 font-weight: 800;
+                max-width: 15ch;
             }
             .mantis-auth-sub {
                 color: var(--mantis-muted);
-                margin-bottom: 0.8rem;
+                margin-bottom: 0.75rem;
+                max-width: 52ch;
+                font-size: 0.96rem;
             }
-            .mantis-auth-points {
-                margin: 0.5rem 0 0.85rem 0;
-                padding-left: 1.1rem;
+            .mantis-auth-workflow {
+                display: grid;
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+                gap: 0.55rem;
+                margin: 0.8rem 0;
             }
-            .mantis-auth-points li {
-                margin-bottom: 0.38rem;
+            .mantis-auth-step {
+                border: 1px solid var(--mantis-card-border);
+                border-radius: 10px;
+                padding: 0.65rem;
+                background: var(--mantis-surface-alt);
             }
-            .mantis-auth-panel-title {
-                margin-bottom: 0.1rem;
+            .mantis-auth-step strong {
+                display: block;
+                margin-bottom: 0.16rem;
             }
-            .mantis-auth-panel-sub {
+            .mantis-auth-step span {
                 color: var(--mantis-muted);
-                margin-bottom: 0.55rem;
+                font-size: 0.8rem;
+                line-height: 1.32;
             }
             .mantis-auth-id-card {
-                margin-top: 1rem;
-                padding: 0.85rem 0.95rem;
-                border-radius: 14px;
+                padding: 0.72rem 0.85rem;
+                border-radius: 10px;
                 background: var(--mantis-surface-alt);
                 border: 1px solid var(--mantis-card-border);
                 color: var(--mantis-text);
+                font-size: 0.9rem;
             }
             .mantis-auth-id-card strong {
                 display: block;
                 margin-bottom: 0.2rem;
+            }
+            .mantis-auth-panel {
+                padding: 0.25rem 0 0.5rem;
+            }
+            .mantis-auth-panel h3 {
+                margin-top: 0;
+                margin-bottom: 0.25rem;
+                font-size: clamp(1.7rem, 2.2vw, 2.12rem);
+                line-height: 1.12;
+            }
+            .mantis-auth-method-label {
+                margin: 0.8rem 0 0.35rem;
+                color: var(--mantis-muted);
+                font-size: 0.86rem;
+                text-transform: uppercase;
+                letter-spacing: 0.05em;
+            }
+            .mantis-auth-divider {
+                margin: 0.75rem 0 0.25rem;
+                border-top: 1px solid var(--mantis-card-border);
+            }
+            @media (max-width: 900px) {
+                .mantis-auth-hero {
+                    min-height: auto;
+                }
+                .mantis-auth-title {
+                    max-width: none;
+                }
+                .mantis-auth-workflow {
+                    grid-template-columns: 1fr;
+                }
             }
             </style>
             """
@@ -2985,40 +3134,55 @@ def _run_ui():
 
         _, center, _ = st.columns([0.08, 1, 0.08])
         with center:
+            st.html('<div class="mantis-auth-shell"></div>')
             hero_col, auth_col = st.columns([1.12, 1], vertical_alignment="top")
 
             with hero_col:
-                st.html(
-                    """
-                    <div class="mantis-auth-hero">
-                        <div class="mantis-auth-kicker">Narrative Studio</div>
-                        <h2 class="mantis-auth-title">Welcome to MANTIS Studio</h2>
-                        <div class="mantis-auth-sub">Write now, upgrade later. Start as guest in one click, then create an account when you want persistence and identity.</div>
-                        <ul class="mantis-auth-points">
-                            <li>Email is the only sign-in identifier</li>
-                            <li>Email unlocks local password recovery</li>
-                            <li>Your project files stay separated per account</li>
-                        </ul>
-                        <div class="mantis-auth-id-card">
-                            <strong>Sign in with email only.</strong>
-                            Account IDs are hidden from auth and can be viewed later in User Settings.
+                with st.container(border=True):
+                    st.html(
+                        f"""
+                        <div class="mantis-auth-hero">
+                            <div>
+                                {auth_lockup_img}
+                                <div class="mantis-auth-kicker">Narrative command center</div>
+                                <h2 class="mantis-auth-title">Write with your canon intact.</h2>
+                                <div class="mantis-auth-sub">Create locally, upgrade when you are ready, and keep every workspace separated by account.</div>
+                                <div class="mantis-auth-workflow">
+                                    <div class="mantis-auth-step"><strong>Plan</strong><span>Outline structure and story targets.</span></div>
+                                    <div class="mantis-auth-step"><strong>Draft</strong><span>Write chapters with AI support available.</span></div>
+                                    <div class="mantis-auth-step"><strong>Review</strong><span>Track canon risk before exporting.</span></div>
+                                </div>
+                            </div>
+                            <div class="mantis-auth-id-card">
+                                <strong>Local-first access</strong>
+                                Guest projects stay local. Email accounts add identity, recovery, and separate workspaces.
+                            </div>
                         </div>
-                    </div>
-                    """
-                )
-                st.html("<div style='height:10px;'></div>")
-                if st.button(
-                    "Continue as guest",
-                    use_container_width=True,
-                    key="auth_continue_guest",
-                ):
-                    _start_guest_session()
-                    st.rerun()
+                        """
+                    )
+                    if st.button(
+                        "Continue as guest",
+                        use_container_width=True,
+                        key="auth_continue_guest",
+                        help="Enter MANTIS without creating an account. You can upgrade later.",
+                    ):
+                        _start_guest_session()
+                        st.rerun()
 
             with auth_col:
                 with st.container(border=True):
-                    st.markdown("### Access Account")
-                    st.caption("Sign in to restore your workspace, recover a password, or create a new account.")
+                    st.html(
+                        """
+                        <div class="mantis-auth-panel">
+                            <div>
+                                <div class="mantis-auth-kicker">Account access</div>
+                                <h3>Sign in or create an account</h3>
+                                <div class="mantis-auth-sub">Restore your workspace, connect OAuth, or set up recovery for a local account.</div>
+                                <div class="mantis-auth-method-label">Connected providers</div>
+                            </div>
+                        </div>
+                        """
+                    )
                     oauth_error = st.session_state.pop("oauth_flash_error", "")
                     oauth_success = st.session_state.pop("oauth_flash_success", "")
                     if oauth_error:
@@ -3044,7 +3208,7 @@ def _run_ui():
                     with social_cols[1]:
                         if st.button("Continue with Microsoft", use_container_width=True, key="auth_microsoft_btn"):
                             st.info("Microsoft login needs OAuth app registration before it can be enabled safely.")
-                    st.divider()
+                    st.html('<div class="mantis-auth-divider"></div>')
                     auth_tabs = st.tabs(["Sign in", "Create account", "Forgot password"])
 
                     with auth_tabs[0]:
@@ -4066,11 +4230,8 @@ def _run_ui():
             st.session_state.get("world_bible_confidence_threshold", AppConfig.WORLD_BIBLE_CONFIDENCE)
         )
         world_threshold = max(0.0, min(1.0, world_threshold))
-        soft_enabled = bool(st.session_state.get("memory_auto_soft_enabled", AppConfig.WORLD_MEMORY_AUTO_SOFT))
         hard_enabled = bool(st.session_state.get("memory_auto_hard_enabled", AppConfig.WORLD_MEMORY_AUTO_HARD))
-        soft_threshold = float(st.session_state.get("memory_auto_soft_threshold", AppConfig.WORLD_MEMORY_SOFT_CONFIDENCE))
         hard_threshold = float(st.session_state.get("memory_auto_hard_threshold", AppConfig.WORLD_MEMORY_HARD_CONFIDENCE))
-        soft_threshold = max(0.0, min(1.0, soft_threshold))
         hard_threshold = max(0.0, min(1.0, hard_threshold))
 
         for e in ents:
@@ -4160,15 +4321,10 @@ def _run_ui():
             else:
                 matched += 1
 
-            # High-confidence facts can be promoted into memory automatically.
+            # High-confidence non-negotiable facts can be promoted into hard memory.
             memory_line = ""
             if desc:
                 memory_line = f"- {ent.name} ({ent.category}): {desc}"
-            if memory_line and soft_enabled and confidence >= soft_threshold:
-                updated_soft, changed = _append_unique_memory_line(p.memory_soft, memory_line)
-                if changed:
-                    p.memory_soft = updated_soft
-                    memory_soft_added += 1
             if memory_line and hard_enabled and confidence >= hard_threshold:
                 updated_hard, changed = _append_unique_memory_line(p.memory_hard, memory_line)
                 if changed:
@@ -4247,7 +4403,6 @@ def _run_ui():
             navigate_to_page(query, rerun=False)
         if handled_query != query or query != current_page:
             st.session_state["_handled_query_page"] = query
-            _mark_scroll_top()
             st.rerun()
             return
 
@@ -4972,7 +5127,7 @@ def _run_ui():
 
         with st.container(border=True):
             st.markdown("### Canon Confidence Rules")
-            st.caption("Set confidence gates for automatic World Bible and Memory updates.")
+            st.caption("Set confidence gates for automatic World Bible updates and strict hard-memory rules.")
             w_col1, w_col2 = st.columns(2)
             with w_col1:
                 wb_threshold = st.slider(
@@ -4985,19 +5140,6 @@ def _run_ui():
                 )
                 st.session_state["world_bible_confidence_threshold"] = float(wb_threshold)
             with w_col2:
-                st.session_state["memory_auto_soft_enabled"] = st.toggle(
-                    "Auto-add to Soft Guidelines",
-                    value=bool(st.session_state.get("memory_auto_soft_enabled", AppConfig.WORLD_MEMORY_AUTO_SOFT)),
-                    key="workspace_memory_soft_enabled",
-                )
-                st.session_state["memory_auto_soft_threshold"] = st.slider(
-                    "Soft memory threshold",
-                    min_value=0.75,
-                    max_value=0.99,
-                    value=float(st.session_state.get("memory_auto_soft_threshold", AppConfig.WORLD_MEMORY_SOFT_CONFIDENCE)),
-                    step=0.01,
-                    key="workspace_memory_soft_threshold",
-                )
                 st.session_state["memory_auto_hard_enabled"] = st.toggle(
                     "Auto-add to Hard Canon Rules",
                     value=bool(st.session_state.get("memory_auto_hard_enabled", AppConfig.WORLD_MEMORY_AUTO_HARD)),
@@ -5021,8 +5163,6 @@ def _run_ui():
                 "weekly_sessions_goal": int(st.session_state.get("weekly_sessions_goal", 4)),
                 "focus_minutes": int(st.session_state.get("focus_minutes", 25)),
                 "world_bible_confidence_threshold": float(st.session_state.get("world_bible_confidence_threshold", AppConfig.WORLD_BIBLE_CONFIDENCE)),
-                "memory_auto_soft_enabled": bool(st.session_state.get("memory_auto_soft_enabled", AppConfig.WORLD_MEMORY_AUTO_SOFT)),
-                "memory_auto_soft_threshold": float(st.session_state.get("memory_auto_soft_threshold", AppConfig.WORLD_MEMORY_SOFT_CONFIDENCE)),
                 "memory_auto_hard_enabled": bool(st.session_state.get("memory_auto_hard_enabled", AppConfig.WORLD_MEMORY_AUTO_HARD)),
                 "memory_auto_hard_threshold": float(st.session_state.get("memory_auto_hard_threshold", AppConfig.WORLD_MEMORY_HARD_CONFIDENCE)),
             })
@@ -5113,7 +5253,6 @@ def _run_ui():
         )
         if st.button("Show Sidebar", key="sidebar_expand", type="secondary", use_container_width=False):
             st.session_state["sidebar_collapsed"] = False
-            st.session_state["_scroll_top_nonce"] = int(st.session_state.get("_scroll_top_nonce", 0)) + 1
             st.rerun()
 
     def render_home():
@@ -5969,35 +6108,6 @@ def _run_ui():
                     p.outline = val
                     save_p()
 
-                if st.button(
-                    "Save Outline",
-                    use_container_width=True,
-                    help="Save and automatically scan for characters, locations, and other entities",
-                    key="outline_save_outline_btn",
-                ):
-                    if persist_project(p, action="save"):
-                        # Automatically scan entities on save so World Bible stays in sync.
-                        scan_result = extract_entities_ui(
-                            p.outline or "",
-                            "Outline",
-                            show_feedback=False,
-                        )
-                        if scan_result:
-                            if scan_result.get("status") == "updated":
-                                st.success(
-                                    "Outline saved and scanned: "
-                                    f"{scan_result.get('added', 0)} new, "
-                                    f"{scan_result.get('matched', 0)} existing, "
-                                    f"{scan_result.get('auto_applied', 0)} auto-applied, "
-                                    f"{scan_result.get('flagged', 0)} flagged."
-                                )
-                            elif scan_result.get("status") == "matched_only":
-                                st.info("Outline saved. Entities were detected and matched existing entries.")
-                            else:
-                                st.info("Outline saved. No entities were detected in this outline text.")
-                        else:
-                            st.success("Outline saved.")
-
                 with st.expander("Revision Tools"):
                     st.caption("Refine outline structure/tone with AI, then review before applying.")
                     if not active_key:
@@ -6041,6 +6151,21 @@ def _run_ui():
                                 "timestamp": time.time(),
                                 "project_id": p.id,
                             }
+                            st.rerun()
+
+                    prev_outline = st.session_state.get("outline_prev_text")
+                    if prev_outline is not None:
+                        if st.button(
+                            "Undo last outline apply",
+                            use_container_width=True,
+                            key=f"outline_revision_undo_{p.id}",
+                            help="Restore the previous outline text from the last apply action.",
+                        ):
+                            p.outline = prev_outline
+                            st.session_state["_outline_sync"] = p.outline
+                            st.session_state.pop("outline_prev_text", None)
+                            save_p()
+                            st.toast("Previous outline restored.")
                             st.rerun()
 
                 pending_outline = st.session_state.get("pending_outline_revision_text") or ""
@@ -6091,20 +6216,33 @@ def _run_ui():
                                 st.rerun()
 
                 if st.button(
-                    "Undo last outline apply",
+                    "Save Outline",
                     use_container_width=True,
-                    key=f"outline_revision_undo_{p.id}",
-                    help="Restore the previous outline text from the last apply action.",
+                    help="Save and automatically scan for characters, locations, and other entities",
+                    key="outline_save_outline_btn",
                 ):
-                    prev_outline = st.session_state.get("outline_prev_text")
-                    if prev_outline is None:
-                        st.info("No previous outline text available.")
-                    else:
-                        p.outline = prev_outline
-                        st.session_state["_outline_sync"] = p.outline
-                        save_p()
-                        st.toast("Previous outline restored.")
-                        st.rerun()
+                    if persist_project(p, action="save"):
+                        # Automatically scan entities on save so World Bible stays in sync.
+                        scan_result = extract_entities_ui(
+                            p.outline or "",
+                            "Outline",
+                            show_feedback=False,
+                        )
+                        if scan_result:
+                            if scan_result.get("status") == "updated":
+                                st.success(
+                                    "Outline saved and scanned: "
+                                    f"{scan_result.get('added', 0)} new, "
+                                    f"{scan_result.get('matched', 0)} existing, "
+                                    f"{scan_result.get('auto_applied', 0)} auto-applied, "
+                                    f"{scan_result.get('flagged', 0)} flagged."
+                                )
+                            elif scan_result.get("status") == "matched_only":
+                                st.info("Outline saved. Entities were detected and matched existing entries.")
+                            else:
+                                st.info("Outline saved. No entities were detected in this outline text.")
+                        else:
+                            st.success("Outline saved.")
 
         with right:
             with st.container(border=True):
@@ -6220,8 +6358,6 @@ def _run_ui():
         return base
 
     def render_world():
-        from app.views.world_relationships import render_world_relationships
-
         p = st.session_state.project
         if not p:
             render_no_project_state("World Bible", "empty_world")
@@ -6250,8 +6386,8 @@ def _run_ui():
             [
                 "Add important names manually or scan chapters to find them automatically.",
                 "Open an entry to edit Notes, aliases, and source markers.",
-                "Use Scan All Chapters to compare the draft against the current World Bible.",
-                "Review AI suggestions before applying them, especially if confidence is low.",
+                "Use Insights to scan chapters and review queued canon changes.",
+                "Apply reviewed suggestions before relying on them in generated prose.",
                 "Use Source markers to see where a detail came from.",
             ],
             [
@@ -6438,47 +6574,6 @@ def _run_ui():
             with top_cols[4]:
                 stat_tile("Canon health", f"{canon_icon} {canon_label}", icon="\u2705")
 
-        with card("Canon scanner", "Review every chapter against the current World Bible and apply safe updates."):
-            scan_cols = st.columns([2.2, 1])
-            with scan_cols[0]:
-                st.caption("Scans chapter text, auto-applies high-confidence canon, and queues uncertain details with source excerpts for review.")
-            with scan_cols[1]:
-                scan_all_disabled = not bool(chapters) or not bool(get_active_key_status()[1])
-                if st.button(
-                    "Scan All Chapters",
-                    use_container_width=True,
-                    type="primary",
-                    disabled=scan_all_disabled,
-                    key=f"world_scan_all_chapters_{p.id}",
-                    help="Requires chapters and an AI key. High-confidence suggestions apply automatically; uncertain suggestions are queued for review.",
-                ):
-                    totals = {"added": 0, "matched": 0, "flagged": 0, "suggested": 0, "auto_applied": 0, "total_detected": 0}
-                    progress = st.progress(0)
-                    ordered = p.get_ordered_chapters()
-                    for idx, chapter in enumerate(ordered, start=1):
-                        if not (chapter.content or "").strip():
-                            progress.progress(idx / max(1, len(ordered)))
-                            continue
-                        result = extract_entities_ui(
-                            chapter.content or "",
-                            f"Chapter {chapter.index}: {chapter.title}",
-                            show_feedback=False,
-                            bypass_cooldown=True,
-                            chapter_id=chapter.id,
-                        )
-                        if result:
-                            for key in totals:
-                                totals[key] += int(result.get(key, 0) or 0)
-                        progress.progress(idx / max(1, len(ordered)))
-                    persist_project(p, action="world_scan_all_chapters")
-                    st.success(
-                        "Chapter scan complete: "
-                        f"{totals['total_detected']} detected, {totals['added']} new, "
-                        f"{totals['matched']} matched, {totals['auto_applied']} auto-applied, "
-                        f"{totals['flagged']} queued for review."
-                    )
-                    st.rerun()
-
         with card("Search & filters", "Refine by status, recency, or canon risk."):
             f1, f2, f3, f4, f5 = st.columns([2.2, 1, 1, 1, 1.1])
             with f1:
@@ -6502,14 +6597,6 @@ def _run_ui():
                     key="world_sort_mode",
                 )
 
-        render_world_relationships(
-            project=p,
-            entries=entries,
-            chapters=chapters,
-            mention_refs=mention_refs,
-            mention_counts=mention_counts,
-        )
-
         tab_options = ["Characters", "Locations", "Factions", "Items", "Lore"]
         default_tab = st.session_state.get("world_tabs", tab_options[0])
         if default_tab not in tab_options:
@@ -6521,87 +6608,6 @@ def _run_ui():
             horizontal=True,
             key="world_tabs",
         )
-
-        def _world_tab_for_category(category: str) -> str:
-            normalized = Project._normalize_category(category)
-            return {
-                "Character": "Characters",
-                "Location": "Locations",
-                "Faction": "Factions",
-                "Item": "Items",
-                "Lore": "Lore",
-            }.get(normalized, "Lore")
-
-        review_queue = st.session_state.get("world_bible_review", [])
-        if review_queue:
-            with card("Review AI Suggestions", "AI suggestions are queued for review. Apply to update canon."):
-                for idx, item in enumerate(list(review_queue)):
-                    stype = item.get("type", "new")
-                    label = f"{item.get('name', 'Unnamed')} | {item.get('category', 'Lore')}"
-                    if stype == "update":
-                        label = f"{label}"
-                    elif stype == "alias_only":
-                        label = f"{label}"
-                    else:
-                        label = f"{label}"
-                    expander_label = build_expander_label(label, str(idx))
-                    with st.expander(expander_label):
-                        type_labels = {"update": "Update Existing", "alias_only": "Add Aliases", "new": "New Entry"}
-                        st.markdown(f"**Action:** {type_labels.get(stype, stype.title())}")
-                        if item.get("match_name"):
-                            st.markdown(f"**Matches:** {item['match_name']}")
-                        confidence = item.get("confidence")
-                        if confidence is not None:
-                            st.markdown(f"**Confidence:** {confidence:.2f}")
-                        source = item.get("source")
-                        if source:
-                            st.markdown(f"**Source:** {source}")
-                        source_excerpt = (item.get("source_excerpt") or item.get("excerpt") or "").strip()
-                        if source_excerpt:
-                            st.caption(source_excerpt)
-                        if item.get("reason"):
-                            st.info(item["reason"])
-                        novel_bullets = item.get("novel_bullets") or []
-                        if novel_bullets:
-                            st.markdown("**New details to add:**")
-                            for b in novel_bullets:
-                                st.markdown(f"- {b}")
-                        elif item.get("description"):
-                            st.markdown("**Suggested Notes**")
-                            st.write(item.get("description"))
-                        novel_aliases = item.get("novel_aliases") or []
-                        if novel_aliases:
-                            st.markdown(f"**New aliases:** {', '.join(novel_aliases)}")
-                        elif item.get("aliases"):
-                            st.markdown(f"**Aliases:** {', '.join(item.get('aliases') or [])}")
-
-                        c1, c2 = st.columns(2)
-                        with c1:
-                            if st.button("Apply", key=f"apply_suggestion_{idx}", use_container_width=True):
-                                from app.services.world_bible_merge import apply_suggestion as _apply_suggestion
-                                applied_ent, _action = _apply_suggestion(p, item)
-                                # Clear cached widget values so the UI
-                                # reflects the updated description/aliases
-                                # on the next rerun.
-                                if applied_ent is not None:
-                                    st.session_state.pop(f"desc_{applied_ent.id}", None)
-                                    st.session_state.pop(f"aliases_{applied_ent.id}", None)
-                                    st.session_state["world_focus_entity"] = applied_ent.id
-                                    st.session_state["world_tabs"] = _world_tab_for_category(applied_ent.category)
-                                review_queue.pop(idx)
-                                st.session_state["world_bible_review"] = review_queue
-                                persist_project(p)
-                                if _action == "duplicate":
-                                    st.toast("No new World Bible changes to apply.")
-                                else:
-                                    st.toast("World Bible updated.")
-                                st.rerun()
-                        with c2:
-                            if st.button("Ignore", key=f"ignore_suggestion_{idx}", use_container_width=True):
-                                review_queue.pop(idx)
-                                st.session_state["world_bible_review"] = review_queue
-                                st.toast("Suggestion removed.")
-                                st.rerun()
 
         focus_entity = st.session_state.get("world_focus_entity")
         recent_cutoff = time.time() - (7 * 86400)
@@ -6709,9 +6715,7 @@ def _run_ui():
                     is_orphaned = e.id in orphaned_ids
                     is_under_described = e.id in under_described_ids
                     is_collision = e.id in collision_ids
-                    if is_orphaned:
-                        status_icon = "Unused"
-                    elif is_collision:
+                    if is_collision:
                         status_icon = "Collision"
                     elif is_under_described:
                         status_icon = "Needs detail"
@@ -6725,8 +6729,9 @@ def _run_ui():
                             f"""
                             <div class="world-card {highlight}">
                                 <div class="world-card-header">
-                                    <div class="world-card-title">{status_icon} {e.name}</div>
+                                    <div class="world-card-title">{e.name}</div>
                                     <div class="world-card-meta">
+                                        <span class="world-badge">{status_icon}</span>
                                         <span class="world-badge">{e.category}</span>
                                         <span class="world-card-metric">{mention_count} mentions</span>
                                     </div>
@@ -6865,304 +6870,6 @@ def _run_ui():
             render_cat("Item")
         elif selected_tab == "Lore":
             render_cat("Lore")
-        elif selected_tab == "Memory":
-            st.markdown("### World Memory")
-            st.caption("Keep canon notes, timelines, and facts the AI should always know.")
-            with st.container(border=True):
-                st.markdown("#### Auto-add settings")
-                st.caption("Auto-add confidence controls are managed in Workspace Settings to avoid duplicate configuration.")
-            st.markdown("#### Hard Canon Rules")
-            hard_key = f"world_memory_hard_{p.id}"
-            hard_default = p.memory_hard or p.memory
-            hard_val = st.text_area("Hard Canon Rules", hard_default, height=160, key=hard_key)
-            if hard_val != p.memory_hard:
-                p.memory_hard = hard_val
-                save_p()
-
-            st.markdown("#### Soft Guidelines")
-            soft_key = f"world_memory_soft_{p.id}"
-            soft_val = st.text_area("Soft Guidelines", p.memory_soft, height=160, key=soft_key)
-            if soft_val != p.memory_soft:
-                p.memory_soft = soft_val
-                save_p()
-
-            st.markdown("#### Project Memory")
-            memory_key = f"world_memory_{p.id}"
-            memory_val = st.text_area("Memory", p.memory, height=320, key=memory_key)
-            if memory_val != p.memory:
-                p.memory = memory_val
-                save_p()
-            if st.button("Save Memory", use_container_width=True):
-                if persist_project(p, action="save"):
-                    st.toast("Memory saved")
-                    st.rerun()
-
-            st.divider()
-            st.markdown("#### Coherence Check")
-            scope_cols = st.columns(3)
-            with scope_cols[0]:
-                scope_outline = st.checkbox("Outline", value=True, key=f"coh_outline_{p.id}")
-            with scope_cols[1]:
-                scope_world = st.checkbox("World Bible", value=True, key=f"coh_world_{p.id}")
-            with scope_cols[2]:
-                scope_chapters = st.checkbox("Chapters", value=True, key=f"coh_chapters_{p.id}")
-
-            provider, active_key, _ = get_active_key_status()
-            coherence_cooldown = _cooldown_remaining(f"coherence_{p.id}", 15)
-            coherence_label = (
-                f"Run Coherence Check ({coherence_cooldown}s)"
-                if coherence_cooldown
-                else "Run Coherence Check"
-            )
-            if not active_key:
-                st.info(
-                    f"Add a {_provider_label(provider)} API key in AI Settings to run coherence checks."
-                )
-            if st.button(
-                coherence_label,
-                use_container_width=True,
-                disabled=bool(coherence_cooldown) or not active_key,
-                key=f"coh_run_{p.id}",
-            ):
-                if not (scope_outline or scope_world or scope_chapters):
-                    st.warning("Choose at least one scope (Outline, World Bible, or Chapters).")
-                    st.stop()
-                model_name = get_ai_model()
-                if not model_name:
-                    st.warning("Choose an AI model in AI Settings first.")
-                    st.session_state.page = "ai"
-                    st.rerun()
-                _mark_action(f"coherence_{p.id}")
-                compiled_world_bible = "\n".join(
-                    f"{e.name} ({e.category}): {e.description}"
-                    for e in p.world_db.values()
-                )
-                chapter_payload = [
-                    {
-                        "chapter_index": c.index,
-                        "summary": c.summary,
-                        "excerpt": (c.content or "")[:800],
-                    }
-                    for c in p.get_ordered_chapters()
-                ]
-                outline_payload = p.outline if scope_outline else ""
-                world_payload = compiled_world_bible if scope_world else ""
-                chapters_payload = chapter_payload if scope_chapters else []
-                with st.spinner("Running coherence check..."):
-                    results = AnalysisEngine.coherence_check(
-                        memory=p.memory,
-                        author_note=p.author_note,
-                        style_guide=p.style_guide,
-                        outline=outline_payload,
-                        world_bible=world_payload,
-                        chapters=chapters_payload,
-                        model=model_name,
-                    )
-                st.session_state["coherence_results"] = results or []
-                canon_icon, canon_label = get_canon_health()
-                st.session_state.setdefault("canon_health_log", [])
-                st.session_state["canon_health_log"].append(
-                    {
-                        "timestamp": time.time(),
-                        "status": canon_icon,
-                        "issue_count": len(st.session_state.get("coherence_results", [])),
-                    }
-                )
-                st.session_state["canon_health_log"] = st.session_state["canon_health_log"][-30:]
-                if results:
-                    st.toast("Coherence issues found.")
-                else:
-                    st.toast("No coherence issues detected.")
-                st.rerun()
-
-            results = st.session_state.get("coherence_results", [])
-            if results:
-                st.markdown("#### Coherence Issues")
-                for idx, issue in enumerate(list(results)):
-                    with st.container(border=True):
-                        chapter_idx = issue.get("chapter_index", "?")
-                        st.markdown(f"**Chapter #{chapter_idx}**")
-                        st.markdown(f"**Issue:** {issue.get('issue', 'Unspecified issue')}")
-                        st.markdown(f"**Confidence:** {issue.get('confidence', 'unknown')}")
-                        st.markdown("**Suggested Rewrite:**")
-                        st.write(issue.get("suggested_rewrite", ""))
-
-                        a1, a2 = st.columns(2)
-                        with a1:
-                            if st.button("Apply Fix", key=f"coh_apply_{idx}", use_container_width=True):
-                                target_excerpt = issue.get("target_excerpt", "")
-                                try:
-                                    chapter_num = int(chapter_idx)
-                                except (TypeError, ValueError):
-                                    chapter_num = None
-                                target_chapter = None
-                                if chapter_num is not None:
-                                    for c in p.get_ordered_chapters():
-                                        if c.index == chapter_num:
-                                            target_chapter = c
-                                            break
-                                if not target_chapter:
-                                    st.warning("Chapter not found for this issue.")
-                                elif target_excerpt and target_excerpt in (target_chapter.content or ""):
-                                    updated = (target_chapter.content or "").replace(
-                                        target_excerpt,
-                                        issue.get("suggested_rewrite", ""),
-                                        1,
-                                    )
-                                    target_chapter.update_content(updated, "Coherence Fix")
-                                    persist_project(p)
-                                    results.pop(idx)
-                                    st.session_state["coherence_results"] = results
-                                    update_locked_chapters()
-                                    st.toast("Applied fix.")
-                                    st.rerun()
-                                elif issue.get("suggested_rewrite"):
-                                    insertion = issue.get("suggested_rewrite", "").strip()
-                                    if insertion:
-                                        spacer = "\n\n" if (target_chapter.content or "").strip() else ""
-                                        updated = f"{(target_chapter.content or '').rstrip()}{spacer}{insertion}"
-                                        target_chapter.update_content(updated, "Coherence Fix (Appended)")
-                                        persist_project(p)
-                                        results.pop(idx)
-                                        st.session_state["coherence_results"] = results
-                                        update_locked_chapters()
-                                        st.toast("Applied fix (appended).")
-                                        st.rerun()
-                                else:
-                                    st.warning("Target excerpt not found in chapter content.")
-                        with a2:
-                            if st.button("Ignore", key=f"coh_ignore_{idx}", use_container_width=True):
-                                results.pop(idx)
-                                st.session_state["coherence_results"] = results
-                                update_locked_chapters()
-                                st.toast("Issue ignored.")
-                                st.rerun()
-        elif selected_tab == "Insights":
-            st.markdown("### World Bible Insights")
-            st.caption("Quick stats on your current canon database.")
-            entries = list(p.world_db.values())
-            total_entries = len(entries)
-            counts = {"Character": 0, "Location": 0, "Faction": 0, "Lore": 0}
-            for ent in entries:
-                category = Project._normalize_category(ent.category)
-                counts[category] = counts.get(category, 0) + 1
-
-            c1, c2, c3, c4 = st.columns(4)
-            c1.metric("Total Entries", total_entries)
-            c2.metric("Characters", counts.get("Character", 0))
-            c3.metric("Locations", counts.get("Location", 0))
-            c4.metric("Factions", counts.get("Faction", 0))
-
-            c5, c6 = st.columns(2)
-            c5.metric("Lore", counts.get("Lore", 0))
-            c6.metric(
-                "Last Updated",
-                time.strftime("%Y-%m-%d", time.localtime(p.last_modified)),
-            )
-
-            st.divider()
-            if not st.session_state.get("is_premium", False):
-                st.info("Canon history is a Premium feature.")
-            else:
-                st.markdown("### Canon Health History")
-                for entry in st.session_state.get("canon_health_log", []):
-                    st.caption(
-                        f"{time.strftime('%Y-%m-%d %H:%M', time.localtime(entry['timestamp']))} "
-                        f"{entry['status']} ({entry['issue_count']} issues)"
-                    )
-
-            st.divider()
-            st.markdown("### ? Timeline Heatmap")
-            for chap in p.get_ordered_chapters():
-                intensity = min(1.0, chap.word_count / 2000)
-                st.progress(intensity, text=f"Chapter {chap.index}: {chap.word_count} words")
-
-            st.divider()
-            st.markdown("#### Entity Utilization")
-            utilization_rows = []
-            for ent in entries:
-                aliases = [ent.name] + (ent.aliases or [])
-                total_hits = mention_counts.get(ent.id, 0)
-                utilization_rows.append(
-                    {
-                        "Name": ent.name,
-                        "Category": ent.category,
-                        "Appearances": total_hits,
-                        "Orphaned": ent.id in orphaned_ids,
-                        "Under-described": ent.id in under_described_ids,
-                    }
-                )
-            if utilization_rows:
-                st.dataframe(utilization_rows, use_container_width=True, hide_index=True)
-            else:
-                st.info("No entities yet to analyze.")
-
-            st.divider()
-            st.markdown("#### Flagged Entities")
-            flagged_entities = [ent for ent in entries if ent.id in flagged_entity_ids]
-            if flagged_entities:
-                for ent in flagged_entities:
-                    reasons = []
-                    if ent.id in orphaned_ids:
-                        reasons.append("Orphaned")
-                    if ent.id in under_described_ids:
-                        reasons.append("Needs detail")
-                    if ent.id in collision_ids:
-                        reasons.append("Name collision")
-                    with st.container(border=True):
-                        r1, r2 = st.columns([3, 1])
-                        with r1:
-                            st.markdown(f"**{ent.name}**  {ent.category}")
-                            st.caption("  ".join(reasons))
-                        with r2:
-                            if st.button("Jump to Entity", key=f"jump_entity_{ent.id}", use_container_width=True):
-                                st.session_state["world_focus_entity"] = ent.id
-                                st.session_state["world_search_pending"] = ent.name
-                                st.toast("Entity highlighted in World Bible.")
-                                st.rerun()
-            else:
-                st.success("No flagged entities right now.")
-
-            st.divider()
-            st.markdown("#### Canon Risk Flags")
-            coherence_results = st.session_state.get("coherence_results", [])
-            high_canon_drift = len(coherence_results) > 0
-            alias_collision = any(len(names) > 1 for names in normalized_name_map.values())
-
-            timeline_dense = False
-            dense_chapters = []
-            for chap in chapters:
-                summary_text = (chap.summary or "").strip()
-                base_text = summary_text if summary_text else (chap.content or "")[:800]
-                sentence_count = len([s for s in re.split(r"[.!?]+", base_text) if s.strip()])
-                if sentence_count > 3:
-                    timeline_dense = True
-                    dense_chapters.append(chap.index)
-
-            if high_canon_drift:
-                st.warning("High Canon Drift: coherence issues detected.")
-            if alias_collision:
-                st.warning("Alias Collision: multiple entities share normalized names.")
-            if timeline_dense:
-                chap_list = ", ".join(str(idx) for idx in dense_chapters)
-                st.warning(f"Timeline Density: >3 major events in chapters {chap_list}.")
-            if not any([high_canon_drift, alias_collision, timeline_dense]):
-                st.success("No canon risk flags detected.")
-
-            st.divider()
-            st.markdown("#### ? AI Readiness Score")
-            readiness = 0
-            if (p.memory or "").strip():
-                readiness += 20
-            if len(entries) > 10:
-                readiness += 20
-            if (p.outline or "").strip():
-                readiness += 20
-            if chapters:
-                readiness += 20
-            if not coherence_results:
-                readiness += 20
-            st.metric("AI Readiness", f"{readiness}%")
 
     def render_memory():
         p = st.session_state.project
@@ -7172,7 +6879,7 @@ def _run_ui():
 
         render_page_header(
             "Memory",
-            "Hard canon rules, soft guidance, and project memory used by AI systems.",
+            "Hard canon rules, writing guidance, and project memory used by AI systems.",
             tag="Canon",
             key_prefix="memory_header",
         )
@@ -7181,14 +6888,15 @@ def _run_ui():
             "Memory is the instruction layer the AI reads before helping you. Use it to tell MANTIS what must never change, what style to prefer, and what background context matters.",
             [
                 "Put non-negotiable facts in Hard Canon Rules.",
-                "Put tone, preferences, and flexible guidance in Soft Guidelines.",
+                "Put tone, preferences, and flexible writing direction in Writing Guidance.",
                 "Put broader story context in Project Memory.",
                 "Put voice, prose, formatting, and narration rules in Style Guide.",
-                "Run Coherence Check when you want MANTIS to compare memory, outline, World Bible, and chapters for contradictions.",
+                "Use World Bible for characters, locations, factions, lore, and scanned canon facts.",
+                "Use Insights for coherence checks and contradiction review.",
             ],
             [
                 "Hard Canon should be short and strict.",
-                "Soft Guidelines can be more conversational.",
+                "Writing Guidance can be more conversational.",
                 "Project Memory is best for recurring context the AI should remember across chapters.",
             ],
         )
@@ -7201,8 +6909,8 @@ def _run_ui():
                 st.markdown("**Hard Canon**")
                 st.caption("Facts the AI must not violate.")
             with guide_cols[1]:
-                st.markdown("**Soft Guidelines**")
-                st.caption("Flexible tone and context preferences.")
+                st.markdown("**Writing Guidance**")
+                st.caption("Flexible tone and direction; not canon facts.")
             with guide_cols[2]:
                 st.markdown("**Project Memory**")
                 st.caption("Background context used across the draft.")
@@ -7212,7 +6920,7 @@ def _run_ui():
 
         with st.container(border=True):
             st.markdown("#### Auto-add settings")
-            st.caption("Auto-add confidence controls are managed in Workspace Settings to avoid duplicate configuration.")
+            st.caption("World Bible stores scanned canon. Workspace Settings only controls strict hard-memory promotion.")
         st.markdown("#### Hard Canon Rules")
         hard_key = f"world_memory_hard_{p.id}"
         hard_default = p.memory_hard or p.memory
@@ -7221,9 +6929,9 @@ def _run_ui():
             p.memory_hard = hard_val
             save_p()
 
-        st.markdown("#### Soft Guidelines")
+        st.markdown("#### Writing Guidance")
         soft_key = f"world_memory_soft_{p.id}"
-        soft_val = st.text_area("Soft Guidelines", p.memory_soft, height=160, key=soft_key)
+        soft_val = st.text_area("Writing Guidance", p.memory_soft, height=160, key=soft_key)
         if soft_val != p.memory_soft:
             p.memory_soft = soft_val
             save_p()
@@ -7252,149 +6960,9 @@ def _run_ui():
                 st.toast("Memory saved")
                 st.rerun()
 
-        st.divider()
-        st.markdown("#### Coherence Check")
-        scope_cols = st.columns(3)
-        with scope_cols[0]:
-            scope_outline = st.checkbox("Outline", value=True, key=f"coh_outline_{p.id}")
-        with scope_cols[1]:
-            scope_world = st.checkbox("World Bible", value=True, key=f"coh_world_{p.id}")
-        with scope_cols[2]:
-            scope_chapters = st.checkbox("Chapters", value=True, key=f"coh_chapters_{p.id}")
-
-        provider, active_key, _ = get_active_key_status()
-        coherence_cooldown = _cooldown_remaining(f"coherence_{p.id}", 15)
-        coherence_label = (
-            f"Run Coherence Check ({coherence_cooldown}s)"
-            if coherence_cooldown
-            else "Run Coherence Check"
-        )
-        if not active_key:
-            st.info(
-                f"Add a {_provider_label(provider)} API key in AI Settings to run coherence checks."
-            )
-        if st.button(
-            coherence_label,
-            use_container_width=True,
-            disabled=bool(coherence_cooldown) or not active_key,
-            key=f"coh_run_memory_{p.id}",
-        ):
-            if not (scope_outline or scope_world or scope_chapters):
-                st.warning("Choose at least one scope (Outline, World Bible, or Chapters).")
-                st.stop()
-            model_name = get_ai_model()
-            if not model_name:
-                st.warning("Choose an AI model in AI Settings first.")
-                st.session_state.page = "ai"
-                st.rerun()
-            _mark_action(f"coherence_{p.id}")
-            compiled_world_bible = "\n".join(
-                f"{e.name} ({e.category}): {e.description}"
-                for e in p.world_db.values()
-            )
-            chapter_payload = [
-                {
-                    "chapter_index": c.index,
-                    "summary": c.summary,
-                    "excerpt": (c.content or "")[:800],
-                }
-                for c in p.get_ordered_chapters()
-            ]
-            outline_payload = p.outline if scope_outline else ""
-            world_payload = compiled_world_bible if scope_world else ""
-            chapters_payload = chapter_payload if scope_chapters else []
-            with st.spinner("Running coherence check..."):
-                results = AnalysisEngine.coherence_check(
-                    memory=p.memory,
-                    author_note=p.author_note,
-                    style_guide=p.style_guide,
-                    outline=outline_payload,
-                    world_bible=world_payload,
-                    chapters=chapters_payload,
-                    model=model_name,
-                )
-            st.session_state["coherence_results"] = results or []
-            canon_icon, _canon_label = get_canon_health()
-            st.session_state.setdefault("canon_health_log", [])
-            st.session_state["canon_health_log"].append(
-                {
-                    "timestamp": time.time(),
-                    "status": canon_icon,
-                    "issue_count": len(st.session_state.get("coherence_results", [])),
-                }
-            )
-            st.session_state["canon_health_log"] = st.session_state["canon_health_log"][-30:]
-            if results:
-                st.toast("Coherence issues found.")
-            else:
-                st.toast("No coherence issues detected.")
-            st.rerun()
-
-        results = st.session_state.get("coherence_results", [])
-        if results:
-            st.markdown("#### Coherence Issues")
-            for idx, issue in enumerate(list(results)):
-                with st.container(border=True):
-                    chapter_idx = issue.get("chapter_index", "?")
-                    st.markdown(f"**Chapter #{chapter_idx}**")
-                    st.markdown(f"**Issue:** {issue.get('issue', 'Unspecified issue')}")
-                    st.markdown(f"**Confidence:** {issue.get('confidence', 'unknown')}")
-                    st.markdown("**Suggested Rewrite:**")
-                    st.write(issue.get("suggested_rewrite", ""))
-
-                    a1, a2 = st.columns(2)
-                    with a1:
-                        if st.button("Apply Fix", key=f"coh_apply_{idx}", use_container_width=True):
-                            target_excerpt = issue.get("target_excerpt", "")
-                            try:
-                                chapter_num = int(chapter_idx)
-                            except (TypeError, ValueError):
-                                chapter_num = None
-                            target_chapter = None
-                            if chapter_num is not None:
-                                for c in p.get_ordered_chapters():
-                                    if c.index == chapter_num:
-                                        target_chapter = c
-                                        break
-                            if not target_chapter:
-                                st.warning("Chapter not found for this issue.")
-                            elif target_excerpt and target_excerpt in (target_chapter.content or ""):
-                                updated = (target_chapter.content or "").replace(
-                                    target_excerpt,
-                                    issue.get("suggested_rewrite", ""),
-                                    1,
-                                )
-                                target_chapter.update_content(updated, "Coherence Fix")
-                                persist_project(p)
-                                results.pop(idx)
-                                st.session_state["coherence_results"] = results
-                                update_locked_chapters()
-                                st.toast("Applied fix.")
-                                st.rerun()
-                            elif issue.get("suggested_rewrite"):
-                                insertion = issue.get("suggested_rewrite", "").strip()
-                                if insertion:
-                                    spacer = "\n\n" if (target_chapter.content or "").strip() else ""
-                                    updated = f"{(target_chapter.content or '').rstrip()}{spacer}{insertion}"
-                                    target_chapter.update_content(updated, "Coherence Fix (Appended)")
-                                    persist_project(p)
-                                    results.pop(idx)
-                                    st.session_state["coherence_results"] = results
-                                    update_locked_chapters()
-                                    st.toast("Applied fix (appended).")
-                                    st.rerun()
-                            else:
-                                st.warning("Target excerpt not found in chapter content.")
-                    with a2:
-                        if st.button("Ignore", key=f"coh_ignore_{idx}", use_container_width=True):
-                            results.pop(idx)
-                            st.session_state["coherence_results"] = results
-                            update_locked_chapters()
-                            st.toast("Issue ignored.")
-                            st.rerun()
-
     def render_insights():
         from app.services.canon_intelligence import analyze_chapter_canon, build_context_packet
+        from app.views.world_relationships import render_world_relationships
 
         p = st.session_state.project
         if not p:
@@ -7439,12 +7007,18 @@ def _run_ui():
             return total
 
         mention_counts: Dict[str, int] = {}
+        mention_refs: Dict[str, List[Chapter]] = {}
         for ent in entries:
             aliases = [ent.name] + (ent.aliases or [])
             total_hits = 0
-            for _chap, lower_text in chapter_texts_lower:
-                total_hits += _count_mentions(aliases, lower_text)
+            hit_chapters = []
+            for chap, lower_text in chapter_texts_lower:
+                hits = _count_mentions(aliases, lower_text)
+                if hits:
+                    hit_chapters.append(chap)
+                total_hits += hits
             mention_counts[ent.id] = total_hits
+            mention_refs[ent.id] = hit_chapters
 
         has_chapter_text = any((text or "").strip() for _chapter, text in chapter_texts)
         orphaned_ids = {eid for eid, count in mention_counts.items() if count == 0} if has_chapter_text else set()
@@ -7490,6 +7064,16 @@ def _run_ui():
         metric_cols[2].metric("Drafted chapters", f"{active_chapters}/{chapter_count}")
         metric_cols[3].metric("Avg words/chapter", avg_words)
         metric_cols[4].metric("Review queue", len(review_queue))
+
+        def _insights_world_tab_for_category(category: str) -> str:
+            normalized = Project._normalize_category(category)
+            return {
+                "Character": "Characters",
+                "Location": "Locations",
+                "Faction": "Factions",
+                "Item": "Items",
+                "Lore": "Lore",
+            }.get(normalized, "Lore")
 
         left, right = st.columns([1.45, 1])
         with left:
@@ -7543,6 +7127,113 @@ def _run_ui():
                     st.success("Keep drafting. Your project health is strong.")
 
             with st.container(border=True):
+                st.markdown("### Canon Scanner")
+                st.caption("Scan chapters, auto-apply high-confidence canon, and send uncertain changes here for review.")
+                scan_all_disabled = not bool(chapters) or not bool(get_active_key_status()[1])
+                if st.button(
+                    "Scan All Chapters",
+                    use_container_width=True,
+                    type="primary",
+                    disabled=scan_all_disabled,
+                    key=f"insights_scan_all_chapters_{p.id}",
+                    help="Requires chapters and an AI key. High-confidence suggestions apply automatically; uncertain suggestions are queued here for review.",
+                ):
+                    totals = {"added": 0, "matched": 0, "flagged": 0, "suggested": 0, "auto_applied": 0, "total_detected": 0}
+                    progress = st.progress(0)
+                    ordered = p.get_ordered_chapters()
+                    for idx, chapter in enumerate(ordered, start=1):
+                        if not (chapter.content or "").strip():
+                            progress.progress(idx / max(1, len(ordered)))
+                            continue
+                        result = extract_entities_ui(
+                            chapter.content or "",
+                            f"Chapter {chapter.index}: {chapter.title}",
+                            show_feedback=False,
+                            bypass_cooldown=True,
+                            chapter_id=chapter.id,
+                        )
+                        if result:
+                            for key in totals:
+                                totals[key] += int(result.get(key, 0) or 0)
+                        progress.progress(idx / max(1, len(ordered)))
+                    persist_project(p, action="insights_scan_all_chapters")
+                    st.success(
+                        "Chapter scan complete: "
+                        f"{totals['total_detected']} detected, {totals['added']} new, "
+                        f"{totals['matched']} matched, {totals['auto_applied']} auto-applied, "
+                        f"{totals['flagged']} queued for review."
+                    )
+                    st.rerun()
+
+                if review_queue:
+                    st.markdown("#### Canon Suggestions")
+                    for idx, item in enumerate(list(review_queue)):
+                        stype = item.get("type", "new")
+                        label = f"{item.get('name', 'Unnamed')} | {item.get('category', 'Lore')}"
+                        expander_label = build_expander_label(label, str(idx))
+                        with st.expander(expander_label):
+                            type_labels = {"update": "Update Existing", "alias_only": "Add Aliases", "new": "New Entry"}
+                            st.markdown(f"**Action:** {type_labels.get(stype, stype.title())}")
+                            if item.get("match_name"):
+                                st.markdown(f"**Matches:** {item['match_name']}")
+                            confidence = item.get("confidence")
+                            if confidence is not None:
+                                st.markdown(f"**Confidence:** {confidence:.2f}")
+                            source = item.get("source")
+                            if source:
+                                st.markdown(f"**Source:** {source}")
+                            source_excerpt = (item.get("source_excerpt") or item.get("excerpt") or "").strip()
+                            if source_excerpt:
+                                st.caption(source_excerpt)
+                            if item.get("reason"):
+                                st.info(item["reason"])
+                            novel_bullets = item.get("novel_bullets") or []
+                            if novel_bullets:
+                                st.markdown("**New details to add:**")
+                                for bullet in novel_bullets:
+                                    st.markdown(f"- {bullet}")
+                            elif item.get("description"):
+                                st.markdown("**Suggested Notes**")
+                                st.write(item.get("description"))
+                            novel_aliases = item.get("novel_aliases") or []
+                            if novel_aliases:
+                                st.markdown(f"**New aliases:** {', '.join(novel_aliases)}")
+                            elif item.get("aliases"):
+                                st.markdown(f"**Aliases:** {', '.join(item.get('aliases') or [])}")
+
+                            c1, c2, c3 = st.columns(3)
+                            with c1:
+                                if st.button("Apply", key=f"ins_apply_suggestion_{idx}", use_container_width=True):
+                                    from app.services.world_bible_merge import apply_suggestion as _apply_suggestion
+                                    applied_ent, action = _apply_suggestion(p, item)
+                                    if applied_ent is not None:
+                                        st.session_state.pop(f"desc_{applied_ent.id}", None)
+                                        st.session_state.pop(f"aliases_{applied_ent.id}", None)
+                                        st.session_state["world_focus_entity"] = applied_ent.id
+                                        st.session_state["world_tabs"] = _insights_world_tab_for_category(applied_ent.category)
+                                    review_queue.pop(idx)
+                                    st.session_state["world_bible_review"] = review_queue
+                                    persist_project(p)
+                                    st.toast("No new World Bible changes to apply." if action == "duplicate" else "World Bible updated.")
+                                    st.rerun()
+                            with c2:
+                                if st.button("Open Entity", key=f"ins_open_suggestion_{idx}", use_container_width=True):
+                                    entity_id = item.get("entity_id")
+                                    if entity_id:
+                                        st.session_state["world_focus_entity"] = entity_id
+                                        st.session_state["world_tabs"] = _insights_world_tab_for_category(item.get("category", "Lore"))
+                                    st.session_state.page = "world"
+                                    st.rerun()
+                            with c3:
+                                if st.button("Ignore", key=f"ins_ignore_suggestion_{idx}", use_container_width=True):
+                                    review_queue.pop(idx)
+                                    st.session_state["world_bible_review"] = review_queue
+                                    st.toast("Suggestion removed.")
+                                    st.rerun()
+                else:
+                    st.success("No queued canon suggestions.")
+
+            with st.container(border=True):
                 render_coherence_panel(p, key_prefix="insights", title="Coherence Check")
 
         with right:
@@ -7570,6 +7261,14 @@ def _run_ui():
                 st.metric("Readiness score", f"{readiness}%")
                 for label, ok in checks:
                     st.caption(f"{'Ready' if ok else 'Needs work'}: {label}")
+
+        render_world_relationships(
+            project=p,
+            entries=entries,
+            chapters=chapters,
+            mention_refs=mention_refs,
+            mention_counts=mention_counts,
+        )
 
         st.divider()
         st.markdown("### Canon Intelligence")
@@ -7643,7 +7342,7 @@ def _run_ui():
             st.dataframe(hotlist[:20], use_container_width=True, hide_index=True)
 
     def render_chapters():
-        from app.views.editor_workspace import render_chapter_sidebar, render_editor_utility_bar
+        from app.views.editor_workspace import render_editor_utility_bar
 
         # Get project first
         p = st.session_state.project
@@ -7817,72 +7516,38 @@ def _run_ui():
         ordered_chapter_ids = [chapter.id for chapter in ordered_chapters]
         chapter_position = ordered_chapter_ids.index(curr.id) if curr.id in ordered_chapter_ids else 0
 
+        def _delete_current_chapter() -> None:
+            p.delete_chapter(curr.id)
+            _sync_session_chapters(force=True)
+            refreshed = st.session_state.get("chapters", [])
+            _set_active_chapter(refreshed[0]["id"] if refreshed else None)
+            st.session_state.delete_chapter_id = None
+            st.session_state.delete_chapter_title = None
+            persist_project(p)
+            st.toast("Chapter deleted.")
+            st.rerun()
+
         render_editor_utility_bar(
             project=p,
             current_chapter=curr,
-            on_open_outline=lambda: (
-                st.session_state.update({"page": "outline"}),
+            chapters=chapters,
+            on_select=lambda chapter_id: (_set_active_chapter(chapter_id), st.rerun()),
+            on_previous=lambda: (_set_active_chapter(ordered_chapter_ids[chapter_position - 1]), st.rerun()),
+            on_next=lambda: (_set_active_chapter(ordered_chapter_ids[chapter_position + 1]), st.rerun()),
+            previous_disabled=chapter_position <= 0,
+            next_disabled=chapter_position >= (len(ordered_chapter_ids) - 1),
+            on_create_next=create_next_chapter,
+            on_delete_current=_delete_current_chapter,
+            delete_pending=st.session_state.get("delete_chapter_id") == curr.id,
+            current_title=st.session_state.get("delete_chapter_title") or curr.title,
+            on_cancel_delete=lambda: (
+                st.session_state.update(
+                    {"delete_chapter_id": None, "delete_chapter_title": None}
+                ),
                 st.rerun(),
-            ),
-            on_open_world=lambda: (
-                st.session_state.update({"page": "world"}),
-                st.rerun(),
-            ),
-            on_word_target_change=lambda value: (
-                setattr(p, "default_word_count", int(value)),
-                save_p(),
             ),
         )
 
-        with st.container(border=True):
-            nav_cols = st.columns([1, 1, 2.2, 0.75, 0.9, 0.9])
-            with nav_cols[0]:
-                if st.button(
-                    "Previous chapter",
-                    use_container_width=True,
-                    disabled=chapter_position <= 0,
-                    key=f"editor_prev_chapter_{p.id}",
-                ):
-                    _set_active_chapter(ordered_chapter_ids[chapter_position - 1])
-                    st.rerun()
-            with nav_cols[1]:
-                if st.button(
-                    "Next chapter",
-                    use_container_width=True,
-                    disabled=chapter_position >= (len(ordered_chapter_ids) - 1),
-                    key=f"editor_next_chapter_{p.id}",
-                ):
-                    _set_active_chapter(ordered_chapter_ids[chapter_position + 1])
-                    st.rerun()
-            with nav_cols[2]:
-                jump_target = st.selectbox(
-                    "Jump to chapter",
-                    options=ordered_chapter_ids,
-                    index=chapter_position,
-                    format_func=lambda chapter_id: (
-                        f"Chapter {p.chapters[chapter_id].index}: {p.chapters[chapter_id].title}"
-                        if chapter_id in p.chapters
-                        else chapter_id
-                    ),
-                    key=f"editor_jump_select_{p.id}",
-                )
-            with nav_cols[3]:
-                if st.button(
-                    "Go",
-                    use_container_width=True,
-                    disabled=jump_target == curr.id,
-                    key=f"editor_jump_go_{p.id}",
-                ):
-                    _set_active_chapter(jump_target)
-                    st.rerun()
-            with nav_cols[4]:
-                if st.button("Outline", use_container_width=True, key=f"editor_controls_outline_{p.id}"):
-                    st.session_state.page = "outline"
-                    st.rerun()
-            with nav_cols[5]:
-                if st.button("World Bible", use_container_width=True, key=f"editor_controls_world_{p.id}"):
-                    st.session_state.page = "world"
-                    st.rerun()
         # --- SAFELY sync programmatic chapter updates into the editor widget (before widget exists)
         ed_key = f"ed_{curr.id}"
         if (
@@ -7902,35 +7567,7 @@ def _run_ui():
             _update_session_chapter(curr)
             persist_project(p)
 
-        col_nav, col_editor, col_ai = st.columns([1.05, 3.2, 1.25])
-
-        with col_nav:
-            def _delete_current_chapter() -> None:
-                p.delete_chapter(curr.id)
-                _sync_session_chapters(force=True)
-                refreshed = st.session_state.get("chapters", [])
-                _set_active_chapter(refreshed[0]["id"] if refreshed else None)
-                st.session_state.delete_chapter_id = None
-                st.session_state.delete_chapter_title = None
-                persist_project(p)
-                st.toast("Chapter deleted.")
-                st.rerun()
-
-            render_chapter_sidebar(
-                chapters=chapters,
-                current_chapter_id=curr.id,
-                on_select=lambda chapter_id: (_set_active_chapter(chapter_id), st.rerun()),
-                on_create_next=create_next_chapter,
-                on_delete_current=_delete_current_chapter,
-                delete_pending=st.session_state.get("delete_chapter_id") == curr.id,
-                current_title=st.session_state.get("delete_chapter_title") or curr.title,
-                on_cancel_delete=lambda: (
-                    st.session_state.update(
-                        {"delete_chapter_id": None, "delete_chapter_title": None}
-                    ),
-                    st.rerun(),
-                ),
-            )
+        col_editor, col_ai = st.columns([4.3, 1.2])
 
         stream_ph = st.empty()
         provider, active_key, _ = get_active_key_status()
@@ -7980,8 +7617,15 @@ def _run_ui():
                     )
                     match_count = (curr.content or "").count(find_text) if find_text else 0
                     st.caption(f"Exact matches: {match_count}")
+                    replace_scope = st.radio(
+                        "Replacement scope",
+                        ["First exact match", "All exact matches"],
+                        horizontal=True,
+                        key=f"editor_replace_scope_{curr.id}",
+                        help="Use first match for pasted passages; use all matches only when you want every identical occurrence changed.",
+                    )
                     if st.button(
-                        "Apply replace all",
+                        "Apply replacement",
                         use_container_width=True,
                         disabled=not find_text or match_count == 0,
                         key=f"editor_replace_apply_{curr.id}",
@@ -7989,73 +7633,40 @@ def _run_ui():
                         st.session_state.chapter_text_prev = {
                             "chapter_id": curr.id,
                             "text": curr.content or "",
+                            "action": "Find/Replace",
+                            "timestamp": time.time(),
                         }
-                        replaced = (curr.content or "").replace(find_text, replace_text)
+                        replace_limit = 1 if replace_scope == "First exact match" else 0
+                        replaced = (curr.content or "").replace(find_text, replace_text, replace_limit)
+                        replaced_count = 1 if replace_limit else match_count
                         curr.update_content(replaced, "Find/Replace")
                         _update_session_chapter(curr)
                         persist_project(p)
                         st.session_state._chapter_sync_id = curr.id
                         st.session_state._chapter_sync_text = replaced
-                        st.toast(f"Replaced {match_count} matches.")
+                        st.toast(f"Applied replacement to {replaced_count} exact match(es).")
                         st.rerun()
 
-                c1, c2 = st.columns([1, 1])
-                with c1:
-                    if st.button(
-                        "Save Chapter",
-                        type="primary",
-                        use_container_width=True,
-                        key=f"editor_save_{curr.id}",
+                    prev_replace = st.session_state.get("chapter_text_prev", {})
+                    if (
+                        prev_replace.get("chapter_id") == curr.id
+                        and prev_replace.get("action") == "Find/Replace"
+                        and prev_replace.get("text") is not None
                     ):
-                        curr.update_content(val, "manual")
-                        _update_session_chapter(curr)
-                        if persist_project(p, action="save"):
-                            # Automatically scan entities from this chapter when the user explicitly saves it.
-                            scan_result = extract_entities_ui(
-                                curr.content or "",
-                                f"Ch {curr.index}",
-                                show_feedback=False,
-                            )
-                            if scan_result:
-                                if scan_result.get("status") == "updated":
-                                    st.success(
-                                        "Chapter saved and scanned: "
-                                        f"{scan_result.get('added', 0)} new, "
-                                        f"{scan_result.get('matched', 0)} existing, "
-                                        f"{scan_result.get('auto_applied', 0)} auto-applied, "
-                                        f"{scan_result.get('flagged', 0)} flagged."
-                                    )
-                                elif scan_result.get("status") == "matched_only":
-                                    st.info("Chapter saved. Entities were detected and matched existing entries.")
-                                else:
-                                    st.info("Chapter saved. No entities were detected in this chapter.")
-                            else:
-                                st.success("Chapter saved.")
-                with c2:
-                    summary_cooldown = _cooldown_remaining(f"summary_{curr.id}", 10)
-                    summary_label = (
-                        f"Update Summary ({summary_cooldown}s)"
-                        if summary_cooldown
-                        else "Update Summary"
-                    )
-                    if not active_key:
-                        st.info(
-                            f"Add a {_provider_label(provider)} API key in AI Settings to update summaries."
-                        )
-                    if st.button(
-                        summary_label,
-                        use_container_width=True,
-                        disabled=bool(summary_cooldown) or not active_key,
-                        key=f"editor_summary_{curr.id}",
-                    ):
-                        _mark_action(f"summary_{curr.id}")
-                        summary = StoryEngine.summarize(curr.content or "", get_ai_model())
-                        if summary.strip().startswith("ERROR: Canon violation detected."):
-                            st.error("Canon violation detected. Resolve issues before generating AI content.")
-                        else:
-                            curr.summary = summary
+                        if st.button(
+                            "Undo replacement",
+                            use_container_width=True,
+                            key=f"editor_replace_undo_{curr.id}",
+                            help="Restore the chapter text from before the last find/replace apply.",
+                        ):
+                            restored = prev_replace.get("text") or ""
+                            curr.update_content(restored, "Undo Find/Replace")
                             _update_session_chapter(curr)
                             persist_project(p)
+                            st.session_state._chapter_sync_id = curr.id
+                            st.session_state._chapter_sync_text = restored
+                            st.session_state.chapter_text_prev = {}
+                            st.toast("Replacement undone.")
                             st.rerun()
 
                 def generate_improvement(style_choice, custom_instructions):
@@ -8123,22 +7734,56 @@ def _run_ui():
                             st.rerun()
 
                 if st.button(
-                    "Undo last apply",
+                    "Save Chapter",
+                    type="primary",
                     use_container_width=True,
-                    key=f"editor_improve__undo_{curr.id}",
-                    help="Restore the previous chapter text, if available.",
+                    key=f"editor_save_{curr.id}",
                 ):
-                    prev = st.session_state.get("chapter_text_prev", {})
-                    if prev.get("chapter_id") == curr.id and prev.get("text") is not None:
-                        curr.update_content(prev.get("text") or "", "Undo Apply")
+                    curr.update_content(val, "manual")
+                    _update_session_chapter(curr)
+                    if persist_project(p, action="save"):
+                        scan_result = extract_entities_ui(
+                            curr.content or "",
+                            f"Ch {curr.index}",
+                            show_feedback=False,
+                        )
+                        if scan_result:
+                            if scan_result.get("status") == "updated":
+                                st.success(
+                                    "Chapter saved and scanned: "
+                                    f"{scan_result.get('added', 0)} new, "
+                                    f"{scan_result.get('matched', 0)} existing, "
+                                    f"{scan_result.get('auto_applied', 0)} auto-applied, "
+                                    f"{scan_result.get('flagged', 0)} flagged."
+                                )
+                            elif scan_result.get("status") == "matched_only":
+                                st.info("Chapter saved. Entities were detected and matched existing entries.")
+                            else:
+                                st.info("Chapter saved. No entities were detected in this chapter.")
+                        else:
+                            st.success("Chapter saved.")
+
+                prev_apply = st.session_state.get("chapter_text_prev", {})
+                if (
+                    prev_apply.get("chapter_id") == curr.id
+                    and prev_apply.get("text") is not None
+                    and prev_apply.get("action") != "Find/Replace"
+                ):
+                    if st.button(
+                        "Undo last apply",
+                        use_container_width=True,
+                        key=f"editor_improve__undo_{curr.id}",
+                        help="Restore the previous chapter text.",
+                    ):
+                        restored = prev_apply.get("text") or ""
+                        curr.update_content(restored, "Undo Apply")
                         _update_session_chapter(curr)
                         persist_project(p)
                         st.session_state._chapter_sync_id = curr.id
-                        st.session_state._chapter_sync_text = prev.get("text") or ""
+                        st.session_state._chapter_sync_text = restored
+                        st.session_state.chapter_text_prev = {}
                         st.toast("Previous chapter text restored.")
                         st.rerun()
-                    else:
-                        st.info("No previous chapter text available to restore.")
 
                 chapter_drafts = [
                     draft for draft in st.session_state.get("chapter_drafts", [])
@@ -8165,6 +7810,8 @@ def _run_ui():
                                 st.session_state.chapter_text_prev = {
                                     "chapter_id": curr.id,
                                     "text": curr.content or "",
+                                    "action": "Draft Applied",
+                                    "timestamp": time.time(),
                                 }
                                 curr.update_content(draft.get("text", ""), "Draft Applied")
                                 _update_session_chapter(curr)
@@ -8177,81 +7824,142 @@ def _run_ui():
         with col_ai:
             with st.container(border=True):
                 st.markdown("### Assistant")
-                st.caption("Generate new prose from your outline + previous context.")
+                st.caption("Drafting support for this chapter.")
+                assistant_mode = st.radio(
+                    "Assistant mode",
+                    ["Write", "Summary", "Tools"],
+                    horizontal=False,
+                    label_visibility="collapsed",
+                    key=f"editor_assistant_mode_{curr.id}",
+                )
 
-                canon_icon, canon_label = get_canon_health()
-                canon_blocked = canon_icon == "RISK"
-                if canon_blocked:
-                    st.button(
-                        "Auto-Write Disabled (Canon Risk)",
-                        disabled=True,
-                        use_container_width=True,
-                        help="Resolve canon issues in World Bible ? Memory before generating.",
-                        key=f"editor_autowrite_blocked_{curr.id}",
+                if assistant_mode == "Write":
+                    canon_icon, canon_label = get_canon_health()
+                    st.caption(f"Canon status: {canon_label}")
+                    canon_blocked = canon_icon == "RISK"
+                    if canon_blocked:
+                        st.button(
+                            "Auto-Write Disabled",
+                            disabled=True,
+                            use_container_width=True,
+                            help="Resolve canon issues in Insights before generating.",
+                            key=f"editor_autowrite_blocked_{curr.id}",
+                        )
+                    else:
+                        if not active_key:
+                            st.info(
+                                f"Add a {_provider_label(provider)} API key in AI Settings to auto-write chapters."
+                            )
+                        auto_cooldown = _cooldown_remaining(f"auto_write_{curr.id}", 12)
+                        auto_label = (
+                            f"Auto-Write ({auto_cooldown}s)"
+                            if auto_cooldown
+                            else "Auto-Write"
+                        )
+                        if st.button(
+                            auto_label,
+                            type="primary",
+                            use_container_width=True,
+                            disabled=bool(auto_cooldown) or not active_key,
+                            key=f"editor_autowrite_{curr.id}",
+                        ):
+                            _mark_action(f"auto_write_{curr.id}")
+                            chapter_lengths = [
+                                int(ch.word_count or 0)
+                                for ch in p.get_ordered_chapters()
+                                if int(ch.word_count or 0) > 0
+                            ]
+                            avg_length = int(sum(chapter_lengths) / len(chapter_lengths)) if chapter_lengths else 0
+                            ai_target_words = int(avg_length or p.default_word_count or 1000)
+                            prompt = StoryEngine.generate_chapter_prompt(p, curr.index, ai_target_words)
+                            full = ""
+                            for chunk in AIEngine().generate_stream(prompt, get_ai_model()):
+                                full += chunk
+                                stream_ph.markdown(f"**GENERATING:**\n\n{full}")
+
+                            if full.strip():
+                                if full.strip().startswith("ERROR: Canon violation detected."):
+                                    st.error("Canon violation detected. Resolve issues before generating AI content.")
+                                    return
+                                violations = detect_hard_canon_violation(p, curr.index, full)
+                                if violations:
+                                    results = st.session_state.get("coherence_results", [])
+                                    results.extend(violations)
+                                    st.session_state["coherence_results"] = results
+                                    update_locked_chapters()
+                                    st.warning("Hard Canon conflict detected. AI output was not applied.")
+                                    return
+                                new_text = ((curr.content or "") + "\n" + full.strip()).strip()
+                                curr.update_content(new_text, "AI Auto-Write")
+                                _update_session_chapter(curr)
+                                persist_project(p)
+
+                                # Queue sync into editor widget on next run (do NOT set ed_key here!)
+                                st.session_state._chapter_sync_id = curr.id
+                                st.session_state._chapter_sync_text = new_text
+
+                                st.toast("Chapter Updated")
+                                time.sleep(0.3)
+                                st.rerun()
+
+                elif assistant_mode == "Summary":
+                    summary_cooldown = _cooldown_remaining(f"summary_{curr.id}", 10)
+                    summary_label = (
+                        f"Update Summary ({summary_cooldown}s)"
+                        if summary_cooldown
+                        else "Update Summary"
                     )
-                else:
                     if not active_key:
                         st.info(
-                            f"Add a {_provider_label(provider)} API key in AI Settings to auto-write chapters."
+                            f"Add a {_provider_label(provider)} API key in AI Settings to update summaries."
                         )
-                    auto_cooldown = _cooldown_remaining(f"auto_write_{curr.id}", 12)
-                    auto_label = (
-                        f"Auto-Write Chapter ({auto_cooldown}s)"
-                        if auto_cooldown
-                        else "Auto-Write Chapter"
-                    )
                     if st.button(
-                        auto_label,
+                        summary_label,
                         type="primary",
                         use_container_width=True,
-                        disabled=bool(auto_cooldown) or not active_key,
-                        key=f"editor_autowrite_{curr.id}",
+                        disabled=bool(summary_cooldown) or not active_key,
+                        key=f"editor_summary_{curr.id}",
                     ):
-                        _mark_action(f"auto_write_{curr.id}")
-                        chapter_lengths = [
-                            int(ch.word_count or 0)
-                            for ch in p.get_ordered_chapters()
-                            if int(ch.word_count or 0) > 0
-                        ]
-                        avg_length = int(sum(chapter_lengths) / len(chapter_lengths)) if chapter_lengths else 0
-                        ai_target_words = int(avg_length or p.default_word_count or 1000)
-                        prompt = StoryEngine.generate_chapter_prompt(p, curr.index, ai_target_words)
-                        full = ""
-                        for chunk in AIEngine().generate_stream(prompt, get_ai_model()):
-                            full += chunk
-                            stream_ph.markdown(f"**GENERATING:**\n\n{full}")
-
-                        if full.strip():
-                            if full.strip().startswith("ERROR: Canon violation detected."):
-                                st.error("Canon violation detected. Resolve issues before generating AI content.")
-                                return
-                            violations = detect_hard_canon_violation(p, curr.index, full)
-                            if violations:
-                                results = st.session_state.get("coherence_results", [])
-                                results.extend(violations)
-                                st.session_state["coherence_results"] = results
-                                update_locked_chapters()
-                                st.warning("Hard Canon conflict detected. AI output was not applied.")
-                                return
-                            new_text = ((curr.content or "") + "\n" + full.strip()).strip()
-                            curr.update_content(new_text, "AI Auto-Write")
+                        _mark_action(f"summary_{curr.id}")
+                        summary = StoryEngine.summarize(curr.content or "", get_ai_model())
+                        if summary.strip().startswith("ERROR: Canon violation detected."):
+                            st.error("Canon violation detected. Resolve issues before generating AI content.")
+                        else:
+                            curr.summary = summary
                             _update_session_chapter(curr)
                             persist_project(p)
-
-                            # Queue sync into editor widget on next run (do NOT set ed_key here!)
-                            st.session_state._chapter_sync_id = curr.id
-                            st.session_state._chapter_sync_text = new_text
-
-                            st.toast("Chapter Updated")
-                            time.sleep(0.3)
                             st.rerun()
+                    if curr.summary:
+                        st.text_area(
+                            "Current summary",
+                            curr.summary,
+                            height=220,
+                            disabled=True,
+                            key=f"editor_summary_preview_{curr.id}",
+                        )
+                    else:
+                        st.info("No summary yet.")
 
-                st.divider()
-                st.markdown("#### Summary")
-                if curr.summary:
-                    st.info(curr.summary)
                 else:
-                    st.info("No summary yet. Click **Update Summary** to generate one.")
+                    st.metric("Chapter words", f"{curr.word_count:,}")
+                    st.metric("All chapters", f"{p.get_total_word_count():,}")
+                    st.metric("Target", f"{int(p.default_word_count or 1000):,}")
+                    avg_target = st.number_input(
+                        "AI avg/chapter",
+                        min_value=200,
+                        max_value=6000,
+                        step=50,
+                        value=int(p.default_word_count or 1000),
+                        key=f"editor_tools_default_word_avg_{p.id}",
+                        help="Fallback length target for AI chapter generation.",
+                    )
+                    if int(avg_target) != int(p.default_word_count or 1000):
+                        p.default_word_count = int(avg_target)
+                        save_p()
+                        st.rerun()
+                    if st.button("Open Insights", use_container_width=True, key=f"editor_assistant_insights_{curr.id}"):
+                        st.session_state.page = "insights"
+                        st.rerun()
 
         pending_text = st.session_state.get("pending_improvement_text") or ""
         pending_meta = st.session_state.get("pending_improvement_meta") or {}
@@ -8325,6 +8033,8 @@ def _run_ui():
                             st.session_state.chapter_text_prev = {
                                 "chapter_id": curr.id,
                                 "text": curr.content or "",
+                                "action": "AI Improve",
+                                "timestamp": time.time(),
                             }
                             new_text = pending_text or ""
                             curr.update_content(new_text, "AI Improve")
@@ -8348,6 +8058,8 @@ def _run_ui():
                             st.session_state.chapter_text_prev = {
                                 "chapter_id": curr.id,
                                 "text": curr.content or "",
+                                "action": "AI Improve",
+                                "timestamp": time.time(),
                             }
                             new_text = ((curr.content or "") + "\n" + (pending_text or "")).strip()
                             curr.update_content(new_text, "AI Improve Append")
@@ -8402,84 +8114,15 @@ def _run_ui():
                         st.session_state.pending_improvement_meta = {}
                         st.rerun()
 
-    def _render_scroll_top_script() -> None:
-        components.html(
-            """
-            <script>
-              (function () {
-                const topWin = window.parent || window;
-                const topDoc = topWin.document || document;
-                try { topWin.history.scrollRestoration = "manual"; } catch (_) {}
-
-                function scrollTarget(el) {
-                  if (!el) return;
-                  try {
-                    if (typeof el.scrollTo === "function") {
-                      el.scrollTo({ top: 0, left: 0, behavior: "auto" });
-                    }
-                    el.scrollTop = 0;
-                    el.scrollLeft = 0;
-                  } catch (_) {}
-                }
-
-                function doScroll() {
-                  const selectors = [
-                    "section.main",
-                    "[data-testid='stAppViewContainer']",
-                    "[data-testid='stMain']",
-                    "[data-testid='stVerticalBlock']",
-                    ".main",
-                    "main",
-                  ];
-                  selectors.forEach((selector) => {
-                    try { topDoc.querySelectorAll(selector).forEach(scrollTarget); } catch (_) {}
-                  });
-                  [
-                    topDoc.scrollingElement,
-                    topDoc.documentElement,
-                    topDoc.body,
-                    topWin,
-                  ].forEach(scrollTarget);
-                  try { topWin.scrollTo({ top: 0, left: 0, behavior: "auto" }); } catch (_) {}
-                  try { topWin.scrollTo(0, 0); } catch (_) {}
-                  try {
-                    if (topWin.location && topWin.location.hash) {
-                      topWin.history.replaceState(null, "", topWin.location.pathname + topWin.location.search);
-                    }
-                  } catch (_) {}
-                }
-
-                doScroll();
-                try { topWin.requestAnimationFrame(doScroll); } catch (_) {}
-                [25, 75, 150, 300, 600, 1000, 1500].forEach((delay) => setTimeout(doScroll, delay));
-                try {
-                  const app = topDoc.querySelector("[data-testid='stAppViewContainer']") || topDoc.body;
-                  const observer = new MutationObserver(doScroll);
-                  observer.observe(app, { childList: true, subtree: true });
-                  setTimeout(() => observer.disconnect(), 1600);
-                } catch (_) {}
-              })();
-            </script>
-            """,
-            height=0,
-        )
-
     def _render_current_page() -> None:
         rendered_page = False
         current_page = st.session_state.get("page")
+        previous_page = st.session_state.get("_last_rendered_page")
+        page_changed = bool(previous_page) and previous_page != current_page
         logger.info(f"Rendering page: {current_page}")
-        last_page = st.session_state.get("_last_rendered_page")
-        scroll_nonce = int(st.session_state.get("_scroll_top_nonce", 0))
-        last_scroll_nonce = int(st.session_state.get("_last_scroll_top_nonce", -1))
-        should_scroll_top = (
-            (current_page != last_page)
-            or (scroll_nonce != last_scroll_nonce)
-            or bool(st.session_state.pop("_scroll_top_pending", False))
-        )
-        if should_scroll_top:
-            st.session_state["_last_rendered_page"] = current_page
-            st.session_state["_last_scroll_top_nonce"] = scroll_nonce
-            _render_scroll_top_script()
+        st.session_state["_last_rendered_page"] = current_page
+        if page_changed:
+            _render_page_position_reset()
         
         if st.session_state.page == "home":
             logger.debug("Rendering home/dashboard page")
@@ -8574,8 +8217,6 @@ def _run_ui():
         if rendered_page:
             logger.debug("Rendering footer")
             render_app_footer()
-            if should_scroll_top:
-                _render_scroll_top_script()
             logger.info(f"Page '{current_page}' rendered successfully")
 
     # Render with comprehensive error handling and fallback UI
@@ -8717,7 +8358,12 @@ def run_repair() -> int:
     os.makedirs(projects_dir, exist_ok=True)
     os.makedirs(backups_dir, exist_ok=True)
 
-    files = [f for f in os.listdir(projects_dir) if f.lower().endswith(".json")]
+    files = [
+        f for f in os.listdir(projects_dir)
+        if f.lower().endswith(".json")
+        and not f.startswith(".")
+        and f.lower() != ".mantis_config.json"
+    ]
     if not files:
         print("[REPAIR] No project files found.")
         return 0

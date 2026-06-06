@@ -1,6 +1,6 @@
 from pathlib import Path
 
-DEFAULT_APP_VERSION = "134.2"
+DEFAULT_APP_VERSION = "135.4"
 
 
 def get_app_version() -> str:

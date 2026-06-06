@@ -145,8 +145,6 @@ def render_navigation_section(
                         on_navigate(target)
                     else:
                         st.session_state.page = target
-                        st.session_state["_scroll_top_nonce"] = int(st.session_state.get("_scroll_top_nonce", 0)) + 1
-                        st.session_state["_scroll_top_pending"] = True
                         st.rerun()
 
 

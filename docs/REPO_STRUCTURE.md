@@ -20,7 +20,7 @@ age. New code should land in the narrowest folder that owns the behavior.
 - `app/services/` - business logic and provider clients.
 - `app/utils/` - small reusable helpers with minimal app knowledge.
 - `app/layout/` - app shell components such as sidebar, header, and footer.
-- `app/ui/` - low-level UI styling/helpers and compatibility shims.
+- `app/ui/` - low-level UI styling and helper components.
 - `app/views/` - page-level UI modules.
 - `app/components/` - reusable Streamlit components.
 - `app/models/` - shared data models when they are split out of legacy modules.
@@ -36,4 +36,3 @@ age. New code should land in the narrowest folder that owns the behavior.
 ## Current Migration Note
 
 `app/main.py` still contains legacy page code and duplicated model logic. New features should avoid growing it further unless they are temporary wiring. As pages are touched, move stable page sections into `app/views/` and business logic into `app/services/`.
-

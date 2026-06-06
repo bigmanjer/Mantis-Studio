@@ -112,11 +112,13 @@ Rule:
   - `Show Sidebar` when collapsed
 
 - World Bible auto-apply default confidence is now `0.83` (83%); suggestions at or above the threshold apply automatically, while lower-confidence suggestions remain queued for review.
-- Insights includes Coherence Check as a primary risk workflow. Each coherence issue must explain the problem, target text, suggested replacement, and whether Apply Fix replaces exact text or appends the rewrite.
-- Footer "Back to top" uses a multi-container scroll handler for Streamlit containers.
+- Insights includes Coherence Check as a primary risk workflow. Each coherence issue must explain the problem, target text, suggested replacement, and whether Apply Fix will replace exact, normalized, or fuzzy-matched text. It must block instead of appending when no reliable passage is found.
+- Memory pages should not render Coherence Check. Memory is for canon instructions and context only; coherence review belongs in Insights.
+- Insights owns review workflows: Canon Scanner, queued World Bible suggestions, and Coherence Check live there. World Bible remains the canon entity database/editor.
+- Editor workspace layout keeps chapter movement in the left rail, the manuscript editor as the widest column, and Assistant controls grouped by task modes.
 - Query-param page routing now includes a loop guard to prevent repeated rerun redirects.
-- Page changes trigger an auto-scroll to top so navigation always lands at the page start.
-- Sidebar IA: `Memory` and `Insights` are grouped under their own `Intelligence` section (not under `Settings`).
+- Page navigation may use the one-shot `#mantis-top` anchor reset when the active page changes. Do not reintroduce repeated scroll timers, mutation observers, or global `scrollRestoration` overrides.
+- Sidebar/footer IA: `Insights` appears before `Memory` in the `Intelligence` section because risk, health, canon suggestions, and coherence review are checked before editing AI memory/instructions.
 - Sidebar IA: there is no separate `Export` page; export actions live in Projects so project management and manuscript download stay together.
 - Light mode regression baseline is validated with `python scripts/toolbox.py visual --base-url http://localhost:8501`.
 - Theme CSS now explicitly styles Streamlit metric internals (`stMetricLabel`, `stMetricValue`, `stMetricDelta`) to prevent washed-out values in Light mode.
@@ -128,6 +130,6 @@ Rule:
   - disabled button readability
   - sidebar button label color lock
   - sidebar workspace chip title/meta color lock
-- Navigation/top landing hardening: sidebar page clicks now increment a scroll nonce, and page render runs a repeated multi-target scroll-to-top routine so page transitions always land at the top (not footer).
+- Navigation/top landing hardening: the earlier scroll nonce/top-scroll routine was removed after it caused viewport jumps; keep top landing limited to the page-change anchor reset and footer `#mantis-top` links.
 - Light mode consistency pass: legacy dark-hardcoded dashboard utility styles were converted to theme-token-driven colors.
 - Docs policy: when behavior changes in routing/state/theme/footer, update `HANDBOOK.md` and `CHANGELOG.md` in the same change set.

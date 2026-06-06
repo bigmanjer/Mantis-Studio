@@ -7,7 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Stability
-- Insights workflow: added the full Coherence Check panel to Insights with explicit target text, suggested replacement, and a clear explanation of whether Apply Fix will replace or append.
+- Navigation landing fix: page changes now reset to the `#mantis-top` anchor once, and footer navigation links target that anchor, so Streamlit reruns no longer leave users staring at the footer after navigation.
+- Outline action layout: moved `Undo last outline apply` into Revision Tools and placed `Save Outline` at the bottom of the Blueprint panel to match the Editor action flow.
+- Auth page polish: rebuilt the account entry screen around the MANTIS brand lockup, a clearer Plan/Draft/Review value flow, an integrated guest path, and a compact account-access panel that fits laptop-height viewports.
+- Editor action layout: Chapter Flow now only handles Previous, Next, chapter selection, New, and Delete; Save Chapter sits below the editor dropdown tools, and Update Summary moved into Assistant > Summary.
+- Scroll stability: removed the automatic page-transition scroll script and theme-level scroll injection that could cause pages to land at the footer or jump unexpectedly.
+- Insights consolidation: moved the relationship graph into Insights so canon health, graph review, scanner results, and coherence checks live in one review page.
+- World Bible cleanup: World Bible cards now keep entity names clean and show status as metadata instead of prefixing names with `Unused`.
+- Memory cleanup: scanned canon facts now belong in World Bible; Memory's soft area is labeled Writing Guidance and no longer receives automatic soft-memory additions.
+- Settings order: Settings navigation now lists Workspace Settings, AI Settings, then User Settings in both sidebar and footer.
+- Project discovery hardening: hidden config JSON files are excluded from project discovery and repair passes so saving AI settings cannot appear as a random project.
+- Welcome onboarding: replaced the jumbled welcome tips with a Start, Write, Review flow plus links to the Getting Started guide and changelog.
+- Release notes UX: replaced stale self-referential update messaging with real current highlights and added a compact latest-update summary plus changelog link to the welcome card.
+- Compatibility shim cleanup: removed obsolete `app/components/ui.py`, `app/ui/theme.py`, `app/ui/layout.py`, and `app/ui/footer_shared.py` wrappers after moving imports to the canonical modules; removed unused split-card helpers from `app/ui/components.py`.
+- Runtime consolidation: removed the legacy `app/app_context.py` duplicate Streamlit implementation so the enhanced sidebar and `app/main.py` are the only live app path.
+- Editor find/replace safety: renamed the action to Apply replacement, defaulted replacement scope to the first exact match, added optional all-match scope, and surfaced an in-panel undo only after a replacement is applied.
+- Editor Chapter Flow: replaced the top stats strip and long left chapter list with a compact dropdown-driven Chapter Flow bar containing Previous, Next, chapter select, New, Delete, Outline, and World Bible actions.
+- Editor workspace restructure: removed the redundant top jump bar, moved chapter movement into the chapter rail, widened the writing surface, compacted draft stats, and changed Assistant to Write/Summary/Tools modes.
+- Memory IA cleanup: removed Coherence Check from Memory now that Insights owns coherence review.
+- Insights IA cleanup: moved Canon Scanner and queued World Bible suggestion review into Insights so canon review work happens in one place.
+- Intelligence navigation order: Insights now appears before Memory in sidebar, footer, and dashboard quick actions so users check risk and project health before editing AI instructions.
+- Insights workflow: added the full Coherence Check panel to Insights with explicit target text, suggested replacement, and smart replacement behavior that blocks instead of appending when it cannot locate the passage.
 - Canon scanner fix: high-confidence World Bible suggestions now auto-apply once they meet the configured threshold, while lower-confidence suggestions stay queued for review.
 - Canon intelligence foundation: added deterministic chapter analysis for extracted facts, relationships, timeline events, memory suggestions, and canon conflicts, then surfaced latest-chapter signals in Insights.
 - Settings IA cleanup: moved super-admin OAuth and user administration controls from Workspace Settings into User Settings.
@@ -42,19 +62,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Crash fix: replaced invalid Streamlit `icon="!"` values with valid emoji characters so settings and World Bible pages render normally again.
 - Light mode button readability: hardened disabled button styles so inactive actions use readable light surfaces instead of dark blocks.
 - Navigation IA: `Export` is available as a primary workflow item while project workflows still expose export actions where useful.
-- Sidebar information architecture: restored `Memory` and `Insights` to their own `Intelligence` section in the sidebar.
+- Sidebar information architecture: restored `Insights` and `Memory` to their own `Intelligence` section in the sidebar.
 - Routing hardening: added query-parameter page navigation guard to prevent rerun redirect loops.
-- Navigation UX: page changes now auto-scroll to top for consistent landing behavior.
-- Footer UX: "Back to top" now targets all Streamlit scroll containers instead of a single element.
+- Navigation UX: removed automatic scroll forcing from page changes after it caused inconsistent landing positions in Streamlit.
+- Footer UX: removed the Back to top control and its scroll handler while app-shell scroll behavior is being reworked.
 - Canon defaults: World Bible auto-apply confidence default increased to `0.83` (83%).
 - Theme consistency: removed hardcoded dark forcing in shell styles so Light mode can apply correctly.
 - Light mode hardening: added explicit Streamlit metric selectors (`stMetricLabel`, `stMetricValue`, `stMetricDelta`) so metric text remains readable in Light mode.
 - QA evidence: reran screenshot regression with `scripts/toolbox.py visual --base-url http://localhost:8501`; artifacts updated under `artifacts/visual_regression/`.
-- Navigation landing fix: sidebar page transitions now trigger a scroll nonce and a repeated, multi-container top-scroll script (main section + app container + document/body) to prevent landing at footer.
+- Navigation landing rollback: removed the earlier scroll nonce and repeated multi-container top-scroll script because it introduced viewport jumps.
 - Dashboard light-theme cleanup: replaced remaining hardcoded dark utility card/status colors with theme tokens for consistent Light-mode rendering.
 - Light-mode permanence pass: added a final, theme-scoped CSS enforcement layer (loaded after shared button CSS) so disabled actions, alerts, and sidebar cards stay readable in Light mode across all pages.
 - Sidebar control wording: standardized collapsed-state control to `Show Sidebar` (open-state remains `Hide Sidebar`) for one consistent toggle flow.
-- Theme duplication cleanup: converted legacy `app/ui/theme.py` into a compatibility shim that forwards to `app/ui/enhanced_theme.py`, preventing parallel theme systems from diverging.
+- Theme duplication cleanup: consolidated theme injection on `app/ui/enhanced_theme.py`, preventing parallel theme systems from diverging.
 - Dashboard cleanup: removed corrupted/garbled dashboard labels, switched KPI label from `System health` to `Workflow readiness`, and normalized CTA text to plain readable labels.
 - Onboarding UX: reordered dashboard checklist so `AI connected` appears first, then project/outline/chapter steps.
 - Light mode hardening (phase 2): added high-priority button text/background overrides (including sidebar buttons and primary/disabled variants) plus explicit sidebar project-chip text color enforcement for reliable readability.
@@ -67,13 +87,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Branding asset map
 - `assets/branding/mantis_favicon.png`  Streamlit `page_icon` metadata
-- `assets/branding/mantis_wordmark.png`  `app_context` header logo
+- `assets/branding/mantis_wordmark.png`  header logo
 - `assets/branding/mantis_lockup.png`  `main.py` top brand header
 - `assets/branding/mantis_emblem.png`  sidebar brand + compact header icon
 
 ### Changelog output
 - Images sliced at runtime: 8 outputs (`mantis_emblem`, `mantis_wordmark`, `mantis_lockup`, `mantis_favicon`, each with 1x and 2x variants).
-- Code files updated: `app/app_context.py`, `app/main.py`, `app/layout/enhanced_sidebar.py`, `app/utils/branding_assets.py`.
+- Code files updated: `app/main.py`, `app/layout/enhanced_sidebar.py`, `app/utils/branding_assets.py`.
 
 ### Fixed
 -  Eliminated binary image slices from git history moving forward by generating derived branding assets on demand, which avoids PR tooling failures on binary diffs.

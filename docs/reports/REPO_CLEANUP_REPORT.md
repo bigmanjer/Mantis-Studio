@@ -57,13 +57,14 @@ Working copy: `C:\Users\BIGMANJER\Documents\Playground\mantis testing`
 
 ### Kept
 - `streamlit_app.py`: retained as deployment compatibility shim.
-- `app/app_context.py`: retained because tests still import it.
+- `app/app_context.py`: previously retained for test compatibility; now retired after test/runtime imports were removed.
 
 ### Merged / Consolidated
 - `app/router.py:get_nav_config` now delegates directly to `app.utils.navigation.get_nav_config`.
 - Reason: one canonical nav source; removes duplicated mapping construction.
 
 ### Deleted
+- `app/app_context.py`: duplicate Streamlit runtime/sidebar implementation retired in favor of `app/main.py` plus `app/layout/enhanced_sidebar.py`.
 - `app/views/home.py`: redundant wrapper not used by router.
 - `app/views/world.py`: redundant wrapper not used by router.
 - `app/views/routes.py`: duplicate route table not used by runtime router.
@@ -120,7 +121,7 @@ Working copy: `C:\Users\BIGMANJER\Documents\Playground\mantis testing`
 ## 6) Follow-up Recommendations
 
 1. Gradually extract render logic from `app/main.py` into `app/views/*` and keep services UI-free.
-2. Retire `app/app_context.py` only after removing test/runtime imports.
+2. Keep `app/main.py` as the single Streamlit runtime and avoid reintroducing alternate app implementations.
 3. Add a small architecture CI check that fails on tracked cache/runtime artifacts.
 4. Consider moving historical QA screenshots to an external artifact store if long-term retention is needed.
 

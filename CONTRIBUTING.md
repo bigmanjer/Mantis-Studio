@@ -33,11 +33,10 @@ streamlit run app/main.py
 ```
 app/
  main.py              # Main Streamlit entry point (state-driven navigation)
- app_context.py       # Alternative implementation (reference only)
  config/              # Application settings and configuration
     settings.py      # AppConfig, env vars, logging setup
  views/               # UI screens (dashboard, projects, editor, etc.)
- components/          # Reusable UI blocks (buttons and compatibility exports)
+ components/          # Reusable UI blocks and buttons
  services/            # Business logic (AI, projects, export, storage)
     ai.py            # AI engine and LLM integration
     projects.py      # Project/Chapter/Entity data models

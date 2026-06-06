@@ -47,18 +47,9 @@ class TestCriticalImports:
             source,
         )
 
-        ctx = importlib.import_module("app.app_context")
-        ctx_source = Path(ctx.__file__).read_text(encoding="utf-8")
-        assert re.search(
-            r"st\.button\([\s\S]*?['\"]\s*Create Chapter 1['\"][\s\S]*?"
-            r"key\s*=\s*['\"]editor_create_chapter_1['\"]",
-            ctx_source,
-        )
-        assert re.search(
-            r"st\.button\([\s\S]*?['\"]\s*New Chapter['\"][\s\S]*?"
-            r"key\s*=\s*['\"]editor_new_chapter['\"]",
-            ctx_source,
-        )
+        workspace = importlib.import_module("app.views.editor_workspace")
+        workspace_source = Path(workspace.__file__).read_text(encoding="utf-8")
+        assert "editor_flow_new_chapter" in workspace_source
 
     def test_import_difflib(self):
         """difflib is required for the editor diff view."""
@@ -83,7 +74,7 @@ class TestCriticalImports:
         assert page_map.get("Dashboard") == "home"
 
     def test_import_ui_components(self):
-        ui = importlib.import_module("app.components.ui")
+        ui = importlib.import_module("app.components.buttons")
         required = ("card", "section_header", "primary_button", "stat_tile", "action_card")
         missing = [name for name in required if not hasattr(ui, name)]
         assert not missing, f"Missing UI helpers: {', '.join(missing)}"
@@ -98,10 +89,11 @@ class TestCriticalImports:
         assert hasattr(ver, "get_app_version")
 
     def test_import_ui_theme(self):
-        importlib.import_module("app.ui.theme")
+        theme = importlib.import_module("app.ui.enhanced_theme")
+        assert hasattr(theme, "inject_enhanced_theme")
 
     def test_import_ui_layout(self):
-        importlib.import_module("app.ui.layout")
+        importlib.import_module("app.layout.layout")
 
     def test_import_ui_components_file(self):
         mod = importlib.import_module("app.ui.components")
@@ -378,11 +370,11 @@ class TestNavigationParity:
     def test_footer_nav_links_match_nav_items(self):
         """The footer link builder must produce one link per NAV_ITEMS entry."""
         from app.utils.navigation import get_nav_items
-        from app.ui.layout import _build_footer_nav_links
+        from app.layout.layout import _build_footer_nav_links
 
         html = _build_footer_nav_links()
         for label, page_key, icon in get_nav_items():
-            assert f'href="?page={page_key}"' in html, (
+            assert f'href="?page={page_key}#mantis-top"' in html, (
                 f"Footer missing link for {label} (?page={page_key})"
             )
             assert label in html, f"Footer missing label text '{label}'"
@@ -394,7 +386,7 @@ class TestNavigationParity:
 
         html = _build_footer_nav_links()
         for label, page_key, icon in get_nav_items():
-            assert f'href="?page={page_key}"' in html, (
+            assert f'href="?page={page_key}#mantis-top"' in html, (
                 f"Layout footer missing link for {label} (?page={page_key})"
             )
 
@@ -410,13 +402,45 @@ class TestNavigationParity:
         for label, page_key, _ in NAV_ITEMS:
             assert pmap[label] == page_key
 
-    def test_main_page_navigation_forces_top_scroll(self):
-        """Page changes must disable browser scroll restoration and re-scroll after render."""
+    def test_insights_precedes_memory_in_sidebar_and_footer_order(self):
+        from app.utils.navigation import get_nav_items, get_nav_sections
+        from app.layout.layout import _build_footer_nav_links
+
+        intelligence = dict(get_nav_sections())["Intelligence"]
+        intelligence_labels = [label for label, _, _ in intelligence]
+        assert intelligence_labels.index("Insights") < intelligence_labels.index("Memory")
+
+        flat_labels = [label for label, _, _ in get_nav_items()]
+        assert flat_labels.index("Insights") < flat_labels.index("Memory")
+
+        html = _build_footer_nav_links()
+        assert html.index("?page=insights") < html.index("?page=memory")
+
+    def test_settings_order_is_workspace_ai_user(self):
+        from app.utils.navigation import get_nav_sections
+        from app.layout.layout import _build_footer_nav_links
+
+        settings = dict(get_nav_sections())["Settings"]
+        labels = [label for label, _, _ in settings]
+        assert labels == ["Workspace Settings", "AI Settings", "User Settings"]
+
+        html = _build_footer_nav_links()
+        assert html.index("?page=workspace") < html.index("?page=ai") < html.index("?page=user")
+
+    def test_dashboard_quick_actions_prioritize_insights_before_memory(self):
+        source = (ROOT / "app" / "views" / "dashboard_workspace.py").read_text(encoding="utf-8")
+        assert source.index('key="qa_insights"') < source.index('key="qa_memory"')
+
+    def test_main_page_navigation_uses_one_shot_top_anchor_reset(self):
+        """Page changes should reset to the top without the old aggressive scroll loop."""
         source = (ROOT / "app" / "main.py").read_text(encoding="utf-8")
         assert "def navigate_to_page(" in source
-        assert "_scroll_top_pending" in source
-        assert 'scrollRestoration = "manual"' in source
-        assert "MutationObserver(doScroll)" in source
+        assert "def _render_page_position_reset(" in source
+        assert "mantis-top" in source
+        assert "scrollIntoView" in source
+        assert "_scroll_top_pending" not in source
+        assert 'scrollRestoration = "manual"' not in source
+        assert "MutationObserver(doScroll)" not in source
         assert '"user",' in source
 
 
@@ -611,6 +635,29 @@ class TestUtilities:
         from app.main import get_app_version
         version = get_app_version()
         assert version  # non-empty string
+
+    def test_whats_new_uses_real_release_highlights(self):
+        source = (ROOT / "app" / "main.py").read_text(encoding="utf-8")
+        assert "def _release_highlights()" in source
+        assert "Chapter Flow now uses a compact chapter dropdown with Previous, Next, New, and Delete actions." in source
+        assert "Find and replace now defaults to the first exact match" in source
+        assert "Canon Scanner, queued canon suggestions, and Coherence Check now live in Insights" in source
+        assert "Relationship graph moved out of World Bible and into Insights" in source
+        assert "Legacy duplicate runtime and UI compatibility shims were removed" in source
+        assert "What's New in Mantis Studio" not in source
+        assert "check_and_show_whats_new" not in source
+        assert "You can now see what changed between versions" not in source
+        assert "This notification system was added" not in source
+        assert "Why This Matters" not in source
+        assert "webbrowser.open" not in source
+
+    def test_welcome_banner_surfaces_latest_update_and_changelog(self):
+        source = (ROOT / "app" / "main.py").read_text(encoding="utf-8")
+        welcome_block = source[source.index("### Welcome to MANTIS Studio"):source.index("elif st.session_state.get(\"first_run\"")]
+        assert "Latest update highlights" in source
+        assert "render_release_summary(compact=True)" in welcome_block
+        assert "Open changelog" in welcome_block
+        assert "AppConfig.CHANGELOG_URL" in welcome_block
 
     def test_truncate_prompt(self):
         from app.main import _truncate_prompt
@@ -1046,11 +1093,6 @@ class TestLayoutConsolidation:
         from app.layout.layout import _CURRENT_YEAR
         assert _CURRENT_YEAR >= 2026
 
-    def test_ui_footer_year_is_dynamic(self):
-        from app.ui.layout import _CURRENT_YEAR
-        assert _CURRENT_YEAR >= 2026
-
-
 class TestOAuthAndRepoStructure:
     """OAuth and repo organization should live in dedicated modules."""
 
@@ -1367,12 +1409,11 @@ class TestHtmlRendering:
 
     _UI_MODULES = [
         "app/ui/components.py",
-        "app/ui/theme.py",
-        "app/ui/layout.py",
+        "app/ui/enhanced_theme.py",
         "app/components/buttons.py",
         "app/layout/layout.py",
         "app/main.py",
-        "app/app_context.py",
+        "app/layout/enhanced_sidebar.py",
     ]
 
     def test_no_unsafe_allow_html_in_ui_modules(self):
@@ -1404,18 +1445,15 @@ class TestHtmlRendering:
 
     def test_theme_uses_st_html(self):
         """Theme injection should use st.html() for CSS."""
-        path = ROOT / "app" / "ui" / "theme.py"
+        path = ROOT / "app" / "ui" / "enhanced_theme.py"
         source = path.read_text(encoding="utf-8")
-        assert "st.html(" in source, "app/ui/theme.py should use st.html()"
+        assert "st.html(" in source, "app/ui/enhanced_theme.py should use st.html()"
 
-    def test_theme_injects_scroll_to_top(self):
-        """Theme injection should include a scroll-to-top script so that
-        every page navigation starts at the top of the viewport."""
-        path = ROOT / "app" / "ui" / "theme.py"
+    def test_theme_does_not_inject_scroll_to_top(self):
+        """Theme injection should not force scroll position."""
+        path = ROOT / "app" / "ui" / "enhanced_theme.py"
         source = path.read_text(encoding="utf-8")
-        assert "scrollTo" in source, (
-            "app/ui/theme.py should inject a scrollTo script for page navigation"
-        )
+        assert "scrollTo" not in source
 
 
 # ---------------------------------------------------------------------------
@@ -1967,6 +2005,25 @@ class TestMantisModelAndArchitectUX:
         assert "World Bible is the story encyclopedia" in source
         assert "Style Guide" in source
 
+    def test_auth_screen_uses_product_access_layout(self):
+        source = (ROOT / "app" / "main.py").read_text(encoding="utf-8")
+        auth_block = source[source.index("def _render_auth_gate()"):source.index("if not _render_auth_gate()")]
+        assert "branding/mantis_lockup.png" in auth_block
+        assert "Write with your canon intact." in auth_block
+        assert "mantis-auth-workflow" in auth_block
+        assert "Local-first access" in auth_block
+        assert "Continue as guest" in auth_block
+        assert "Account access" in auth_block
+        assert "Sign in or create an account" in auth_block
+        assert "Welcome to MANTIS Studio" not in auth_block
+
+    def test_memory_page_does_not_render_coherence_check(self):
+        source = (ROOT / "app" / "main.py").read_text(encoding="utf-8")
+        memory_block = source[source.index("def render_memory():"):source.index("def render_insights():")]
+        assert "Coherence Check" not in memory_block
+        assert "coh_run_memory" not in memory_block
+        assert "Use Insights for coherence checks" in memory_block
+
     def test_insights_uses_canon_intelligence_panel(self):
         source = (ROOT / "app" / "main.py").read_text(encoding="utf-8")
         assert "analyze_chapter_canon" in source
@@ -1979,7 +2036,19 @@ class TestMantisModelAndArchitectUX:
         assert 'render_coherence_panel(p, key_prefix="insights", title="Coherence Check")' in source
         assert "What Apply Fix will do" in source
         assert "replace the exact target text" in source
-        assert "append the suggested rewrite to the end of this chapter" in source
+        assert "replace the closest matching passage" in source
+        assert "could not confidently locate the passage" in source
+
+    def test_insights_owns_canon_scanner_and_review_queue(self):
+        source = (ROOT / "app" / "main.py").read_text(encoding="utf-8")
+        world_block = source[source.index("def render_world():"):source.index("def render_memory():")]
+        insights_block = source[source.index("def render_insights():"):source.index("def render_chapters():")]
+        assert "Canon Scanner" not in world_block
+        assert "Scan All Chapters" not in world_block
+        assert "Review AI Suggestions" not in world_block
+        assert "Canon Scanner" in insights_block
+        assert "insights_scan_all_chapters" in insights_block
+        assert "Canon Suggestions" in insights_block
 
     def test_high_confidence_world_bible_updates_auto_apply(self):
         source = (ROOT / "app" / "main.py").read_text(encoding="utf-8")
@@ -1992,7 +2061,7 @@ class TestMantisModelAndArchitectUX:
     def test_world_bible_apply_focuses_updated_entity(self):
         source = (ROOT / "app" / "main.py").read_text(encoding="utf-8")
         assert 'st.session_state["world_focus_entity"] = applied_ent.id' in source
-        assert 'st.session_state["world_tabs"] = _world_tab_for_category(applied_ent.category)' in source
+        assert 'st.session_state["world_tabs"] = _insights_world_tab_for_category(applied_ent.category)' in source
         assert '"Item": "Items"' in source
 
     def test_world_bible_items_tab_is_visible(self):
@@ -2004,8 +2073,47 @@ class TestMantisModelAndArchitectUX:
     def test_editor_utility_bar_no_duplicate_quick_jump(self):
         source = (ROOT / "app" / "views" / "editor_workspace.py").read_text(encoding="utf-8")
         assert "Quick jump" not in source
-        assert "Draft status" in source
-        assert "Project total" in source
+        assert "Chapter Flow" in source
+        assert "editor_chapter_flow_select" in source
+        assert "editor_flow_new_chapter" in source
+        assert "editor_flow_delete" in source
+        assert "editor_flow_outline" not in source
+        assert "editor_flow_world" not in source
+        assert "render_chapter_sidebar" not in source
+        main_source = (ROOT / "app" / "main.py").read_text(encoding="utf-8")
+        assert "Assistant mode" in main_source
+        assert main_source.index('with st.expander("Modify / Improve Text"') < main_source.index('"Save Chapter"')
+        summary_block = main_source[main_source.index('elif assistant_mode == "Summary"'):main_source.index('else:', main_source.index('elif assistant_mode == "Summary"'))]
+        assert "Update Summary" in summary_block
+        assert "editor_jump_select" not in main_source
+        assert "render_chapter_sidebar" not in main_source
+
+    def test_editor_find_replace_uses_safe_apply_and_inline_undo(self):
+        source = (ROOT / "app" / "main.py").read_text(encoding="utf-8")
+        find_block = source[source.index('with st.expander("Find and replace'):source.index('with st.expander("Modify / Improve Text"')]
+        assert "Apply replace all" not in find_block
+        assert "Apply replacement" in find_block
+        assert "Replacement scope" in find_block
+        assert "First exact match" in find_block
+        assert "All exact matches" in find_block
+        assert '"action": "Find/Replace"' in find_block
+        assert "Undo replacement" in find_block
+        assert "st.session_state.chapter_text_prev = {}" in find_block
+
+    def test_editor_improve_undo_is_conditional(self):
+        source = (ROOT / "app" / "main.py").read_text(encoding="utf-8")
+        improve_block = source[source.index('with st.expander("Modify / Improve Text"'):source.index("chapter_drafts = [")]
+        assert "prev_apply.get(\"action\") != \"Find/Replace\"" in improve_block
+        assert "No previous chapter text available to restore." not in improve_block
+
+    def test_outline_save_and_undo_follow_editor_action_order(self):
+        source = (ROOT / "app" / "main.py").read_text(encoding="utf-8")
+        outline_block = source[source.index("def render_outline():"):source.index("def build_expander_label")]
+        revision_block = outline_block[outline_block.index('with st.expander("Revision Tools"'):outline_block.index("pending_outline =")]
+        assert "Undo last outline apply" in revision_block
+        assert 'st.session_state.pop("outline_prev_text", None)' in revision_block
+        assert "No previous outline text available." not in outline_block
+        assert outline_block.index('with st.expander("Revision Tools"') < outline_block.index('"Save Outline"')
 
 
 # ---------------------------------------------------------------------------
@@ -2015,30 +2123,9 @@ class TestMantisModelAndArchitectUX:
 class TestApplySuggestionClearsWidgetCache:
     """Verify that the apply-suggestion UI clears stale widget keys."""
 
-    def test_app_context_clears_desc_and_aliases_keys(self):
-        """The apply-suggestion code must pop desc_ and aliases_ keys from
-        session_state so the Notes text area picks up the updated value."""
-        import importlib
-        ctx = importlib.import_module("app.app_context")
-        source = Path(ctx.__file__).read_text(encoding="utf-8")
-
-        # Must capture return value from apply_suggestion
-        assert re.search(
-            r"=\s*_?apply_suggestion.*\(.*p.*,.*item.*\)",
-            source,
-        ), "apply_suggestion return value not captured"
-
-        # Must clear the widget key for description
-        assert re.search(
-            r'session_state\.pop\(\s*f["\']desc_',
-            source,
-        ), "session_state.pop for desc_ key not found"
-
-        # Must clear the widget key for aliases
-        assert re.search(
-            r'session_state\.pop\(\s*f["\']aliases_',
-            source,
-        ), "session_state.pop for aliases_ key not found"
+    def test_legacy_app_context_removed(self):
+        """The removed compatibility app should not keep duplicate UI alive."""
+        assert not (ROOT / "app" / "app_context.py").exists()
 
     def test_main_clears_desc_and_aliases_keys(self):
         """The apply-suggestion code in main.py must pop desc_ and aliases_

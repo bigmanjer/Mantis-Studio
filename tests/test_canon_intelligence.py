@@ -72,3 +72,65 @@ def test_context_packet_retrieves_relevant_entities():
     assert packet["hard_canon"] == "Aria's eyes are green."
     assert packet["soft_guidelines"] == "Keep political betrayals tense."
 
+
+def test_analyze_chapter_rejects_transient_eye_motion_as_fact():
+    project = _project()
+    project.world_db["maya"] = Entity(
+        id="maya",
+        name="Maya",
+        category="Character",
+        description="A survivor.",
+    )
+
+    report = analyze_chapter_canon(
+        project,
+        "Maya's eyes fluttered open. Maya carried a cracked silver key.",
+        chapter_id="ch3",
+        chapter_title="Chapter 3",
+    )
+
+    assert not any(
+        fact.subject == "Maya" and fact.attribute == "eyes" and "fluttered" in fact.value
+        for fact in report.facts
+    )
+    assert any(fact.subject == "Maya" and fact.attribute == "item" for fact in report.facts)
+
+
+def test_analyze_chapter_extracts_dense_scene_signals():
+    project = _project()
+    project.world_db["maya"] = Entity(
+        id="maya",
+        name="Maya",
+        category="Character",
+        description="A reluctant investigator.",
+    )
+    project.world_db["consortium"] = Entity(
+        id="consortium",
+        name="Consortium",
+        category="Faction",
+        description="A powerful faction.",
+    )
+    project.world_db["ironfall"] = Entity(
+        id="ironfall",
+        name="Ironfall",
+        category="Location",
+        description="A vertical city.",
+    )
+
+    report = analyze_chapter_canon(
+        project,
+        (
+            "Maya, a former courier, entered Ironfall with the Consortium on her tail. "
+            "Maya carried a cracked silver key and realized the room around her began to disintegrate. "
+            "Maya confronted Consortium agents and escaped through the market."
+        ),
+        chapter_id="ch4",
+        chapter_title="Chapter 4",
+    )
+
+    fact_pairs = {(fact.attribute, fact.value.lower()) for fact in report.facts}
+    assert any(attr == "role" and "former courier" in value for attr, value in fact_pairs)
+    assert any(attr == "location" and "ironfall" in value for attr, value in fact_pairs)
+    assert any(attr == "item" and "silver key" in value for attr, value in fact_pairs)
+    assert any(rel.source == "Maya" and rel.target == "Consortium" for rel in report.relationships)
+    assert len(report.events) >= 3

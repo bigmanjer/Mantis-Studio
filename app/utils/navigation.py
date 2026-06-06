@@ -8,6 +8,8 @@ NAV_ITEMS: List[Tuple[str, str, str]] = [
     ("Outline", "outline", ""),
     ("Editor", "chapters", ""),
     ("World Bible", "world", ""),
+    ("Insights", "insights", ""),
+    ("Memory", "memory", ""),
     ("AI Settings", "ai", ""),
 ]
 
@@ -20,13 +22,13 @@ NAV_SECTIONS: List[Tuple[str, List[Tuple[str, str, str]]]] = [
         ("World Bible", "world", ""),
     ]),
     ("Intelligence", [
-        ("Memory", "memory", ""),
         ("Insights", "insights", ""),
+        ("Memory", "memory", ""),
     ]),
     ("Settings", [
-        ("User Settings", "user", ""),
-        ("AI Settings", "ai", ""),
         ("Workspace Settings", "workspace", ""),
+        ("AI Settings", "ai", ""),
+        ("User Settings", "user", ""),
     ]),
 ]
 

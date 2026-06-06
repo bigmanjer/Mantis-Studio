@@ -5,7 +5,6 @@ from pathlib import Path
 from typing import Dict
 
 import streamlit as st
-import streamlit.components.v1 as components
 
 from app.utils.branding_assets import resolve_asset_path
 
@@ -640,7 +639,7 @@ def _build_footer_nav_links() -> str:
             if page_key == "legal":
                 continue
             lines.append(
-                f'<li><a href="?page={page_key}">'
+                f'<li><a href="?page={page_key}#mantis-top">'
                 f'<span class="mantis-footer-icon">{icon}</span> {label}</a></li>'
             )
     return "\n            ".join(lines)
@@ -678,36 +677,6 @@ def render_footer(
         border-top: 1px solid var(--mantis-divider, #143023);
         background: var(--mantis-surface-alt, rgba(5,14,11,0.9));
         padding: 2.5rem 1.5rem 0;
-    }}
-
-    /*  Back-to-top  */
-    .mantis-footer-top {{
-        display: flex;
-        justify-content: flex-end;
-        max-width: 960px;
-        margin: 0 auto 1.5rem;
-    }}
-    .mantis-footer-top a {{
-        display: inline-flex;
-        align-items: center;
-        gap: 0.35rem;
-        font-size: 0.78rem;
-        font-weight: 600;
-        color: var(--mantis-muted, #9CA3AF);
-        text-decoration: none;
-        padding: 0.35rem 0.75rem;
-        border-radius: 999px;
-        border: 1px solid var(--mantis-divider, #143023);
-        transition: color 0.15s, border-color 0.15s;
-    }}
-    .mantis-footer-top a:hover {{
-        color: var(--mantis-accent, #22c55e);
-        border-color: var(--mantis-accent, #22c55e);
-    }}
-    .mantis-footer-top a:focus-visible {{
-        outline: 2px solid var(--mantis-accent, #22c55e);
-        outline-offset: 2px;
-        border-radius: 999px;
     }}
 
     /*  Grid  */
@@ -849,9 +818,6 @@ def render_footer(
     }}
     </style>
     <footer class="mantis-footer" role="contentinfo" aria-label="Site footer">
-      <div class="mantis-footer-top">
-        <a href="#" class="mantis-back-to-top" aria-label="Back to top">&uarr; Back to top</a>
-      </div>
       <div class="mantis-footer-grid">
         <div class="mantis-footer-section mantis-footer-brand">
           {"<img class='mantis-footer-logo' src='" + brand_logo_src + "' alt='MANTIS Studio' />" if brand_logo_src else ""}
@@ -867,15 +833,15 @@ def render_footer(
         <nav class="mantis-footer-section" aria-label="All Policies">
           <h4>All Policies</h4>
           <ul>
-            <li><a href="?page=terms">Terms of Service</a></li>
-            <li><a href="?page=privacy">Privacy Policy</a></li>
-            <li><a href="?page=legal">All Policies</a></li>
+            <li><a href="?page=terms#mantis-top">Terms of Service</a></li>
+            <li><a href="?page=privacy#mantis-top">Privacy Policy</a></li>
+            <li><a href="?page=legal#mantis-top">All Policies</a></li>
           </ul>
         </nav>
         <nav class="mantis-footer-section" aria-label="Support">
           <h4>Support</h4>
           <ul>
-            <li><a href="?page=help"><span class="mantis-footer-icon">&#9432;</span> Help</a></li>
+            <li><a href="?page=help#mantis-top"><span class="mantis-footer-icon">&#9432;</span> Help</a></li>
             <li><a href="{support_url}" target="_blank" rel="noopener noreferrer">Report an Issue <span class="mantis-footer-ext">&#8599;</span></a></li>
             <li><a href="mailto:{contact_email}"><span class="mantis-footer-icon">&#9993;</span> Contact</a></li>
           </ul>
@@ -889,43 +855,4 @@ def render_footer(
       </div>
     </footer>
     """,
-    )
-    components.html(
-        """
-        <script>
-          (function() {
-            function scrollToTop(doc, win) {
-              const targets = [
-                doc.querySelector('section.main'),
-                doc.querySelector('[data-testid="stAppViewContainer"]'),
-                doc.querySelector('[data-testid="stMain"]'),
-                doc.documentElement,
-                doc.body,
-              ].filter(Boolean);
-              targets.forEach((el) => {
-                try {
-                  if (typeof el.scrollTo === 'function') {
-                    el.scrollTo({ top: 0, behavior: 'smooth' });
-                  }
-                  el.scrollTop = 0;
-                } catch (_) {}
-              });
-              try { win.scrollTo({ top: 0, behavior: 'smooth' }); } catch (_) {}
-              try { win.scrollTo(0, 0); } catch (_) {}
-            }
-            const topWin = window.parent || window;
-            const topDoc = topWin.document || document;
-            const links = topDoc.querySelectorAll('.mantis-back-to-top');
-            links.forEach((link) => {
-              if (link.dataset.boundTop === '1') return;
-              link.dataset.boundTop = '1';
-              link.addEventListener('click', function(ev) {
-                ev.preventDefault();
-                scrollToTop(topDoc, topWin);
-              });
-            });
-          })();
-        </script>
-        """,
-        height=0,
     )

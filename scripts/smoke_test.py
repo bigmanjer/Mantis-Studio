@@ -21,7 +21,7 @@ def _check_imports() -> bool:
         ok = False
 
     try:
-        ui = importlib.import_module("app.components.ui")
+        ui = importlib.import_module("app.components.buttons")
         required = ("card", "section_header", "primary_button", "stat_tile", "action_card")
         missing = [name for name in required if not hasattr(ui, name)]
         if missing:

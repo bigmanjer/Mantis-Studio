@@ -10,7 +10,6 @@ app/
 +-- router.py               # Page routing + render fallback
 +-- session_init.py         # Session state bootstrap
 +-- state.py                # Key helpers + compatibility state wrapper
-+-- app_context.py          # Legacy compatibility module (still used by tests)
 +-- ui_context.py           # Shared UI context helper class
 +-- config/
    +-- settings.py         # App config + persistent config load/save
@@ -38,6 +37,7 @@ app/
 ## Cleanup Notes
 
 - `router.get_nav_config()` now delegates to `app.utils.navigation.get_nav_config()` to avoid duplicate nav mapping logic.
+- Retired `app_context.py`; `app/main.py` is the only Streamlit runtime implementation.
 - Thin duplicate view wrappers that were not used by runtime routing were removed.
 - Placeholder modules with no implementation were removed.
 - Generated caches are intentionally excluded from source control.

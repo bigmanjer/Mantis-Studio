@@ -91,7 +91,7 @@ was removed.
 2. Remaining `unsafe_allow_html=True` app usage was removed.
    Streamlit HTML snippets now use `st.html()`.
 
-3. Legacy `app/app_context.py` canon gating now matches `app/main.py`.
+3. Legacy `app/app_context.py` was retired so canon gating lives in `app/main.py` only.
    Canon statuses are `OK`, `WARN`, and `RISK`; Auto-Write only blocks on
    `RISK`.
 
@@ -121,7 +121,7 @@ Confirmed by audit/source search:
 
 - No `unsafe_allow_html` remains in runtime `app/` modules.
 - `app/main.py` selftest cleanup targets `selftest_dir`, not the projects root.
-- `app/app_context.py` blocks Auto-Write only on `RISK`.
+- `app/main.py` blocks Auto-Write only on `RISK`.
 - The full audit runner is present and wired into `scripts/toolbox.py qa`.
 
 ## Current Static Risks To Watch

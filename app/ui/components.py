@@ -88,9 +88,8 @@ def section_title(title: str, subtitle: Optional[str] = None) -> None:
 def card_block(title: Optional[str] = None, subtitle: Optional[str] = None) -> Generator[None, None, None]:
     """Render a styled card using Streamlit's native container.
 
-    Replaces the old card_start/card_end pattern which broke rendering
-    because Streamlit sanitizes each st.markdown call independently,
-    preventing split open/close ``<div>`` tags from working.
+    Use this context manager instead of split open/close card calls so
+    Streamlit keeps the container structure valid.
     """
     with st.container(border=True):
         if title:
@@ -98,25 +97,6 @@ def card_block(title: Optional[str] = None, subtitle: Optional[str] = None) -> G
         if subtitle:
             st.caption(subtitle)
         yield
-
-
-def card_start(title: Optional[str] = None, subtitle: Optional[str] = None) -> None:
-    """Deprecated  kept for backward compatibility.
-
-    Prefer :func:`card_block` context manager instead.  This now
-    delegates to ``st.container(border=True)`` so the opening markup
-    is no longer an orphaned ``<div>`` tag.
-    """
-    st.html("<div class='mantis-card'>")
-    if title:
-        st.markdown(f"### {title}")
-    if subtitle:
-        st.caption(subtitle)
-
-
-def card_end() -> None:
-    """Deprecated  kept for backward compatibility."""
-    st.html("</div>")
 
 
 def cta_tile(title: str, body: str, *, icon: Optional[str] = None, subtitle: Optional[str] = None) -> None:
@@ -315,4 +295,3 @@ def info_message(message: str) -> None:
         </div>
         """
     )
-

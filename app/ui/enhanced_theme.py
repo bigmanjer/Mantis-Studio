@@ -1087,5 +1087,3 @@ __all__ = [
     "generate_typography_css",
     "generate_component_css",
 ]
-
-

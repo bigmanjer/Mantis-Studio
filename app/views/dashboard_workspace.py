@@ -112,12 +112,12 @@ def render_dashboard_workspace(
                     on_open_world()
             with action_row[3]:
                 if st.button(
-                    "Memory",
+                    "Insights",
                     use_container_width=True,
                     disabled=not recent_projects,
-                    key="qa_memory",
+                    key="qa_insights",
                 ):
-                    on_open_memory()
+                    on_open_insights()
             with action_row[4]:
                 if st.button(
                     "New project",
@@ -125,17 +125,17 @@ def render_dashboard_workspace(
                     key="dashboard_new_project_focus",
                 ):
                     on_new_project()
-            insight_row = st.columns([1, 1])
-            with insight_row[0]:
+            memory_row = st.columns([1, 1])
+            with memory_row[0]:
                 st.caption("Pick up writing, canon, or project setup from one place.")
-            with insight_row[1]:
+            with memory_row[1]:
                 if st.button(
-                    "Insights",
+                    "Memory",
                     use_container_width=True,
                     disabled=not recent_projects,
-                    key="qa_insights",
+                    key="qa_memory",
                 ):
-                    on_open_insights()
+                    on_open_memory()
 
         st.html("<div style='height: 8px;'></div>")
         st.markdown("### My projects")

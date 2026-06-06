@@ -25,6 +25,15 @@ ATTRIBUTE_ALIASES: Dict[str, str] = {
     "rank": "rank",
     "title": "title",
     "weapon": "weapon",
+    "role": "role",
+    "occupation": "role",
+    "location": "location",
+    "place": "location",
+    "goal": "goal",
+    "knowledge": "knowledge",
+    "appearance": "appearance",
+    "item": "item",
+    "emotion": "emotional_state",
 }
 
 RELATIONSHIP_VERBS: Dict[str, str] = {
@@ -38,6 +47,68 @@ RELATIONSHIP_VERBS: Dict[str, str] = {
     "serves": "serves",
     "follows": "follows",
     "leads": "leads",
+    "meets": "meets",
+    "helps": "helps",
+    "attacks": "attacks",
+    "warns": "warns",
+    "confronts": "confronts",
+    "chases": "chases",
+    "pursues": "pursues",
+    "searches for": "searches_for",
+    "looks for": "searches_for",
+}
+
+TRANSIENT_BODY_ACTIONS: set[str] = {
+    "blinked",
+    "closed",
+    "darted",
+    "fluttered",
+    "fluttered open",
+    "narrowed",
+    "opened",
+    "shifted",
+    "widened",
+}
+
+EVENT_TRIGGERS: set[str] = {
+    "arrived",
+    "asked",
+    "attacked",
+    "battle",
+    "began",
+    "betrayal",
+    "betrayed",
+    "chased",
+    "collapsed",
+    "confronted",
+    "coronation",
+    "death",
+    "decided",
+    "destroyed",
+    "discovered",
+    "entered",
+    "escaped",
+    "fell",
+    "fled",
+    "found",
+    "heard",
+    "hid",
+    "killed",
+    "left",
+    "learned",
+    "met",
+    "opened",
+    "pursued",
+    "realized",
+    "reached",
+    "revealed",
+    "saw",
+    "searched",
+    "stumbled",
+    "took",
+    "turned",
+    "war",
+    "warned",
 }
 
 CONFLICTING_RELATIONS: Dict[str, set[str]] = {
@@ -191,6 +262,7 @@ def analyze_chapter_canon(
     """Analyze chapter text against project canon without mutating state."""
     sentences = _split_sentences(chapter_text)
     report = CanonIntelligenceReport()
+    entity_names = _known_entity_names(project)
 
     for sentence in sentences:
         evidence = CanonEvidence(
@@ -199,8 +271,8 @@ def analyze_chapter_canon(
             source_label=chapter_title,
             quote=sentence,
         )
-        facts = _extract_facts(sentence, evidence)
-        relationships = _extract_relationships(sentence, evidence)
+        facts = _extract_facts(sentence, evidence, entity_names=entity_names)
+        relationships = _extract_relationships(sentence, evidence, entity_names=entity_names)
         events = _extract_events(sentence, evidence)
 
         report.facts.extend(facts)
@@ -257,7 +329,12 @@ def _split_sentences(text: str) -> List[str]:
     ]
 
 
-def _extract_facts(sentence: str, evidence: CanonEvidence) -> List[CanonFact]:
+def _extract_facts(
+    sentence: str,
+    evidence: CanonEvidence,
+    *,
+    entity_names: Optional[List[str]] = None,
+) -> List[CanonFact]:
     facts: List[CanonFact] = []
     patterns = [
         re.compile(
@@ -280,43 +357,147 @@ def _extract_facts(sentence: str, evidence: CanonEvidence) -> List[CanonFact]:
                 value = raw_attr
             if raw_attr == "years old":
                 attr = "age"
-            if value:
-                facts.append(
-                    CanonFact(
-                        subject=match.group("subject").strip(),
-                        attribute=attr,
-                        value=value,
-                        confidence=0.78,
-                        evidence=evidence,
-                    )
-                )
+            _append_fact(
+                facts,
+                subject=match.group("subject").strip(),
+                attribute=attr,
+                value=value,
+                confidence=0.78,
+                evidence=evidence,
+            )
+
+    subject_pattern = _subject_pattern(entity_names)
+    sentence_patterns = [
+        (
+            re.compile(
+                rf"\b(?P<subject>{subject_pattern}),\s+(?:a|an|the)\s+"
+                r"(?P<value>[A-Za-z][A-Za-z0-9 '\-]{2,80}?)(?:,|\.|;| who\b| with\b| and\b)",
+                re.IGNORECASE,
+            ),
+            "role",
+            0.72,
+        ),
+        (
+            re.compile(
+                rf"\b(?P<subject>{subject_pattern})\s+(?:is|was|remains|became|becomes)\s+"
+                r"(?P<value>(?:a|an|the)?\s*[A-Za-z][A-Za-z0-9 '\-]{2,80}?)(?:,|\.|;| who\b| with\b| and\b)",
+                re.IGNORECASE,
+            ),
+            "role",
+            0.7,
+        ),
+        (
+            re.compile(
+                rf"\b(?P<subject>{subject_pattern})\s+(?:carried|carries|held|holds|gripped|grips|wielded|wields)\s+"
+                r"(?P<value>(?:a|an|the)?\s*[A-Za-z][A-Za-z0-9 '\-]{2,60}?)(?:,|\.|;| as\b| while\b| and\b)",
+                re.IGNORECASE,
+            ),
+            "item",
+            0.68,
+        ),
+        (
+            re.compile(
+                rf"\b(?P<subject>{subject_pattern})(?:,\s+[^,.;!?]{{2,80}},)?\s+"
+                r"(?:entered|reached|arrived at|arrived in|returned to|went to|moved through|stood in|hid in|slipped inside)\s+"
+                r"(?P<value>(?:the\s+)?[A-Z][A-Za-z0-9 '\-]{1,60}|(?:the|a|an)\s+[a-z][A-Za-z0-9 '\-]{2,60})(?:,|\.|;| as\b| while\b| and\b)",
+                re.IGNORECASE,
+            ),
+            "location",
+            0.68,
+        ),
+        (
+            re.compile(
+                rf"\b(?P<subject>{subject_pattern})\s+(?:knew|realized|remembered|learned|discovered|suspected|noticed)\s+"
+                r"(?P<value>that\s+)?(?P<detail>[A-Za-z0-9][^.;!?]{8,120})",
+                re.IGNORECASE,
+            ),
+            "knowledge",
+            0.62,
+        ),
+        (
+            re.compile(
+                rf"\b(?P<subject>{subject_pattern})\s+(?:felt|looked|seemed|appeared)\s+"
+                r"(?P<value>[A-Za-z][A-Za-z0-9 '\-]{2,50}?)(?:,|\.|;| as\b| while\b| and\b)",
+                re.IGNORECASE,
+            ),
+            "emotional_state",
+            0.58,
+        ),
+    ]
+    for pattern, attribute, confidence in sentence_patterns:
+        for match in pattern.finditer(sentence):
+            value = match.groupdict().get("detail") or match.groupdict().get("value") or ""
+            _append_fact(
+                facts,
+                subject=match.group("subject").strip(),
+                attribute=attribute,
+                value=_clean_value(value),
+                confidence=confidence,
+                evidence=evidence,
+            )
     return _dedupe_facts(facts)
 
 
-def _extract_relationships(sentence: str, evidence: CanonEvidence) -> List[RelationshipSignal]:
+def _extract_relationships(
+    sentence: str,
+    evidence: CanonEvidence,
+    *,
+    entity_names: Optional[List[str]] = None,
+) -> List[RelationshipSignal]:
     relationships: List[RelationshipSignal] = []
     verb_pattern = "|".join(re.escape(v) for v in RELATIONSHIP_VERBS)
+    subject_pattern = _subject_pattern(entity_names)
     pattern = re.compile(
-        r"\b(?P<source>[A-Z][A-Za-z]+(?:\s+[A-Z][A-Za-z]+)*) "
+        rf"\b(?P<source>{subject_pattern}) "
         rf"(?P<verb>{verb_pattern}) "
-        r"(?P<target>[A-Z][A-Za-z]+(?:\s+[A-Z][A-Za-z]+)*)\b"
+        rf"(?P<target>{subject_pattern})\b",
+        re.IGNORECASE,
     )
     for match in pattern.finditer(sentence):
+        source = _canonical_name(match.group("source"), entity_names)
+        target = _canonical_name(match.group("target"), entity_names)
+        if not source or not target or source == target:
+            continue
         relationships.append(
             RelationshipSignal(
-                source=match.group("source").strip(),
-                target=match.group("target").strip(),
+                source=source,
+                target=target,
                 relation=RELATIONSHIP_VERBS[match.group("verb").lower()],
                 confidence=0.74,
                 evidence=evidence,
             )
         )
+    interaction_patterns = [
+        (r"with", "with"),
+        (r"against", "opposes"),
+        (r"from", "separated_from"),
+        (r"toward|towards", "approaches"),
+    ]
+    for prep, relation in interaction_patterns:
+        interaction = re.compile(
+            rf"\b(?P<source>{subject_pattern})\b[^.!?]{{0,80}}\b(?:{prep})\s+(?:the\s+)?(?P<target>{subject_pattern})\b",
+            re.IGNORECASE,
+        )
+        for match in interaction.finditer(sentence):
+            source = _canonical_name(match.group("source"), entity_names)
+            target = _canonical_name(match.group("target"), entity_names)
+            if not source or not target or source == target:
+                continue
+            relationships.append(
+                RelationshipSignal(
+                    source=source,
+                    target=target,
+                    relation=relation,
+                    confidence=0.56,
+                    evidence=evidence,
+                )
+            )
     return relationships
 
 
 def _extract_events(sentence: str, evidence: CanonEvidence) -> List[TimelineEvent]:
     lowered = sentence.lower()
-    if not any(token in lowered for token in ("battle", "death", "coronation", "arrival", "war", "betrayal")):
+    if not any(re.search(rf"\b{re.escape(token)}\b", lowered) for token in EVENT_TRIGGERS):
         return []
     order_hint = None
     year_match = re.search(r"\b(?:year|yr)\s*(?P<year>-?\d{1,5})\b", lowered)
@@ -407,6 +588,86 @@ def _build_memory_suggestions(report: CanonIntelligenceReport) -> List[MemorySug
     return suggestions
 
 
+def _known_entity_names(project: Project) -> List[str]:
+    names: List[str] = []
+    for entity in project.world_db.values():
+        names.append(entity.name)
+        names.extend(entity.aliases or [])
+    cleaned = [_clean_value(name) for name in names if _clean_value(name)]
+    return sorted(set(cleaned), key=len, reverse=True)
+
+
+def _subject_pattern(entity_names: Optional[List[str]] = None) -> str:
+    names = [name for name in (entity_names or []) if name]
+    if names:
+        return "|".join(re.escape(name) for name in names)
+    return r"[A-Z][A-Za-z]+(?:\s+[A-Z][A-Za-z]+)*"
+
+
+def _canonical_name(raw_name: str, entity_names: Optional[List[str]] = None) -> str:
+    name = _clean_value(raw_name)
+    if not name or _normalize_value(name) in {"he", "she", "they", "it", "his", "her", "their"}:
+        return ""
+    for candidate in entity_names or []:
+        if _normalize_value(candidate) == _normalize_value(name):
+            return candidate
+    return name
+
+
+def _append_fact(
+    facts: List[CanonFact],
+    *,
+    subject: str,
+    attribute: str,
+    value: str,
+    confidence: float,
+    evidence: CanonEvidence,
+) -> None:
+    clean_subject = _canonical_name(subject)
+    clean_value = _clean_value(value)
+    if not clean_subject or not clean_value:
+        return
+    if attribute == "location":
+        clean_value = _clean_location_value(clean_value)
+    elif attribute in {"item", "weapon"}:
+        clean_value = re.sub(r"^(?:a|an|the)\s+", "", clean_value, flags=re.IGNORECASE)
+    if _is_transient_fact(attribute, clean_value):
+        return
+    if len(clean_value.split()) > 14:
+        clean_value = " ".join(clean_value.split()[:14])
+    facts.append(
+        CanonFact(
+            subject=clean_subject,
+            attribute=ATTRIBUTE_ALIASES.get(attribute, attribute),
+            value=clean_value,
+            confidence=confidence,
+            evidence=evidence,
+        )
+    )
+
+
+def _is_transient_fact(attribute: str, value: str) -> bool:
+    normalized = _normalize_value(value)
+    if attribute in {"eyes", "hair"} and normalized in {_normalize_value(action) for action in TRANSIENT_BODY_ACTIONS}:
+        return True
+    if attribute in {"eyes", "hair"} and any(
+        normalized.startswith(_normalize_value(action)) for action in TRANSIENT_BODY_ACTIONS
+    ):
+        return True
+    return False
+
+
+def _clean_location_value(value: str) -> str:
+    value = _clean_value(value)
+    value = re.split(
+        r"\b(?:with|without|on|under|before|after|while|as|because|when)\b",
+        value,
+        maxsplit=1,
+        flags=re.IGNORECASE,
+    )[0]
+    return re.sub(r"^(?:a|an|the)\s+", "", _clean_value(value), flags=re.IGNORECASE)
+
+
 def _find_existing_attribute(description: str, attribute: str) -> str:
     if not description:
         return ""
@@ -456,4 +717,3 @@ def _dedupe_facts(facts: List[CanonFact]) -> List[CanonFact]:
         seen.add(key)
         deduped.append(fact)
     return deduped
-
