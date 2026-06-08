@@ -3,6 +3,10 @@ from __future__ import annotations
 
 import secrets
 import time
+import base64
+import hashlib
+import hmac
+import json
 from typing import Any, Dict, Tuple
 from urllib.parse import parse_qs, urlencode, urlparse
 import os
@@ -50,6 +54,7 @@ GOOGLE_REDIRECT_URI_STREAMLIT_KEYS = (
     "google_redirect_uri",
     "oauth_google_redirect_uri",
 )
+OAUTH_STATE_TTL_SECONDS = 10 * 60
 
 
 def _read_streamlit_secret(key: str) -> str:
@@ -203,13 +208,57 @@ def is_google_oauth_ready() -> Tuple[bool, str, Dict[str, Any]]:
     return True, "Google OAuth ready.", cfg
 
 
+def _state_signing_key(cfg: Dict[str, Any]) -> bytes:
+    secret = str(cfg.get("client_secret") or "")
+    client_id = str(cfg.get("client_id") or "")
+    return hashlib.sha256(f"{secret}:{client_id}:mantis-google-oauth".encode("utf-8")).digest()
+
+
+def _encode_state(payload: Dict[str, Any], cfg: Dict[str, Any]) -> str:
+    body = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    signature = hmac.new(_state_signing_key(cfg), body, hashlib.sha256).digest()
+    return base64.urlsafe_b64encode(body + signature).decode("ascii").rstrip("=")
+
+
+def _decode_state(state: str, cfg: Dict[str, Any]) -> Tuple[bool, str, Dict[str, Any]]:
+    raw_state = (state or "").strip()
+    if not raw_state:
+        return False, "OAuth state check failed. Try signing in again.", {}
+    try:
+        padded = raw_state + ("=" * (-len(raw_state) % 4))
+        decoded = base64.urlsafe_b64decode(padded.encode("ascii"))
+    except Exception:
+        return False, "OAuth state check failed. Try signing in again.", {}
+    if len(decoded) <= 32:
+        return False, "OAuth state check failed. Try signing in again.", {}
+    body = decoded[:-32]
+    signature = decoded[-32:]
+    expected = hmac.new(_state_signing_key(cfg), body, hashlib.sha256).digest()
+    if not hmac.compare_digest(signature, expected):
+        return False, "OAuth state check failed. Try signing in again.", {}
+    try:
+        payload = json.loads(body.decode("utf-8"))
+    except Exception:
+        return False, "OAuth state check failed. Try signing in again.", {}
+    started_at = float(payload.get("iat") or 0)
+    if not started_at or (time.time() - started_at) > OAUTH_STATE_TTL_SECONDS:
+        return False, "OAuth sign-in expired. Try again.", {}
+    return True, "OAuth state valid.", payload
+
+
 def build_google_authorization_url(session_state: Any) -> Tuple[bool, str, str]:
     ready, msg, cfg = is_google_oauth_ready()
     if not ready:
         return False, msg, ""
-    state = secrets.token_urlsafe(32)
     nonce = secrets.token_urlsafe(24)
-    session_state["oauth_google_state"] = state
+    state = _encode_state(
+        {
+            "provider": "google",
+            "nonce": nonce,
+            "iat": time.time(),
+        },
+        cfg,
+    )
     session_state["oauth_google_nonce"] = nonce
     session_state["oauth_google_started_at"] = time.time()
     params = {
@@ -226,16 +275,14 @@ def build_google_authorization_url(session_state: Any) -> Tuple[bool, str, str]:
 
 
 def complete_google_oauth(*, code: str, state: str, session_state: Any) -> Tuple[bool, str, Dict[str, Any]]:
-    expected_state = session_state.get("oauth_google_state")
-    started_at = float(session_state.get("oauth_google_started_at") or 0)
-    if not expected_state or not state or not secrets.compare_digest(str(expected_state), str(state)):
-        return False, "OAuth state check failed. Try signing in again.", {}
-    if started_at and (time.time() - started_at) > 600:
-        return False, "OAuth sign-in expired. Try again.", {}
-
     ready, msg, cfg = is_google_oauth_ready()
     if not ready:
         return False, msg, {}
+    state_ok, state_msg, state_payload = _decode_state(state, cfg)
+    if not state_ok:
+        return False, state_msg, {}
+    if state_payload.get("provider") != "google":
+        return False, "OAuth state check failed. Try signing in again.", {}
 
     token_resp = requests.post(
         GOOGLE_TOKEN_URL,

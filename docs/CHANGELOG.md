@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Stability
+- Dashboard cleanup: removed the low-value dashboard caption and autosave/canon/mode status strip so the workspace starts with useful project controls instead of debug-like metadata.
+- Coherence Apply Fix hardening: Apply Fix now resolves chapters by id, number, title, or matching excerpt, and applied/ignored coherence cards are removed from the queue immediately.
+- Editor rewrite guardrail: Improve Flow and other rewrite tools now request prose-only chapter output and strip assistant notes, labels, and explanations before the text can be applied.
+- Canon Scanner labeling: Insights now reports pending canon review as Canon Scanner suggestions instead of World Bible queue items.
+- World Bible wording: mention scan cards now say `No chapter mentions yet` instead of `Unused in chapters` while preserving the same alias/name scan behavior.
+- Project seed diversity: AI title generation now rejects generic `Beyond the...`/horizon-style formulas and asks for context-specific titles.
+- Version bump: updated app metadata and docs to `136.6`.
+- Google OAuth state fix: OAuth callback validation now uses a signed, expiring state token instead of relying on the same Streamlit session surviving the Google round trip.
+- Google sign-in UX: Google sign-in is back to one visible click using a primary link button when OAuth is configured.
+- Auth copy polish: reduced the oversized sign-in headline and replaced the stiff canon-control line with simpler first-visit copy.
+- Version bump: updated app metadata and docs to `136.5`.
 - Dashboard release highlights: refreshed the Welcome card's latest update list so it reflects the current auth, Google OAuth, email recovery, canon automation, and workspace settings releases instead of older editor-only changes.
 - Version bump: updated app metadata and docs to `136.4`.
 - Auth page overhaul: replaced abstract studio/canon headline copy with a clearer MANTIS-themed first-visit experience focused on planning, drafting, canon review, and the guest-to-account path.

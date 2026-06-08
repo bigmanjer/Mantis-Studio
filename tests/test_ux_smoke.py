@@ -747,11 +747,23 @@ class TestUtilities:
         result = rewrite_prompt("Sample text", "Fix Grammar")
         assert "Fix Grammar" in result
         assert "Sample text" in result
+        assert "Return only rewritten chapter prose" in result
+        assert "Do not include labels" in result
 
     def test_rewrite_prompt_custom(self):
         from app.main import rewrite_prompt
         result = rewrite_prompt("Text", "Custom", "Make it funny")
         assert "Make it funny" in result
+
+    def test_clean_rewrite_output_removes_editor_notes(self):
+        from app.main import clean_rewrite_output
+        raw = "Here is the improved chapter:\nMaya opened the door.\n\nNotes: I improved the flow."
+        assert clean_rewrite_output(raw) == "Maya opened the door."
+
+    def test_project_title_filter_rejects_generic_formulas(self):
+        from app.main import _is_generic_project_title
+        assert _is_generic_project_title("Beyond the Fractured Horizon") is True
+        assert _is_generic_project_title("The Unseen Library") is False
 
     def test_app_version(self):
         from app.main import get_app_version
@@ -762,17 +774,21 @@ class TestUtilities:
         source = (ROOT / "app" / "main.py").read_text(encoding="utf-8")
         highlights_block = source[source.index("def _release_highlights()"):source.index("def render_release_summary")]
         assert "def _release_highlights()" in source
+        assert "Dashboard no longer repeats low-value autosave" in highlights_block
+        assert "Apply Fix now resolves chapters by id, number, title, or matching excerpt" in highlights_block
+        assert "Improve Flow and other rewrite tools now request prose-only output" in highlights_block
+        assert "Insights now labels pending canon review as Canon Scanner suggestions" in highlights_block
         assert "Sign-in now uses a clearer MANTIS-themed first-visit page" in highlights_block
-        assert "Hosted Streamlit now shows an explicit Open Google sign-in button" in highlights_block
-        assert "Streamlit Secrets now accepts uppercase deployment keys" in highlights_block
+        assert "Google sign-in now uses a one-click link button" in highlights_block
+        assert "OAuth state validation now survives the Google round trip" in highlights_block
         assert "Password recovery now supports Resend-backed one-time reset links" in highlights_block
         assert "High-confidence World Bible suggestions now auto-apply" in highlights_block
         assert "Chapter Flow now uses a compact chapter dropdown with Previous, Next, New, and Delete actions." in source
         assert "Find and replace now defaults to the first exact match" in source
         assert "Canon Scanner, queued canon suggestions, and Coherence Check now live in Insights" in source
         assert "Relationship graph moved out of World Bible and into Insights" in source
-        assert highlights_block.index("Sign-in now uses a clearer") < highlights_block.index("Chapter Flow now uses")
-        assert highlights_block.index("Password recovery now supports") < highlights_block.index("Find and replace now defaults")
+        assert highlights_block.index("Dashboard no longer repeats") < highlights_block.index("Sign-in now uses a clearer")
+        assert highlights_block.index("Apply Fix now resolves") < highlights_block.index("Google sign-in now uses")
         assert "Legacy duplicate runtime and UI compatibility shims were removed" not in highlights_block
         assert "What's New in Mantis Studio" not in source
         assert "check_and_show_whats_new" not in source
@@ -792,13 +808,26 @@ class TestUtilities:
             if line.strip().startswith('("')
         ][:4]
         compact_text = "\n".join(compact_items)
-        assert "Access" in compact_text
-        assert "Google Sign-In" in compact_text
-        assert "Google OAuth" in compact_text
-        assert "Email Recovery" in compact_text
-        assert "Chapter Flow" not in compact_text
+        assert "Dashboard" in compact_text
+        assert "Coherence Fix" in compact_text
+        assert "Editor Rewrite" in compact_text
+        assert "Canon Scanner" in compact_text
+        assert "Google Sign-In" not in compact_text
         assert "Open changelog" in welcome_block
         assert "AppConfig.CHANGELOG_URL" in welcome_block
+
+    def test_dashboard_removes_low_value_status_strip(self):
+        source = (ROOT / "app" / "main.py").read_text(encoding="utf-8")
+        dashboard_block = source[source.index("def render_home():"):source.index("def render_projects():")]
+        assert "Outcome-focused workspace for planning, drafting, canon, and export." not in dashboard_block
+        assert "Canon {canon_label} - Mode: {system_mode}" not in dashboard_block
+
+    def test_insights_and_world_bible_use_current_review_language(self):
+        source = (ROOT / "app" / "main.py").read_text(encoding="utf-8")
+        assert "Canon Scanner suggestions pending" in source
+        assert "World Bible review queue pending" not in source
+        assert "No chapter mentions yet" in source
+        assert "Unused in chapters" not in source
 
     def test_workspace_settings_restore_saved_config_values(self):
         source = (ROOT / "app" / "main.py").read_text(encoding="utf-8")
@@ -1316,6 +1345,15 @@ class TestOAuthAndRepoStructure:
         assert "MANTIS_GOOGLE_REDIRECT_URI" in source
         assert "GOOGLE_REDIRECT_URI" in source
         assert "google_redirect_uri" in source
+
+    def test_google_oauth_uses_signed_state_not_session_state(self):
+        source = (ROOT / "app" / "services" / "oauth.py").read_text(encoding="utf-8")
+        assert "def _encode_state(" in source
+        assert "def _decode_state(" in source
+        assert "hmac.compare_digest(signature, expected)" in source
+        assert "OAUTH_STATE_TTL_SECONDS" in source
+        assert 'session_state["oauth_google_state"]' not in source
+        assert "expected_state = session_state.get" not in source
 
 
 # ---------------------------------------------------------------------------
@@ -2190,7 +2228,8 @@ class TestMantisModelAndArchitectUX:
         auth_block = source[source.index("def _render_auth_gate()"):source.index("if not _render_auth_gate()")]
         assert "branding/mantis_lockup.png" in auth_block
         assert "MANTIS Studio" in auth_block
-        assert "Plan the story. Draft the chapters. Keep canon under control." in auth_block
+        assert "Let your imagination write with you." in auth_block
+        assert "font-size: 2.35rem" in auth_block
         assert "A focused AI writing workspace for novels, series bibles, and long-form projects" in auth_block
         assert "Start locally. Upgrade when the project needs an account." in auth_block
         assert "mantis-auth-signal-strip" in auth_block
@@ -2219,9 +2258,12 @@ class TestMantisModelAndArchitectUX:
         assert "Use recovery code instead" in auth_block
         assert "Add MANTIS_GOOGLE_CLIENT_SECRET or google_client_secret" in auth_block
         assert "Ask the super admin to configure Google OAuth" not in auth_block
-        assert "oauth_google_pending_url" in auth_block
-        assert "Open Google sign-in" in auth_block
-        assert "Google sign-in is ready. Use the button below to open Google." in auth_block
+        assert "google_ready, google_msg, google_auth_url = build_google_authorization_url" in auth_block
+        assert "st.link_button(" in auth_block
+        assert "Continue with Google" in auth_block
+        assert "oauth_google_pending_url" not in auth_block
+        assert "Open Google sign-in" not in auth_block
+        assert "Google sign-in is ready. Use the button below to open Google." not in auth_block
         assert "Redirecting to Google..." not in auth_block
         assert "window.parent.location.href" not in auth_block
         assert "Enter the recovery code you saved" in auth_block
@@ -2239,6 +2281,7 @@ class TestMantisModelAndArchitectUX:
         assert "Write with your canon intact." not in auth_block
         assert "MANTIS Studio Access" not in auth_block
         assert "Enter the studio with your canon protected." not in auth_block
+        assert "Plan the story. Draft the chapters. Keep canon under control." not in auth_block
         assert "paid access" in auth_block
         assert "Welcome to MANTIS Studio" not in auth_block
 

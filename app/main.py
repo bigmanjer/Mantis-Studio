@@ -94,7 +94,7 @@ def get_app_version() -> str:
         # Never block app start on version metadata.
         pass
 
-    return "136.4"
+    return "136.6"
 
 
 def _safe_int_env(env_var: str, default: int) -> int:
@@ -1422,7 +1422,58 @@ def rewrite_prompt(text: str, preset: str, custom: str = "") -> str:
     text = sanitize_ai_input(text, AppConfig.MAX_PROMPT_CHARS)
     custom = sanitize_ai_input(custom, 2000)
     instr = custom if preset == "Custom" else REWRITE_PRESETS.get(preset, "")
-    return f"Act as an editor.\nTASK: {preset}\nDETAILS: {instr}\n\nINPUT TEXT:\n{text}"
+    return (
+        "Act as a fiction line editor.\n"
+        f"TASK: {preset}\n"
+        f"DETAILS: {instr}\n\n"
+        "OUTPUT RULES:\n"
+        "- Return only rewritten chapter prose.\n"
+        "- Do not include labels, notes, explanations, bullet points, markdown, or before/after commentary.\n"
+        "- Preserve character names, canon facts, and the chapter's point of view unless the task explicitly changes them.\n\n"
+        f"INPUT TEXT:\n{text}"
+    )
+
+
+def clean_rewrite_output(raw: str) -> str:
+    """Keep AI rewrite output usable as chapter prose, even if the model adds commentary."""
+    text = (raw or "").strip()
+    if not text:
+        return ""
+    text = re.sub(r"^\s*```(?:[a-zA-Z0-9_-]+)?\s*", "", text)
+    text = re.sub(r"\s*```\s*$", "", text).strip()
+    text = re.sub(
+        r"(?is)^\s*(?:here(?:'s| is)\s+(?:the\s+)?(?:rewritten|improved|revised)\s+(?:chapter|text|version)|"
+        r"(?:rewritten|improved|revised)\s+(?:chapter|text|version)|final\s+(?:chapter|text|version))\s*[:\-]\s*",
+        "",
+        text,
+    ).strip()
+    trailing_markers = [
+        r"\n\s*(?:notes?|editor'?s note|explanation|changes made|what changed|rationale)\s*:",
+        r"\n\s*#{1,6}\s*(?:notes?|explanation|changes made|what changed)\b",
+        r"\n\s*(?:-\s*)?(?:I changed|I improved|This version|The rewrite)\b",
+    ]
+    cut_at = len(text)
+    for pattern in trailing_markers:
+        match = re.search(pattern, text, flags=re.IGNORECASE)
+        if match:
+            cut_at = min(cut_at, match.start())
+    text = text[:cut_at].strip()
+    return text
+
+
+def _is_generic_project_title(title: str) -> bool:
+    clean = re.sub(r"[^a-z0-9\s]", " ", (title or "").lower())
+    clean = re.sub(r"\s+", " ", clean).strip()
+    if not clean:
+        return True
+    generic_patterns = [
+        r"^beyond the\b",
+        r"\bedge of tomorrow\b",
+        r"\bfractured horizon\b",
+        r"\bshadows? of the past\b",
+        r"\bveil of\b",
+    ]
+    return any(re.search(pattern, clean) for pattern in generic_patterns)
 
 def project_to_markdown(project: Project) -> str:
     md = [f"# {project.title}", f"**Genre:** {project.genre}\n"]
@@ -1784,14 +1835,63 @@ def _run_ui():
         st.session_state["locked_chapters"] = locked
 
     def _coherence_issue_chapter(project: Project, issue: Dict[str, Any]) -> Optional[Chapter]:
-        try:
-            chapter_num = int(issue.get("chapter_index", -1))
-        except (TypeError, ValueError):
+        chapters = project.get_ordered_chapters()
+        if not chapters:
             return None
-        for chapter in project.get_ordered_chapters():
-            if chapter.index == chapter_num:
-                return chapter
+
+        chapter_id = str(issue.get("chapter_id") or issue.get("id") or "").strip()
+        if chapter_id:
+            for chapter in chapters:
+                if str(getattr(chapter, "id", "")).strip() == chapter_id:
+                    return chapter
+
+        numeric_candidates: List[int] = []
+        for key in ("chapter_index", "chapter_number", "chapter"):
+            raw_value = issue.get(key)
+            try:
+                numeric_candidates.append(int(raw_value))
+            except (TypeError, ValueError):
+                continue
+        for chapter_num in numeric_candidates:
+            for chapter in chapters:
+                if chapter.index == chapter_num:
+                    return chapter
+            if chapter_num >= 0:
+                for zero_based, chapter in enumerate(chapters):
+                    if zero_based == chapter_num:
+                        return chapter
+
+        title = str(issue.get("chapter_title") or issue.get("source_chapter") or "").strip().lower()
+        if title:
+            for chapter in chapters:
+                if (chapter.title or "").strip().lower() == title:
+                    return chapter
+
+        excerpt = str(issue.get("target_excerpt") or "").strip()
+        if excerpt:
+            for chapter in chapters:
+                if _normalized_replacement_span(chapter.content or "", excerpt):
+                    return chapter
+            best_match: Optional[tuple[Chapter, float]] = None
+            for chapter in chapters:
+                fuzzy = _fuzzy_replacement_span(chapter.content or "", excerpt)
+                if fuzzy and (best_match is None or fuzzy[2] > best_match[1]):
+                    best_match = (chapter, fuzzy[2])
+            if best_match:
+                return best_match[0]
         return None
+
+    def _coherence_issue_key(issue: Dict[str, Any]) -> str:
+        key_payload = {
+            "chapter_id": issue.get("chapter_id"),
+            "chapter_index": issue.get("chapter_index"),
+            "chapter_number": issue.get("chapter_number"),
+            "chapter_title": issue.get("chapter_title") or issue.get("source_chapter"),
+            "target_excerpt": issue.get("target_excerpt"),
+            "suggested_rewrite": issue.get("suggested_rewrite"),
+            "issue": issue.get("issue") or issue.get("message") or issue.get("description"),
+        }
+        return json.dumps(key_payload, sort_keys=True, default=str)
 
     def _normalized_text_with_map(text: str) -> tuple[str, List[int]]:
         normalized = []
@@ -1953,10 +2053,34 @@ def _run_ui():
         else:
             return plan["effect"]
         persist_project(project)
-        results.pop(idx)
-        st.session_state["coherence_results"] = results
+        issue_key = _coherence_issue_key(issue)
+        current_results = list(st.session_state.get("coherence_results", results))
+        filtered_results = [
+            result
+            for result in current_results
+            if _coherence_issue_key(result) != issue_key
+        ]
+        if len(filtered_results) == len(current_results) and 0 <= idx < len(current_results):
+            filtered_results = current_results[:idx] + current_results[idx + 1 :]
+        st.session_state["coherence_results"] = filtered_results
         update_locked_chapters()
         return "Applied fix."
+
+    def _remove_coherence_issue(results: List[Dict[str, Any]], idx: int) -> List[Dict[str, Any]]:
+        if idx < 0 or idx >= len(results):
+            return list(results)
+        issue_key = _coherence_issue_key(results[idx])
+        current_results = list(st.session_state.get("coherence_results", results))
+        filtered_results = [
+            result
+            for result in current_results
+            if _coherence_issue_key(result) != issue_key
+        ]
+        if len(filtered_results) == len(current_results):
+            filtered_results = current_results[:idx] + current_results[idx + 1 :]
+        st.session_state["coherence_results"] = filtered_results
+        update_locked_chapters()
+        return filtered_results
 
     def render_coherence_panel(project: Project, *, key_prefix: str, title: str = "Coherence Check") -> None:
         st.markdown(f"### {title}")
@@ -2095,9 +2219,7 @@ def _run_ui():
                         st.rerun()
                 with a3:
                     if st.button("Ignore", key=f"{key_prefix}_coh_ignore_{idx}", use_container_width=True):
-                        results.pop(idx)
-                        st.session_state["coherence_results"] = results
-                        update_locked_chapters()
+                        _remove_coherence_issue(results, idx)
                         st.toast("Issue ignored.")
                         st.rerun()
 
@@ -2840,9 +2962,13 @@ def _run_ui():
 
     def _release_highlights() -> List[tuple[str, str]]:
         return [
+            ("Dashboard", "Dashboard no longer repeats low-value autosave, canon, or mode status text above the workspace."),
+            ("Coherence Fix", "Apply Fix now resolves chapters by id, number, title, or matching excerpt, and applied or ignored issues leave the queue immediately."),
+            ("Editor Rewrite", "Improve Flow and other rewrite tools now request prose-only output and strip assistant notes before review or apply."),
+            ("Canon Scanner", "Insights now labels pending canon review as Canon Scanner suggestions, matching where users review them."),
             ("Access", "Sign-in now uses a clearer MANTIS-themed first-visit page focused on planning, drafting, canon review, and the guest-to-account path."),
-            ("Google Sign-In", "Hosted Streamlit now shows an explicit Open Google sign-in button instead of relying on an iframe auto-redirect."),
-            ("Google OAuth", "Streamlit Secrets now accepts uppercase deployment keys such as MANTIS_GOOGLE_CLIENT_SECRET and the active Streamlit callback URL."),
+            ("Google Sign-In", "Google sign-in now uses a one-click link button when OAuth is configured, avoiding Streamlit iframe redirect issues."),
+            ("Google OAuth", "OAuth state validation now survives the Google round trip with a signed expiring state token."),
             ("Email Recovery", "Password recovery now supports Resend-backed one-time reset links with hashed expiring tokens and recovery-code fallback."),
             ("Canon Automation", "High-confidence World Bible suggestions now auto-apply after classified confidence is checked against workspace rules."),
             ("Workspace Settings", "Workspace preferences now restore saved autosave, writing goals, focus timer, and canon confidence settings on startup."),
@@ -3124,11 +3250,11 @@ def _run_ui():
                 margin-bottom: 0.5rem;
             }
             .mantis-auth-title {
-                font-size: 3.35rem;
-                line-height: 1.01;
-                margin: 0 0 0.8rem 0;
+                font-size: 2.35rem;
+                line-height: 1.12;
+                margin: 0 0 0.65rem 0;
                 font-weight: 800;
-                max-width: 15ch;
+                max-width: 18ch;
             }
             .mantis-auth-sub {
                 color: var(--mantis-muted);
@@ -3309,7 +3435,7 @@ def _run_ui():
                             <div>
                                 {auth_lockup_img}
                                 <div class="mantis-auth-kicker">MANTIS Studio</div>
-                                <h2 class="mantis-auth-title">Plan the story. Draft the chapters. Keep canon under control.</h2>
+                                <h2 class="mantis-auth-title">Let your imagination write with you.</h2>
                                 <div class="mantis-auth-sub">A focused AI writing workspace for novels, series bibles, and long-form projects where continuity matters.</div>
                                 <div class="mantis-auth-command">
                                     <strong>Start locally. Upgrade when the project needs an account.</strong>
@@ -3333,6 +3459,7 @@ def _run_ui():
 
             with auth_col:
                 with st.container(border=True):
+                    google_ready, google_msg, google_auth_url = build_google_authorization_url(st.session_state)
                     st.html(
                         """
                         <div class="mantis-auth-panel">
@@ -3371,25 +3498,19 @@ def _run_ui():
                     st.html('<div class="mantis-auth-method-label">Provider sign-in</div>')
                     social_cols = st.columns(2)
                     with social_cols[0]:
-                        if st.button("Continue with Google", use_container_width=True, key="auth_google_btn"):
-                            ok, msg, auth_url = build_google_authorization_url(st.session_state)
-                            if not ok:
-                                st.info(
-                                    f"{msg} Add MANTIS_GOOGLE_CLIENT_SECRET or google_client_secret "
-                                    "in Streamlit Secrets, then redeploy."
-                                )
-                            else:
-                                st.session_state["oauth_google_pending_url"] = auth_url
-                                st.success(
-                                    "Google sign-in is ready. Use the button below to open Google."
-                                )
-                        pending_google_url = st.session_state.get("oauth_google_pending_url", "")
-                        if pending_google_url:
+                        if google_ready and google_auth_url:
                             st.link_button(
-                                "Open Google sign-in",
-                                pending_google_url,
+                                "Continue with Google",
+                                google_auth_url,
                                 type="primary",
                                 use_container_width=True,
+                            )
+                        else:
+                            if st.button("Continue with Google", use_container_width=True, key="auth_google_btn", disabled=True):
+                                pass
+                            st.info(
+                                f"{google_msg} Add MANTIS_GOOGLE_CLIENT_SECRET or google_client_secret "
+                                "in Streamlit Secrets, then redeploy."
                             )
                     with social_cols[1]:
                         if st.button("Continue with Microsoft", use_container_width=True, key="auth_microsoft_btn"):
@@ -4129,7 +4250,9 @@ def _run_ui():
             f"PROJECT CONTEXT:\n{context}\n\n"
             f"GENRE HINTS: {genre_hint or 'Open'}\n"
             "TASK: Generate a creative, relevant project title.\n"
-            "RULES: Return ONLY the title. No quotes. No prefixes."
+            "RULES: Return ONLY the title. No quotes. No prefixes. Use 2-6 words.\n"
+            "Make it specific to the supplied names, places, objects, conflict, or tone.\n"
+            "Avoid generic formulas and overused words such as Beyond, Edge, Horizon, Tomorrow, Veil, and Shadows."
         )
         response = AIEngine(provider=provider).generate(prompt, model)
         raw = (response.get("text", "") or "").strip()
@@ -4137,7 +4260,8 @@ def _run_ui():
             return ""
         clean = re.sub(r"(?i)^(title|project title|suggested title)[:\s-]*", "", raw).strip()
         clean = clean.replace('"', "").replace("'", "").strip()
-        return clean.splitlines()[0].strip() if clean else ""
+        title = clean.splitlines()[0].strip() if clean else ""
+        return "" if _is_generic_project_title(title) else title
 
     def _generate_project_genres(context: str, title: str, model: str, provider: str) -> List[str]:
         prompt = (
@@ -5738,10 +5862,8 @@ def _run_ui():
         from app.views.dashboard_workspace import render_dashboard_workspace
 
         st.markdown("## Dashboard")
-        st.caption("Outcome-focused workspace for planning, drafting, canon, and export.")
         if dashboard_visual:
             st.image(dashboard_visual, use_container_width=True)
-        st.caption(f"{autosave_status} - Canon {canon_label} - Mode: {system_mode}")
         st.html("<div style='height: 8px;'></div>")
         if not recent_projects:
             render_welcome_banner("home")
@@ -6710,7 +6832,7 @@ def _run_ui():
                 "Use Source markers to see where a detail came from.",
             ],
             [
-                "Unused in chapters means the entry exists but MANTIS did not find it in drafted chapter text.",
+                "No chapter mentions yet means the entry exists, but MANTIS did not find its name or aliases in drafted chapter text.",
                 "Needs detail means the entry is too short to help AI reason well.",
             ],
         )
@@ -7061,7 +7183,7 @@ def _run_ui():
 
                         issues = []
                         if is_orphaned:
-                            issues.append("Unused in chapters")
+                            issues.append("No chapter mentions yet")
                         if is_under_described:
                             issues.append("Needs detail")
                         if is_collision:
@@ -7453,7 +7575,7 @@ def _run_ui():
                 if len(flagged_entity_ids) > 0:
                     risk_items.append(f"Entities need review: {len(flagged_entity_ids)}")
                 if len(review_queue) > 0:
-                    risk_items.append(f"World Bible review queue pending: {len(review_queue)}")
+                    risk_items.append(f"Canon Scanner suggestions pending: {len(review_queue)}")
                 if not (p.outline or "").strip():
                     risk_items.append("Outline missing")
                 if chapter_count == 0:
@@ -8057,7 +8179,11 @@ def _run_ui():
                     if full.strip().startswith("ERROR: Canon violation detected."):
                         st.error("Canon violation detected. Resolve issues before generating AI content.")
                         return ""
-                    violations = detect_hard_canon_violation(p, curr.index, full)
+                    cleaned = clean_rewrite_output(full)
+                    if not cleaned:
+                        st.warning("MANTIS did not receive usable chapter prose from the AI response.")
+                        return ""
+                    violations = detect_hard_canon_violation(p, curr.index, cleaned)
                     if violations:
                         results = st.session_state.get("coherence_results", [])
                         results.extend(violations)
@@ -8065,7 +8191,7 @@ def _run_ui():
                         update_locked_chapters()
                         st.warning("Hard Canon conflict detected. AI output was not applied.")
                         return ""
-                    return full
+                    return cleaned
 
                 with st.expander("Modify / Improve Text"):
                     rewrite_locked = curr.index in locked_chapters
