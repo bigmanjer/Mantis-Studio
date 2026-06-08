@@ -94,7 +94,7 @@ def get_app_version() -> str:
         # Never block app start on version metadata.
         pass
 
-    return "136.1"
+    return "136.2"
 
 
 def _safe_int_env(env_var: str, default: int) -> int:
@@ -3356,15 +3356,18 @@ def _run_ui():
                                     "in Streamlit Secrets, then redeploy."
                                 )
                             else:
-                                components.html(
-                                    f"""
-                                    <script>
-                                      window.parent.location.href = {json.dumps(auth_url)};
-                                    </script>
-                                    """,
-                                    height=0,
+                                st.session_state["oauth_google_pending_url"] = auth_url
+                                st.success(
+                                    "Google sign-in is ready. Use the button below to open Google."
                                 )
-                                st.info("Redirecting to Google...")
+                        pending_google_url = st.session_state.get("oauth_google_pending_url", "")
+                        if pending_google_url:
+                            st.link_button(
+                                "Open Google sign-in",
+                                pending_google_url,
+                                type="primary",
+                                use_container_width=True,
+                            )
                     with social_cols[1]:
                         if st.button("Continue with Microsoft", use_container_width=True, key="auth_microsoft_btn"):
                             st.info("Microsoft login needs OAuth app registration before it can be enabled safely.")

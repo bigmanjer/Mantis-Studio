@@ -2194,6 +2194,11 @@ class TestMantisModelAndArchitectUX:
         assert "Use recovery code instead" in auth_block
         assert "Add MANTIS_GOOGLE_CLIENT_SECRET or google_client_secret" in auth_block
         assert "Ask the super admin to configure Google OAuth" not in auth_block
+        assert "oauth_google_pending_url" in auth_block
+        assert "Open Google sign-in" in auth_block
+        assert "Google sign-in is ready. Use the button below to open Google." in auth_block
+        assert "Redirecting to Google..." not in auth_block
+        assert "window.parent.location.href" not in auth_block
         assert "Enter the recovery code you saved" in auth_block
         assert "new one-time code to save" in auth_block
         assert 'st.form("auth_login_form"' in auth_block
