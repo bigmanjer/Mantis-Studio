@@ -431,6 +431,13 @@ class TestNavigationParity:
         source = (ROOT / "app" / "views" / "dashboard_workspace.py").read_text(encoding="utf-8")
         assert source.index('key="qa_insights"') < source.index('key="qa_memory"')
 
+    def test_dashboard_removes_redundant_data_confidence_card(self):
+        source = (ROOT / "app" / "main.py").read_text(encoding="utf-8")
+        home_block = source[source.index("def render_home():"):source.index("def render_projects():")]
+        assert "Data confidence" not in home_block
+        assert "Ownership and save behavior for long-form work." not in home_block
+        assert "You keep project files and can export anytime from Projects." not in home_block
+
     def test_main_page_navigation_uses_one_shot_top_anchor_reset(self):
         """Page changes should reset to the top without the old aggressive scroll loop."""
         source = (ROOT / "app" / "main.py").read_text(encoding="utf-8")
@@ -511,6 +518,121 @@ class TestAuth:
         )
         assert ok is True
         assert "New recovery code" in msg
+
+    def test_email_reset_link_uses_hashed_one_time_token(self, tmp_path):
+        import json
+        from pathlib import Path
+        from urllib.parse import parse_qs, urlparse
+
+        from app.utils.auth import (
+            authenticate_user,
+            register_user,
+            request_password_reset_email,
+            reset_password_with_token,
+        )
+
+        ok, _, _user = register_user(
+            "reset@example.com",
+            "Password1234",
+            display_name="Writer",
+            base_projects_dir=str(tmp_path),
+        )
+        assert ok is True
+
+        sent = {}
+
+        def fake_send_email(*, to_email, reset_url):
+            sent["to_email"] = to_email
+            sent["reset_url"] = reset_url
+            return True, "sent"
+
+        ok, msg = request_password_reset_email(
+            email="reset@example.com",
+            app_url="https://mantis-studio.streamlit.app",
+            send_email=fake_send_email,
+            base_projects_dir=str(tmp_path),
+        )
+        assert ok is True
+        assert "reset link" in msg
+        assert sent["to_email"] == "reset@example.com"
+        token = parse_qs(urlparse(sent["reset_url"]).query)["reset_token"][0]
+        assert token
+
+        accounts = json.loads((Path(tmp_path) / ".mantis_users.json").read_text(encoding="utf-8"))
+        stored = next(u for u in accounts["users"] if u["email"] == "reset@example.com")
+        assert stored["reset_token_hash"] != token
+        assert stored["reset_token_salt"]
+        assert stored["reset_token_expires_at"] > 0
+
+        ok, msg = reset_password_with_token(
+            reset_token=token,
+            new_password="BetterPassword123",
+            base_projects_dir=str(tmp_path),
+        )
+        assert ok is True
+        assert "New recovery code" in msg
+
+        ok, _, user = authenticate_user(
+            "reset@example.com",
+            "BetterPassword123",
+            base_projects_dir=str(tmp_path),
+        )
+        assert ok is True
+        assert user["email"] == "reset@example.com"
+
+        ok, msg = reset_password_with_token(
+            reset_token=token,
+            new_password="AnotherPassword123",
+            base_projects_dir=str(tmp_path),
+        )
+        assert ok is False
+        assert "invalid or expired" in msg
+
+    def test_expired_email_reset_token_is_rejected(self, tmp_path):
+        import json
+        import time
+        from pathlib import Path
+        from urllib.parse import parse_qs, urlparse
+
+        from app.utils.auth import register_user, request_password_reset_email, reset_password_with_token
+
+        ok, _, _user = register_user(
+            "expired@example.com",
+            "Password1234",
+            display_name="Writer",
+            base_projects_dir=str(tmp_path),
+        )
+        assert ok is True
+
+        sent = {}
+
+        def fake_send_email(*, to_email, reset_url):
+            sent["reset_url"] = reset_url
+            return True, "sent"
+
+        ok, _msg = request_password_reset_email(
+            email="expired@example.com",
+            app_url="https://mantis-studio.streamlit.app",
+            send_email=fake_send_email,
+            base_projects_dir=str(tmp_path),
+        )
+        assert ok is True
+        token = parse_qs(urlparse(sent["reset_url"]).query)["reset_token"][0]
+
+        accounts_path = Path(tmp_path) / ".mantis_users.json"
+        accounts = json.loads(accounts_path.read_text(encoding="utf-8"))
+        for user in accounts["users"]:
+            if user["email"] == "expired@example.com":
+                user["reset_token_expires_at"] = time.time() - 1
+        accounts_path.write_text(json.dumps(accounts), encoding="utf-8")
+
+        ok, msg = reset_password_with_token(
+            reset_token=token,
+            new_password="BetterPassword123",
+            base_projects_dir=str(tmp_path),
+        )
+        assert ok is False
+        assert "invalid or expired" in msg
 
     def test_builtin_admin_seeded(self, tmp_path):
         from app.utils.auth import authenticate_user
@@ -658,6 +780,42 @@ class TestUtilities:
         assert "render_release_summary(compact=True)" in welcome_block
         assert "Open changelog" in welcome_block
         assert "AppConfig.CHANGELOG_URL" in welcome_block
+
+    def test_workspace_settings_restore_saved_config_values(self):
+        source = (ROOT / "app" / "main.py").read_text(encoding="utf-8")
+        assert "def config_bool(" in source
+        assert "def config_int(" in source
+        assert "def config_float(" in source
+        assert 'init_state("auto_save", config_bool(config_data, "auto_save", True))' in source
+        assert 'config_int(config_data, "daily_word_goal", 1000' in source
+        assert 'config_int(config_data, "weekly_sessions_goal", 4' in source
+        assert 'config_int(config_data, "focus_minutes", 25' in source
+        assert 'config_float(\n            config_data,\n            "world_bible_confidence_threshold"' in source
+        assert 'config_bool(config_data, "memory_auto_hard_enabled"' in source
+
+    def test_workspace_settings_exposes_operational_sections(self):
+        source = (ROOT / "app" / "main.py").read_text(encoding="utf-8")
+        workspace_block = source[source.index("def render_workspace_settings():"):source.index("# Render enhanced sidebar")]
+        assert "Workspace Overview" in workspace_block
+        assert "Storage & Safety" in workspace_block
+        assert "Projects folder" in workspace_block
+        assert "Config file" in workspace_block
+        assert "Backup folder" in workspace_block
+        assert "Save current project" in workspace_block
+        assert "Prepare export" in workspace_block
+        assert "Refresh project list" in workspace_block
+        assert "Studio Preferences" in workspace_block
+        assert "Canon Confidence Rules" in workspace_block
+
+    def test_email_delivery_service_uses_resend_and_streamlit_secrets(self):
+        source = (ROOT / "app" / "services" / "email_delivery.py").read_text(encoding="utf-8")
+        assert "https://api.resend.com/emails" in source
+        assert "RESEND_API_KEY" in source
+        assert "MANTIS_EMAIL_FROM" in source
+        assert "MANTIS_APP_URL" in source
+        assert "https://mantis-studio.streamlit.app" in source
+        assert "requests.post" in source
+        assert "Reset your MANTIS Studio password" in source
 
     def test_truncate_prompt(self):
         from app.main import _truncate_prompt
@@ -2009,12 +2167,36 @@ class TestMantisModelAndArchitectUX:
         source = (ROOT / "app" / "main.py").read_text(encoding="utf-8")
         auth_block = source[source.index("def _render_auth_gate()"):source.index("if not _render_auth_gate()")]
         assert "branding/mantis_lockup.png" in auth_block
-        assert "Write with your canon intact." in auth_block
-        assert "mantis-auth-workflow" in auth_block
-        assert "Local-first access" in auth_block
+        assert "MANTIS Studio Access" in auth_block
+        assert "Keep the story straight." in auth_block
+        assert "Restore your workspace, manage projects, and keep canon intelligence connected" in auth_block
+        assert "mantis-auth-proof-grid" in auth_block
+        assert "What an account unlocks" in auth_block
+        assert "Provider sign in" in auth_block
+        assert "Choose access" in auth_block
+        assert "Continue to MANTIS" in auth_block
+        assert 'st.tabs(["Sign in", "Create account", "Recover"])' in auth_block
+        assert "Email recovery is ready." in auth_block
+        assert "Send reset link" in auth_block
+        assert "auth_email_reset_request_form" in auth_block
+        assert "auth_token_reset_form" in auth_block
+        assert "auth_request_password_reset_email" in auth_block
+        assert "auth_reset_password_with_token" in auth_block
+        assert "Use recovery code instead" in auth_block
+        assert "Enter the recovery code you saved" in auth_block
+        assert "new one-time code to save" in auth_block
+        assert 'st.form("auth_login_form"' in auth_block
+        assert 'st.form("auth_signup_form"' in auth_block
+        assert 'st.form("auth_reset_form"' in auth_block
+        assert 'key="auth_login_submit"' in auth_block
+        assert 'key="auth_signup_submit"' in auth_block
+        assert 'key="auth_reset_submit"' in auth_block
         assert "Continue as guest" in auth_block
-        assert "Account access" in auth_block
-        assert "Sign in or create an account" in auth_block
+        assert auth_block.index("auth_continue_guest") < auth_block.index("Continue with Google")
+        assert "Sign in or create an account" not in auth_block
+        assert "Narrative command center" not in auth_block
+        assert "Write with your canon intact." not in auth_block
+        assert "subscription access" in auth_block
         assert "Welcome to MANTIS Studio" not in auth_block
 
     def test_memory_page_does_not_render_coherence_check(self):
@@ -2054,9 +2236,17 @@ class TestMantisModelAndArchitectUX:
         source = (ROOT / "app" / "main.py").read_text(encoding="utf-8")
         threshold_gate = source.index("if confidence < world_threshold:")
         auto_apply_call = source.index("ent, status = _apply_suggestion(p, classified)")
+        classify_call = source.index("classified = _classify_suggestion(p, suggestion_payload)")
+        assert classify_call < threshold_gate
         assert threshold_gate < auto_apply_call
+        assert 'confidence = max(0.0, min(1.0, float(classified.get("confidence", confidence) or 0.0)))' in source
         assert "auto_applied += 1" in source
         assert "High-confidence suggestions apply automatically" in source
+        assert "def _auto_apply_eligible_review_queue()" in source
+        assert 'persist_project(p, action="insights_auto_apply_review_queue")' in source
+        assert "Auto-applied {promoted_count} queued canon suggestion(s)." in source
+        assert "Current World Bible entry" in source
+        assert "Current notes:" in source
 
     def test_world_bible_apply_focuses_updated_entity(self):
         source = (ROOT / "app" / "main.py").read_text(encoding="utf-8")

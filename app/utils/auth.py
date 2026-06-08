@@ -5,10 +5,12 @@ import hashlib
 import hmac
 import json
 import os
+import secrets
 import time
 import uuid
+from urllib.parse import urlencode
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Callable, Dict, Optional, Tuple
 
 
 ACCOUNTS_FILENAME = ".mantis_users.json"
@@ -16,6 +18,7 @@ PBKDF2_ROUNDS = 200_000
 DEFAULT_PASSWORD_ALGO = "sha256"
 MAX_FAILED_LOGINS = 5
 LOCKOUT_SECONDS = 15 * 60
+RESET_TOKEN_TTL_SECONDS = 60 * 60
 BUILTIN_ADMIN_EMAIL = "ADMIN"
 BUILTIN_ADMIN_USERNAME = "ADMIN"
 BUILTIN_ADMIN_PASSWORD = "Admin@13319!"
@@ -127,6 +130,22 @@ def _new_recovery_code() -> str:
 
 def _new_recovery_record(recovery_code: str) -> Tuple[str, str]:
     return _new_password_record(recovery_code)
+
+
+def _new_reset_token_record(reset_token: str) -> Tuple[str, str]:
+    return _new_password_record(reset_token)
+
+
+def _verify_reset_token(reset_token: str, user: Dict[str, Any]) -> bool:
+    salt_hex = user.get("reset_token_salt", "")
+    expected_hash = user.get("reset_token_hash", "")
+    expires_at = float(user.get("reset_token_expires_at") or 0)
+    if not salt_hex or not expected_hash or not reset_token:
+        return False
+    if expires_at <= time.time():
+        return False
+    current_hash = _hash_password(reset_token, salt_hex, algo=DEFAULT_PASSWORD_ALGO)
+    return hmac.compare_digest(current_hash, expected_hash)
 
 
 def _verify_recovery_code(recovery_code: str, user: Dict[str, Any]) -> bool:
@@ -574,6 +593,88 @@ def reset_password_with_email(
     target["recovery_hash"] = recovery_hash
     target["failed_login_count"] = 0
     target["lock_until"] = 0.0
+    _save_accounts(base_projects_dir, data)
+    return True, f"Password reset. New recovery code: {next_code}"
+
+
+def request_password_reset_email(
+    *,
+    email: str,
+    app_url: str,
+    send_email: Callable[..., Tuple[bool, str]],
+    base_projects_dir: str = "projects",
+) -> Tuple[bool, str]:
+    email_key = _normalize_email(email)
+    if not email_key:
+        return False, "Enter your account email."
+    if not _is_valid_email(email_key) or email_key == _normalize_email(BUILTIN_ADMIN_EMAIL):
+        return True, "If that email exists, a reset link has been sent."
+
+    data = _load_accounts(base_projects_dir)
+    matches = [
+        user
+        for user in data.get("users", [])
+        if _normalize_email(user.get("email", "")) == email_key
+    ]
+    if len(matches) != 1:
+        return True, "If that email exists, a reset link has been sent."
+
+    target = matches[0]
+    if bool(target.get("disabled", False)):
+        return True, "If that email exists, a reset link has been sent."
+
+    raw_token = secrets.token_urlsafe(32)
+    token_salt, token_hash = _new_reset_token_record(raw_token)
+    target["reset_token_salt"] = token_salt
+    target["reset_token_hash"] = token_hash
+    target["reset_token_expires_at"] = time.time() + RESET_TOKEN_TTL_SECONDS
+    _save_accounts(base_projects_dir, data)
+
+    base_url = (app_url or "").strip().rstrip("/")
+    if not base_url.startswith(("http://", "https://")):
+        return False, "MANTIS_APP_URL must be a full URL before email recovery can be sent."
+    reset_url = f"{base_url}/?{urlencode({'reset_token': raw_token})}"
+    ok, msg = send_email(to_email=email_key, reset_url=reset_url)
+    if not ok:
+        return False, msg
+    return True, "If that email exists, a reset link has been sent."
+
+
+def reset_password_with_token(
+    *,
+    reset_token: str,
+    new_password: str,
+    base_projects_dir: str = "projects",
+) -> Tuple[bool, str]:
+    password_error = _validate_password_strength(new_password)
+    if password_error:
+        return False, password_error
+    token = (reset_token or "").strip()
+    if not token:
+        return False, "Reset link is missing or invalid."
+
+    data = _load_accounts(base_projects_dir)
+    target = None
+    for user in data.get("users", []):
+        if _verify_reset_token(token, user):
+            target = user
+            break
+    if target is None:
+        return False, "Reset link is invalid or expired."
+
+    salt_hex, password_hash = _new_password_record(new_password)
+    next_code = _new_recovery_code()
+    recovery_salt, recovery_hash = _new_recovery_record(next_code)
+    target["password_algo"] = DEFAULT_PASSWORD_ALGO
+    target["password_salt"] = salt_hex
+    target["password_hash"] = password_hash
+    target["recovery_salt"] = recovery_salt
+    target["recovery_hash"] = recovery_hash
+    target["failed_login_count"] = 0
+    target["lock_until"] = 0.0
+    target.pop("reset_token_salt", None)
+    target.pop("reset_token_hash", None)
+    target.pop("reset_token_expires_at", None)
     _save_accounts(base_projects_dir, data)
     return True, f"Password reset. New recovery code: {next_code}"
 

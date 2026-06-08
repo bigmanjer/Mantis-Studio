@@ -66,6 +66,21 @@ Start here:
 - [App architecture notes](app/README.md)
 - [Legal index](legal/README.md)
 
+## Streamlit Secrets
+
+Hosted recovery emails use Resend through Streamlit secrets. In Streamlit Cloud,
+open **App settings > Secrets** and paste TOML like this:
+
+```toml
+MANTIS_EMAIL_PROVIDER = "resend"
+RESEND_API_KEY = "replace-with-a-new-resend-key"
+MANTIS_EMAIL_FROM = "MANTIS Studio <rebusinessmatters@gmail.com>"
+MANTIS_APP_URL = "https://mantis-studio.streamlit.app"
+```
+
+Rotate any API key that was pasted into chat or screenshots before using it in
+production. Resend may require the sender/domain to be verified before delivery.
+
 Current audit/cleanup reports:
 
 - [Full code audit report](docs/reports/FULL_CODE_AUDIT_REPORT.md)
@@ -102,7 +117,7 @@ The audit runner writes:
 
 ## Versioning
 
-Current version: `135.4`.
+Current version: `135.9`.
 
 Current version is stored in [VERSION.txt](VERSION.txt).
 

@@ -94,7 +94,7 @@ def get_app_version() -> str:
         # Never block app start on version metadata.
         pass
 
-    return "135.4"
+    return "135.9"
 
 
 def _safe_int_env(env_var: str, default: int) -> int:
@@ -1531,7 +1531,9 @@ def _run_ui():
         logout_session as auth_logout_session,
         register_user,
         change_user_password as auth_change_user_password,
+        request_password_reset_email as auth_request_password_reset_email,
         reset_password_with_email as auth_reset_password_with_email,
+        reset_password_with_token as auth_reset_password_with_token,
         reset_user_password as auth_reset_user_password,
         set_user_disabled as auth_set_user_disabled,
         set_user_role as auth_set_user_role,
@@ -1542,6 +1544,11 @@ def _run_ui():
         complete_google_oauth,
         get_google_oauth_config,
         is_google_oauth_ready,
+    )
+    from app.services.email_delivery import (
+        email_settings,
+        is_email_ready,
+        send_password_reset_email,
     )
     # Import enhanced UI feedback components
     from app.ui.feedback import (
@@ -1609,6 +1616,34 @@ def _run_ui():
     def init_state(key: str, default: Any) -> None:
         if key not in st.session_state:
             st.session_state[key] = default
+
+    def config_bool(data: Dict[str, Any], key: str, default: bool) -> bool:
+        value = data.get(key, default)
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, (int, float)):
+            return bool(value)
+        if isinstance(value, str):
+            normalized = value.strip().lower()
+            if normalized in {"1", "true", "yes", "on"}:
+                return True
+            if normalized in {"0", "false", "no", "off"}:
+                return False
+        return bool(default)
+
+    def config_int(data: Dict[str, Any], key: str, default: int, *, minimum: int, maximum: int) -> int:
+        try:
+            value = int(data.get(key, default))
+        except (TypeError, ValueError):
+            value = int(default)
+        return max(minimum, min(maximum, value))
+
+    def config_float(data: Dict[str, Any], key: str, default: float, *, minimum: float, maximum: float) -> float:
+        try:
+            value = float(data.get(key, default))
+        except (TypeError, ValueError):
+            value = float(default)
+        return max(minimum, min(maximum, value))
 
     def queue_widget_update(key: str, value: Any) -> None:
         pending = st.session_state.setdefault("_pending_widget_updates", {})
@@ -2678,7 +2713,19 @@ def _run_ui():
     init_state("project", None)
     init_state("page", "home")
     logger.debug(f"Default page set to: {st.session_state.page}")
-    init_state("auto_save", True)
+    init_state("auto_save", config_bool(config_data, "auto_save", True))
+    init_state(
+        "daily_word_goal",
+        config_int(config_data, "daily_word_goal", 1000, minimum=100, maximum=10000),
+    )
+    init_state(
+        "weekly_sessions_goal",
+        config_int(config_data, "weekly_sessions_goal", 4, minimum=1, maximum=14),
+    )
+    init_state(
+        "focus_minutes",
+        config_int(config_data, "focus_minutes", 25, minimum=5, maximum=180),
+    )
     init_state("ghost_text", "")
     init_state("pending_improvement_text", "")
     init_state("pending_improvement_meta", {})
@@ -2716,7 +2763,16 @@ def _run_ui():
     init_state("openai_model_list", [])
     init_state("openai_model_tests", {})
     init_state("ui_theme", config_data.get("ui_theme", "Dark"))
-    init_state("world_bible_confidence_threshold", float(config_data.get("world_bible_confidence_threshold", AppConfig.WORLD_BIBLE_CONFIDENCE)))
+    init_state(
+        "world_bible_confidence_threshold",
+        config_float(
+            config_data,
+            "world_bible_confidence_threshold",
+            AppConfig.WORLD_BIBLE_CONFIDENCE,
+            minimum=0.50,
+            maximum=0.99,
+        ),
+    )
     init_state("groq_base_url", config_data.get("groq_base_url", AppConfig.GROQ_API_URL))
     init_state("groq_key_input", "")
     init_state("groq_model", config_data.get("groq_model", AppConfig.DEFAULT_MODEL))
@@ -2724,8 +2780,20 @@ def _run_ui():
     init_state("groq_model_tests", {})
     init_state("_force_nav", False)
     init_state("_last_rendered_page", "")
-    init_state("memory_auto_hard_enabled", bool(config_data.get("memory_auto_hard_enabled", AppConfig.WORLD_MEMORY_AUTO_HARD)))
-    init_state("memory_auto_hard_threshold", float(config_data.get("memory_auto_hard_threshold", AppConfig.WORLD_MEMORY_HARD_CONFIDENCE)))
+    init_state(
+        "memory_auto_hard_enabled",
+        config_bool(config_data, "memory_auto_hard_enabled", AppConfig.WORLD_MEMORY_AUTO_HARD),
+    )
+    init_state(
+        "memory_auto_hard_threshold",
+        config_float(
+            config_data,
+            "memory_auto_hard_threshold",
+            AppConfig.WORLD_MEMORY_HARD_CONFIDENCE,
+            minimum=0.90,
+            maximum=0.995,
+        ),
+    )
 
     AppConfig.GROQ_API_URL = st.session_state.groq_base_url
     AppConfig.DEFAULT_MODEL = st.session_state.groq_model
@@ -3022,22 +3090,23 @@ def _run_ui():
             """
             <style>
             .mantis-auth-shell {
-                padding-top: 0.15rem;
+                padding: 0.2rem 0 1rem;
             }
             .mantis-auth-hero {
-                padding: 0.95rem 1rem 0.8rem;
+                padding: 1rem 1rem 0.9rem;
                 display: flex;
                 flex-direction: column;
                 justify-content: space-between;
-                gap: 0.85rem;
+                gap: 1rem;
+                min-height: 520px;
             }
             .mantis-auth-logo {
-                width: min(265px, 76%);
+                width: min(300px, 82%);
                 max-height: 96px;
                 object-fit: contain;
                 object-position: left center;
                 display: block;
-                margin-bottom: 0.75rem;
+                margin-bottom: 0.9rem;
             }
             .mantis-auth-wordmark {
                 font-size: 1.25rem;
@@ -3049,72 +3118,95 @@ def _run_ui():
                 text-transform: uppercase;
                 font-size: 0.74rem;
                 color: var(--mantis-muted);
-                margin-bottom: 0.35rem;
+                margin-bottom: 0.45rem;
             }
             .mantis-auth-title {
-                font-size: clamp(2.15rem, 3.45vw, 3.15rem);
-                line-height: 1.04;
-                margin: 0 0 0.45rem 0;
+                font-size: clamp(2.25rem, 4vw, 3.8rem);
+                line-height: 1.02;
+                margin: 0 0 0.75rem 0;
                 font-weight: 800;
-                max-width: 15ch;
+                max-width: 13ch;
             }
             .mantis-auth-sub {
                 color: var(--mantis-muted);
-                margin-bottom: 0.75rem;
-                max-width: 52ch;
-                font-size: 0.96rem;
+                margin-bottom: 0.9rem;
+                max-width: 56ch;
+                font-size: 1.02rem;
+                line-height: 1.55;
             }
-            .mantis-auth-workflow {
+            .mantis-auth-proof-grid {
                 display: grid;
                 grid-template-columns: repeat(3, minmax(0, 1fr));
-                gap: 0.55rem;
-                margin: 0.8rem 0;
+                gap: 0;
+                margin: 1.1rem 0 0;
+                border-top: 1px solid var(--mantis-card-border);
+                border-bottom: 1px solid var(--mantis-card-border);
             }
-            .mantis-auth-step {
-                border: 1px solid var(--mantis-card-border);
-                border-radius: 10px;
-                padding: 0.65rem;
-                background: var(--mantis-surface-alt);
+            .mantis-auth-proof {
+                padding: 0.8rem 0.75rem;
+                border-right: 1px solid var(--mantis-card-border);
             }
-            .mantis-auth-step strong {
+            .mantis-auth-proof:last-child {
+                border-right: 0;
+            }
+            .mantis-auth-proof strong {
                 display: block;
                 margin-bottom: 0.16rem;
             }
-            .mantis-auth-step span {
+            .mantis-auth-proof span {
                 color: var(--mantis-muted);
                 font-size: 0.8rem;
                 line-height: 1.32;
             }
-            .mantis-auth-id-card {
-                padding: 0.72rem 0.85rem;
-                border-radius: 10px;
-                background: var(--mantis-surface-alt);
-                border: 1px solid var(--mantis-card-border);
+            .mantis-auth-account-list {
+                padding-top: 0.8rem;
+                border-top: 1px solid var(--mantis-card-border);
                 color: var(--mantis-text);
                 font-size: 0.9rem;
+                line-height: 1.5;
             }
-            .mantis-auth-id-card strong {
+            .mantis-auth-account-list strong {
                 display: block;
                 margin-bottom: 0.2rem;
             }
+            .mantis-auth-account-list ul {
+                margin: 0.35rem 0 0;
+                padding-left: 1.1rem;
+                color: var(--mantis-muted);
+            }
+            .mantis-auth-account-list li {
+                margin-bottom: 0.18rem;
+            }
             .mantis-auth-panel {
-                padding: 0.25rem 0 0.5rem;
+                padding: 0.9rem 0.2rem 0.5rem;
             }
             .mantis-auth-panel h3 {
                 margin-top: 0;
-                margin-bottom: 0.25rem;
-                font-size: clamp(1.7rem, 2.2vw, 2.12rem);
+                margin-bottom: 0.35rem;
+                font-size: clamp(2rem, 2.8vw, 2.6rem);
                 line-height: 1.12;
             }
             .mantis-auth-method-label {
-                margin: 0.8rem 0 0.35rem;
+                margin: 1rem 0 0.35rem;
                 color: var(--mantis-muted);
                 font-size: 0.86rem;
                 text-transform: uppercase;
                 letter-spacing: 0.05em;
             }
+            .mantis-auth-form-note {
+                color: var(--mantis-muted);
+                font-size: 0.86rem;
+                line-height: 1.45;
+                margin: 0.2rem 0 0.7rem;
+            }
+            .mantis-auth-guest-note {
+                margin-top: 0.75rem;
+                color: var(--mantis-muted);
+                font-size: 0.86rem;
+                line-height: 1.45;
+            }
             .mantis-auth-divider {
-                margin: 0.75rem 0 0.25rem;
+                margin: 0.95rem 0 0.35rem;
                 border-top: 1px solid var(--mantis-card-border);
             }
             @media (max-width: 900px) {
@@ -3124,8 +3216,13 @@ def _run_ui():
                 .mantis-auth-title {
                     max-width: none;
                 }
-                .mantis-auth-workflow {
+                .mantis-auth-proof-grid {
                     grid-template-columns: 1fr;
+                    border-bottom: 0;
+                }
+                .mantis-auth-proof {
+                    border-right: 0;
+                    border-bottom: 1px solid var(--mantis-card-border);
                 }
             }
             </style>
@@ -3135,7 +3232,7 @@ def _run_ui():
         _, center, _ = st.columns([0.08, 1, 0.08])
         with center:
             st.html('<div class="mantis-auth-shell"></div>')
-            hero_col, auth_col = st.columns([1.12, 1], vertical_alignment="top")
+            hero_col, auth_col = st.columns([0.95, 1.05], vertical_alignment="top")
 
             with hero_col:
                 with st.container(border=True):
@@ -3144,30 +3241,26 @@ def _run_ui():
                         <div class="mantis-auth-hero">
                             <div>
                                 {auth_lockup_img}
-                                <div class="mantis-auth-kicker">Narrative command center</div>
-                                <h2 class="mantis-auth-title">Write with your canon intact.</h2>
-                                <div class="mantis-auth-sub">Create locally, upgrade when you are ready, and keep every workspace separated by account.</div>
-                                <div class="mantis-auth-workflow">
-                                    <div class="mantis-auth-step"><strong>Plan</strong><span>Outline structure and story targets.</span></div>
-                                    <div class="mantis-auth-step"><strong>Draft</strong><span>Write chapters with AI support available.</span></div>
-                                    <div class="mantis-auth-step"><strong>Review</strong><span>Track canon risk before exporting.</span></div>
+                                <div class="mantis-auth-kicker">MANTIS Studio Access</div>
+                                <h2 class="mantis-auth-title">Keep the story straight.</h2>
+                                <div class="mantis-auth-sub">Restore your workspace, manage projects, and keep canon intelligence connected to the writing that matters.</div>
+                                <div class="mantis-auth-proof-grid">
+                                    <div class="mantis-auth-proof"><strong>Start fast</strong><span>Draft locally as a guest before creating an account.</span></div>
+                                    <div class="mantis-auth-proof"><strong>Recover safely</strong><span>Email accounts add password recovery and identity.</span></div>
+                                    <div class="mantis-auth-proof"><strong>Scale later</strong><span>Accounts prepare the studio for paid access.</span></div>
                                 </div>
                             </div>
-                            <div class="mantis-auth-id-card">
-                                <strong>Local-first access</strong>
-                                Guest projects stay local. Email accounts add identity, recovery, and separate workspaces.
+                            <div class="mantis-auth-account-list">
+                                <strong>What an account unlocks</strong>
+                                <ul>
+                                    <li>Separated project workspaces</li>
+                                    <li>Password recovery with one-time codes</li>
+                                    <li>OAuth identity when providers are configured</li>
+                                </ul>
                             </div>
                         </div>
                         """
                     )
-                    if st.button(
-                        "Continue as guest",
-                        use_container_width=True,
-                        key="auth_continue_guest",
-                        help="Enter MANTIS without creating an account. You can upgrade later.",
-                    ):
-                        _start_guest_session()
-                        st.rerun()
 
             with auth_col:
                 with st.container(border=True):
@@ -3175,10 +3268,9 @@ def _run_ui():
                         """
                         <div class="mantis-auth-panel">
                             <div>
-                                <div class="mantis-auth-kicker">Account access</div>
-                                <h3>Sign in or create an account</h3>
-                                <div class="mantis-auth-sub">Restore your workspace, connect OAuth, or set up recovery for a local account.</div>
-                                <div class="mantis-auth-method-label">Connected providers</div>
+                                <div class="mantis-auth-kicker">Choose access</div>
+                                <h3>Continue to MANTIS</h3>
+                                <div class="mantis-auth-sub">Use the fastest safe path for where you are: guest drafting, email recovery, or OAuth sign-in.</div>
                             </div>
                         </div>
                         """
@@ -3189,6 +3281,19 @@ def _run_ui():
                         st.error(oauth_error)
                     if oauth_success:
                         st.success(oauth_success)
+                    if st.button(
+                        "Continue as guest",
+                        use_container_width=True,
+                        key="auth_continue_guest",
+                        help="Enter MANTIS without creating an account. You can upgrade later.",
+                    ):
+                        _start_guest_session()
+                        st.rerun()
+                    st.html(
+                        '<div class="mantis-auth-guest-note">Guest mode is best for quick local drafting. Create an account when you want recovery, identity, and subscription access.</div>'
+                    )
+                    st.html('<div class="mantis-auth-divider"></div>')
+                    st.html('<div class="mantis-auth-method-label">Provider sign in</div>')
                     social_cols = st.columns(2)
                     with social_cols[0]:
                         if st.button("Continue with Google", use_container_width=True, key="auth_google_btn"):
@@ -3209,12 +3314,20 @@ def _run_ui():
                         if st.button("Continue with Microsoft", use_container_width=True, key="auth_microsoft_btn"):
                             st.info("Microsoft login needs OAuth app registration before it can be enabled safely.")
                     st.html('<div class="mantis-auth-divider"></div>')
-                    auth_tabs = st.tabs(["Sign in", "Create account", "Forgot password"])
+                    auth_tabs = st.tabs(["Sign in", "Create account", "Recover"])
 
                     with auth_tabs[0]:
-                        login_email = st.text_input("Email", key="auth_login_email")
-                        login_password = st.text_input("Password", type="password", key="auth_login_password")
-                        if st.button("Sign in", type="primary", use_container_width=True, key="auth_login_submit"):
+                        st.html('<div class="mantis-auth-form-note">Return to a saved workspace with your email and password.</div>')
+                        with st.form("auth_login_form", clear_on_submit=False):
+                            login_email = st.text_input("Email", key="auth_login_email")
+                            login_password = st.text_input("Password", type="password", key="auth_login_password")
+                            login_submitted = st.form_submit_button(
+                                "Sign in",
+                                type="primary",
+                                use_container_width=True,
+                                key="auth_login_submit",
+                            )
+                        if login_submitted:
                             ok, msg, user = authenticate_user(
                                 login_email,
                                 login_password,
@@ -3233,12 +3346,21 @@ def _run_ui():
                                 st.rerun()
 
                     with auth_tabs[1]:
-                        st.caption("Use your email to create an account. Password must be 10+ characters with uppercase, lowercase, and a number.")
-                        signup_email = st.text_input("Email", key="auth_signup_email")
-                        signup_display_name = st.text_input("Display name", key="auth_signup_display_name")
-                        signup_password = st.text_input("Password", type="password", key="auth_signup_password")
-                        signup_confirm = st.text_input("Confirm password", type="password", key="auth_signup_confirm")
-                        if st.button("Create account", type="primary", use_container_width=True, key="auth_signup_submit"):
+                        st.html(
+                            '<div class="mantis-auth-form-note">Create a local MANTIS identity. Passwords need 10+ characters with uppercase, lowercase, and a number.</div>'
+                        )
+                        with st.form("auth_signup_form", clear_on_submit=False):
+                            signup_email = st.text_input("Email", key="auth_signup_email")
+                            signup_display_name = st.text_input("Display name", key="auth_signup_display_name")
+                            signup_password = st.text_input("Password", type="password", key="auth_signup_password")
+                            signup_confirm = st.text_input("Confirm password", type="password", key="auth_signup_confirm")
+                            signup_submitted = st.form_submit_button(
+                                "Create account",
+                                type="primary",
+                                use_container_width=True,
+                                key="auth_signup_submit",
+                            )
+                        if signup_submitted:
                             if signup_password != signup_confirm:
                                 st.error("Passwords do not match.")
                             else:
@@ -3261,30 +3383,108 @@ def _run_ui():
                                     st.success("Account created.")
                                     st.rerun()
                     with auth_tabs[2]:
-                        st.caption("Local recovery requires your saved email and one-time recovery code.")
-                        reset_email = st.text_input("Account email", key="auth_reset_email")
-                        reset_code = st.text_input("Recovery code", type="password", key="auth_reset_recovery_code")
-                        reset_password = st.text_input("New password", type="password", key="auth_reset_password")
-                        reset_confirm = st.text_input("Confirm new password", type="password", key="auth_reset_confirm")
-                        if st.button("Reset password", type="primary", use_container_width=True, key="auth_reset_submit"):
-                            if reset_password != reset_confirm:
-                                st.error("Passwords do not match.")
-                            else:
-                                ok, msg = auth_reset_password_with_email(
-                                    email=reset_email,
-                                    recovery_code=reset_code,
-                                    new_password=reset_password,
+                        reset_token = (_query_value("reset_token") or "").strip()
+                        email_ready, email_ready_msg = is_email_ready()
+                        if email_ready:
+                            st.success("Email recovery is ready.")
+                        else:
+                            st.info(f"Email recovery setup needed: {email_ready_msg}")
+
+                        if reset_token:
+                            st.html(
+                                '<div class="mantis-auth-form-note">Enter a new password for the reset link. The link is one-time use and expires after 1 hour.</div>'
+                            )
+                            with st.form("auth_token_reset_form", clear_on_submit=False):
+                                token_password = st.text_input("New password", type="password", key="auth_token_reset_password")
+                                token_confirm = st.text_input("Confirm new password", type="password", key="auth_token_reset_confirm")
+                                token_submitted = st.form_submit_button(
+                                    "Set new password",
+                                    type="primary",
+                                    use_container_width=True,
+                                    key="auth_token_reset_submit",
+                                )
+                            if token_submitted:
+                                if token_password != token_confirm:
+                                    st.error("Passwords do not match.")
+                                else:
+                                    ok, msg = auth_reset_password_with_token(
+                                        reset_token=reset_token,
+                                        new_password=token_password,
+                                        base_projects_dir=AppConfig.PROJECTS_DIR,
+                                    )
+                                    if ok:
+                                        try:
+                                            st.query_params.clear()
+                                        except Exception:
+                                            pass
+                                        if "New recovery code:" in msg:
+                                            prefix, _, code = msg.partition("New recovery code:")
+                                            st.success(prefix.strip())
+                                            st.warning(f"Save this new recovery code now: {code.strip()}")
+                                        else:
+                                            st.success(msg)
+                                    else:
+                                        st.error(msg)
+                        else:
+                            st.html(
+                                '<div class="mantis-auth-form-note">Send a secure reset link to your account email. Recovery code reset remains available as a backup.</div>'
+                            )
+                            with st.form("auth_email_reset_request_form", clear_on_submit=False):
+                                request_email = st.text_input("Account email", key="auth_email_reset_request_email")
+                                request_submitted = st.form_submit_button(
+                                    "Send reset link",
+                                    type="primary",
+                                    use_container_width=True,
+                                    key="auth_email_reset_request_submit",
+                                    disabled=not email_ready,
+                                )
+                            if request_submitted:
+                                settings = email_settings()
+                                ok, msg = auth_request_password_reset_email(
+                                    email=request_email,
+                                    app_url=settings.get("app_url", ""),
+                                    send_email=send_password_reset_email,
                                     base_projects_dir=AppConfig.PROJECTS_DIR,
                                 )
                                 if ok:
-                                    if "New recovery code:" in msg:
-                                        prefix, _, code = msg.partition("New recovery code:")
-                                        st.success(prefix.strip())
-                                        st.warning(f"Save this new recovery code now: {code.strip()}")
-                                    else:
-                                        st.success(msg)
+                                    st.success(msg)
                                 else:
                                     st.error(msg)
+
+                            with st.expander("Use recovery code instead"):
+                                st.html(
+                                    '<div class="mantis-auth-form-note">Enter the recovery code you saved when the account was created. After reset, MANTIS shows a new one-time code to save.</div>'
+                                )
+                                with st.form("auth_reset_form", clear_on_submit=False):
+                                    reset_email = st.text_input("Account email", key="auth_reset_email")
+                                    reset_code = st.text_input("Recovery code", type="password", key="auth_reset_recovery_code")
+                                    reset_password = st.text_input("New password", type="password", key="auth_reset_password")
+                                    reset_confirm = st.text_input("Confirm new password", type="password", key="auth_reset_confirm")
+                                    reset_submitted = st.form_submit_button(
+                                        "Reset password",
+                                        type="primary",
+                                        use_container_width=True,
+                                        key="auth_reset_submit",
+                                    )
+                                if reset_submitted:
+                                    if reset_password != reset_confirm:
+                                        st.error("Passwords do not match.")
+                                    else:
+                                        ok, msg = auth_reset_password_with_email(
+                                            email=reset_email,
+                                            recovery_code=reset_code,
+                                            new_password=reset_password,
+                                            base_projects_dir=AppConfig.PROJECTS_DIR,
+                                        )
+                                        if ok:
+                                            if "New recovery code:" in msg:
+                                                prefix, _, code = msg.partition("New recovery code:")
+                                                st.success(prefix.strip())
+                                                st.warning(f"Save this new recovery code now: {code.strip()}")
+                                            else:
+                                                st.success(msg)
+                                        else:
+                                            st.error(msg)
             render_footer(AppConfig.VERSION)
         return False
 
@@ -4257,45 +4457,6 @@ def _run_ui():
                 confidence = confidence / 100.0
             confidence = max(0.0, min(1.0, confidence))
 
-            if confidence < world_threshold:
-                existing = p.find_entity_match(
-                    name,
-                    category,
-                    aliases=aliases if isinstance(aliases, list) else None,
-                )
-                if existing and desc:
-                    _queue_world_bible_suggestion(
-                        {
-                            "type": "update",
-                            "entity_id": existing.id,
-                            "name": existing.name,
-                            "category": existing.category,
-                            "description": desc,
-                            "aliases": aliases,
-                            "confidence": confidence,
-                            "source": label,
-                            "source_excerpt": source_excerpt,
-                            "chapter_id": chapter_id,
-                        }
-                    )
-                    suggested += 1
-                else:
-                    _queue_world_bible_suggestion(
-                        {
-                            "type": "new",
-                            "name": name,
-                            "category": Project._normalize_category(category),
-                            "description": desc,
-                            "aliases": aliases,
-                            "confidence": confidence,
-                            "source": label,
-                            "source_excerpt": source_excerpt,
-                            "chapter_id": chapter_id,
-                        }
-                    )
-                flagged += 1
-                continue
-
             suggestion_payload = {
                 "type": "new",
                 "name": name,
@@ -4308,6 +4469,15 @@ def _run_ui():
                 "chapter_id": chapter_id,
             }
             classified = _classify_suggestion(p, suggestion_payload)
+            confidence = max(0.0, min(1.0, float(classified.get("confidence", confidence) or 0.0)))
+
+            if confidence < world_threshold:
+                _queue_world_bible_suggestion(classified)
+                if classified.get("type") in {"update", "alias_only"}:
+                    suggested += 1
+                flagged += 1
+                continue
+
             ent, status = _apply_suggestion(p, classified)
             if ent is None:
                 continue
@@ -5086,6 +5256,86 @@ def _run_ui():
             tag="Workspace",
             key_prefix="workspace_header",
         )
+
+        active_dir = get_active_projects_dir() or AppConfig.PROJECTS_DIR
+        p = st.session_state.get("project")
+        project_entries = _load_recent_projects(active_dir, st.session_state.get("projects_refresh_token", 0))
+        backup_count = 0
+        try:
+            backup_count = len(
+                [
+                    name for name in os.listdir(AppConfig.BACKUPS_DIR)
+                    if os.path.isfile(os.path.join(AppConfig.BACKUPS_DIR, name))
+                ]
+            )
+        except OSError:
+            backup_count = 0
+        current_file = str(getattr(p, "filepath", "") or "")
+        current_file_exists = bool(current_file and os.path.exists(current_file))
+        current_words = p.get_total_word_count() if p else 0
+        current_entities = len(getattr(p, "world_db", {}) or {}) if p else 0
+
+        with st.container(border=True):
+            st.markdown("### Workspace Overview")
+            overview_cols = st.columns(4)
+            with overview_cols[0]:
+                st.metric("Projects", f"{len(project_entries):,}")
+            with overview_cols[1]:
+                st.metric("Current words", f"{current_words:,}")
+            with overview_cols[2]:
+                st.metric("World Bible entries", f"{current_entities:,}")
+            with overview_cols[3]:
+                st.metric("Backups", f"{backup_count:,}")
+            status_cols = st.columns([1, 1, 1])
+            with status_cols[0]:
+                st.caption("Session")
+                st.write("Guest workspace" if st.session_state.get("guest_mode") else "Account workspace")
+            with status_cols[1]:
+                st.caption("Autosave")
+                st.write("Enabled" if st.session_state.get("auto_save", True) else "Manual save")
+            with status_cols[2]:
+                st.caption("Current project")
+                st.write(p.title if p else "No project open")
+
+        with st.container(border=True):
+            st.markdown("### Storage & Safety")
+            path_cols = st.columns(3)
+            with path_cols[0]:
+                st.text_input("Projects folder", value=str(active_dir), disabled=True, key="workspace_projects_dir")
+            with path_cols[1]:
+                st.text_input("Config file", value=str(AppConfig.CONFIG_PATH), disabled=True, key="workspace_config_path")
+            with path_cols[2]:
+                st.text_input("Backup folder", value=str(AppConfig.BACKUPS_DIR), disabled=True, key="workspace_backup_dir")
+            if p:
+                file_label = current_file if current_file else "Project has not been saved to disk yet."
+                st.text_input("Current project file", value=file_label, disabled=True, key="workspace_current_project_file")
+                if current_file and not current_file_exists:
+                    st.warning("The current project file path is set, but the file is missing on disk. Save the project to recreate it.")
+                action_cols = st.columns(3)
+                with action_cols[0]:
+                    if st.button("Save current project", type="primary", use_container_width=True, key="workspace_save_current_project"):
+                        if persist_project(p, action="workspace_save_current_project"):
+                            st.toast("Current project saved.")
+                            st.rerun()
+                with action_cols[1]:
+                    if st.button("Prepare export", use_container_width=True, key="workspace_prepare_export"):
+                        if p.filepath:
+                            st.session_state.export_project_path = p.filepath
+                            st.session_state.page = "projects"
+                            st.rerun()
+                        else:
+                            st.toast("Save the project before exporting.")
+                with action_cols[2]:
+                    if st.button("Refresh project list", use_container_width=True, key="workspace_refresh_projects"):
+                        st.session_state.projects_refresh_token = int(st.session_state.get("projects_refresh_token", 0)) + 1
+                        st.toast("Project list refreshed.")
+                        st.rerun()
+            else:
+                st.info("Open or create a project to see file safety actions here.")
+                if st.button("Open Projects", type="primary", use_container_width=True, key="workspace_open_projects"):
+                    st.session_state.page = "projects"
+                    st.rerun()
+
         with st.container(border=True):
             st.markdown("### Studio Preferences")
             col1, col2 = st.columns(2)
@@ -5153,6 +5403,9 @@ def _run_ui():
                     step=0.005,
                     key="workspace_memory_hard_threshold",
                 )
+            st.info(
+                "High-confidence World Bible updates can auto-apply. Lower-confidence details stay queued in Insights for review."
+            )
 
         if st.button("Save Workspace Settings", type="primary", use_container_width=True, key="workspace_save"):
             data = load_app_config()
@@ -5444,22 +5697,6 @@ def _run_ui():
             on_open_insights=lambda: open_recent_project("insights"),
             on_open_project=_open_project,
         )
-
-        with st.container(border=True):
-            st.markdown("#### Data confidence")
-            st.caption("Ownership and save behavior for long-form work.")
-            st.markdown(f"**Autosave:** {autosave_status}")
-            st.markdown(f"**Project storage:** {system_mode} workspace")
-            st.caption("You keep project files and can export anytime from Projects.")
-            action_cols = st.columns(2)
-            with action_cols[0]:
-                if st.button("AI Settings", use_container_width=True, key="home_data_ai_settings"):
-                    st.session_state.page = "ai"
-                    st.rerun()
-            with action_cols[1]:
-                if st.button("Open Projects", use_container_width=True, key="home_data_open_projects"):
-                    st.session_state.page = "projects"
-                    st.rerun()
 
         return
 
@@ -7040,6 +7277,53 @@ def _run_ui():
         coherence_results = st.session_state.get("coherence_results", [])
         review_queue = st.session_state.get("world_bible_review", [])
 
+        def _normalize_review_confidence(item: Dict[str, Any]) -> float:
+            try:
+                value = float(item.get("confidence", 0.0) or 0.0)
+            except (TypeError, ValueError):
+                value = 0.0
+            if value > 1.0:
+                value = value / 100.0
+            return max(0.0, min(1.0, value))
+
+        def _auto_apply_eligible_review_queue() -> int:
+            from app.services.world_bible_merge import apply_suggestion as _apply_suggestion
+            from app.services.world_bible_merge import classify_suggestion as _classify_suggestion
+
+            threshold = float(
+                st.session_state.get("world_bible_confidence_threshold", AppConfig.WORLD_BIBLE_CONFIDENCE)
+            )
+            threshold = max(0.0, min(1.0, threshold))
+            remaining = []
+            applied_count = 0
+            changed = False
+            for queued in list(st.session_state.get("world_bible_review", [])):
+                classified = _classify_suggestion(p, queued)
+                confidence = _normalize_review_confidence(classified)
+                classified["confidence"] = confidence
+                if confidence + 1e-9 >= threshold:
+                    applied_ent, action = _apply_suggestion(p, classified)
+                    changed = True
+                    if applied_ent is not None:
+                        st.session_state.pop(f"desc_{applied_ent.id}", None)
+                        st.session_state.pop(f"aliases_{applied_ent.id}", None)
+                    if action != "duplicate":
+                        applied_count += 1
+                    continue
+                remaining.append(classified)
+                if classified != queued:
+                    changed = True
+            if changed:
+                st.session_state["world_bible_review"] = remaining
+                persist_project(p, action="insights_auto_apply_review_queue")
+            return applied_count
+
+        promoted_count = _auto_apply_eligible_review_queue()
+        if promoted_count:
+            st.toast(f"Auto-applied {promoted_count} queued canon suggestion(s).")
+            st.rerun()
+        review_queue = st.session_state.get("world_bible_review", [])
+
         total_words = p.get_total_word_count()
         chapter_count = len(chapters)
         active_chapters = len([c for c in chapters if (c.word_count or 0) > 0])
@@ -7187,6 +7471,19 @@ def _run_ui():
                                 st.caption(source_excerpt)
                             if item.get("reason"):
                                 st.info(item["reason"])
+                            matched_entity = p.world_db.get(item.get("entity_id") or "")
+                            if matched_entity is not None:
+                                with st.expander("Current World Bible entry"):
+                                    st.markdown(f"**Name:** {matched_entity.name}")
+                                    st.markdown(f"**Category:** {matched_entity.category}")
+                                    current_notes = (matched_entity.description or "").strip()
+                                    if current_notes:
+                                        st.markdown("**Current notes:**")
+                                        st.write(current_notes)
+                                    else:
+                                        st.caption("No current notes on this entry.")
+                                    if matched_entity.aliases:
+                                        st.markdown(f"**Aliases:** {', '.join(matched_entity.aliases)}")
                             novel_bullets = item.get("novel_bullets") or []
                             if novel_bullets:
                                 st.markdown("**New details to add:**")

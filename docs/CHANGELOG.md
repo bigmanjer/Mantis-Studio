@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Stability
+- Email password recovery: added Resend-backed one-time reset links using Streamlit secrets, hashed expiring reset tokens, and a token landing flow on the auth page.
+- Recovery UX: the Recover tab now prefers email reset links, keeps recovery-code reset as a fallback, and reports whether email secrets are configured.
+- Version bump: updated app metadata and docs to `135.9`.
+- Auth page redesign: replaced the earlier command-center hero with a focused access screen emphasizing guest drafting, account recovery, provider sign-in, and canon continuity.
+- Canon auto-apply correction: Canon Scanner now uses classified/boosted confidence for Workspace threshold decisions and Insights auto-promotes already-queued suggestions that meet the current threshold.
+- Canon review clarity: queued suggestions now show the matched World Bible entry so users can confirm whether proposed details are already present before applying.
+- Workspace Settings expansion: added workspace overview metrics, storage/config/backup visibility, current-project save/export/refresh actions, and clearer writing/canon automation controls.
+- Workspace settings persistence fix: startup now restores saved autosave, word-goal, session-goal, focus-timer, and confidence settings with safe bool/int/float coercion.
+- Auth access redesign: rebuilt the sign-in/sign-up page into a focused account workflow with clearer provider sign-in, form-based Sign in/Create/Recover tabs, a better guest path, and local-first/subscription-ready positioning.
 - Navigation landing fix: page changes now reset to the `#mantis-top` anchor once, and footer navigation links target that anchor, so Streamlit reruns no longer leave users staring at the footer after navigation.
 - Outline action layout: moved `Undo last outline apply` into Revision Tools and placed `Save Outline` at the bottom of the Blueprint panel to match the Editor action flow.
 - Auth page polish: rebuilt the account entry screen around the MANTIS brand lockup, a clearer Plan/Draft/Review value flow, an integrated guest path, and a compact account-access panel that fits laptop-height viewports.
