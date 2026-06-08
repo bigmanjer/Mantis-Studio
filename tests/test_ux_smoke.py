@@ -760,12 +760,20 @@ class TestUtilities:
 
     def test_whats_new_uses_real_release_highlights(self):
         source = (ROOT / "app" / "main.py").read_text(encoding="utf-8")
+        highlights_block = source[source.index("def _release_highlights()"):source.index("def render_release_summary")]
         assert "def _release_highlights()" in source
+        assert "Sign-in now uses a clearer MANTIS-themed first-visit page" in highlights_block
+        assert "Hosted Streamlit now shows an explicit Open Google sign-in button" in highlights_block
+        assert "Streamlit Secrets now accepts uppercase deployment keys" in highlights_block
+        assert "Password recovery now supports Resend-backed one-time reset links" in highlights_block
+        assert "High-confidence World Bible suggestions now auto-apply" in highlights_block
         assert "Chapter Flow now uses a compact chapter dropdown with Previous, Next, New, and Delete actions." in source
         assert "Find and replace now defaults to the first exact match" in source
         assert "Canon Scanner, queued canon suggestions, and Coherence Check now live in Insights" in source
         assert "Relationship graph moved out of World Bible and into Insights" in source
-        assert "Legacy duplicate runtime and UI compatibility shims were removed" in source
+        assert highlights_block.index("Sign-in now uses a clearer") < highlights_block.index("Chapter Flow now uses")
+        assert highlights_block.index("Password recovery now supports") < highlights_block.index("Find and replace now defaults")
+        assert "Legacy duplicate runtime and UI compatibility shims were removed" not in highlights_block
         assert "What's New in Mantis Studio" not in source
         assert "check_and_show_whats_new" not in source
         assert "You can now see what changed between versions" not in source
@@ -776,8 +784,19 @@ class TestUtilities:
     def test_welcome_banner_surfaces_latest_update_and_changelog(self):
         source = (ROOT / "app" / "main.py").read_text(encoding="utf-8")
         welcome_block = source[source.index("### Welcome to MANTIS Studio"):source.index("elif st.session_state.get(\"first_run\"")]
+        highlights_block = source[source.index("def _release_highlights()"):source.index("def render_release_summary")]
         assert "Latest update highlights" in source
         assert "render_release_summary(compact=True)" in welcome_block
+        compact_items = [
+            line for line in highlights_block.splitlines()
+            if line.strip().startswith('("')
+        ][:4]
+        compact_text = "\n".join(compact_items)
+        assert "Access" in compact_text
+        assert "Google Sign-In" in compact_text
+        assert "Google OAuth" in compact_text
+        assert "Email Recovery" in compact_text
+        assert "Chapter Flow" not in compact_text
         assert "Open changelog" in welcome_block
         assert "AppConfig.CHANGELOG_URL" in welcome_block
 

@@ -94,7 +94,7 @@ def get_app_version() -> str:
         # Never block app start on version metadata.
         pass
 
-    return "136.3"
+    return "136.4"
 
 
 def _safe_int_env(env_var: str, default: int) -> int:
@@ -2840,13 +2840,16 @@ def _run_ui():
 
     def _release_highlights() -> List[tuple[str, str]]:
         return [
+            ("Access", "Sign-in now uses a clearer MANTIS-themed first-visit page focused on planning, drafting, canon review, and the guest-to-account path."),
+            ("Google Sign-In", "Hosted Streamlit now shows an explicit Open Google sign-in button instead of relying on an iframe auto-redirect."),
+            ("Google OAuth", "Streamlit Secrets now accepts uppercase deployment keys such as MANTIS_GOOGLE_CLIENT_SECRET and the active Streamlit callback URL."),
+            ("Email Recovery", "Password recovery now supports Resend-backed one-time reset links with hashed expiring tokens and recovery-code fallback."),
+            ("Canon Automation", "High-confidence World Bible suggestions now auto-apply after classified confidence is checked against workspace rules."),
+            ("Workspace Settings", "Workspace preferences now restore saved autosave, writing goals, focus timer, and canon confidence settings on startup."),
             ("Editor", "Chapter Flow now uses a compact chapter dropdown with Previous, Next, New, and Delete actions."),
             ("Editor", "Find and replace now defaults to the first exact match, has optional all-match scope, and shows Undo replacement only after use."),
             ("Insights", "Canon Scanner, queued canon suggestions, and Coherence Check now live in Insights so risk review happens in one place."),
             ("Insights", "Relationship graph moved out of World Bible and into Insights with the rest of project health review."),
-            ("Canon Intelligence", "Latest-chapter analysis now catches more real facts, events, relationships, locations, roles, and items while ignoring transient eye/body motions."),
-            ("Navigation", "Insights now appears before Memory in sidebar, footer, and dashboard quick actions."),
-            ("Cleanup", "Legacy duplicate runtime and UI compatibility shims were removed so the app has fewer competing code paths."),
         ]
 
     def render_release_summary(*, compact: bool = False) -> None:

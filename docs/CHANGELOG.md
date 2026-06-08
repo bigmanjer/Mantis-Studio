@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Stability
+- Dashboard release highlights: refreshed the Welcome card's latest update list so it reflects the current auth, Google OAuth, email recovery, canon automation, and workspace settings releases instead of older editor-only changes.
+- Version bump: updated app metadata and docs to `136.4`.
 - Auth page overhaul: replaced abstract studio/canon headline copy with a clearer MANTIS-themed first-visit experience focused on planning, drafting, canon review, and the guest-to-account path.
 - Version bump: updated app metadata and docs to `136.3`.
 - Google sign-in launch fix: replaced the Streamlit iframe auto-redirect with an explicit Google sign-in link button so hosted Streamlit deployments can open OAuth reliably.
