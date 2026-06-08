@@ -18,7 +18,7 @@ GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
 GOOGLE_TOKENINFO_URL = "https://oauth2.googleapis.com/tokeninfo"
 DEFAULT_GOOGLE_SCOPES = "openid email profile"
 DEFAULT_GOOGLE_CLIENT_ID = "1089899786902-85r6u83hstmskkjbniva160d29fdko4c.apps.googleusercontent.com"
-HOSTED_GOOGLE_REDIRECT_URI = "https://mantisstudio.streamlit.app/?oauth_provider=google"
+HOSTED_GOOGLE_REDIRECT_URI = "https://mantis-studio.streamlit.app/?oauth_provider=google"
 LOCAL_GOOGLE_REDIRECT_URI = "http://localhost:8501/?oauth_provider=google"
 GOOGLE_SECRET_ENV_VARS = (
     "MANTIS_GOOGLE_CLIENT_SECRET",
@@ -33,14 +33,20 @@ GOOGLE_REDIRECT_URI_ENV_VARS = (
     "GOOGLE_REDIRECT_URI",
 )
 GOOGLE_SECRET_STREAMLIT_KEYS = (
+    "MANTIS_GOOGLE_CLIENT_SECRET",
+    "GOOGLE_CLIENT_SECRET",
     "google_client_secret",
     "oauth_google_client_secret",
 )
 GOOGLE_CLIENT_ID_STREAMLIT_KEYS = (
+    "MANTIS_GOOGLE_CLIENT_ID",
+    "GOOGLE_CLIENT_ID",
     "google_client_id",
     "oauth_google_client_id",
 )
 GOOGLE_REDIRECT_URI_STREAMLIT_KEYS = (
+    "MANTIS_GOOGLE_REDIRECT_URI",
+    "GOOGLE_REDIRECT_URI",
     "google_redirect_uri",
     "oauth_google_redirect_uri",
 )

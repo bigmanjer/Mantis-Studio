@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Stability
+- Google OAuth secret detection: Streamlit Secrets now accepts both uppercase deployment keys and lowercase Streamlit keys, and the auth screen points users to Secrets instead of a removed super-admin OAuth menu.
+- Google OAuth redirect default: hosted Google sign-in now defaults to the active `https://mantis-studio.streamlit.app/?oauth_provider=google` callback URL.
+- Version bump: updated app metadata and docs to `136.1`.
+- Auth page professional redesign: rebuilt the sign-in screen into a cleaner product-access page with research-informed hierarchy, fewer default choices, stronger guest/account/subscription comparison, and clearer provider/recovery positioning.
+- Version bump: updated app metadata and docs to `136.0`.
 - Email password recovery: added Resend-backed one-time reset links using Streamlit secrets, hashed expiring reset tokens, and a token landing flow on the auth page.
 - Recovery UX: the Recover tab now prefers email reset links, keeps recovery-code reset as a fallback, and reports whether email secrets are configured.
 - Version bump: updated app metadata and docs to `135.9`.

@@ -11,13 +11,13 @@ code flow.
 4. Add the exact redirect URI shown in MANTIS User Settings.
    For the hosted Streamlit app this is:
 
-   `https://mantisstudio.streamlit.app/?oauth_provider=google`
+   `https://mantis-studio.streamlit.app/?oauth_provider=google`
 
    For local Streamlit this is usually:
 
    `http://localhost:8501/?oauth_provider=google`
 
-   Do not enter only `mantisstudio.streamlit.app`; Google requires the full
+   Do not enter only `mantis-studio.streamlit.app`; Google requires the full
    URL, including `https://` and `?oauth_provider=google`.
 
 5. Add the Google client secret to deployment secrets.
@@ -35,19 +35,22 @@ deployments such as Streamlit Cloud, store the client secret outside the app
 config:
 
 - Environment variable: `MANTIS_GOOGLE_CLIENT_SECRET`
+- Streamlit secret: `MANTIS_GOOGLE_CLIENT_SECRET`
 - Streamlit secret: `google_client_secret`
 - Alternate Streamlit secret: `oauth_google_client_secret`
 
 Optional overrides are still available for alternate deployments:
 
 - Environment variable: `MANTIS_GOOGLE_CLIENT_ID`
+- Streamlit secret: `MANTIS_GOOGLE_CLIENT_ID`
 - Streamlit secret: `google_client_id`
 - Optional environment variable: `MANTIS_GOOGLE_REDIRECT_URI`
+- Optional Streamlit secret: `MANTIS_GOOGLE_REDIRECT_URI`
 - Optional Streamlit secret: `google_redirect_uri`
 
 When these external values are present, MANTIS uses them for Google OAuth. If no
 redirect URI is saved, MANTIS defaults to
-`https://mantisstudio.streamlit.app/?oauth_provider=google`.
+`https://mantis-studio.streamlit.app/?oauth_provider=google`.
 
 ## Account Linking
 

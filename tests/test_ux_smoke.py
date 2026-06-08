@@ -1269,7 +1269,7 @@ class TestOAuthAndRepoStructure:
         assert "Google Client Secret" not in source
         assert "user_admin_google_client_secret" not in source
         oauth_source = (ROOT / "app" / "services" / "oauth.py").read_text(encoding="utf-8")
-        assert "https://mantisstudio.streamlit.app/?oauth_provider=google" in oauth_source
+        assert "https://mantis-studio.streamlit.app/?oauth_provider=google" in oauth_source
         assert "DEFAULT_GOOGLE_CLIENT_ID" in oauth_source
 
     def test_secret_store_refuses_plaintext_fallback(self):
@@ -1287,12 +1287,15 @@ class TestOAuthAndRepoStructure:
     def test_google_oauth_supports_external_secret_sources(self):
         source = (ROOT / "app" / "services" / "oauth.py").read_text(encoding="utf-8")
         assert "MANTIS_GOOGLE_CLIENT_SECRET" in source
+        assert "GOOGLE_CLIENT_SECRET" in source
         assert "google_client_secret" in source
         assert "oauth_google_client_secret" in source
         assert "DEFAULT_GOOGLE_CLIENT_ID" in source
         assert "MANTIS_GOOGLE_CLIENT_ID" in source
+        assert "GOOGLE_CLIENT_ID" in source
         assert "google_client_id" in source
         assert "MANTIS_GOOGLE_REDIRECT_URI" in source
+        assert "GOOGLE_REDIRECT_URI" in source
         assert "google_redirect_uri" in source
 
 
@@ -2167,14 +2170,20 @@ class TestMantisModelAndArchitectUX:
         source = (ROOT / "app" / "main.py").read_text(encoding="utf-8")
         auth_block = source[source.index("def _render_auth_gate()"):source.index("if not _render_auth_gate()")]
         assert "branding/mantis_lockup.png" in auth_block
-        assert "MANTIS Studio Access" in auth_block
-        assert "Keep the story straight." in auth_block
-        assert "Restore your workspace, manage projects, and keep canon intelligence connected" in auth_block
-        assert "mantis-auth-proof-grid" in auth_block
-        assert "What an account unlocks" in auth_block
-        assert "Provider sign in" in auth_block
-        assert "Choose access" in auth_block
-        assert "Continue to MANTIS" in auth_block
+        assert "Narrative Operating System" in auth_block
+        assert "Enter the studio with your canon protected." in auth_block
+        assert "Start drafting immediately, then attach an account" in auth_block
+        assert "mantis-auth-signal-strip" in auth_block
+        assert "mantis-auth-paths" in auth_block
+        assert "Guest draft" in auth_block
+        assert "Free account" in auth_block
+        assert "Paid access" in auth_block
+        assert "Design benchmark: modern auth screens reduce default form load" in auth_block
+        assert "Provider sign-in" in auth_block
+        assert "Account Access" in auth_block
+        assert "Choose how to continue" in auth_block
+        assert "Local-first workspace" in auth_block
+        assert "One-time reset links" in auth_block
         assert 'st.tabs(["Sign in", "Create account", "Recover"])' in auth_block
         assert "Email recovery is ready." in auth_block
         assert "Send reset link" in auth_block
@@ -2183,6 +2192,8 @@ class TestMantisModelAndArchitectUX:
         assert "auth_request_password_reset_email" in auth_block
         assert "auth_reset_password_with_token" in auth_block
         assert "Use recovery code instead" in auth_block
+        assert "Add MANTIS_GOOGLE_CLIENT_SECRET or google_client_secret" in auth_block
+        assert "Ask the super admin to configure Google OAuth" not in auth_block
         assert "Enter the recovery code you saved" in auth_block
         assert "new one-time code to save" in auth_block
         assert 'st.form("auth_login_form"' in auth_block
@@ -2191,11 +2202,12 @@ class TestMantisModelAndArchitectUX:
         assert 'key="auth_login_submit"' in auth_block
         assert 'key="auth_signup_submit"' in auth_block
         assert 'key="auth_reset_submit"' in auth_block
-        assert "Continue as guest" in auth_block
+        assert "Start as guest" in auth_block
         assert auth_block.index("auth_continue_guest") < auth_block.index("Continue with Google")
         assert "Sign in or create an account" not in auth_block
         assert "Narrative command center" not in auth_block
         assert "Write with your canon intact." not in auth_block
+        assert "MANTIS Studio Access" not in auth_block
         assert "subscription access" in auth_block
         assert "Welcome to MANTIS Studio" not in auth_block
 
