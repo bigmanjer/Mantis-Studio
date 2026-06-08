@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Stability
+- Auth page overhaul: replaced abstract studio/canon headline copy with a clearer MANTIS-themed first-visit experience focused on planning, drafting, canon review, and the guest-to-account path.
+- Version bump: updated app metadata and docs to `136.3`.
 - Google sign-in launch fix: replaced the Streamlit iframe auto-redirect with an explicit Google sign-in link button so hosted Streamlit deployments can open OAuth reliably.
 - Version bump: updated app metadata and docs to `136.2`.
 - Google OAuth secret detection: Streamlit Secrets now accepts both uppercase deployment keys and lowercase Streamlit keys, and the auth screen points users to Secrets instead of a removed super-admin OAuth menu.

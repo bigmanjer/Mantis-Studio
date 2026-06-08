@@ -2170,20 +2170,26 @@ class TestMantisModelAndArchitectUX:
         source = (ROOT / "app" / "main.py").read_text(encoding="utf-8")
         auth_block = source[source.index("def _render_auth_gate()"):source.index("if not _render_auth_gate()")]
         assert "branding/mantis_lockup.png" in auth_block
-        assert "Narrative Operating System" in auth_block
-        assert "Enter the studio with your canon protected." in auth_block
-        assert "Start drafting immediately, then attach an account" in auth_block
+        assert "MANTIS Studio" in auth_block
+        assert "Plan the story. Draft the chapters. Keep canon under control." in auth_block
+        assert "A focused AI writing workspace for novels, series bibles, and long-form projects" in auth_block
+        assert "Start locally. Upgrade when the project needs an account." in auth_block
         assert "mantis-auth-signal-strip" in auth_block
         assert "mantis-auth-paths" in auth_block
-        assert "Guest draft" in auth_block
-        assert "Free account" in auth_block
-        assert "Paid access" in auth_block
-        assert "Design benchmark: modern auth screens reduce default form load" in auth_block
+        assert "Plan" in auth_block
+        assert "Draft" in auth_block
+        assert "Review" in auth_block
+        assert "Guest session" in auth_block
+        assert "Writer account" in auth_block
+        assert "Subscription ready" in auth_block
+        assert "MANTIS means Modular AI Narrative Text Intelligence System." in auth_block
+        assert "Design benchmark: modern auth screens reduce default form load" not in auth_block
         assert "Provider sign-in" in auth_block
-        assert "Account Access" in auth_block
-        assert "Choose how to continue" in auth_block
-        assert "Local-first workspace" in auth_block
-        assert "One-time reset links" in auth_block
+        assert "Access" in auth_block
+        assert "Start writing in seconds" in auth_block
+        assert "Local-first" in auth_block
+        assert "Recoverable" in auth_block
+        assert "Exportable" in auth_block
         assert 'st.tabs(["Sign in", "Create account", "Recover"])' in auth_block
         assert "Email recovery is ready." in auth_block
         assert "Send reset link" in auth_block
@@ -2213,7 +2219,8 @@ class TestMantisModelAndArchitectUX:
         assert "Narrative command center" not in auth_block
         assert "Write with your canon intact." not in auth_block
         assert "MANTIS Studio Access" not in auth_block
-        assert "subscription access" in auth_block
+        assert "Enter the studio with your canon protected." not in auth_block
+        assert "paid access" in auth_block
         assert "Welcome to MANTIS Studio" not in auth_block
 
     def test_memory_page_does_not_render_coherence_check(self):

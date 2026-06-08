@@ -94,7 +94,7 @@ def get_app_version() -> str:
         # Never block app start on version metadata.
         pass
 
-    return "136.2"
+    return "136.3"
 
 
 def _safe_int_env(env_var: str, default: int) -> int:
@@ -3090,23 +3090,23 @@ def _run_ui():
             """
             <style>
             .mantis-auth-shell {
-                padding: 0.35rem 0 1rem;
+                padding: 0.2rem 0 1rem;
             }
             .mantis-auth-hero {
-                padding: 1.1rem 1rem;
+                padding: 1.15rem 1rem 1rem;
                 display: flex;
                 flex-direction: column;
                 justify-content: space-between;
-                gap: 1.1rem;
-                min-height: 560px;
+                gap: 1rem;
+                min-height: 590px;
             }
             .mantis-auth-logo {
-                width: min(340px, 88%);
-                max-height: 104px;
+                width: min(360px, 90%);
+                max-height: 108px;
                 object-fit: contain;
                 object-position: left center;
                 display: block;
-                margin-bottom: 1rem;
+                margin-bottom: 1.05rem;
             }
             .mantis-auth-wordmark {
                 font-size: 1.25rem;
@@ -3114,31 +3114,47 @@ def _run_ui():
                 margin-bottom: 0.8rem;
             }
             .mantis-auth-kicker {
-                letter-spacing: 0.06em;
+                letter-spacing: 0.08em;
                 text-transform: uppercase;
-                font-size: 0.74rem;
+                font-size: 0.72rem;
                 color: var(--mantis-muted);
-                margin-bottom: 0.45rem;
+                margin-bottom: 0.5rem;
             }
             .mantis-auth-title {
-                font-size: 3.2rem;
-                line-height: 1.04;
-                margin: 0 0 0.75rem 0;
+                font-size: 3.35rem;
+                line-height: 1.01;
+                margin: 0 0 0.8rem 0;
                 font-weight: 800;
-                max-width: 14ch;
+                max-width: 15ch;
             }
             .mantis-auth-sub {
                 color: var(--mantis-muted);
-                margin-bottom: 1rem;
-                max-width: 56ch;
+                margin-bottom: 0.9rem;
+                max-width: 58ch;
                 font-size: 1rem;
-                line-height: 1.55;
+                line-height: 1.58;
+            }
+            .mantis-auth-command {
+                border: 1px solid var(--mantis-card-border);
+                border-radius: 8px;
+                padding: 0.8rem 0.85rem;
+                margin: 0.85rem 0 0.95rem;
+                background: color-mix(in srgb, var(--mantis-primary) 7%, transparent);
+            }
+            .mantis-auth-command strong {
+                display: block;
+                margin-bottom: 0.18rem;
+            }
+            .mantis-auth-command span {
+                color: var(--mantis-muted);
+                font-size: 0.86rem;
+                line-height: 1.45;
             }
             .mantis-auth-signal-strip {
                 display: grid;
                 grid-template-columns: repeat(3, minmax(0, 1fr));
                 gap: 0;
-                margin: 1rem 0 0;
+                margin: 0;
                 border-top: 1px solid var(--mantis-card-border);
                 border-bottom: 1px solid var(--mantis-card-border);
             }
@@ -3186,7 +3202,7 @@ def _run_ui():
                 font-size: 0.86rem;
                 line-height: 1.45;
             }
-            .mantis-auth-research-note {
+            .mantis-auth-footnote {
                 color: var(--mantis-muted);
                 font-size: 0.78rem;
                 line-height: 1.4;
@@ -3199,7 +3215,7 @@ def _run_ui():
             .mantis-auth-panel h3 {
                 margin-top: 0;
                 margin-bottom: 0.35rem;
-                font-size: 2.15rem;
+                font-size: 2.2rem;
                 line-height: 1.14;
             }
             .mantis-auth-action-row {
@@ -3280,7 +3296,7 @@ def _run_ui():
         _, center, _ = st.columns([0.06, 1, 0.06])
         with center:
             st.html('<div class="mantis-auth-shell"></div>')
-            hero_col, auth_col = st.columns([1.05, 0.95], vertical_alignment="top")
+            hero_col, auth_col = st.columns([1.1, 0.9], vertical_alignment="top")
 
             with hero_col:
                 with st.container(border=True):
@@ -3289,20 +3305,24 @@ def _run_ui():
                         <div class="mantis-auth-hero">
                             <div>
                                 {auth_lockup_img}
-                                <div class="mantis-auth-kicker">Narrative Operating System</div>
-                                <h2 class="mantis-auth-title">Enter the studio with your canon protected.</h2>
-                                <div class="mantis-auth-sub">Start drafting immediately, then attach an account when you need recovery, separated workspaces, OAuth identity, and subscription access.</div>
+                                <div class="mantis-auth-kicker">MANTIS Studio</div>
+                                <h2 class="mantis-auth-title">Plan the story. Draft the chapters. Keep canon under control.</h2>
+                                <div class="mantis-auth-sub">A focused AI writing workspace for novels, series bibles, and long-form projects where continuity matters.</div>
+                                <div class="mantis-auth-command">
+                                    <strong>Start locally. Upgrade when the project needs an account.</strong>
+                                    <span>Guest mode gets you into the editor fast. Accounts add recovery, separated workspaces, provider sign-in, and the foundation for paid access.</span>
+                                </div>
                                 <div class="mantis-auth-signal-strip">
-                                    <div class="mantis-auth-signal"><strong>3 paths</strong><span>Guest, account, or provider sign-in depending on the session.</span></div>
-                                    <div class="mantis-auth-signal"><strong>1 inbox</strong><span>Email recovery routes reset links back to this app.</span></div>
-                                    <div class="mantis-auth-signal"><strong>0 lock-in</strong><span>Projects stay exportable from the workspace.</span></div>
+                                    <div class="mantis-auth-signal"><strong>Plan</strong><span>Outline structure, chapter beats, and story targets.</span></div>
+                                    <div class="mantis-auth-signal"><strong>Draft</strong><span>Write chapters with AI support close to the manuscript.</span></div>
+                                    <div class="mantis-auth-signal"><strong>Review</strong><span>Check canon risk before details drift.</span></div>
                                 </div>
                             </div>
                             <div class="mantis-auth-paths">
-                                <div class="mantis-auth-path"><strong>Guest draft</strong><span>Best for testing the editor and sketching locally before committing to an identity.</span></div>
-                                <div class="mantis-auth-path"><strong>Free account</strong><span>Keeps projects separated by account and enables password recovery.</span></div>
-                                <div class="mantis-auth-path"><strong>Paid access</strong><span>Ready for subscription gating once billing is connected.</span></div>
-                                <div class="mantis-auth-research-note">Design benchmark: modern auth screens reduce default form load, make the primary action visually obvious, and explain why account creation is worth the friction.</div>
+                                <div class="mantis-auth-path"><strong>Guest session</strong><span>Try the studio immediately without creating an account.</span></div>
+                                <div class="mantis-auth-path"><strong>Writer account</strong><span>Save identity, recovery, OAuth sign-in, and account-separated projects.</span></div>
+                                <div class="mantis-auth-path"><strong>Subscription ready</strong><span>Built to support paid access when billing is connected.</span></div>
+                                <div class="mantis-auth-footnote">MANTIS means Modular AI Narrative Text Intelligence System.</div>
                             </div>
                         </div>
                         """
@@ -3314,14 +3334,14 @@ def _run_ui():
                         """
                         <div class="mantis-auth-panel">
                             <div>
-                                <div class="mantis-auth-kicker">Account Access</div>
-                                <h3>Choose how to continue</h3>
-                                <div class="mantis-auth-sub">Use guest mode for speed, or sign in when the work should belong to an account.</div>
+                                <div class="mantis-auth-kicker">Access</div>
+                                <h3>Start writing in seconds</h3>
+                                <div class="mantis-auth-sub">Jump in as a guest, or sign in when this workspace should belong to you.</div>
                             </div>
                             <div class="mantis-auth-trust-row">
-                                <span>Local-first workspace</span>
-                                <span>One-time reset links</span>
-                                <span>Subscription-ready accounts</span>
+                                <span>Local-first</span>
+                                <span>Recoverable</span>
+                                <span>Exportable</span>
                             </div>
                         </div>
                         """
@@ -3332,7 +3352,7 @@ def _run_ui():
                         st.error(oauth_error)
                     if oauth_success:
                         st.success(oauth_success)
-                    st.html('<div class="mantis-auth-method-label">Fastest path</div>')
+                    st.html('<div class="mantis-auth-method-label">Recommended for first visit</div>')
                     if st.button(
                         "Start as guest",
                         use_container_width=True,
@@ -3342,7 +3362,7 @@ def _run_ui():
                         _start_guest_session()
                         st.rerun()
                     st.html(
-                        '<div class="mantis-auth-guest-note">Guest mode is for quick local drafting. Create or sign into an account when recovery, identity, and paid access matter.</div>'
+                        '<div class="mantis-auth-guest-note">You can create an account later when the project needs recovery or paid access.</div>'
                     )
                     st.html('<div class="mantis-auth-divider"></div>')
                     st.html('<div class="mantis-auth-method-label">Provider sign-in</div>')
