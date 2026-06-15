@@ -27,6 +27,7 @@ def render_dashboard_workspace(
     on_open_outline: Callable[[], None],
     on_new_project: Callable[[], None],
     on_open_world: Callable[[], None],
+    on_open_knowledge: Callable[[], None],
     on_open_memory: Callable[[], None],
     on_open_insights: Callable[[], None],
     on_open_project: Callable[[str, str], None],
@@ -125,10 +126,17 @@ def render_dashboard_workspace(
                     key="dashboard_new_project_focus",
                 ):
                     on_new_project()
-            memory_row = st.columns([1, 1])
-            with memory_row[0]:
+            support_row = st.columns([1, 1, 1])
+            with support_row[0]:
                 st.caption("Pick up writing, canon, or project setup from one place.")
-            with memory_row[1]:
+            with support_row[1]:
+                if st.button(
+                    "Knowledge Base",
+                    use_container_width=True,
+                    key="qa_knowledge",
+                ):
+                    on_open_knowledge()
+            with support_row[2]:
                 if st.button(
                     "Memory",
                     use_container_width=True,
@@ -188,7 +196,7 @@ def render_dashboard_workspace(
             st.markdown("#### Studio snapshot")
             st.caption("At-a-glance health for your workspace.")
             st.markdown(f"**Canon health:** {canon_icon} {canon_label}")
-            st.caption(f"System mode: {system_mode} - AI ops today: {ai_ops_today}")
+            st.caption("Project health, writing momentum, and canon readiness.")
             st.divider()
             st.markdown("**Weekly momentum**")
             st.caption(f"{weekly_count}/{weekly_goal} sessions logged")

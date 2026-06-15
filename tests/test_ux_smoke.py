@@ -408,12 +408,17 @@ class TestNavigationParity:
 
         intelligence = dict(get_nav_sections())["Intelligence"]
         intelligence_labels = [label for label, _, _ in intelligence]
+        assert "Knowledge Base" in intelligence_labels
+        assert intelligence_labels.index("Knowledge Base") < intelligence_labels.index("Insights")
         assert intelligence_labels.index("Insights") < intelligence_labels.index("Memory")
 
         flat_labels = [label for label, _, _ in get_nav_items()]
+        assert "Knowledge Base" in flat_labels
         assert flat_labels.index("Insights") < flat_labels.index("Memory")
 
         html = _build_footer_nav_links()
+        assert "?page=knowledge" in html
+        assert html.index("?page=knowledge") < html.index("?page=insights")
         assert html.index("?page=insights") < html.index("?page=memory")
 
     def test_settings_order_is_workspace_ai_user(self):
@@ -445,10 +450,21 @@ class TestNavigationParity:
         assert "def _render_page_position_reset(" in source
         assert "mantis-top" in source
         assert "scrollIntoView" in source
+        assert 'section[data-testid="stMain"]' in source
+        assert "section.stMain" in source
         assert "_scroll_top_pending" not in source
         assert 'scrollRestoration = "manual"' not in source
         assert "MutationObserver(doScroll)" not in source
         assert '"user",' in source
+
+    def test_knowledge_base_learning_page_is_registered(self):
+        source = (ROOT / "app" / "main.py").read_text(encoding="utf-8")
+        assert "def render_knowledge_base():" in source
+        assert 'st.session_state.page = "knowledge"' in source
+        assert 'elif pg == "knowledge":' in source
+        assert "extract_text_from_upload" in source
+        assert "import_knowledge_document" in source
+        assert "search_knowledge_base" in source
 
 
 # ---------------------------------------------------------------------------
@@ -765,6 +781,34 @@ class TestUtilities:
         assert _is_generic_project_title("Beyond the Fractured Horizon") is True
         assert _is_generic_project_title("The Unseen Library") is False
 
+    def test_knowledge_base_import_search_and_context(self, tmp_path):
+        from app.services.knowledge_base import (
+            build_knowledge_context,
+            import_knowledge_document,
+            knowledge_stats,
+            search_knowledge_base,
+        )
+
+        text = (
+            "Jane Austen style notes: irony, free indirect discourse, and social observation.\n\n"
+            "Gothic atmosphere uses isolation, dread, symbols, and dark settings.\n\n"
+            "Copyright rule: use public-domain excerpts or original summaries for modern works."
+        )
+        result = import_knowledge_document(str(tmp_path), "literary_notes.txt", text)
+        assert result["chunks"] >= 1
+
+        stats = knowledge_stats(str(tmp_path))
+        assert stats["documents"] == 1
+        assert stats["chunks"] >= 1
+
+        results = search_knowledge_base(str(tmp_path), "gothic atmosphere", limit=3)
+        assert results
+        assert "Gothic atmosphere" in results[0]["text"]
+
+        context = build_knowledge_context(str(tmp_path), "free indirect discourse", limit=2)
+        assert "Knowledge Base" not in context  # source name should come from the imported file
+        assert "literary_notes.txt" in context
+
     def test_app_version(self):
         from app.main import get_app_version
         version = get_app_version()
@@ -774,6 +818,10 @@ class TestUtilities:
         source = (ROOT / "app" / "main.py").read_text(encoding="utf-8")
         highlights_block = source[source.index("def _release_highlights()"):source.index("def render_release_summary")]
         assert "def _release_highlights()" in source
+        assert "MANTIS can now import DOCX, TXT, and Markdown learning material" in highlights_block
+        assert "Chapter generation now retrieves relevant Knowledge Base guidance" in highlights_block
+        assert "Guest projects now use a stable local guest id" in highlights_block
+        assert "reset Streamlit's real main scroll container" in highlights_block
         assert "Dashboard no longer repeats low-value autosave" in highlights_block
         assert "Apply Fix now resolves chapters by id, number, title, or matching excerpt" in highlights_block
         assert "Improve Flow and other rewrite tools now request prose-only output" in highlights_block
@@ -787,8 +835,8 @@ class TestUtilities:
         assert "Find and replace now defaults to the first exact match" in source
         assert "Canon Scanner, queued canon suggestions, and Coherence Check now live in Insights" in source
         assert "Relationship graph moved out of World Bible and into Insights" in source
-        assert highlights_block.index("Dashboard no longer repeats") < highlights_block.index("Sign-in now uses a clearer")
-        assert highlights_block.index("Apply Fix now resolves") < highlights_block.index("Google sign-in now uses")
+        assert highlights_block.index("MANTIS can now import") < highlights_block.index("Dashboard no longer repeats")
+        assert highlights_block.index("Guest projects now use") < highlights_block.index("Sign-in now uses a clearer")
         assert "Legacy duplicate runtime and UI compatibility shims were removed" not in highlights_block
         assert "What's New in Mantis Studio" not in source
         assert "check_and_show_whats_new" not in source
@@ -808,19 +856,22 @@ class TestUtilities:
             if line.strip().startswith('("')
         ][:4]
         compact_text = "\n".join(compact_items)
-        assert "Dashboard" in compact_text
-        assert "Coherence Fix" in compact_text
-        assert "Editor Rewrite" in compact_text
-        assert "Canon Scanner" in compact_text
-        assert "Google Sign-In" not in compact_text
+        assert "Knowledge Base" in compact_text
+        assert "AI Learning" in compact_text
+        assert "Guest Workspaces" in compact_text
+        assert "Navigation" in compact_text
+        assert "Dashboard" not in compact_text
         assert "Open changelog" in welcome_block
         assert "AppConfig.CHANGELOG_URL" in welcome_block
 
     def test_dashboard_removes_low_value_status_strip(self):
         source = (ROOT / "app" / "main.py").read_text(encoding="utf-8")
+        dashboard_source = (ROOT / "app" / "views" / "dashboard_workspace.py").read_text(encoding="utf-8")
         dashboard_block = source[source.index("def render_home():"):source.index("def render_projects():")]
         assert "Outcome-focused workspace for planning, drafting, canon, and export." not in dashboard_block
         assert "Canon {canon_label} - Mode: {system_mode}" not in dashboard_block
+        assert "System mode:" not in dashboard_source
+        assert "AI ops today" not in dashboard_source
 
     def test_insights_and_world_bible_use_current_review_language(self):
         source = (ROOT / "app" / "main.py").read_text(encoding="utf-8")
@@ -828,6 +879,21 @@ class TestUtilities:
         assert "World Bible review queue pending" not in source
         assert "No chapter mentions yet" in source
         assert "Unused in chapters" not in source
+
+    def test_oauth_docs_use_hyphenated_streamlit_url(self):
+        source = (ROOT / "docs" / "OAUTH_SETUP.md").read_text(encoding="utf-8")
+        assert "https://mantis-studio.streamlit.app/?oauth_provider=google" in source
+        assert "https://mantisstudio.streamlit.app" not in source
+
+    def test_footer_contact_is_not_placeholder(self):
+        source = (ROOT / "app" / "layout" / "layout.py").read_text(encoding="utf-8")
+        assert "support@mantis-studio.example" not in source
+        assert "rebusinessmatters@gmail.com" in source
+
+    def test_mobile_sidebar_uses_full_width_drawer(self):
+        source = (ROOT / "app" / "ui" / "enhanced_theme.py").read_text(encoding="utf-8")
+        assert "@media (max-width: 760px)" in source
+        assert "width: 100vw !important" in source
 
     def test_workspace_settings_restore_saved_config_values(self):
         source = (ROOT / "app" / "main.py").read_text(encoding="utf-8")
@@ -1539,12 +1605,12 @@ class TestAPIKeyValidation:
 
 
 # ---------------------------------------------------------------------------
-# 22b) API key persistence  keys survive refresh via config file
+# 22b) API key persistence  keys should not be saved as plaintext
 # ---------------------------------------------------------------------------
 
 
 class TestAPIKeyPersistence:
-    """Verify that API keys are saved to and loaded from the config file."""
+    """Verify API key config behavior avoids new plaintext persistence."""
 
     @pytest.fixture(autouse=True)
     def _tmpdir(self, tmp_path):
@@ -1556,7 +1622,7 @@ class TestAPIKeyPersistence:
         mock_st.session_state = state_dict
         return mock_st
 
-    def test_set_session_key_persists_to_config(self):
+    def test_set_session_key_does_not_persist_plaintext(self):
         from app.main import AppConfig as MainAppConfig, set_session_key, load_app_config
         import unittest.mock as mock
 
@@ -1565,11 +1631,34 @@ class TestAPIKeyPersistence:
             MainAppConfig.CONFIG_PATH = self.config_path
             mock_st = self._make_mock_st({"ai_session_keys": {"openai": "", "groq": ""}})
 
-            with mock.patch("app.main._get_streamlit", return_value=mock_st):
+            with mock.patch("app.main._get_streamlit", return_value=mock_st), \
+                 mock.patch("app.main.protected_storage_available", return_value=False):
                 set_session_key("groq", "sk-test-persist-key")
 
             config = load_app_config()
-            assert config.get("groq_api_key") == "sk-test-persist-key"
+            assert config.get("groq_api_key") is None
+            assert config.get("groq_api_key_protected") is None
+            assert mock_st.session_state["ai_session_keys"]["groq"] == "sk-test-persist-key"
+        finally:
+            MainAppConfig.CONFIG_PATH = original
+
+    def test_set_session_key_uses_protected_storage_when_available(self):
+        from app.main import AppConfig as MainAppConfig, set_session_key, load_app_config
+        import unittest.mock as mock
+
+        original = MainAppConfig.CONFIG_PATH
+        try:
+            MainAppConfig.CONFIG_PATH = self.config_path
+            mock_st = self._make_mock_st({"ai_session_keys": {"openai": "", "groq": ""}})
+
+            with mock.patch("app.main._get_streamlit", return_value=mock_st), \
+                 mock.patch("app.main.protected_storage_available", return_value=True), \
+                 mock.patch("app.main.protect_secret", return_value={"kind": "test", "value": "encrypted"}):
+                set_session_key("groq", "sk-test-persist-key")
+
+            config = load_app_config()
+            assert "groq_api_key" not in config
+            assert config.get("groq_api_key_protected") == {"kind": "test", "value": "encrypted"}
         finally:
             MainAppConfig.CONFIG_PATH = original
 
@@ -1589,10 +1678,11 @@ class TestAPIKeyPersistence:
 
             config = load_app_config()
             assert "groq_api_key" not in config
+            assert "groq_api_key_protected" not in config
         finally:
             MainAppConfig.CONFIG_PATH = original
 
-    def test_get_effective_key_finds_saved_key(self):
+    def test_get_effective_key_finds_legacy_saved_key(self):
         from app.main import AppConfig as MainAppConfig, get_effective_key, save_app_config
         import unittest.mock as mock
 
@@ -1607,7 +1697,27 @@ class TestAPIKeyPersistence:
                 key, source = get_effective_key("openai")
 
             assert key == "sk-saved-key"
-            assert source == "saved"
+            assert source == "legacy config"
+        finally:
+            MainAppConfig.CONFIG_PATH = original
+
+    def test_get_effective_key_finds_protected_key(self):
+        from app.main import AppConfig as MainAppConfig, get_effective_key, save_app_config
+        import unittest.mock as mock
+
+        original = MainAppConfig.CONFIG_PATH
+        try:
+            MainAppConfig.CONFIG_PATH = self.config_path
+            save_app_config({"openai_api_key_protected": {"kind": "test", "value": "encrypted"}})
+
+            mock_st = self._make_mock_st({"ai_session_keys": {"openai": "", "groq": ""}})
+
+            with mock.patch("app.main._get_streamlit", return_value=mock_st), \
+                 mock.patch("app.main.reveal_secret", return_value="sk-protected-key"):
+                key, source = get_effective_key("openai")
+
+            assert key == "sk-protected-key"
+            assert source == "protected"
         finally:
             MainAppConfig.CONFIG_PATH = original
 

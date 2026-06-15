@@ -55,6 +55,8 @@ if str(ROOT_DIR) not in sys.path:
 
 from app.utils.navigation import get_nav_config
 from app.utils.branding_assets import read_asset_bytes, resolve_asset_path
+from app.services.knowledge_base import build_knowledge_context
+from app.security.secret_store import protect_secret, protected_storage_available, reveal_secret
 
 # NOTE: Streamlit-dependent utilities are imported inside _run_ui() so
 # `python -m app.main --selftest` can run without Streamlit installed.
@@ -94,7 +96,7 @@ def get_app_version() -> str:
         # Never block app start on version metadata.
         pass
 
-    return "136.6"
+    return "136.7"
 
 
 def _safe_int_env(env_var: str, default: int) -> int:
@@ -335,9 +337,14 @@ def set_session_key(provider: str, key: str) -> None:
     keys = _ensure_session_keys(st)
     keys[provider] = cleaned
     st.session_state["ai_session_keys"] = keys
-    # Persist to config file so the key survives a page refresh
     config = load_app_config()
-    config[f"{provider}_api_key"] = cleaned
+    config.pop(f"{provider}_api_key", None)
+    config.pop(f"{provider}_api_key_protected", None)
+    if cleaned and protected_storage_available():
+        try:
+            config[f"{provider}_api_key_protected"] = protect_secret(cleaned)
+        except Exception:
+            logger.warning("Could not protect %s API key; keeping it session-only.", provider, exc_info=True)
     save_app_config(config)
 
 
@@ -352,6 +359,7 @@ def clear_session_key(provider: str) -> None:
     # Remove from config file as well
     config = load_app_config()
     config.pop(f"{provider}_api_key", None)
+    config.pop(f"{provider}_api_key_protected", None)
     save_app_config(config)
 
 
@@ -398,9 +406,13 @@ def get_effective_key(provider: str, user_id: Optional[str] = None) -> tuple[str
             return session_key, "session"
     # Check config file for a previously saved key
     config = load_app_config()
-    saved_key = (config.get(f"{provider}_api_key") or "").strip()
+    protected_record = config.get(f"{provider}_api_key_protected") or {}
+    saved_key = reveal_secret(protected_record) if isinstance(protected_record, dict) else ""
     if saved_key:
-        return saved_key, "saved"
+        return saved_key, "protected"
+    legacy_plaintext = (config.get(f"{provider}_api_key") or "").strip()
+    if legacy_plaintext:
+        return legacy_plaintext, "legacy config"
     default_key = _get_server_default_key(provider)
     if default_key:
         return default_key, "default"
@@ -1370,6 +1382,24 @@ class StoryEngine:
                 summ = c.summary if c.summary else "No summary."
                 story_so_far += f"Ch {c.index}: {summ}\n"
             prev_text = f"\nIMMEDIATELY PRECEDING SCENE:\n{(prev_chaps[-1].content or '')[-1500:]}\n"
+        knowledge_query = " ".join(
+            part
+            for part in [
+                project.title,
+                project.genre,
+                specific_beat if match else "",
+                style_guide,
+                soft_guidelines,
+            ]
+            if part
+        )
+        knowledge_context = build_knowledge_context(AppConfig.PROJECTS_DIR, knowledge_query, limit=3)
+        knowledge_block = (
+            "LITERARY KNOWLEDGE BASE GUIDANCE (reference only; do not copy text):\n"
+            f"{knowledge_context[:2600]}\n\n"
+            if knowledge_context
+            else ""
+        )
 
         prompt = (
             f"TITLE: {project.title}\nGENRE: {project.genre}\n"
@@ -1378,6 +1408,7 @@ class StoryEngine:
             f"{memory_block}"
             f"{author_block}"
             f"{style_block}"
+            f"{knowledge_block}"
             f"OUTLINE CONTEXT:\n{outline_context}\n\n"
             f"{story_so_far}"
             f"{prev_text}\n"
@@ -1600,6 +1631,14 @@ def _run_ui():
         email_settings,
         is_email_ready,
         send_password_reset_email,
+    )
+    from app.services.knowledge_base import (
+        extract_text_from_upload,
+        import_knowledge_document,
+        knowledge_base_path,
+        knowledge_stats,
+        load_knowledge_base,
+        search_knowledge_base,
     )
     # Import enhanced UI feedback components
     from app.ui.feedback import (
@@ -2962,6 +3001,10 @@ def _run_ui():
 
     def _release_highlights() -> List[tuple[str, str]]:
         return [
+            ("Knowledge Base", "MANTIS can now import DOCX, TXT, and Markdown learning material, then chunk, classify, tag, and search it locally."),
+            ("AI Learning", "Chapter generation now retrieves relevant Knowledge Base guidance as reference-only context before writing."),
+            ("Guest Workspaces", "Guest projects now use a stable local guest id so refreshes do not make newly created projects disappear."),
+            ("Navigation", "Page changes now reset Streamlit's real main scroll container so users no longer land at the footer after moving around."),
             ("Dashboard", "Dashboard no longer repeats low-value autosave, canon, or mode status text above the workspace."),
             ("Coherence Fix", "Apply Fix now resolves chapters by id, number, title, or matching excerpt, and applied or ignored issues leave the queue immediately."),
             ("Editor Rewrite", "Improve Flow and other rewrite tools now request prose-only output and strip assistant notes before review or apply."),
@@ -3047,6 +3090,18 @@ def _run_ui():
                 try {
                     const win = window.parent || window;
                     const doc = win.document || document;
+                    const scrollTargets = [
+                        doc.querySelector('section[data-testid="stMain"]'),
+                        doc.querySelector('section.stMain'),
+                        doc.querySelector('[data-testid="stAppViewContainer"]'),
+                        doc.scrollingElement,
+                        doc.documentElement,
+                        doc.body
+                    ].filter(Boolean);
+                    scrollTargets.forEach((node) => {
+                        try { node.scrollTop = 0; } catch (_) {}
+                    });
+                    try { win.scrollTo(0, 0); } catch (_) {}
                     const top = doc.getElementById("mantis-top");
                     if (top && typeof top.scrollIntoView === "function") {
                         top.scrollIntoView({ block: "start", inline: "nearest" });
@@ -3113,8 +3168,16 @@ def _run_ui():
             return False
 
     def _get_guest_projects_dir() -> str:
-        guest_id = st.session_state.get("guest_id") or f"guest_{uuid.uuid4().hex[:10]}"
+        config = load_app_config()
+        guest_id = (
+            st.session_state.get("guest_id")
+            or config.get("local_guest_id")
+            or f"guest_{uuid.uuid4().hex[:10]}"
+        )
         st.session_state["guest_id"] = guest_id
+        if config.get("local_guest_id") != guest_id:
+            config["local_guest_id"] = guest_id
+            save_app_config(config)
         target = os.path.join(AppConfig.PROJECTS_DIR, "guests", guest_id)
         os.makedirs(target, exist_ok=True)
         return target
@@ -4820,7 +4883,10 @@ def _run_ui():
                 st.metric("OpenAI", "Connected" if openai_key else "Not configured")
             with status_cols[2]:
                 current_model = get_ai_model() or "None"
-                st.metric("Active Model", current_model)
+                model_label = current_model if len(current_model) <= 28 else f"{current_model[:25]}..."
+                st.metric("Active Model", model_label)
+                if current_model != model_label:
+                    st.caption(current_model)
         if not (groq_key or openai_key):
             st.info(
                 "You can still create projects, build your world bible, write outlines, and draft chapters without AI. "
@@ -5814,6 +5880,10 @@ def _run_ui():
             st.session_state.page = "ai"
             st.rerun()
 
+        def open_knowledge_base() -> None:
+            st.session_state.page = "knowledge"
+            st.rerun()
+
         def open_primary_cta() -> None:
             if primary_target == "chapters" and latest_chapter_id:
                 st.session_state.curr_chap_id = latest_chapter_id
@@ -5897,6 +5967,7 @@ def _run_ui():
             on_open_outline=lambda: open_recent_project("outline"),
             on_new_project=open_new_project,
             on_open_world=lambda: open_recent_project("world"),
+            on_open_knowledge=open_knowledge_base,
             on_open_memory=lambda: open_recent_project("memory"),
             on_open_insights=lambda: open_recent_project("insights"),
             on_open_project=_open_project,
@@ -7312,6 +7383,122 @@ def _run_ui():
         elif selected_tab == "Lore":
             render_cat("Lore")
 
+    def render_knowledge_base():
+        render_page_header(
+            "Knowledge Base",
+            "Teach MANTIS reusable literary knowledge, style theory, genre patterns, and copyright-safe reference material.",
+            tag="Learning",
+            key_prefix="knowledge_header",
+        )
+        render_page_guide(
+            "Knowledge Base",
+            "Knowledge Base is MANTIS's searchable reference layer. It does not rewrite the model itself; it stores structured guidance that AI tools can retrieve when writing, outlining, or reviewing.",
+            [
+                "Upload DOCX, Markdown, or TXT notes about authors, works, themes, structures, and craft.",
+                "MANTIS chunks and classifies the document into searchable reference cards.",
+                "Chapter generation can retrieve relevant guidance as reference-only context.",
+                "Use public-domain text for excerpts; use original summaries and analysis for modern copyrighted works.",
+            ],
+            [
+                "Knowledge Base is not canon. World Bible remains the source of story facts.",
+                "Memory remains the source of project-specific preferences and rules.",
+            ],
+        )
+
+        kb_file = knowledge_base_path(AppConfig.PROJECTS_DIR)
+        stats = knowledge_stats(AppConfig.PROJECTS_DIR)
+        metric_cols = st.columns(4)
+        metric_cols[0].metric("Documents", stats.get("documents", 0))
+        metric_cols[1].metric("Reference chunks", stats.get("chunks", 0))
+        metric_cols[2].metric("Categories", len(stats.get("categories", {}) or {}))
+        metric_cols[3].metric("Storage", "Local")
+        st.caption(f"Stored at {kb_file}")
+
+        upload_cols = st.columns([1.2, 1])
+        with upload_cols[0]:
+            with st.container(border=True):
+                st.markdown("### Import learning material")
+                uploaded = st.file_uploader(
+                    "Upload DOCX, TXT, or Markdown",
+                    type=["docx", "txt", "md"],
+                    key="knowledge_upload",
+                    help="Use public-domain excerpts or your own summaries/analysis for copyrighted works.",
+                )
+                if uploaded is not None:
+                    if st.button("Import to Knowledge Base", type="primary", use_container_width=True, key="knowledge_import"):
+                        try:
+                            text = extract_text_from_upload(uploaded.name, uploaded.getvalue())
+                            result = import_knowledge_document(AppConfig.PROJECTS_DIR, uploaded.name, text)
+                            st.success(
+                                f"Imported {result['chunks']} searchable chunk(s) from {uploaded.name}."
+                            )
+                            st.session_state["knowledge_last_import"] = result
+                            st.rerun()
+                        except Exception as exc:
+                            st.error(f"Import failed: {exc}")
+                st.info("MANTIS uses imported material as reference guidance. It should not copy source text into generated chapters.")
+        with upload_cols[1]:
+            with st.container(border=True):
+                st.markdown("### Category mix")
+                categories = stats.get("categories", {}) or {}
+                if not categories:
+                    st.caption("No imported learning material yet.")
+                else:
+                    for category, count in sorted(categories.items(), key=lambda item: item[0]):
+                        st.markdown(f"**{category.title()}**: {count}")
+                top_tags = stats.get("top_tags", []) or []
+                if top_tags:
+                    st.divider()
+                    st.markdown("**Top tags**")
+                    st.caption(", ".join(f"{tag} ({count})" for tag, count in top_tags[:8]))
+
+        with st.container(border=True):
+            st.markdown("### Search what MANTIS has learned")
+            query = st.text_input(
+                "Search Knowledge Base",
+                placeholder="e.g., gothic atmosphere, mystery clues, free indirect discourse",
+                key="knowledge_query",
+            )
+            results = search_knowledge_base(AppConfig.PROJECTS_DIR, query, limit=8) if query else []
+            if query and not results:
+                st.warning("No matching reference chunks yet. Import more notes or try broader terms.")
+            for idx, item in enumerate(results, start=1):
+                with st.expander(
+                    f"{idx}. {item.get('category', 'reference').title()} | {item.get('source', 'Knowledge Base')} | score {item.get('score')}",
+                    expanded=idx == 1,
+                ):
+                    tags = ", ".join(item.get("tags", []) or []) or "none"
+                    st.caption(f"Tags: {tags}")
+                    st.write((item.get("text") or "")[:1600])
+                    p = st.session_state.get("project")
+                    if p:
+                        add_cols = st.columns(2)
+                        with add_cols[0]:
+                            if st.button("Add to Writing Guidance", key=f"kb_add_soft_{item.get('id')}", use_container_width=True):
+                                addition = f"\n\nKnowledge Base guidance from {item.get('source', 'reference')}:\n{(item.get('text') or '')[:900]}"
+                                p.memory_soft = ((p.memory_soft or "") + addition).strip()
+                                persist_project(p, action="knowledge_to_guidance")
+                                st.toast("Added to Writing Guidance.")
+                                st.rerun()
+                        with add_cols[1]:
+                            if st.button("Add to Style Guide", key=f"kb_add_style_{item.get('id')}", use_container_width=True):
+                                addition = f"\n\nKnowledge Base style reference from {item.get('source', 'reference')}:\n{(item.get('text') or '')[:900]}"
+                                p.style_guide = ((p.style_guide or "") + addition).strip()
+                                persist_project(p, action="knowledge_to_style")
+                                st.toast("Added to Style Guide.")
+                                st.rerun()
+
+        with st.container(border=True):
+            st.markdown("### Imported documents")
+            data = load_knowledge_base(AppConfig.PROJECTS_DIR)
+            documents = data.get("documents", []) or []
+            if not documents:
+                st.caption("No documents imported yet.")
+            for doc in documents[:12]:
+                created = time.strftime("%Y-%m-%d %H:%M", time.localtime(float(doc.get("created_at", 0) or 0)))
+                st.markdown(f"**{doc.get('filename', 'Document')}**")
+                st.caption(f"{doc.get('chunks', 0)} chunks | {int(doc.get('chars', 0) or 0):,} chars | Imported {created}")
+
     def render_memory():
         p = st.session_state.project
         if not p:
@@ -8704,6 +8891,11 @@ def _run_ui():
                 logger.debug("Rendering memory page")
                 with key_scope("memory"):
                     render_memory()
+                rendered_page = True
+            elif pg == "knowledge":
+                logger.debug("Rendering knowledge base page")
+                with key_scope("knowledge"):
+                    render_knowledge_base()
                 rendered_page = True
             elif pg == "insights":
                 logger.debug("Rendering insights page")

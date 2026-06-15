@@ -1033,6 +1033,24 @@ def inject_enhanced_theme(theme: Literal["Dark", "Light"] = "Dark", page_key: st
             background: var(--mantis-sidebar-bg);
             border-right: 1px solid var(--mantis-sidebar-border);
         }}
+
+        @media (max-width: 760px) {{
+            section[data-testid="stSidebar"] {{
+                width: 100vw !important;
+                min-width: 100vw !important;
+                max-width: 100vw !important;
+                border-right: none !important;
+                box-shadow: 0 0 0 1px var(--mantis-sidebar-border), 0 24px 60px rgba(0,0,0,0.45);
+            }}
+            section[data-testid="stSidebar"] div[data-testid="stSidebarUserContent"] {{
+                padding-left: 1rem !important;
+                padding-right: 1rem !important;
+            }}
+            .block-container {{
+                padding-left: 1rem !important;
+                padding-right: 1rem !important;
+            }}
+        }}
         
         section[data-testid="stSidebar"] h3 {{
             color: var(--mantis-sidebar-title);

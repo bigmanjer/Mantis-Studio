@@ -4,6 +4,7 @@ __pycache__/
 *.pyd
 **/__pycache__/
 logs/
+.codex_streamlit_*.log
 artifacts/
 projects/
 !projects/.gitkeep

@@ -7,6 +7,7 @@ from app.views.ai_tools import render_ai_settings
 from app.views.editor import render_chapters
 from app.views.dashboard import render_home
 from app.views.legal import render_legal_redirect
+from app.views.knowledge_base import render_knowledge_base
 from app.views.outline import render_outline
 from app.views.projects import render_projects
 from app.views.world_bible import render_world
@@ -31,6 +32,7 @@ def get_routes() -> Dict[str, PageRenderer]:
         "outline": render_outline,
         "chapters": render_chapters,
         "world": render_world,
+        "knowledge": render_knowledge_base,
         "export": render_projects,
         "ai": render_ai_settings,
         "legal": render_legal_redirect,

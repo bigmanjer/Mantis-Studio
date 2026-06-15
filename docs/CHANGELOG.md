@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Stability
+- Knowledge Base learning layer: added a local DOCX/TXT/Markdown importer that chunks, classifies, tags, stores, and searches literary/craft reference material for MANTIS.
+- AI learning retrieval: chapter generation now retrieves relevant Knowledge Base guidance as reference-only context so imported documents can improve writing without becoming copied output.
+- Knowledge navigation: added Knowledge Base to Intelligence navigation, footer links, and Dashboard quick actions.
+- Guest workspace persistence: guest project folders now use a stable local guest id so refreshes do not make newly created guest projects disappear.
+- Scroll reset hardening: page changes now reset Streamlit's actual `stMain` scroll container, not only the browser window.
+- OAuth documentation correction: Google OAuth setup now consistently uses `https://mantis-studio.streamlit.app/?oauth_provider=google`.
+- Secret handling hardening: provider API keys are protected with local secret storage when available and old plaintext config persistence is no longer used for new saves.
+- Mobile sidebar polish: narrow screens now treat the sidebar as a full-width drawer instead of leaving a thin unusable content strip.
+- Dashboard and AI settings polish: removed internal dashboard system-mode status copy and prevented long active model names from clipping.
+- Version bump: updated app metadata and docs to `136.7`.
 - Dashboard cleanup: removed the low-value dashboard caption and autosave/canon/mode status strip so the workspace starts with useful project controls instead of debug-like metadata.
 - Coherence Apply Fix hardening: Apply Fix now resolves chapters by id, number, title, or matching excerpt, and applied/ignored coherence cards are removed from the queue immediately.
 - Editor rewrite guardrail: Improve Flow and other rewrite tools now request prose-only chapter output and strip assistant notes, labels, and explanations before the text can be applied.
