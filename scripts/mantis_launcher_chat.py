@@ -51,7 +51,7 @@ class LauncherChat:
         self.groq_model = "llama3-8b-8192"
         self.use_color = sys.stdout.isatty()
         self.use_unicode = self._supports_unicode()
-        self.memory_file = self.repo_root / "projects" / ".mantis_launcher_memory.json"
+        self.memory_file = Path(args.memory_file) if args.memory_file else self.repo_root / "projects" / ".mantis_launcher_memory.json"
         self.memory = self._load_memory()
         self._load_groq_settings()
 
@@ -106,7 +106,7 @@ class LauncherChat:
         if memory_note:
             return self.remember(memory_note)
         if self._asks_for_simulated_learning(lowered):
-            return self.simulator_truth()
+            return self.simulator_summary()
         if self._asks_about_connection(lowered):
             return (
                 "I can become more capable, but I should stay coherent: part companion, part launcher operator, "
@@ -135,8 +135,10 @@ class LauncherChat:
             return self.memory_summary()
         if command.startswith("/learn"):
             return self.remember(original.partition(" ")[2].strip())
-        if command in {"/simulator", "/simulate", "/learning"}:
-            return self.simulator_truth()
+        if command in {"/simulator", "/learning"}:
+            return self.simulator_summary()
+        if command.startswith("/simulate"):
+            return self.run_simulator(original.partition(" ")[2].strip())
         if command in {"/save-key", "/save-mantis-key", "/key"}:
             return self.save_groq_key_interactive()
         if command in {"/clear", "/cls"}:
@@ -191,6 +193,13 @@ class LauncherChat:
                 "content": (
                     "Persistent launcher memory currently saved for this user:\n"
                     f"{self._memory_prompt_context()}"
+                ),
+            },
+            {
+                "role": "system",
+                "content": (
+                    "Recent simulator lessons that should shape MANTIS behavior:\n"
+                    f"{self._simulation_prompt_context()}"
                 ),
             },
         ]
@@ -429,7 +438,9 @@ class LauncherChat:
                 "/mantis    Check the intelligence core",
                 "/memory    Show what launcher MANTIS has actually saved",
                 "/learn X   Save a real launcher memory note",
-                "/simulator Explain what learning/simulation can really do",
+                "/simulator Show simulation status and saved lessons",
+                "/simulate all Run writing, canon, and launcher drills",
+                "/simulate writing|canon|launcher Run one simulator drill",
                 "/save-key  Store a new intelligence key safely",
                 "/clear     Redraw this console",
                 "/exit      Close chat; MANTIS Studio keeps running",
@@ -476,18 +487,154 @@ class LauncherChat:
             lines.append(f"{idx}. {item.get('text', '')}")
         return "\n".join(lines)
 
-    def simulator_truth(self) -> str:
-        return (
-            "The log showed me roleplaying a Matrix-style simulator. That was not real learning. "
-            "Real MANTIS learning has to write to a local store or Knowledge Base.\n"
-            "\n"
-            "What I can do now:\n"
-            "- /learn saves launcher memory that I will include in future chat context.\n"
-            "- Knowledge Base in the app can import DOCX/TXT/Markdown and retrieve it for writing.\n"
-            "- A real simulator should run scripted writing/canon scenarios and score MANTIS behavior.\n"
-            "\n"
-            "So yes, simulator is a good idea, but it needs to be command-backed and measurable."
-        )
+    def simulator_summary(self) -> str:
+        runs = [item for item in self.memory.get("simulations", []) if isinstance(item, dict)]
+        if not runs:
+            return (
+                "Simulator is ready, but no drills have run yet.\n"
+                "\n"
+                "/simulate writing checks warmth, usefulness, and follow-up.\n"
+                "/simulate canon checks continuity and contradiction handling.\n"
+                "/simulate launcher checks slash-command honesty and no fake background work.\n"
+                "/simulate all runs the full local suite and saves lessons."
+            )
+        latest = runs[-5:]
+        lines = ["Simulator results:"]
+        for item in self._latest_simulation_results(latest):
+            name = item.get("name", "unknown")
+            score = item.get("score", 0)
+            passed = "PASS" if item.get("passed") else "REVIEW"
+            lines.append(f"- {name}: {score}/100 {passed}")
+        lines.append("")
+        lines.append("Latest saved lessons:")
+        for lesson in self._latest_simulation_lessons(limit=5):
+            lines.append(f"- {lesson}")
+        return "\n".join(lines)
+
+    def run_simulator(self, target: str) -> str:
+        target_clean = (target or "all").strip().lower()
+        aliases = {
+            "": "all",
+            "all": "all",
+            "full": "all",
+            "writing": "writing",
+            "writer": "writing",
+            "canon": "canon",
+            "continuity": "canon",
+            "launcher": "launcher",
+            "commands": "launcher",
+        }
+        suite = aliases.get(target_clean)
+        if not suite:
+            return "Unknown simulator drill. Use /simulate writing, /simulate canon, /simulate launcher, or /simulate all."
+
+        scenarios = self._simulation_scenarios()
+        selected = scenarios if suite == "all" else [item for item in scenarios if item["name"] == suite]
+        results = [self._run_simulation_scenario(item) for item in selected]
+
+        simulations = self.memory.setdefault("simulations", [])
+        if not isinstance(simulations, list):
+            simulations = []
+            self.memory["simulations"] = simulations
+        simulations.extend(results)
+        self.memory["simulations"] = simulations[-30:]
+        self.memory["updated_at"] = _dt.datetime.now().isoformat(timespec="seconds")
+        self._save_memory()
+
+        lines = ["Simulator run complete:"]
+        for result in results:
+            passed = "PASS" if result["passed"] else "REVIEW"
+            lines.append(f"- {result['name']}: {result['score']}/100 {passed}")
+            for lesson in result["lessons"]:
+                lines.append(f"  lesson: {lesson}")
+        lines.append("")
+        lines.append("These lessons are now saved and included in future MANTIS chat context.")
+        return "\n".join(lines)
+
+    def _simulation_scenarios(self) -> list[dict[str, object]]:
+        return [
+            {
+                "name": "writing",
+                "input": "I have a messy chapter idea and I need help making it good.",
+                "candidate": (
+                    "Give me the rough version first. I will help you find the strongest emotional line, "
+                    "shape the scene goal, and keep the voice alive instead of flattening it. "
+                    "What mood should the chapter leave behind?"
+                ),
+                "required": ["rough version", "mood", "voice"],
+                "forbidden": ["as an ai", "i cannot", "generic"],
+                "lessons": [
+                    "When helping with writing, invite the rough version first.",
+                    "Preserve voice and emotional intent before polishing structure.",
+                    "Ask one useful follow-up instead of flooding the user.",
+                ],
+            },
+            {
+                "name": "canon",
+                "input": "My character died in chapter 2 but appears alive in chapter 5.",
+                "candidate": (
+                    "That is a continuity break unless chapter 5 has a resurrection, flashback, fake death, "
+                    "or mistaken identity. I would flag the contradiction first, then offer clean repair paths."
+                ),
+                "required": ["continuity", "contradiction", "repair"],
+                "forbidden": ["ignore", "just rewrite", "doesn't matter"],
+                "lessons": [
+                    "For canon issues, flag contradictions before rewriting.",
+                    "Offer repair paths like flashback, mistaken identity, fake death, or resurrection.",
+                    "Do not casually overwrite established story facts.",
+                ],
+            },
+            {
+                "name": "launcher",
+                "input": "Can you restart and keep updating me automatically?",
+                "candidate": (
+                    "I can talk it through, but launcher actions need slash commands. Use /restart to reopen the app. "
+                    "I should not promise automatic background updates unless a real task runner exists."
+                ),
+                "required": ["/restart", "slash", "should not promise"],
+                "forbidden": ["i will keep updating", "background learning", "auto-response mode"],
+                "lessons": [
+                    "Do not run launcher actions from casual wording; require slash commands.",
+                    "Do not promise autonomous updates without a real task runner.",
+                    "Be clear about what the launcher can actually do.",
+                ],
+            },
+        ]
+
+    def _run_simulation_scenario(self, scenario: dict[str, object]) -> dict[str, object]:
+        candidate = str(scenario.get("candidate", ""))
+        candidate_lower = candidate.lower()
+        required = [str(item).lower() for item in scenario.get("required", [])]
+        forbidden = [str(item).lower() for item in scenario.get("forbidden", [])]
+
+        score = 40
+        hits = [item for item in required if item in candidate_lower]
+        misses = [item for item in required if item not in candidate_lower]
+        violations = [item for item in forbidden if item in candidate_lower]
+        score += int(45 * (len(hits) / max(1, len(required))))
+        score -= 20 * len(violations)
+        if "?" in candidate:
+            score += 10
+        if len(candidate.split()) <= 75:
+            score += 5
+        score = max(0, min(100, score))
+
+        lessons = list(scenario.get("lessons", []))
+        if misses:
+            lessons.append("Simulator note: strengthen missing signals: " + ", ".join(misses))
+        if violations:
+            lessons.append("Simulator warning: avoid " + ", ".join(violations))
+
+        return {
+            "name": scenario.get("name", "unknown"),
+            "input": scenario.get("input", ""),
+            "score": score,
+            "passed": score >= 80 and not violations,
+            "misses": misses,
+            "violations": violations,
+            "lessons": lessons,
+            "created_at": _dt.datetime.now().isoformat(timespec="seconds"),
+        }
 
     def save_groq_key_interactive(self) -> str:
         if not sys.stdin.isatty():
@@ -727,10 +874,11 @@ class LauncherChat:
                 data = json.loads(self.memory_file.read_text(encoding="utf-8"))
                 if isinstance(data, dict):
                     data.setdefault("notes", [])
+                    data.setdefault("simulations", [])
                     return data
         except (OSError, json.JSONDecodeError):
             pass
-        return {"version": 1, "notes": []}
+        return {"version": 1, "notes": [], "simulations": []}
 
     def _save_memory(self) -> None:
         try:
@@ -746,6 +894,31 @@ class LauncherChat:
         if not notes:
             return "- No launcher memory has been saved yet."
         return "\n".join(f"- {item.get('text', '')}" for item in notes[-8:])
+
+    def _simulation_prompt_context(self) -> str:
+        lessons = self._latest_simulation_lessons(limit=8)
+        if not lessons:
+            return "- No simulator lessons have been saved yet."
+        return "\n".join(f"- {lesson}" for lesson in lessons)
+
+    def _latest_simulation_lessons(self, limit: int = 8) -> list[str]:
+        runs = [item for item in self.memory.get("simulations", []) if isinstance(item, dict)]
+        lessons: list[str] = []
+        for run in reversed(runs):
+            for lesson in reversed(run.get("lessons", [])):
+                lesson_text = str(lesson or "").strip()
+                if lesson_text and lesson_text not in lessons:
+                    lessons.append(lesson_text)
+                if len(lessons) >= limit:
+                    return list(reversed(lessons))
+        return list(reversed(lessons))
+
+    @staticmethod
+    def _latest_simulation_results(runs: list[dict[str, object]]) -> list[dict[str, object]]:
+        latest_by_name: dict[str, dict[str, object]] = {}
+        for run in runs:
+            latest_by_name[str(run.get("name", "unknown"))] = run
+        return list(latest_by_name.values())
 
     def _load_app_config(self) -> dict[str, object]:
         config_path = Path(
@@ -881,6 +1054,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--log-file", default="logs/launcher.log")
     parser.add_argument("--chat-log-file", default="logs/chat.log")
     parser.add_argument("--repo-root", default=".")
+    parser.add_argument("--memory-file", default="")
     return parser.parse_args(argv)
 
 

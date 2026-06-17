@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Stability
+- Launcher simulator: wired `/simulator` and `/simulate` to real local drills that save measurable lessons into launcher memory and feed them back into future launcher chat context.
 - Launcher dependencies: synced `requirements.txt` with the launcher runtime package list and added missing `python-docx` and `pypdf` installs for DOCX export/import and PDF upload support.
 - Knowledge Base learning layer: added a local DOCX/TXT/Markdown importer that chunks, classifies, tags, stores, and searches literary/craft reference material for MANTIS.
 - AI learning retrieval: chapter generation now retrieves relevant Knowledge Base guidance as reference-only context so imported documents can improve writing without becoming copied output.

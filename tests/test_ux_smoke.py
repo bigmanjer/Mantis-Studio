@@ -917,7 +917,9 @@ class TestUtilities:
         source = (ROOT / "scripts" / "mantis_launcher_chat.py").read_text(encoding="utf-8")
         assert "def _user_is_claiming_creator_context" in source
         assert "You are building MANTIS" in source
-        assert "The log showed me roleplaying a Matrix-style simulator. That was not real learning." in source
+        assert "def run_simulator" in source
+        assert "/simulate all runs the full local suite and saves lessons." in source
+        assert "These lessons are now saved and included in future MANTIS chat context." in source
         assert "Do not claim you are working in the background, learning autonomously" in source
 
     def test_footer_contact_is_not_placeholder(self):
