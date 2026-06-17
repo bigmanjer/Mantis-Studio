@@ -96,7 +96,7 @@ def get_app_version() -> str:
         # Never block app start on version metadata.
         pass
 
-    return "136.7"
+    return "136.8"
 
 
 def _safe_int_env(env_var: str, default: int) -> int:
@@ -4830,7 +4830,7 @@ def _run_ui():
     query = query_raw[0] if isinstance(query_raw, list) and query_raw else query_raw
     valid_query_pages = {
         "home", "projects", "outline", "chapters", "world", "memory",
-        "insights", "ai", "workspace", "privacy", "terms", "copyright",
+        "knowledge", "insights", "ai", "workspace", "privacy", "terms", "copyright",
         "cookie", "legal", "help", "user",
     }
     if query in valid_query_pages:

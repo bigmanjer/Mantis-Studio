@@ -462,6 +462,7 @@ class TestNavigationParity:
         assert "def render_knowledge_base():" in source
         assert 'st.session_state.page = "knowledge"' in source
         assert 'elif pg == "knowledge":' in source
+        assert '"knowledge", "insights"' in source
         assert "extract_text_from_upload" in source
         assert "import_knowledge_document" in source
         assert "search_knowledge_base" in source
@@ -884,6 +885,40 @@ class TestUtilities:
         source = (ROOT / "docs" / "OAUTH_SETUP.md").read_text(encoding="utf-8")
         assert "https://mantis-studio.streamlit.app/?oauth_provider=google" in source
         assert "https://mantisstudio.streamlit.app" not in source
+
+    def test_launcher_dependencies_match_requirements(self):
+        launcher = (ROOT / "Mantis_Launcher.bat").read_text(encoding="utf-8", errors="replace")
+        requirements = (ROOT / "requirements.txt").read_text(encoding="utf-8")
+        required_packages = {
+            line.split(">=")[0].strip()
+            for line in requirements.splitlines()
+            if line.strip() and not line.lstrip().startswith("#")
+        }
+        for package in (
+            "streamlit",
+            "requests",
+            "python-dotenv",
+            "python-docx",
+            "pypdf",
+            "weasyprint",
+            "reportlab",
+            "pandas",
+            "plotly",
+            "numpy",
+            "pytz",
+            "Pillow",
+            "matplotlib",
+            "tqdm",
+        ):
+            assert package in launcher
+            assert package in required_packages
+
+    def test_launcher_chat_handles_creator_and_learning_truth_locally(self):
+        source = (ROOT / "scripts" / "mantis_launcher_chat.py").read_text(encoding="utf-8")
+        assert "def _user_is_claiming_creator_context" in source
+        assert "You are building MANTIS" in source
+        assert "The log showed me roleplaying a Matrix-style simulator. That was not real learning." in source
+        assert "Do not claim you are working in the background, learning autonomously" in source
 
     def test_footer_contact_is_not_placeholder(self):
         source = (ROOT / "app" / "layout" / "layout.py").read_text(encoding="utf-8")

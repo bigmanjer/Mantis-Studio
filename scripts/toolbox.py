@@ -162,6 +162,7 @@ def cmd_visual(args: argparse.Namespace) -> int:
         ("outline", "Outline"),
         ("chapters", "Chapters"),
         ("world_bible", "World Bible"),
+        ("knowledge", "Knowledge Base"),
         ("memory", "Memory"),
         ("insights", "Insights"),
     ]

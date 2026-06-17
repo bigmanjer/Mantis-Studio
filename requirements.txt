@@ -1,5 +1,14 @@
 streamlit>=1.30.0
 requests
 python-dotenv
+python-docx
+pypdf
+weasyprint
+reportlab
 pandas
 plotly
+numpy
+pytz
+Pillow
+matplotlib
+tqdm
