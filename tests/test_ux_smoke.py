@@ -928,9 +928,14 @@ class TestUtilities:
             "Pillow",
             "matplotlib",
             "tqdm",
+            "playwright",
         ):
             assert package in launcher
             assert package in required_packages
+
+        assert 'set "HEALTH_URL=http://127.0.0.1:%SERVER_PORT%"' in launcher
+        assert "EXISTING MANTIS RUNTIME DETECTED" in launcher
+        assert "for /L %%i in (1,1,90)" in launcher
 
     def test_launcher_chat_handles_creator_and_learning_truth_locally(self):
         source = (ROOT / "scripts" / "mantis_launcher_chat.py").read_text(encoding="utf-8")
@@ -940,6 +945,46 @@ class TestUtilities:
         assert "/simulate all runs the full local suite and saves lessons." in source
         assert "These lessons are now saved and included in future MANTIS chat context." in source
         assert "Do not claim you are working in the background, learning autonomously" in source
+        assert "def forget(" in source
+        assert "/forget X  Remove saved launcher memory notes containing X" in source
+        assert "Simulator runs saved:" in source
+
+    def test_launcher_chat_masks_secrets_and_forgets_memory(self, tmp_path):
+        import argparse
+
+        from scripts.mantis_launcher_chat import LauncherChat
+
+        args = argparse.Namespace(
+            url="http://localhost:8501",
+            port=8501,
+            log_file=str(tmp_path / "streamlit.log"),
+            chat_log_file=str(tmp_path / "chat.log"),
+            repo_root=str(tmp_path),
+            memory_file=str(tmp_path / "memory.json"),
+            drills_file=str(tmp_path / "drills.json"),
+            handoff=False,
+        )
+        chat = LauncherChat(args)
+
+        secret_text = (
+            "gsk_abc1234567890SECRET "
+            "GOCSPX-testClientSecretForMasking123 "
+            "re_testResendKeyForMasking123456789 "
+            "123456789012-fakegoogleclientidmasking.apps.googleusercontent.com"
+        )
+        masked = chat._mask_secrets(secret_text)
+        assert "SECRET" not in masked
+        assert "GOCSPX-testClientSecretForMasking123" not in masked
+        assert "re_testResendKeyForMasking123456789" not in masked
+        assert "123456789012-fakegoogleclientidmasking" not in masked
+
+        assert "will not save" in chat.remember("GOCSPX-testClientSecretForMasking123")
+        assert "Saved to real launcher memory" in chat.remember("Call me Jeremy")
+        assert "Saved to real launcher memory" in chat.remember("Use shorter replies")
+        assert "Forgot 1 launcher memory" in chat.forget("Jeremy")
+        summary = chat.memory_summary()
+        assert "Jeremy" not in summary
+        assert "Use shorter replies" in summary
 
     def test_footer_contact_is_not_placeholder(self):
         source = (ROOT / "app" / "layout" / "layout.py").read_text(encoding="utf-8")

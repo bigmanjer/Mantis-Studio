@@ -16,8 +16,10 @@ import socket
 import sys
 import textwrap
 import urllib.error
+import urllib.parse
 import urllib.request
 import webbrowser
+from html.parser import HTMLParser
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -31,6 +33,39 @@ except ModuleNotFoundError:  # pragma: no cover - Python < 3.11 fallback
 class KeySource:
     label: str
     key: str
+
+
+class WebTextExtractor(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__()
+        self.title = ""
+        self._in_title = False
+        self._skip_depth = 0
+        self.chunks: list[str] = []
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag in {"script", "style", "noscript", "svg"}:
+            self._skip_depth += 1
+        if tag == "title":
+            self._in_title = True
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag in {"script", "style", "noscript", "svg"} and self._skip_depth:
+            self._skip_depth -= 1
+        if tag == "title":
+            self._in_title = False
+
+    def handle_data(self, data: str) -> None:
+        text = re.sub(r"\s+", " ", data or "").strip()
+        if not text:
+            return
+        if self._in_title:
+            self.title = (self.title + " " + text).strip()
+        elif not self._skip_depth:
+            self.chunks.append(text)
+
+    def text(self, limit: int = 8000) -> str:
+        return re.sub(r"\s+", " ", " ".join(self.chunks)).strip()[:limit]
 
 
 class LauncherChat:
@@ -49,16 +84,25 @@ class LauncherChat:
         self.groq_key_source = ""
         self.groq_base_url = "https://api.groq.com/openai/v1"
         self.groq_model = "llama3-8b-8192"
-        self.use_color = sys.stdout.isatty()
-        self.use_unicode = self._supports_unicode()
+        self.use_color = self._enable_ansi_color()
+        self.use_native_color = (not self.use_color) and self._supports_native_color()
+        self.use_unicode = False
+        self.handoff_mode = bool(getattr(args, "handoff", False))
         self.memory_file = Path(args.memory_file) if args.memory_file else self.repo_root / "projects" / ".mantis_launcher_memory.json"
+        self.drills_file = Path(args.drills_file) if args.drills_file else self.repo_root / "scripts" / "mantis_simulator_drills.json"
+        self.learned_drills_file = self.repo_root / "scripts" / "mantis_learned_drills.json"
+        self.todo_file = self.repo_root / "TODO.md"
         self.memory = self._load_memory()
         self._load_groq_settings()
 
     def run(self) -> int:
-        self._screen()
+        if self.handoff_mode:
+            self._handoff_screen()
+        else:
+            self._screen()
         self._log_event("system", f"chat started url={self.url} app_log={self.log_file}")
-        self._boot_sequence()
+        if not self.handoff_mode:
+            self._boot_sequence()
         self._connect_groq()
         while True:
             try:
@@ -80,13 +124,16 @@ class LauncherChat:
                 print("  MANTIS > Standing down. MANTIS Studio can keep running in the background.")
                 return 0
 
-            self._thinking_pulse("MANTIS is thinking")
+            print()
+            self._thinking_pulse("THINKING")
             answer = self.respond(user_text)
             self.history.append(("user", user_text))
             self.history.append(("mantis", answer))
             self._log_event("mantis", answer)
             print()
+            self._set_native_color("green")
             print(self._wrap(answer))
+            self._reset_color()
             print()
 
     def respond(self, text: str) -> str:
@@ -94,7 +141,7 @@ class LauncherChat:
 
         if lowered.startswith("/"):
             return self.handle_command(lowered, text)
-        if re.search(r"\bgsk_[A-Za-z0-9_-]{20,}\b", text):
+        if self._contains_secret(text):
             return "That looks like a secret key. I will not send it through chat. Use /save-key so I can store it safely."
         if self._user_is_claiming_creator_context(lowered):
             return (
@@ -105,13 +152,22 @@ class LauncherChat:
         memory_note = self._extract_memory_request(text)
         if memory_note:
             return self.remember(memory_note)
-        if self._asks_for_simulated_learning(lowered):
-            return self.simulator_summary()
+        todo_note = self._extract_todo_request(text)
+        if todo_note is not None:
+            return self.add_todo_items(todo_note)
+        auto_lesson = self._extract_auto_lesson(text)
+        if auto_lesson and self._auto_learn_enabled():
+            saved = self.save_lessons("auto", "conversation-feedback", [auto_lesson], text)
+            return (
+                saved
+                + "\n\nI will treat that as behavior guidance going forward. "
+                "If you want to inspect what I learned, use /learn."
+            )
         if self._asks_about_connection(lowered):
             return (
-                "I can become more capable, but I should stay coherent: part companion, part launcher operator, "
-                "part writing partner. I do not need random web tricks to feel smart. I need better memory, "
-                "better tone, and a few intentional tools that fit MANTIS."
+                "Yes. The better version is research mode: use /research with a topic, and I search sources, "
+                "compress what I find into lessons, save those lessons, and add simulator checks for them. "
+                "Use /learn web when you already have a specific URL."
             )
         if self._is_asking_about_groq_failure(lowered):
             return self.groq_fix_help()
@@ -129,16 +185,41 @@ class LauncherChat:
             return self.self_check()
         if command in {"/logs", "/log"}:
             return self.summarize_logs()
+        if command.startswith("/todo add"):
+            parts = original.split(maxsplit=2)
+            return self.add_todo_items(parts[2] if len(parts) > 2 else "")
+        if command in {"/todo", "/todos", "/tasks", "/list"}:
+            return self.todo_summary()
         if command in {"/mantis", "/mantis-status", "/core", "/core-status", "/ai-status"}:
             return self.ai_status()
         if command == "/memory":
             return self.memory_summary()
+        if command in {"/learn", "/learning"}:
+            return self.learning_summary()
+        if command.startswith("/learn auto"):
+            return self.set_auto_learn(original.partition("auto")[2].strip())
+        if command.startswith("/learn research"):
+            return self.research_topic(original.partition("research")[2].strip())
+        if command.startswith("/learn web"):
+            return self.learn_web(original.partition("web")[2].strip())
+        if command.startswith("/learn run"):
+            return self.run_simulator(original.partition("run")[2].strip())
+        if command.startswith("/learn lesson"):
+            return self.save_lessons("manual", "manual-lesson", [original.partition("lesson")[2].strip()], original)
+        if command.startswith("/learn note"):
+            return self.remember(original.partition("note")[2].strip())
+        if command.startswith("/learn-web"):
+            return self.learn_web(original.partition(" ")[2].strip())
         if command.startswith("/learn"):
             return self.remember(original.partition(" ")[2].strip())
-        if command in {"/simulator", "/learning"}:
-            return self.simulator_summary()
+        if command.startswith("/forget"):
+            return self.forget(original.partition(" ")[2].strip())
+        if command in {"/simulator"}:
+            return self.learning_summary()
         if command.startswith("/simulate"):
             return self.run_simulator(original.partition(" ")[2].strip())
+        if command.startswith("/research"):
+            return self.research_topic(original.partition(" ")[2].strip())
         if command in {"/save-key", "/save-mantis-key", "/key"}:
             return self.save_groq_key_interactive()
         if command in {"/clear", "/cls"}:
@@ -146,7 +227,7 @@ class LauncherChat:
             return "Fresh screen. Systems are still awake."
         if command in {"/exit", "/quit"}:
             return "Use exit or /exit at the prompt to close this chat."
-        if re.search(r"\bgsk_[A-Za-z0-9_-]{20,}\b", original):
+        if self._contains_secret(original):
             return "That looks like a secret key. Use /save-key, then paste it into the hidden prompt."
         return "I do not know that slash command yet. Use /help to see what I can do."
 
@@ -171,13 +252,18 @@ class LauncherChat:
                     "Keep replies readable: short paragraphs, natural wording, and no dense walls of text. "
                     "Do not use markdown headings, code fences, fake loading bars, or fake progress percentages "
                     "unless the user explicitly asks for a written mockup. The launcher renders real status bars itself. "
+                    "Do not overpraise, flatter heavily, or call yourself special unless the user is clearly sharing a warm moment; "
+                    "even then keep it grounded and brief. "
                     "Do not claim you are working in the background, learning autonomously, checking files, "
                     "or providing automatic updates unless a real command/tool has been run. "
-                    "Ask good follow-up questions when the user is exploring, but be decisive when they want action. "
-                    "Launcher actions are slash commands like /help, /restart, /status, and /logs. "
-                    "If the user casually mentions restarting or logs, discuss it conversationally unless "
-                    "they use a slash command. If asked about current/live facts, be honest that you may not "
-                    "have live lookup unless a specific tool is added. Help with writing, app operation, "
+                    "Ask one good follow-up when the user is exploring, but be decisive when they want action. "
+                    "Launcher actions are slash commands like /help, /restart, /status, /todo, and /logs. "
+                    "If the user casually mentions restarting, logs, simulator, or status, discuss it conversationally unless "
+                    "they use a slash command. If the user asks for a saved todo list or local project notes, treat that as "
+                    "a real save request when the local command layer catches it; never keep telling them to do it themselves. "
+                    "Groq-style model reasoning is not the same thing as web browsing. If asked about current/live facts, say "
+                    "MANTIS needs /learn web or another web tool to ingest sources. If the user clearly corrects your behavior, "
+                    "the launcher can save that as an auto-learned lesson. Help with writing, app operation, "
                     "troubleshooting, and normal conversation."
                 ),
             },
@@ -340,6 +426,8 @@ class LauncherChat:
             f"Port {self.port}: {'online' if health['open'] else 'not answering yet'}",
             f"HTTP check: {health['http']}",
             f"Log check: {log_summary}",
+            f"Launcher memory notes: {len([item for item in self.memory.get('notes', []) if isinstance(item, dict)])}",
+            f"Simulator runs saved: {len([item for item in self.memory.get('simulations', []) if isinstance(item, dict)])}",
         ]
         if health["open"] and "error" not in log_summary.lower():
             parts.append("Verdict: runtime looks healthy from the launcher side.")
@@ -381,11 +469,290 @@ class LauncherChat:
             if re.search(r"\b(error|exception|traceback|failed|warning)\b", line, re.I)
         ]
         if issues:
-            preview = "\n".join(f"- {line[:180]}" for line in issues[-5:])
+            preview = "\n".join(f"- {self._mask_secrets(line[:180])}" for line in issues[-5:])
             return f"I found these recent warning/error lines:\n{preview}"
 
-        preview = "\n".join(line.rstrip() for line in lines[-8:])
+        preview = "\n".join(self._mask_secrets(line.rstrip()) for line in lines[-8:])
         return f"No obvious recent errors. Latest log tail:\n{preview}"
+
+    def todo_summary(self) -> str:
+        note_names = re.compile(r"(todo|to-do|task|roadmap|plan|notes)", re.I)
+        candidates = [
+            path for path in self.repo_root.rglob("*")
+            if path.is_file()
+            and ".git" not in path.parts
+            and "logs" not in path.parts
+            and note_names.search(path.name)
+            and path.suffix.lower() in {".md", ".txt", ".rst"}
+        ]
+        marker_hits: list[str] = []
+        current_file = Path(__file__).resolve()
+        for path in self.repo_root.rglob("*"):
+            if len(marker_hits) >= 10:
+                break
+            if not path.is_file() or ".git" in path.parts or "logs" in path.parts:
+                continue
+            if path.resolve() == current_file:
+                continue
+            if path.suffix.lower() not in {".py", ".md", ".txt", ".bat", ".ps1", ".js", ".ts", ".tsx", ".json"}:
+                continue
+            try:
+                for idx, line in enumerate(path.read_text(encoding="utf-8", errors="replace").splitlines(), start=1):
+                    if re.search(r"\b(TODO|FIXME|ROADMAP)\b", line):
+                        rel = path.relative_to(self.repo_root)
+                        marker_hits.append(f"- {rel}:{idx} {line.strip()[:120]}")
+                        break
+            except OSError:
+                continue
+
+        lines = ["Local task scan:"]
+        if self.todo_file.exists():
+            todo_lines = [
+                line.strip()
+                for line in self.todo_file.read_text(encoding="utf-8", errors="replace").splitlines()
+                if line.strip().startswith("- [ ]")
+            ]
+            lines.append("Saved TODO.md items:")
+            if todo_lines:
+                lines.extend(todo_lines[-12:])
+            else:
+                lines.append("- TODO.md exists, but no unchecked items were found.")
+            lines.append("")
+        if candidates:
+            lines.append("Task-like files:")
+            for path in candidates[:8]:
+                lines.append(f"- {path.relative_to(self.repo_root)}")
+        else:
+            lines.append("Task-like files: none found.")
+        if marker_hits:
+            lines.append("")
+            lines.append("Code/task markers:")
+            lines.extend(marker_hits)
+        else:
+            lines.append("Code/task markers: none found.")
+        lines.append("")
+        lines.append("Use /todo add item one; item two to save real items into TODO.md.")
+        return "\n".join(lines)
+
+    def add_todo_items(self, raw_items: str) -> str:
+        items = self._parse_todo_items(raw_items)
+        if not items:
+            return "Give me what to save, like: /todo add Add web lesson intake; Build Knowledge Base matcher"
+        existing = ""
+        if self.todo_file.exists():
+            existing = self.todo_file.read_text(encoding="utf-8", errors="replace")
+        lines: list[str] = []
+        if not existing.strip():
+            lines.extend(["# MANTIS TODO", ""])
+        elif not existing.endswith("\n"):
+            lines.append("")
+        added: list[str] = []
+        existing_lower = existing.lower()
+        for item in items:
+            clean = re.sub(r"\s+", " ", item).strip(" -\t")
+            if not clean or clean.lower() in existing_lower:
+                continue
+            lines.append(f"- [ ] {clean}")
+            added.append(clean)
+        if not added:
+            return "Those todo items already look saved."
+        self.todo_file.parent.mkdir(parents=True, exist_ok=True)
+        with self.todo_file.open("a", encoding="utf-8") as handle:
+            handle.write("\n".join(lines) + "\n")
+        return "Saved to TODO.md:\n" + "\n".join(f"- {item}" for item in added)
+
+    def _parse_todo_items(self, raw_items: str) -> list[str]:
+        text = re.sub(r"\s+", " ", raw_items or "").strip()
+        if not text:
+            return []
+        if text.lower() in {"that", "that list", "the list", "make that todo list for me"}:
+            text = self._latest_assistant_list_text()
+        if not text:
+            return []
+        numbered = re.split(r"\s+\d+\.\s+", " " + text)
+        if len(numbered) > 1:
+            return [item.strip(" .") for item in numbered if item.strip(" .")]
+        if ";" in text:
+            return [item.strip() for item in text.split(";")]
+        if "\n" in text:
+            return [item.strip(" -*\t") for item in text.splitlines() if item.strip()]
+        if "," in text and len(text) < 260:
+            return [item.strip() for item in text.split(",")]
+        return [text]
+
+    def _latest_assistant_list_text(self) -> str:
+        for speaker, content in reversed(self.history):
+            if speaker != "mantis":
+                continue
+            lines = []
+            for line in content.splitlines():
+                stripped = line.strip()
+                if re.match(r"^(\*|-|\d+\.)\s+", stripped):
+                    lines.append(re.sub(r"^(\*|-|\d+\.)\s+", "", stripped))
+            if lines:
+                return "\n".join(lines)
+        return ""
+
+    def learn_web(self, target: str) -> str:
+        target = (target or "").strip()
+        if not target:
+            return "Use /learn web https://example.com/article to ingest a page into saved MANTIS lessons."
+        parsed = urllib.parse.urlparse(target)
+        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+            return "For direct page learning, use a full http or https URL. For topic research, use /research your topic."
+        try:
+            title, page_text = self._fetch_web_text(target)
+        except Exception as exc:
+            return f"I could not read that page for lessons: {exc}"
+        if not page_text:
+            return "I reached the page, but could not extract readable lesson text from it."
+
+        lessons = self._web_lessons_from_text(title or target, target, page_text)
+        if not lessons:
+            return "I read the page, but I could not turn it into useful MANTIS lessons."
+        name = self._slugify(title or parsed.netloc)[:40] or "web-lesson"
+        return self.save_lessons("web", name, lessons, target, lead="Saved web lessons from " + (title or target))
+
+    def research_topic(self, topic: str) -> str:
+        query = re.sub(r"\s+", " ", topic or "").strip()
+        if not query:
+            return "Use /research followed by a topic, like: /research best practices for LLM memory."
+        parsed = urllib.parse.urlparse(query)
+        if parsed.scheme in {"http", "https"} and parsed.netloc:
+            return self.learn_web(query)
+        api_key = self._research_api_key()
+        if not api_key:
+            return (
+                "Research mode needs a search API key before I can search on my own.\n"
+                "Save TAVILY_API_KEY or MANTIS_RESEARCH_API_KEY in .streamlit/secrets.toml, "
+                "then use /research your topic.\n"
+                "For now, give me a direct source with /learn web URL."
+            )
+        data, error = self._tavily_search(query, api_key)
+        if error:
+            return error
+        sources = self._research_sources(data)
+        if not sources:
+            return "I searched, but did not get usable sources back."
+        research_text = self._research_text(query, data, sources)
+        lessons = self._web_lessons_from_text(f"Research: {query}", "research://" + query, research_text)
+        if not lessons:
+            return "I found sources, but could not turn them into useful MANTIS lessons."
+        saved = self.save_lessons("research", self._slugify(query)[:40], lessons, query, lead="Saved research lessons")
+        source_lines = "\n".join(f"- {title}: {url}" for title, url, _content in sources[:5])
+        return saved + "\n\nSources checked:\n" + source_lines
+
+    def _tavily_search(self, query: str, api_key: str) -> tuple[dict[str, object], str | None]:
+        payload = {
+            "query": query,
+            "search_depth": "basic",
+            "max_results": 5,
+            "include_answer": True,
+            "include_raw_content": False,
+        }
+        request = urllib.request.Request(
+            "https://api.tavily.com/search",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+                "User-Agent": "MANTIS-Studio-Research/1.0",
+                "Accept": "application/json",
+            },
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=25) as response:
+                return json.loads(response.read().decode("utf-8")), None
+        except urllib.error.HTTPError as exc:
+            body = self._read_http_error(exc)
+            details = self._extract_groq_error(body)
+            return {}, f"Research search failed with HTTP {exc.code}." + (f"\nDetail: {details}" if details else "")
+        except Exception as exc:
+            return {}, f"Research search failed: {exc}"
+
+    @staticmethod
+    def _research_sources(data: dict[str, object]) -> list[tuple[str, str, str]]:
+        raw_results = data.get("results", [])
+        if not isinstance(raw_results, list):
+            return []
+        sources: list[tuple[str, str, str]] = []
+        for item in raw_results:
+            if not isinstance(item, dict):
+                continue
+            title = str(item.get("title") or "Untitled source").strip()
+            url = str(item.get("url") or "").strip()
+            content = str(item.get("content") or "").strip()
+            if url and content:
+                sources.append((title, url, content))
+        return sources
+
+    @staticmethod
+    def _research_text(query: str, data: dict[str, object], sources: list[tuple[str, str, str]]) -> str:
+        parts = [f"Research query: {query}"]
+        answer = str(data.get("answer") or "").strip()
+        if answer:
+            parts.append("Search answer: " + answer)
+        for title, url, content in sources:
+            parts.append(f"Source: {title}\nURL: {url}\nContent: {content}")
+        return "\n\n".join(parts)
+
+    def _fetch_web_text(self, url: str) -> tuple[str, str]:
+        request = urllib.request.Request(
+            url,
+            headers={
+                "User-Agent": "MANTIS-Studio-LessonReader/1.0",
+                "Accept": "text/html,text/plain;q=0.9,*/*;q=0.2",
+            },
+        )
+        with urllib.request.urlopen(request, timeout=12) as response:
+            raw = response.read(350_000)
+            content_type = response.headers.get_content_charset() or "utf-8"
+        decoded = raw.decode(content_type, errors="replace")
+        extractor = WebTextExtractor()
+        extractor.feed(decoded)
+        title = extractor.title.strip()
+        text = extractor.text()
+        if not text and "<" not in decoded[:2000]:
+            text = re.sub(r"\s+", " ", decoded).strip()[:8000]
+        return title, text
+
+    def _web_lessons_from_text(self, title: str, url: str, page_text: str) -> list[str]:
+        if self.groq_key:
+            payload = {
+                "model": self.groq_model,
+                "messages": [
+                    {
+                        "role": "system",
+                        "content": (
+                            "Turn source text into 3 to 5 durable MANTIS behavior lessons. "
+                            "Each lesson must be one short sentence, practical, and useful for future writing, "
+                            "coding, research, or launcher behavior. Return only bullet lines."
+                        ),
+                    },
+                    {
+                        "role": "user",
+                        "content": f"Title: {title}\nURL: {url}\nSource text:\n{page_text[:6000]}",
+                    },
+                ],
+                "temperature": 0.35,
+                "max_completion_tokens": 350,
+            }
+            data, error = self._post_groq(payload)
+            if not error:
+                try:
+                    content = data["choices"][0]["message"]["content"]
+                    lessons = [
+                        re.sub(r"^[-*]\s*", "", line.strip()).strip()
+                        for line in str(content).splitlines()
+                        if line.strip()
+                    ]
+                    return [lesson for lesson in lessons if lesson][:5]
+                except (KeyError, IndexError, TypeError):
+                    pass
+        sentences = re.split(r"(?<=[.!?])\s+", page_text)
+        useful = [sentence.strip() for sentence in sentences if 55 <= len(sentence.strip()) <= 180]
+        return [f"Web source note: {sentence}" for sentence in useful[:4]]
 
     def log_health(self) -> str:
         if not self.log_file.exists():
@@ -435,12 +802,21 @@ class LauncherChat:
                 "/restart   Reopen the localhost window",
                 "/status    Check the local runtime",
                 "/logs      Read the latest server log lines",
+                "/todo      Scan local TODO/task notes",
+                "/todo add X Save real items into TODO.md",
                 "/mantis    Check the intelligence core",
                 "/memory    Show what launcher MANTIS has actually saved",
-                "/learn X   Save a real launcher memory note",
-                "/simulator Show simulation status and saved lessons",
-                "/simulate all Run writing, canon, and launcher drills",
-                "/simulate writing|canon|launcher Run one simulator drill",
+                "/learn     Show notes, lessons, simulator, and auto-learn status",
+                "/learn note X Save a real launcher memory note",
+                "/learn web URL Read a page and save it as lessons",
+                "/learn research X Search sources and save lessons",
+                "/learn run all Run the full local lesson suite",
+                "/learn auto on|off Control correction-based auto-learning",
+                "/research X Search sources and save MANTIS lessons",
+                "/forget X  Remove saved launcher memory notes containing X",
+                "/simulator Alias for /learn",
+                "/simulate all Run the full local lesson suite",
+                "/simulate tone|memory|rag|tools|writing Run a lesson category",
                 "/save-key  Store a new intelligence key safely",
                 "/clear     Redraw this console",
                 "/exit      Close chat; MANTIS Studio keeps running",
@@ -457,14 +833,24 @@ class LauncherChat:
         return (
             "MANTIS higher reasoning is online.\n"
             "Local runtime link: active\n"
-            "Intelligence key: saved and hidden\n"
+            f"Intelligence key: {self._key_scope_label()}\n"
             f"Launcher memories: {len(self.memory.get('notes', []))}"
         )
+
+    def _key_scope_label(self) -> str:
+        source = self.groq_key_source.lower()
+        if "chat" in source:
+            return "dedicated chat key saved and hidden"
+        if "session key" in source:
+            return "temporary session key"
+        return "fallback app key saved and hidden"
 
     def remember(self, note: str) -> str:
         clean = re.sub(r"\s+", " ", note or "").strip()
         if not clean:
             return "Give me the thing to remember, like: /learn Call me Jeremy and keep replies direct."
+        if self._contains_secret(clean):
+            return "That looks like a secret. I will not save it in launcher memory. Use /save-key for keys."
         notes = self.memory.setdefault("notes", [])
         if not isinstance(notes, list):
             notes = []
@@ -478,6 +864,29 @@ class LauncherChat:
         self._save_memory()
         return f"Saved to real launcher memory: {clean}"
 
+    def forget(self, query: str) -> str:
+        needle = re.sub(r"\s+", " ", query or "").strip().lower()
+        if not needle:
+            return "Tell me what to forget, like: /forget last name"
+        notes = self.memory.setdefault("notes", [])
+        if not isinstance(notes, list):
+            self.memory["notes"] = []
+            return "Launcher memory had no readable notes to forget."
+        kept: list[object] = []
+        removed: list[str] = []
+        for item in notes:
+            text = str(item.get("text", "") if isinstance(item, dict) else item)
+            if needle in text.lower():
+                removed.append(text)
+            else:
+                kept.append(item)
+        if not removed:
+            return f"I did not find a saved launcher memory containing: {query}"
+        self.memory["notes"] = kept
+        self.memory["updated_at"] = _dt.datetime.now().isoformat(timespec="seconds")
+        self._save_memory()
+        return f"Forgot {len(removed)} launcher memory note(s) matching: {query}"
+
     def memory_summary(self) -> str:
         notes = [item for item in self.memory.get("notes", []) if isinstance(item, dict)]
         if not notes:
@@ -487,25 +896,108 @@ class LauncherChat:
             lines.append(f"{idx}. {item.get('text', '')}")
         return "\n".join(lines)
 
+    def learning_summary(self) -> str:
+        notes = [item for item in self.memory.get("notes", []) if isinstance(item, dict)]
+        runs = [item for item in self.memory.get("simulations", []) if isinstance(item, dict)]
+        scenarios = self._simulation_scenarios()
+        categories = sorted({str(item.get("category", "core")) for item in scenarios})
+        learned_drills = self._learned_simulation_scenarios()
+        lines = [
+            "MANTIS learning system:",
+            f"- Auto-learn: {'on' if self._auto_learn_enabled() else 'off'}",
+            f"- Memory notes: {len(notes)}",
+            f"- Saved lesson runs: {len(runs)}",
+            f"- Simulator drills: {len(scenarios)} across {len(categories)} categories",
+            f"- Learned simulator drills: {len(learned_drills)}",
+        ]
+        latest_lessons = self._latest_simulation_lessons(limit=6)
+        if latest_lessons:
+            lines.append("")
+            lines.append("Latest lessons:")
+            lines.extend(f"- {lesson}" for lesson in latest_lessons)
+        lines.extend(
+            [
+                "",
+                "Learning commands:",
+                "/learn note X saves a memory note.",
+                "/learn web URL reads a page and saves lessons.",
+                "/learn research X searches sources and saves lessons.",
+                "/learn run all tests behavior and saves lessons.",
+                "/learn auto on|off controls correction-based auto-learning.",
+            ]
+        )
+        return "\n".join(lines)
+
+    def set_auto_learn(self, value: str) -> str:
+        clean = (value or "").strip().lower()
+        if clean in {"on", "true", "yes", "1"}:
+            self.memory["auto_learn_enabled"] = True
+            self.memory["updated_at"] = _dt.datetime.now().isoformat(timespec="seconds")
+            self._save_memory()
+            return "Auto-learn is on. Clear corrections can become saved MANTIS behavior lessons."
+        if clean in {"off", "false", "no", "0"}:
+            self.memory["auto_learn_enabled"] = False
+            self.memory["updated_at"] = _dt.datetime.now().isoformat(timespec="seconds")
+            self._save_memory()
+            return "Auto-learn is off. I will only save lessons when you use /learn."
+        return f"Auto-learn is currently {'on' if self._auto_learn_enabled() else 'off'}. Use /learn auto on or /learn auto off."
+
+    def _auto_learn_enabled(self) -> bool:
+        return bool(self.memory.get("auto_learn_enabled", True))
+
+    def save_lessons(self, category: str, name: str, lessons: list[str], source: str, lead: str = "Saved lessons") -> str:
+        clean_lessons = []
+        for lesson in lessons:
+            clean = re.sub(r"\s+", " ", str(lesson or "")).strip(" -*\t")
+            if clean and clean not in clean_lessons:
+                clean_lessons.append(clean)
+        if not clean_lessons:
+            return "No useful lesson text was provided."
+        result = {
+            "name": name or "lesson",
+            "category": category or "manual",
+            "input": source,
+            "score": 100,
+            "passed": True,
+            "misses": [],
+            "violations": [],
+            "lessons": clean_lessons[:8],
+            "created_at": _dt.datetime.now().isoformat(timespec="seconds"),
+        }
+        simulations = self.memory.setdefault("simulations", [])
+        if not isinstance(simulations, list):
+            simulations = []
+            self.memory["simulations"] = simulations
+        simulations.append(result)
+        self.memory["simulations"] = simulations[-240:]
+        self.memory["updated_at"] = _dt.datetime.now().isoformat(timespec="seconds")
+        self._save_memory()
+        added_drills = self._append_learned_drills(category, name, clean_lessons[:8], source)
+        suffix = f"\n\nUpdated simulator with {added_drills} learned drill(s)." if added_drills else "\n\nSimulator already had drills for those lessons."
+        return lead + ":\n" + "\n".join(f"- {lesson}" for lesson in clean_lessons[:8]) + suffix
+
     def simulator_summary(self) -> str:
         runs = [item for item in self.memory.get("simulations", []) if isinstance(item, dict)]
+        scenarios = self._simulation_scenarios()
+        categories = sorted({str(item.get("category", "core")) for item in scenarios})
         if not runs:
             return (
                 "Simulator is ready, but no drills have run yet.\n"
                 "\n"
-                "/simulate writing checks warmth, usefulness, and follow-up.\n"
-                "/simulate canon checks continuity and contradiction handling.\n"
-                "/simulate launcher checks slash-command honesty and no fake background work.\n"
+                f"Loaded drills: {len(scenarios)} across {len(categories)} categories.\n"
+                "Categories: " + ", ".join(categories) + "\n"
                 "/simulate all runs the full local suite and saves lessons."
             )
         latest = runs[-5:]
         lines = ["Simulator results:"]
         for item in self._latest_simulation_results(latest):
             name = item.get("name", "unknown")
+            category = item.get("category", "core")
             score = item.get("score", 0)
             passed = "PASS" if item.get("passed") else "REVIEW"
-            lines.append(f"- {name}: {score}/100 {passed}")
+            lines.append(f"- {category}/{name}: {score}/100 {passed}")
         lines.append("")
+        lines.append(f"Loaded drill library: {len(scenarios)} drills across {len(categories)} categories.")
         lines.append("Latest saved lessons:")
         for lesson in self._latest_simulation_lessons(limit=5):
             lines.append(f"- {lesson}")
@@ -513,23 +1005,40 @@ class LauncherChat:
 
     def run_simulator(self, target: str) -> str:
         target_clean = (target or "all").strip().lower()
+        scenarios = self._simulation_scenarios()
         aliases = {
             "": "all",
             "all": "all",
             "full": "all",
-            "writing": "writing",
+            "everything": "all",
             "writer": "writing",
-            "canon": "canon",
-            "continuity": "canon",
-            "launcher": "launcher",
-            "commands": "launcher",
+            "canon": "story",
+            "continuity": "story",
+            "launcher": "tools",
+            "commands": "tools",
+            "grounding": "rag",
+            "knowledge": "rag",
+            "security": "safety",
+            "privacy": "safety",
+            "debugging": "debug",
         }
-        suite = aliases.get(target_clean)
-        if not suite:
-            return "Unknown simulator drill. Use /simulate writing, /simulate canon, /simulate launcher, or /simulate all."
-
-        scenarios = self._simulation_scenarios()
-        selected = scenarios if suite == "all" else [item for item in scenarios if item["name"] == suite]
+        suite = aliases.get(target_clean, target_clean)
+        if suite == "all":
+            selected = scenarios
+        else:
+            selected = [
+                item for item in scenarios
+                if str(item.get("category", "")).lower() == suite
+                or str(item.get("name", "")).lower() == suite
+            ]
+        if not selected:
+            categories = sorted({str(item.get("category", "core")) for item in scenarios})
+            names = sorted(str(item.get("name", "unknown")) for item in scenarios)[:12]
+            return (
+                "Unknown simulator drill.\n"
+                "Try a category: " + ", ".join(categories) + "\n"
+                "Or a drill name like: " + ", ".join(names)
+            )
         results = [self._run_simulation_scenario(item) for item in selected]
 
         simulations = self.memory.setdefault("simulations", [])
@@ -537,14 +1046,14 @@ class LauncherChat:
             simulations = []
             self.memory["simulations"] = simulations
         simulations.extend(results)
-        self.memory["simulations"] = simulations[-30:]
+        self.memory["simulations"] = simulations[-240:]
         self.memory["updated_at"] = _dt.datetime.now().isoformat(timespec="seconds")
         self._save_memory()
 
         lines = ["Simulator run complete:"]
         for result in results:
             passed = "PASS" if result["passed"] else "REVIEW"
-            lines.append(f"- {result['name']}: {result['score']}/100 {passed}")
+            lines.append(f"- {result['category']}/{result['name']}: {result['score']}/100 {passed}")
             for lesson in result["lessons"]:
                 lines.append(f"  lesson: {lesson}")
         lines.append("")
@@ -552,9 +1061,21 @@ class LauncherChat:
         return "\n".join(lines)
 
     def _simulation_scenarios(self) -> list[dict[str, object]]:
+        scenarios: list[dict[str, object]] = []
+        if self.drills_file.exists():
+            try:
+                raw = json.loads(self.drills_file.read_text(encoding="utf-8"))
+                if isinstance(raw, list):
+                    scenarios.extend(item for item in raw if isinstance(item, dict))
+            except (OSError, json.JSONDecodeError):
+                pass
+        scenarios.extend(self._learned_simulation_scenarios())
+        if scenarios:
+            return scenarios
         return [
             {
                 "name": "writing",
+                "category": "writing",
                 "input": "I have a messy chapter idea and I need help making it good.",
                 "candidate": (
                     "Give me the rough version first. I will help you find the strongest emotional line, "
@@ -571,6 +1092,7 @@ class LauncherChat:
             },
             {
                 "name": "canon",
+                "category": "story",
                 "input": "My character died in chapter 2 but appears alive in chapter 5.",
                 "candidate": (
                     "That is a continuity break unless chapter 5 has a resurrection, flashback, fake death, "
@@ -586,6 +1108,7 @@ class LauncherChat:
             },
             {
                 "name": "launcher",
+                "category": "tools",
                 "input": "Can you restart and keep updating me automatically?",
                 "candidate": (
                     "I can talk it through, but launcher actions need slash commands. Use /restart to reopen the app. "
@@ -601,6 +1124,68 @@ class LauncherChat:
             },
         ]
 
+    def _learned_simulation_scenarios(self) -> list[dict[str, object]]:
+        if not self.learned_drills_file.exists():
+            return []
+        try:
+            raw = json.loads(self.learned_drills_file.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return []
+        return [item for item in raw if isinstance(item, dict)] if isinstance(raw, list) else []
+
+    def _append_learned_drills(self, category: str, name: str, lessons: list[str], source: str) -> int:
+        existing = self._learned_simulation_scenarios()
+        seen = {
+            str(item.get("lesson_id") or item.get("name") or "").strip().lower()
+            for item in existing
+            if isinstance(item, dict)
+        }
+        added = 0
+        for lesson in lessons:
+            lesson_id = self._lesson_id(category, lesson)
+            if lesson_id in seen:
+                continue
+            required = self._lesson_keywords(lesson)
+            existing.append(
+                {
+                    "name": f"learned_{self._slugify(name or category)[:18]}_{self._slugify(lesson)[:24]}",
+                    "lesson_id": lesson_id,
+                    "category": "learned",
+                    "input": f"Apply learned MANTIS behavior from {category}: {source[:160]}",
+                    "candidate": lesson,
+                    "required": required,
+                    "forbidden": ["ignore the user", "as an ai", "cannot remember"],
+                    "lessons": [lesson],
+                    "source_category": category,
+                    "source_name": name,
+                    "created_at": _dt.datetime.now().isoformat(timespec="seconds"),
+                }
+            )
+            seen.add(lesson_id)
+            added += 1
+        if added:
+            self.learned_drills_file.parent.mkdir(parents=True, exist_ok=True)
+            self.learned_drills_file.write_text(json.dumps(existing[-500:], indent=2), encoding="utf-8")
+        return added
+
+    def _lesson_id(self, category: str, lesson: str) -> str:
+        return f"{self._slugify(category)}:{self._slugify(lesson)[:90]}"
+
+    @staticmethod
+    def _lesson_keywords(lesson: str) -> list[str]:
+        words = re.findall(r"[a-zA-Z][a-zA-Z0-9/-]{3,}", lesson.lower())
+        stop = {
+            "that", "this", "with", "from", "when", "then", "should", "would", "could",
+            "into", "user", "mantis", "lesson", "behavior", "guidance", "real"
+        }
+        keywords: list[str] = []
+        for word in words:
+            if word not in stop and word not in keywords:
+                keywords.append(word)
+            if len(keywords) >= 4:
+                break
+        return keywords or ["learned"]
+
     def _run_simulation_scenario(self, scenario: dict[str, object]) -> dict[str, object]:
         candidate = str(scenario.get("candidate", ""))
         candidate_lower = candidate.lower()
@@ -608,9 +1193,14 @@ class LauncherChat:
         forbidden = [str(item).lower() for item in scenario.get("forbidden", [])]
 
         score = 40
-        hits = [item for item in required if item in candidate_lower]
-        misses = [item for item in required if item not in candidate_lower]
-        violations = [item for item in forbidden if item in candidate_lower]
+        def has_signal(signal: str) -> bool:
+            if re.fullmatch(r"[a-z0-9_/-]+", signal):
+                return bool(re.search(rf"(?<![a-z0-9_/-]){re.escape(signal)}(?![a-z0-9_/-])", candidate_lower))
+            return signal in candidate_lower
+
+        hits = [item for item in required if has_signal(item)]
+        misses = [item for item in required if not has_signal(item)]
+        violations = [item for item in forbidden if has_signal(item)]
         score += int(45 * (len(hits) / max(1, len(required))))
         score -= 20 * len(violations)
         if "?" in candidate:
@@ -627,6 +1217,7 @@ class LauncherChat:
 
         return {
             "name": scenario.get("name", "unknown"),
+            "category": scenario.get("category", "core"),
             "input": scenario.get("input", ""),
             "score": score,
             "passed": score >= 80 and not violations,
@@ -653,11 +1244,11 @@ class LauncherChat:
         secrets_path.parent.mkdir(parents=True, exist_ok=True)
         try:
             existing = secrets_path.read_text(encoding="utf-8") if secrets_path.exists() else ""
-            replacement = f'GROQ_API_KEY = "{self._toml_escape(key)}"'
-            if re.search(r"(?m)^GROQ_API_KEY\s*=", existing):
-                updated = re.sub(r'(?m)^GROQ_API_KEY\s*=.*$', replacement, existing)
-            elif re.search(r"(?m)^groq_api_key\s*=", existing):
-                updated = re.sub(r'(?m)^groq_api_key\s*=.*$', replacement, existing)
+            replacement = f'MANTIS_CHAT_GROQ_API_KEY = "{self._toml_escape(key)}"'
+            if re.search(r"(?m)^MANTIS_CHAT_GROQ_API_KEY\s*=", existing):
+                updated = re.sub(r'(?m)^MANTIS_CHAT_GROQ_API_KEY\s*=.*$', replacement, existing)
+            elif re.search(r"(?m)^mantis_chat_groq_api_key\s*=", existing):
+                updated = re.sub(r'(?m)^mantis_chat_groq_api_key\s*=.*$', replacement, existing)
             else:
                 spacer = "" if not existing or existing.endswith("\n") else "\n"
                 updated = f"{existing}{spacer}{replacement}\n"
@@ -667,8 +1258,8 @@ class LauncherChat:
 
         self._load_groq_settings()
         return (
-            "Saved the MANTIS intelligence key and reloaded my higher reasoning layer. "
-            "Use /mantis to confirm; the key stays hidden. "
+            "Saved the dedicated MANTIS chat intelligence key and reloaded my conversation layer. "
+            "Use /mantis to confirm; this key is separate from the main app key and stays hidden. "
             "If that key was pasted into the visible console, revoke it and save a fresh one."
         )
 
@@ -685,6 +1276,8 @@ class LauncherChat:
         now = _dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         print()
         self._print_banner()
+        print(self._color("  NEON LINK READY  ::  LOCAL CONSOLE  ::  SLASH COMMANDS ON /HELP", "dim"))
+        print()
         self._print_panel(
             "SESSION",
             [
@@ -695,14 +1288,37 @@ class LauncherChat:
         )
         print()
 
+    def _handoff_screen(self) -> None:
+        now = _dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        print()
+        print(self._color("  +-- MANTIS LINK ---------------------------------------------------+", "green"))
+        self._print_handoff_row("RUNTIME", self.url)
+        self._print_handoff_row("TIME", now)
+        self._print_handoff_row("HELP", "/help for commands. normal text is chat.")
+        print(self._color("  +----------------------------------------------------------------+", "green"))
+        print()
+
+    def _print_handoff_row(self, label: str, value: str) -> None:
+        label_text = f"  {label:<8} "
+        value_text = f"{value:<50}"[:50]
+        print(
+            self._color("  |", "green")
+            + self._color(label_text, "cyan")
+            + self._color(value_text, "soft")
+            + self._color("|", "green")
+        )
+
     def _prompt(self) -> str:
         if not self.use_color:
-            return "  You > "
-        return "\033[96m  You > "
+            self._set_native_color("blue")
+            return "  YOU > "
+        return "\033[94m  YOU \033[96m>\033[0m "
 
     def _reset_color(self) -> None:
         if self.use_color:
             print("\033[0m", end="")
+        elif self.use_native_color:
+            self._set_native_color("soft")
 
     def _print_banner(self) -> None:
         if self.use_unicode:
@@ -723,48 +1339,52 @@ class LauncherChat:
             ]
         else:
             lines = [
-                "+=======================================================+",
-                "|                                                       |",
-                "|       M   M   AAAAA   N   N  TTTTT  III   SSSSS       |",
-                "|       MM MM   A   A   NN  N    T     I    S           |",
-                "|       M M M   AAAAA   N N N    T     I    SSSSS       |",
-                "|       M   M   A   A   N  NN    T     I        S       |",
-                "|       M   M   A   A   N   N    T    III   SSSSS       |",
-                "|                                                       |",
-                "|     Modular AI Narrative Text Intelligence System     |",
-                "+=======================================================+",
+                "  +------------------------------------------------------------------+",
+                "  |                                                                  |",
+                "  |      ##     ##    ###    ##    ## ######## ####  ######          |",
+                "  |      ###   ###   ## ##   ###   ##    ##     ##  ##    ##         |",
+                "  |      #### ####  ##   ##  ####  ##    ##     ##  ##               |",
+                "  |      ## ### ## ######### ## ## ##    ##     ##   ######          |",
+                "  |      ##     ## ##     ## ##  ####    ##     ##        ##         |",
+                "  |      ##     ## ##     ## ##   ###    ##     ##  ##    ##         |",
+                "  |      ##     ## ##     ## ##    ##    ##    ####  ######          |",
+                "  |                                                                  |",
+                "  |         Modular AI Narrative Text Intelligence System            |",
+                "  |             LOCAL INTELLIGENCE CONSOLE // MANTIS STUDIO          |",
+                "  |                                                                  |",
+                "  +------------------------------------------------------------------+",
             ]
         for line in lines:
-            print(self._color(line, "blue"))
+            print(self._color(line, "green"))
 
     def _print_status_line(self, label: str, value: str) -> None:
-        label_text = f"{label:<8}"
-        print(f"  {self._color(label_text, 'cyan')} {value}")
+        label_text = f"{label.upper():<8}"
+        print(f"  {self._color('[' + label_text + ']', 'green')} {self._color(value, 'soft')}")
 
     def _print_panel(self, title: str, rows: list[tuple[str, str]]) -> None:
         width = self.FRAME_WIDTH
-        print(self._color("+" + "-" * (width - 2) + "+", "blue"))
-        print(self._color("|", "blue") + f" {title:<{width - 4}}" + self._color("|", "blue"))
-        print(self._color("|" + "-" * (width - 2) + "|", "blue"))
+        print(self._color("  +" + "=" * (width - 2) + "+", "green"))
+        print(self._color("  |", "green") + self._color(f" {title:<{width - 4}}", "cyan") + self._color("|", "green"))
+        print(self._color("  |" + "-" * (width - 2) + "|", "green"))
         for label, value in rows:
             value_width = width - 15
             wrapped = textwrap.wrap(value, width=value_width) or [""]
             for idx, chunk in enumerate(wrapped):
                 row_label = label if idx == 0 else ""
                 text = f" {row_label:<10} {chunk}"
-                print(self._color("|", "blue") + f"{text:<{width - 2}}" + self._color("|", "blue"))
-        print(self._color("+" + "-" * (width - 2) + "+", "blue"))
+                print(self._color("  |", "green") + f"{text:<{width - 2}}" + self._color("|", "green"))
+        print(self._color("  +" + "=" * (width - 2) + "+", "green"))
 
     def _boot_sequence(self) -> None:
         if not sys.stdin.isatty():
             return
-        self._print_status_line("Boot", "Synchronizing console interface")
+        self._print_status_line("Boot", "Synchronizing MANTIS console")
         print()
-        self._print_status_line("Sync", self._bar(4, 24))
+        self._print_status_line("Scan", self._bar(3, 10))
         self._sleep(0.08)
-        self._print_status_line("Sync", self._bar(12, 24))
+        self._print_status_line("Core", self._bar(7, 10))
         self._sleep(0.08)
-        self._print_status_line("Sync", self._bar(24, 24))
+        self._print_status_line("Link", self._bar(10, 10))
         print()
         self._print_status_line("Link", "Ready for conversation")
         print()
@@ -772,15 +1392,36 @@ class LauncherChat:
     def _thinking_pulse(self, label: str) -> None:
         if not sys.stdin.isatty():
             return
-        for filled in (5, 11, 18, 24):
-            print(f"\r  {self._color(label, 'cyan')} {self._bar(filled, 24)}", end="", flush=True)
+        for filled in (3, 7, 10):
+            if self.use_native_color and not self.use_color:
+                print("\r  ", end="")
+                self._set_native_color("green")
+                print("MANTIS >", end="")
+                self._set_native_color("soft")
+                print(f" {label} ", end="")
+                self._set_native_color("green")
+                print(self._plain_bar(filled, 10), end="", flush=True)
+            else:
+                status = self._color("MANTIS >", "green")
+                print(f"\r  {status} {self._color(label, 'soft')} {self._bar(filled, 10)}", end="", flush=True)
             self._sleep(0.06)
-        print()
+        self._reset_color()
+        print("\n")
 
     def _bar(self, filled: int, total: int) -> str:
+        return self._color(self._plain_bar(filled, total), "green")
+
+    @staticmethod
+    def _plain_bar(filled: int, total: int) -> str:
         filled = max(0, min(filled, total))
-        bar = ("█" * filled + "░" * (total - filled)) if self.use_unicode else ("#" * filled + "." * (total - filled))
-        return self._color(f"[{bar}]", "blue")
+        full, empty = "\u2588", "\u2591"
+        encoding = sys.stdout.encoding or ""
+        try:
+            (full + empty).encode(encoding or "utf-8")
+        except (LookupError, UnicodeEncodeError):
+            full, empty = "#", "-"
+        bar = full * filled + empty * (total - filled)
+        return f"[{bar}]"
 
     def _color(self, text: str, color: str) -> str:
         if not self.use_color:
@@ -790,6 +1431,8 @@ class LauncherChat:
             "cyan": "\033[96m",
             "green": "\033[92m",
             "yellow": "\033[93m",
+            "soft": "\033[97m",
+            "dim": "\033[90m",
             "reset": "\033[0m",
         }
         return f"{colors.get(color, '')}{text}{colors['reset']}"
@@ -808,11 +1451,61 @@ class LauncherChat:
         encoding = (sys.stdout.encoding or "").lower()
         return "utf" in encoding or "65001" in encoding
 
+    @staticmethod
+    def _enable_ansi_color() -> bool:
+        if not sys.stdout.isatty():
+            return False
+        if os.name != "nt":
+            return True
+        try:
+            import ctypes
+
+            kernel32 = ctypes.windll.kernel32
+            handle = kernel32.GetStdHandle(-11)
+            mode = ctypes.c_uint32()
+            if not kernel32.GetConsoleMode(handle, ctypes.byref(mode)):
+                return False
+            enable_virtual_terminal = 0x0004
+            if kernel32.SetConsoleMode(handle, mode.value | enable_virtual_terminal):
+                return True
+        except Exception:
+            return False
+        return False
+
+    @staticmethod
+    def _supports_native_color() -> bool:
+        return os.name == "nt" and sys.stdout.isatty()
+
+    def _set_native_color(self, color: str) -> None:
+        if not self.use_native_color:
+            return
+        attrs = {
+            "blue": 0x09,
+            "green": 0x0A,
+            "yellow": 0x0E,
+            "cyan": 0x0B,
+            "soft": 0x0F,
+            "dim": 0x08,
+        }
+        try:
+            import ctypes
+
+            kernel32 = ctypes.windll.kernel32
+            handle = kernel32.GetStdHandle(-11)
+            kernel32.SetConsoleTextAttribute(handle, attrs.get(color, 0x0F))
+        except Exception:
+            pass
+
     def _connect_groq(self) -> None:
         if self.groq_key:
-            self._print_status_line("Core", "Intelligence core online.")
+            if not self.handoff_mode:
+                self._print_status_line("Core", "Intelligence core online.")
             self._log_event("system", f"groq connected source={self.groq_key_source} model={self.groq_model}")
-            print()
+            if not self.handoff_mode:
+                print()
+            return
+        if self.handoff_mode:
+            self._log_event("system", "running local conversation mode")
             return
         if not sys.stdin.isatty():
             return
@@ -842,19 +1535,26 @@ class LauncherChat:
         secrets = self._load_streamlit_secrets()
 
         self.groq_base_url = (
-            os.getenv("GROQ_API_URL")
+            os.getenv("MANTIS_CHAT_GROQ_API_URL")
+            or os.getenv("GROQ_API_URL")
             or os.getenv("MANTIS_GROQ_API_URL")
             or str(config.get("groq_base_url") or "").strip()
             or "https://api.groq.com/openai/v1"
         )
         self.groq_model = (
-            os.getenv("GROQ_MODEL")
+            os.getenv("MANTIS_CHAT_GROQ_MODEL")
+            or os.getenv("GROQ_MODEL")
             or os.getenv("MANTIS_GROQ_MODEL")
             or str(config.get("groq_model") or "").strip()
             or "llama3-8b-8192"
         )
 
         key_sources = [
+            ("MANTIS_CHAT_GROQ_API_KEY environment variable", os.getenv("MANTIS_CHAT_GROQ_API_KEY")),
+            (".streamlit/secrets.toml MANTIS_CHAT_GROQ_API_KEY", secrets.get("MANTIS_CHAT_GROQ_API_KEY")),
+            (".streamlit/secrets.toml mantis_chat_groq_api_key", secrets.get("mantis_chat_groq_api_key")),
+            (".streamlit/secrets.toml [mantis_chat].groq_api_key", self._nested_secret(secrets, "mantis_chat", "groq_api_key")),
+            (".streamlit/secrets.toml [mantis_chat].api_key", self._nested_secret(secrets, "mantis_chat", "api_key")),
             ("GROQ_API_KEY environment variable", os.getenv("GROQ_API_KEY")),
             ("MANTIS_GROQ_API_KEY environment variable", os.getenv("MANTIS_GROQ_API_KEY")),
             ("MANTIS saved app config", config.get("groq_api_key")),
@@ -943,6 +1643,23 @@ class LauncherChat:
         except (OSError, tomllib.TOMLDecodeError):
             return {}
 
+    def _research_api_key(self) -> str:
+        secrets = self._load_streamlit_secrets()
+        candidates = [
+            os.getenv("MANTIS_RESEARCH_API_KEY"),
+            os.getenv("TAVILY_API_KEY"),
+            secrets.get("MANTIS_RESEARCH_API_KEY"),
+            secrets.get("TAVILY_API_KEY"),
+            secrets.get("tavily_api_key"),
+            self._nested_secret(secrets, "research", "api_key"),
+            self._nested_secret(secrets, "tavily", "api_key"),
+        ]
+        for key in candidates:
+            clean = str(key or "").strip()
+            if clean:
+                return clean
+        return ""
+
     @staticmethod
     def _nested_secret(data: dict[str, object], section: str, key: str) -> object:
         value = data.get(section)
@@ -962,6 +1679,11 @@ class LauncherChat:
         except OSError:
             return []
 
+    @staticmethod
+    def _slugify(value: str) -> str:
+        slug = re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
+        return slug or "item"
+
     def _log_event(self, speaker: str, message: str) -> None:
         try:
             self.chat_log_file.parent.mkdir(parents=True, exist_ok=True)
@@ -975,7 +1697,21 @@ class LauncherChat:
 
     @staticmethod
     def _mask_secrets(value: str) -> str:
-        return re.sub(r"\bgsk_[A-Za-z0-9_-]{8,}\b", "gsk_***MASKED***", str(value))
+        text = str(value)
+        patterns = [
+            (r"\bgsk_[A-Za-z0-9_-]{8,}\b", "gsk_***MASKED***"),
+            (r"\bre_[A-Za-z0-9_-]{12,}\b", "re_***MASKED***"),
+            (r"\bGOCSPX-[A-Za-z0-9_-]{8,}\b", "GOCSPX-***MASKED***"),
+            (r"\b[0-9]{6,}-[A-Za-z0-9_-]{20,}\.apps\.googleusercontent\.com\b", "***GOOGLE_CLIENT_ID***"),
+            (r"\bsk-[A-Za-z0-9_-]{12,}\b", "sk-***MASKED***"),
+        ]
+        for pattern, replacement in patterns:
+            text = re.sub(pattern, replacement, text)
+        return text
+
+    @classmethod
+    def _contains_secret(cls, value: str) -> bool:
+        return cls._mask_secrets(value) != str(value)
 
     def _wrap(self, text: str) -> str:
         output: list[str] = []
@@ -995,7 +1731,7 @@ class LauncherChat:
     def _mantis_prefix(self) -> str:
         if not self.use_color:
             return "  MANTIS > "
-        return "\033[94m  MANTIS > \033[0m"
+        return "\033[92m  MANTIS \033[96m>\033[0m "
 
     @staticmethod
     def _asks_about_connection(text: str) -> bool:
@@ -1018,6 +1754,47 @@ class LauncherChat:
                 note = match.group(1).strip()
                 if note.lower() not in {"", "i guess", "now", "everything"}:
                     return note
+        return ""
+
+    def _extract_todo_request(self, text: str) -> str | None:
+        clean = re.sub(r"\s+", " ", text or "").strip()
+        lowered = clean.lower()
+        if not re.search(r"\b(todo|to-do|task list|list)\b", lowered):
+            return None
+        add_match = re.search(r"\b(?:add|save|put)\s+(.+?)\s+(?:to|in|into|on)\s+(?:the\s+)?(?:todo|to-do|task list|list)\b", clean, re.I)
+        if add_match:
+            return add_match.group(1).strip()
+        if re.search(r"\b(make|create|save|write)\s+(that|the)\s+(?:(?:todo|to-do|task)\s+)?list\b.*$", lowered):
+            return "that list"
+        if re.search(r"\b(add|save)\s+(that|the)\s+(?:to|in|into|on)\s+(?:the\s+)?(?:todo|to-do|task list|list)\b.*$", lowered):
+            return "that list"
+        return None
+
+    @staticmethod
+    def _extract_auto_lesson(text: str) -> str:
+        clean = re.sub(r"\s+", " ", text or "").strip()
+        lowered = clean.lower()
+        if not clean or len(clean) < 12:
+            return ""
+        patterns = [
+            r"\bi need you to understand\s+(.+)$",
+            r"\bremember this[:\s]+(.+)$",
+            r"\banother thing to fix[:\s]+(.+)$",
+            r"\bfix this[:\s]+(.+)$",
+            r"\bplease learn\s+(.+)$",
+        ]
+        for pattern in patterns:
+            match = re.search(pattern, clean, re.I)
+            if match:
+                return "User behavior guidance: " + match.group(1).strip()
+        if re.search(r"\b(you|u|mantis)\b.*\b(not listening|did it again|not hearing|missing what i mean)\b", lowered):
+            return "When the user says MANTIS is not listening, slow down, reflect the exact point, and avoid repeating the previous mistake."
+        if re.search(r"\bif\s+i\s+say\b.+\bdoesn'?t\s+mean\b", lowered):
+            return "Do not treat casual mentions as commands; wait for an explicit slash command before showing status, logs, simulator results, or restarting."
+        if re.search(r"\b(don't|dont|do not)\s+(mention|say|call|assume|repeat|show)\b", lowered):
+            return "Respect direct user preference: " + clean
+        if re.search(r"\bslash command\b", lowered) and re.search(r"\b(status|logs|simulator|restart|command)\b", lowered):
+            return "Launcher actions should require slash commands; normal text should stay conversational."
         return ""
 
     @staticmethod
@@ -1055,6 +1832,8 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--chat-log-file", default="logs/chat.log")
     parser.add_argument("--repo-root", default=".")
     parser.add_argument("--memory-file", default="")
+    parser.add_argument("--drills-file", default="")
+    parser.add_argument("--handoff", action="store_true")
     return parser.parse_args(argv)
 
 
