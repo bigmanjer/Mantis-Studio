@@ -60,7 +60,9 @@ for %%P in ("python" "py -3" "py") do (
 
 if not defined PYTHON_CMD (
   color %CLR_ERR%
+  echo.
   echo [FAIL] PYTHON NOT FOUND.
+  echo.
   pause
   exit /b 1
 )
@@ -77,7 +79,9 @@ for %%F in (
 
 if not defined APP_FILE (
   color %CLR_ERR%
+  echo.
   echo [FAIL] NO MANTIS APP FILE FOUND.
+  echo.
   pause
   exit /b 1
 )
@@ -88,6 +92,7 @@ if not defined APP_FILE (
 cls
 color %CLR_WARN%
 call :banner
+color %CLR_WARN%
 
 echo.
 echo   AWAKENING MANTIS NEURAL INTERFACE...
@@ -114,8 +119,10 @@ echo.
 cls
 color %CLR_WARN%
 call :banner
+color %CLR_WARN%
 echo.
 echo VERIFYING DEPENDENCIES...
+echo.
 
 for %%D in (
   streamlit
@@ -134,29 +141,33 @@ for %%D in (
   tqdm
   playwright
 ) do (
+  color %CLR_WARN%
+  echo CHECKING %%D...
   %PYTHON_CMD% -m pip show %%D >nul 2>&1
   if errorlevel 1 (
     color %CLR_WARN%
-    echo INSTALLING %%D...
+    echo   INSTALLING %%D...
     echo.
     call :progress_bar_fast
     %PYTHON_CMD% -m pip install %%D --quiet >>"%LOG_FILE%" 2>&1
     if errorlevel 1 (
       color %CLR_ERR%
+      echo.
       echo [FAIL] COULD NOT INSTALL %%D.
       echo Check "%LOG_FILE%" for details.
+      echo.
       pause
       exit /b 1
     )
     color %CLR_OK%
-    echo OK: %%D
+    echo   OK: %%D
+    echo.
     call :sleep 90
-    color %CLR_WARN%
   ) else (
     color %CLR_OK%
-    echo OK: %%D
+    echo   OK: %%D
+    echo.
     call :sleep 90
-    color %CLR_WARN%
   )
 )
 
@@ -169,6 +180,7 @@ call :sleep 1500
 set "AI_READY=1"
 color %CLR_WARN%
 call :banner
+color %CLR_WARN%
 echo.
 color %CLR_WARN%
 echo   INITIALIZING NEURAL NETWORK...
@@ -194,6 +206,7 @@ color %CLR_WARN%
 if "%AI_READY%"=="1" (
   color %CLR_AI%
   call :banner
+  color %CLR_AI%
   echo.
   echo ================================
   echo   MANTIS A.I. ONLINE
@@ -201,8 +214,11 @@ if "%AI_READY%"=="1" (
 ) else (
   color %CLR_ERR%
   call :banner
+  color %CLR_ERR%
+  echo.
   echo.
   echo AI CORE OFFLINE - SAFE MODE
+  echo.
 )
 call :sleep 120
 
@@ -214,8 +230,10 @@ call :wait_for_server
 if errorlevel 1 (
   color %CLR_ERR%
   echo.
+  echo.
   echo [FAIL] MANTIS STUDIO DID NOT ANSWER ON %APP_URL%.
   echo Check "%STREAMLIT_LOG_FILE%" for details.
+  echo.
   if "%HAVE_PS%"=="1" (
     echo.
     echo Recent runtime log:
@@ -307,11 +325,21 @@ exit /b 1
 if "%HAVE_PS%"=="1" (
   powershell -NoProfile -Command "try { $r = Invoke-WebRequest -UseBasicParsing -Uri '%HEALTH_URL%' -TimeoutSec 2; if ($r.StatusCode -ge 200 -and $r.StatusCode -lt 500) { exit 0 } } catch { exit 1 }" >nul 2>&1
   if not errorlevel 1 (
+    color %CLR_OK%
+    echo.
     echo   EXISTING MANTIS RUNTIME DETECTED ON %APP_URL%.
+    echo.
     exit /b 0
   )
 ) else (
-  netstat -ano | findstr ":%SERVER_PORT%" >nul && exit /b 0
+  netstat -ano | findstr ":%SERVER_PORT%" >nul
+  if not errorlevel 1 (
+    color %CLR_OK%
+    echo.
+    echo   EXISTING MANTIS RUNTIME DETECTED ON %APP_URL%.
+    echo.
+    exit /b 0
+  )
 )
 if "%HAVE_PS%"=="1" (
   powershell -NoProfile -ExecutionPolicy Bypass -Command "$py = '%PYTHON_CMD%'; $app = '%APP_FILE%'; $port = '%SERVER_PORT%'; $log = '%STREAMLIT_LOG_FILE%'; $cmd = ('/c {0} -m streamlit run \"{1}\" --server.headless true --server.port {2} >> \"{3}\" 2>&1' -f $py, $app, $port, $log); Start-Process -WindowStyle Hidden -FilePath 'cmd.exe' -ArgumentList $cmd" >nul 2>&1
@@ -326,8 +354,11 @@ set "MANTIS_CHATBOT=scripts\mantis_launcher_chat.py"
 if exist "%MANTIS_CHATBOT%" (
   %PYTHON_CMD% "%MANTIS_CHATBOT%" --url "%APP_URL%" --port "%SERVER_PORT%" --log-file "%STREAMLIT_LOG_FILE%" --chat-log-file "%CHAT_LOG_FILE%" --repo-root "%CD%" --handoff
   if not errorlevel 1 exit /b
+  color %CLR_ERR%
   echo MANTIS PYTHON CHAT FAILED TO START. FALLING BACK TO BASIC LAUNCHER CHAT.>>"%CHAT_LOG_FILE%"
+  echo.
   echo MANTIS PYTHON CHAT FAILED TO START. FALLING BACK TO BASIC LAUNCHER CHAT.
+  echo.
   pause
 )
 color %CLR_ERR%
@@ -438,6 +469,7 @@ exit /b
 
 :banner
 cls
+color %CLR_OK%
 echo.
 echo  ╔═══════════════════════════════════════════════════════════════╗
 echo  ║                                                               ║
