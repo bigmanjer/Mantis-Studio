@@ -9,7 +9,7 @@ import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from io import BytesIO
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 
 KB_VERSION = 1
@@ -117,6 +117,10 @@ def chunk_text(text: str, *, max_chars: int = DEFAULT_CHUNK_CHARS) -> List[str]:
     chunks: List[str] = []
     current = ""
     for paragraph in paragraphs:
+        if current and len(paragraph) >= 45:
+            chunks.append(current.strip())
+            current = paragraph
+            continue
         if current and len(current) + len(paragraph) + 2 > max_chars:
             chunks.append(current.strip())
             current = paragraph
@@ -232,13 +236,24 @@ def _score_chunk(query_terms: List[str], chunk: Dict[str, Any]) -> float:
     return score
 
 
-def search_knowledge_base(projects_dir: str, query: str, *, limit: int = 6) -> List[Dict[str, Any]]:
+def search_knowledge_base(
+    projects_dir: str,
+    query: str,
+    *,
+    limit: int = 6,
+    category: str = "",
+    source: str = "",
+) -> List[Dict[str, Any]]:
     terms = [term for term in re.findall(r"[a-zA-Z0-9][a-zA-Z0-9\-']+", (query or "").lower()) if len(term) > 2]
     if not terms:
         return []
     data = load_knowledge_base(projects_dir)
     scored = []
     for chunk in data.get("chunks", []):
+        if category and str(chunk.get("category") or "").lower() != category.strip().lower():
+            continue
+        if source and str(chunk.get("source") or "") != source:
+            continue
         score = _score_chunk(terms, chunk)
         if score > 0:
             row = dict(chunk)
@@ -246,6 +261,51 @@ def search_knowledge_base(projects_dir: str, query: str, *, limit: int = 6) -> L
             scored.append(row)
     scored.sort(key=lambda item: (item.get("score", 0), item.get("created_at", 0)), reverse=True)
     return scored[: max(1, limit)]
+
+
+def list_knowledge_categories(projects_dir: str) -> List[str]:
+    data = load_knowledge_base(projects_dir)
+    categories = {
+        str(chunk.get("category") or "reference")
+        for chunk in data.get("chunks", []) or []
+    }
+    return sorted(categories)
+
+
+def list_knowledge_sources(projects_dir: str) -> List[str]:
+    data = load_knowledge_base(projects_dir)
+    sources = {
+        str(doc.get("filename") or "")
+        for doc in data.get("documents", []) or []
+        if str(doc.get("filename") or "").strip()
+    }
+    return sorted(sources)
+
+
+def get_document_chunks(projects_dir: str, document_id: str, *, limit: Optional[int] = None) -> List[Dict[str, Any]]:
+    data = load_knowledge_base(projects_dir)
+    chunks = [
+        dict(chunk)
+        for chunk in data.get("chunks", []) or []
+        if str(chunk.get("document_id") or "") == str(document_id or "")
+    ]
+    chunks.sort(key=lambda item: item.get("title", ""))
+    return chunks[:limit] if limit else chunks
+
+
+def delete_knowledge_document(projects_dir: str, document_id: str) -> bool:
+    doc_id = str(document_id or "").strip()
+    if not doc_id:
+        return False
+    data = load_knowledge_base(projects_dir)
+    documents = [doc for doc in data.get("documents", []) or [] if str(doc.get("id") or "") != doc_id]
+    chunks = [chunk for chunk in data.get("chunks", []) or [] if str(chunk.get("document_id") or "") != doc_id]
+    if len(documents) == len(data.get("documents", []) or []):
+        return False
+    data["documents"] = documents
+    data["chunks"] = chunks
+    save_knowledge_base(projects_dir, data)
+    return True
 
 
 def knowledge_stats(projects_dir: str) -> Dict[str, Any]:

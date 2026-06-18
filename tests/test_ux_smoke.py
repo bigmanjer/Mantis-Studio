@@ -805,10 +805,27 @@ class TestUtilities:
         results = search_knowledge_base(str(tmp_path), "gothic atmosphere", limit=3)
         assert results
         assert "Gothic atmosphere" in results[0]["text"]
+        filtered = search_knowledge_base(str(tmp_path), "gothic atmosphere", limit=3, category="theme")
+        assert filtered
+        no_match = search_knowledge_base(str(tmp_path), "gothic atmosphere", limit=3, category="workflow")
+        assert no_match == []
 
         context = build_knowledge_context(str(tmp_path), "free indirect discourse", limit=2)
         assert "Knowledge Base" not in context  # source name should come from the imported file
         assert "literary_notes.txt" in context
+
+        from app.services.knowledge_base import (
+            delete_knowledge_document,
+            get_document_chunks,
+            list_knowledge_categories,
+            list_knowledge_sources,
+        )
+
+        assert "literary_notes.txt" in list_knowledge_sources(str(tmp_path))
+        assert list_knowledge_categories(str(tmp_path))
+        assert get_document_chunks(str(tmp_path), result["document_id"])
+        assert delete_knowledge_document(str(tmp_path), result["document_id"]) is True
+        assert knowledge_stats(str(tmp_path))["documents"] == 0
 
     def test_app_version(self):
         from app.main import get_app_version
@@ -819,7 +836,9 @@ class TestUtilities:
         source = (ROOT / "app" / "main.py").read_text(encoding="utf-8")
         highlights_block = source[source.index("def _release_highlights()"):source.index("def render_release_summary")]
         assert "def _release_highlights()" in source
-        assert "MANTIS can now import DOCX, TXT, and Markdown learning material" in highlights_block
+        assert "Knowledge Base now has Import, Search, and Library tabs" in highlights_block
+        assert "Coherence fixes can now use the best matching chapter passage" in highlights_block
+        assert "Editor summary text and disabled text areas now stay readable" in highlights_block
         assert "Chapter generation now retrieves relevant Knowledge Base guidance" in highlights_block
         assert "Guest projects now use a stable local guest id" in highlights_block
         assert "reset Streamlit's real main scroll container" in highlights_block
@@ -836,7 +855,7 @@ class TestUtilities:
         assert "Find and replace now defaults to the first exact match" in source
         assert "Canon Scanner, queued canon suggestions, and Coherence Check now live in Insights" in source
         assert "Relationship graph moved out of World Bible and into Insights" in source
-        assert highlights_block.index("MANTIS can now import") < highlights_block.index("Dashboard no longer repeats")
+        assert highlights_block.index("Knowledge Base now has Import") < highlights_block.index("Dashboard no longer repeats")
         assert highlights_block.index("Guest projects now use") < highlights_block.index("Sign-in now uses a clearer")
         assert "Legacy duplicate runtime and UI compatibility shims were removed" not in highlights_block
         assert "What's New in Mantis Studio" not in source
@@ -857,10 +876,10 @@ class TestUtilities:
             if line.strip().startswith('("')
         ][:4]
         compact_text = "\n".join(compact_items)
+        assert "Access" in compact_text
         assert "Knowledge Base" in compact_text
-        assert "AI Learning" in compact_text
-        assert "Guest Workspaces" in compact_text
-        assert "Navigation" in compact_text
+        assert "Apply Fix" in compact_text
+        assert "Theme Polish" in compact_text
         assert "Dashboard" not in compact_text
         assert "Open changelog" in welcome_block
         assert "AppConfig.CHANGELOG_URL" in welcome_block
@@ -2376,25 +2395,21 @@ class TestMantisModelAndArchitectUX:
         assert "branding/mantis_lockup.png" in auth_block
         assert "MANTIS Studio" in auth_block
         assert "Let your imagination write with you." in auth_block
-        assert "font-size: 2.35rem" in auth_block
-        assert "A focused AI writing workspace for novels, series bibles, and long-form projects" in auth_block
-        assert "Start locally. Upgrade when the project needs an account." in auth_block
+        assert "font-size: 1.95rem" in auth_block
+        assert "A focused workspace for drafting chapters, building story knowledge, and checking continuity before details drift." in auth_block
+        assert "No account required to try it." in auth_block
         assert "mantis-auth-signal-strip" in auth_block
         assert "mantis-auth-paths" in auth_block
         assert "Plan" in auth_block
         assert "Draft" in auth_block
-        assert "Review" in auth_block
-        assert "Guest session" in auth_block
-        assert "Writer account" in auth_block
-        assert "Subscription ready" in auth_block
+        assert "Check" in auth_block
+        assert "Guest" in auth_block
+        assert "Account" in auth_block
+        assert "Paid access" in auth_block
         assert "MANTIS means Modular AI Narrative Text Intelligence System." in auth_block
         assert "Design benchmark: modern auth screens reduce default form load" not in auth_block
-        assert "Provider sign-in" in auth_block
         assert "Access" in auth_block
-        assert "Start writing in seconds" in auth_block
-        assert "Local-first" in auth_block
-        assert "Recoverable" in auth_block
-        assert "Exportable" in auth_block
+        assert "Choose how to enter" in auth_block
         assert 'st.tabs(["Sign in", "Create account", "Recover"])' in auth_block
         assert "Email recovery is ready." in auth_block
         assert "Send reset link" in auth_block
@@ -2406,7 +2421,8 @@ class TestMantisModelAndArchitectUX:
         assert "Add MANTIS_GOOGLE_CLIENT_SECRET or google_client_secret" in auth_block
         assert "Ask the super admin to configure Google OAuth" not in auth_block
         assert "google_ready, google_msg, google_auth_url = build_google_authorization_url" in auth_block
-        assert "st.link_button(" in auth_block
+        assert 'target="_self"' in auth_block
+        assert "mantis-auth-primary-link" in auth_block
         assert "Continue with Google" in auth_block
         assert "oauth_google_pending_url" not in auth_block
         assert "Open Google sign-in" not in auth_block
@@ -2421,15 +2437,15 @@ class TestMantisModelAndArchitectUX:
         assert 'key="auth_login_submit"' in auth_block
         assert 'key="auth_signup_submit"' in auth_block
         assert 'key="auth_reset_submit"' in auth_block
-        assert "Start as guest" in auth_block
-        assert auth_block.index("auth_continue_guest") < auth_block.index("Continue with Google")
+        assert "Continue as guest" in auth_block
+        assert auth_block.index("Continue with Google") < auth_block.index("auth_continue_guest")
         assert "Sign in or create an account" not in auth_block
         assert "Narrative command center" not in auth_block
         assert "Write with your canon intact." not in auth_block
         assert "MANTIS Studio Access" not in auth_block
         assert "Enter the studio with your canon protected." not in auth_block
         assert "Plan the story. Draft the chapters. Keep canon under control." not in auth_block
-        assert "paid access" in auth_block
+        assert "Paid access" in auth_block
         assert "Welcome to MANTIS Studio" not in auth_block
 
     def test_memory_page_does_not_render_coherence_check(self):
@@ -2452,7 +2468,9 @@ class TestMantisModelAndArchitectUX:
         assert "What Apply Fix will do" in source
         assert "replace the exact target text" in source
         assert "replace the closest matching passage" in source
-        assert "could not confidently locate the passage" in source
+        assert "_best_effort_replacement_span" in source
+        assert "replace the best matching passage" in source
+        assert "could not confidently locate the passage" not in source
 
     def test_insights_owns_canon_scanner_and_review_queue(self):
         source = (ROOT / "app" / "main.py").read_text(encoding="utf-8")

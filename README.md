@@ -107,6 +107,7 @@ Useful toolbox commands:
 python scripts/toolbox.py health
 python scripts/toolbox.py smoke
 python scripts/toolbox.py test --target tests
+python scripts/toolbox.py visual --base-url http://localhost:8501
 python scripts/toolbox.py qa
 ```
 
@@ -117,7 +118,7 @@ The audit runner writes:
 
 ## Versioning
 
-Current version: `136.9`.
+Current version: `137.1`.
 
 Current version is stored in [VERSION.txt](VERSION.txt).
 

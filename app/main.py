@@ -32,6 +32,7 @@ Directory Structure:
 
 import datetime
 import difflib
+import html
 import json
 import logging
 import os
@@ -1635,8 +1636,12 @@ def _run_ui():
     from app.services.knowledge_base import (
         extract_text_from_upload,
         import_knowledge_document,
+        delete_knowledge_document,
+        get_document_chunks,
         knowledge_base_path,
         knowledge_stats,
+        list_knowledge_categories,
+        list_knowledge_sources,
         load_knowledge_base,
         search_knowledge_base,
     )
@@ -2005,6 +2010,47 @@ def _run_ui():
             return best
         return None
 
+    def _keyword_overlap_score(target_excerpt: str, candidate: str) -> float:
+        stop_words = {
+            "about", "after", "again", "against", "also", "and", "are", "because",
+            "been", "before", "between", "but", "can", "chapter", "could", "from",
+            "had", "has", "have", "her", "him", "his", "into", "not", "she", "that",
+            "the", "their", "them", "then", "there", "they", "this", "was", "were",
+            "with", "would", "you", "your",
+        }
+        target_terms = {
+            term
+            for term in re.findall(r"[a-zA-Z0-9][a-zA-Z0-9'-]+", (target_excerpt or "").lower())
+            if len(term) > 3 and term not in stop_words
+        }
+        if not target_terms:
+            return 0.0
+        candidate_terms = set(
+            re.findall(r"[a-zA-Z0-9][a-zA-Z0-9'-]+", (candidate or "").lower())
+        )
+        if not candidate_terms:
+            return 0.0
+        return len(target_terms & candidate_terms) / max(1, len(target_terms))
+
+    def _best_effort_replacement_span(chapter_text: str, target_excerpt: str) -> Optional[tuple[int, int, float]]:
+        target_norm, _ = _normalized_text_with_map(target_excerpt.lower())
+        if len(target_norm) < 18:
+            return None
+        best: Optional[tuple[int, int, float]] = None
+        for start, end in _candidate_text_spans(chapter_text):
+            candidate = (chapter_text[start:end] or "").strip()
+            candidate_norm, _ = _normalized_text_with_map(candidate.lower())
+            if not candidate_norm:
+                continue
+            similarity = difflib.SequenceMatcher(None, target_norm, candidate_norm).ratio()
+            overlap = _keyword_overlap_score(target_excerpt, candidate)
+            score = (similarity * 0.65) + (overlap * 0.35)
+            if best is None or score > best[2]:
+                best = (start, end, score)
+        if best and best[2] >= 0.46:
+            return best
+        return None
+
     def _coherence_fix_plan(project: Project, issue: Dict[str, Any]) -> Dict[str, Any]:
         chapter = _coherence_issue_chapter(project, issue)
         target_excerpt = (issue.get("target_excerpt") or "").strip()
@@ -2033,6 +2079,11 @@ def _run_ui():
             if chapter and target_excerpt and not can_replace and not normalized_span
             else None
         )
+        best_effort_span = (
+            _best_effort_replacement_span(chapter_text, target_excerpt)
+            if chapter and target_excerpt and not can_replace and not normalized_span and not fuzzy_span
+            else None
+        )
         if can_replace:
             action = "replace"
             effect = "Apply Fix will replace the exact target text in this chapter with the suggested rewrite."
@@ -2048,12 +2099,19 @@ def _run_ui():
             action = "replace_fuzzy"
             start, end, match_score = fuzzy_span
             effect = f"Apply Fix will replace the closest matching passage MANTIS found (match {match_score:.0%})."
+        elif best_effort_span:
+            action = "replace_best_effort"
+            start, end, match_score = best_effort_span
+            effect = (
+                "Apply Fix will replace the best matching passage MANTIS found. "
+                f"Review the highlighted current text first (match {match_score:.0%})."
+            )
         elif chapter:
             action = "blocked"
             start = end = None
             match_score = 0.0
             if suggested_rewrite:
-                effect = "Apply Fix is blocked because MANTIS could not confidently locate the passage to replace. Use Open Chapter and the copy-ready replacement below."
+                effect = "Apply Fix needs a clearer target excerpt before it can safely replace text."
             else:
                 effect = "Apply Fix is unavailable because the issue has no usable suggested rewrite."
         else:
@@ -2081,7 +2139,7 @@ def _run_ui():
         chapter = plan["chapter"]
         if not chapter:
             return "Chapter not found for this issue."
-        if plan["action"] in {"replace", "replace_normalized", "replace_fuzzy"}:
+        if plan["action"] in {"replace", "replace_normalized", "replace_fuzzy", "replace_best_effort"}:
             start = plan.get("start")
             end = plan.get("end")
             if start is None or end is None:
@@ -3001,7 +3059,11 @@ def _run_ui():
 
     def _release_highlights() -> List[tuple[str, str]]:
         return [
-            ("Knowledge Base", "MANTIS can now import DOCX, TXT, and Markdown learning material, then chunk, classify, tag, and search it locally."),
+            ("Access", "Sign-in is now a cleaner MANTIS-themed entry page with one primary Google path, guest access, and compact email recovery."),
+            ("Knowledge Base", "Knowledge Base now has Import, Search, and Library tabs with filters, document previews, and document delete controls."),
+            ("Apply Fix", "Coherence fixes can now use the best matching chapter passage instead of stopping when the exact excerpt is not found."),
+            ("Theme Polish", "Editor summary text and disabled text areas now stay readable in light mode and dark mode."),
+            ("Visual QA", "Playwright screenshot regression is now a documented dependency with a verified Chromium setup path for proper UI testing."),
             ("AI Learning", "Chapter generation now retrieves relevant Knowledge Base guidance as reference-only context before writing."),
             ("Guest Workspaces", "Guest projects now use a stable local guest id so refreshes do not make newly created projects disappear."),
             ("Navigation", "Page changes now reset Streamlit's real main scroll container so users no longer land at the footer after moving around."),
@@ -3313,11 +3375,11 @@ def _run_ui():
                 margin-bottom: 0.5rem;
             }
             .mantis-auth-title {
-                font-size: 2.35rem;
+                font-size: 1.95rem;
                 line-height: 1.12;
                 margin: 0 0 0.65rem 0;
                 font-weight: 800;
-                max-width: 18ch;
+                max-width: 22ch;
             }
             .mantis-auth-sub {
                 color: var(--mantis-muted);
@@ -3407,8 +3469,26 @@ def _run_ui():
             .mantis-auth-panel h3 {
                 margin-top: 0;
                 margin-bottom: 0.35rem;
-                font-size: 2.2rem;
+                font-size: 1.65rem;
                 line-height: 1.14;
+            }
+            .mantis-auth-primary-link {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                min-height: 2.85rem;
+                width: 100%;
+                border-radius: 8px;
+                border: 1px solid var(--mantis-primary-border);
+                background: var(--mantis-primary-bg);
+                color: #fff !important;
+                -webkit-text-fill-color: #fff !important;
+                font-weight: 700;
+                text-decoration: none !important;
+            }
+            .mantis-auth-primary-link:hover {
+                border-color: var(--mantis-primary-hover-border);
+                filter: brightness(1.04);
             }
             .mantis-auth-action-row {
                 display: grid;
@@ -3464,7 +3544,7 @@ def _run_ui():
                     min-height: auto;
                 }
                 .mantis-auth-title {
-                    font-size: 2.35rem;
+                    font-size: 1.9rem;
                     max-width: none;
                 }
                 .mantis-auth-signal-strip,
@@ -3499,21 +3579,21 @@ def _run_ui():
                                 {auth_lockup_img}
                                 <div class="mantis-auth-kicker">MANTIS Studio</div>
                                 <h2 class="mantis-auth-title">Let your imagination write with you.</h2>
-                                <div class="mantis-auth-sub">A focused AI writing workspace for novels, series bibles, and long-form projects where continuity matters.</div>
+                                <div class="mantis-auth-sub">A focused workspace for drafting chapters, building story knowledge, and checking continuity before details drift.</div>
                                 <div class="mantis-auth-command">
-                                    <strong>Start locally. Upgrade when the project needs an account.</strong>
-                                    <span>Guest mode gets you into the editor fast. Accounts add recovery, separated workspaces, provider sign-in, and the foundation for paid access.</span>
+                                    <strong>No account required to try it.</strong>
+                                    <span>Use guest mode for a quick session. Sign in when you want recovery, separated workspaces, and future subscription access.</span>
                                 </div>
                                 <div class="mantis-auth-signal-strip">
-                                    <div class="mantis-auth-signal"><strong>Plan</strong><span>Outline structure, chapter beats, and story targets.</span></div>
-                                    <div class="mantis-auth-signal"><strong>Draft</strong><span>Write chapters with AI support close to the manuscript.</span></div>
-                                    <div class="mantis-auth-signal"><strong>Review</strong><span>Check canon risk before details drift.</span></div>
+                                    <div class="mantis-auth-signal"><strong>Plan</strong><span>Outline and chapter beats.</span></div>
+                                    <div class="mantis-auth-signal"><strong>Draft</strong><span>Write with AI support.</span></div>
+                                    <div class="mantis-auth-signal"><strong>Check</strong><span>Review canon risk.</span></div>
                                 </div>
                             </div>
                             <div class="mantis-auth-paths">
-                                <div class="mantis-auth-path"><strong>Guest session</strong><span>Try the studio immediately without creating an account.</span></div>
-                                <div class="mantis-auth-path"><strong>Writer account</strong><span>Save identity, recovery, OAuth sign-in, and account-separated projects.</span></div>
-                                <div class="mantis-auth-path"><strong>Subscription ready</strong><span>Built to support paid access when billing is connected.</span></div>
+                                <div class="mantis-auth-path"><strong>Guest</strong><span>Fastest way in.</span></div>
+                                <div class="mantis-auth-path"><strong>Account</strong><span>Recovery and separated projects.</span></div>
+                                <div class="mantis-auth-path"><strong>Paid access</strong><span>Ready for billing when connected.</span></div>
                                 <div class="mantis-auth-footnote">MANTIS means Modular AI Narrative Text Intelligence System.</div>
                             </div>
                         </div>
@@ -3528,13 +3608,13 @@ def _run_ui():
                         <div class="mantis-auth-panel">
                             <div>
                                 <div class="mantis-auth-kicker">Access</div>
-                                <h3>Start writing in seconds</h3>
-                                <div class="mantis-auth-sub">Jump in as a guest, or sign in when this workspace should belong to you.</div>
+                                <h3>Choose how to enter</h3>
+                                <div class="mantis-auth-sub">Use one path now. You can connect more later from User Settings.</div>
                             </div>
                             <div class="mantis-auth-trust-row">
-                                <span>Local-first</span>
-                                <span>Recoverable</span>
-                                <span>Exportable</span>
+                                <span>Guest</span>
+                                <span>Email</span>
+                                <span>Google</span>
                             </div>
                         </div>
                         """
@@ -3545,40 +3625,28 @@ def _run_ui():
                         st.error(oauth_error)
                     if oauth_success:
                         st.success(oauth_success)
-                    st.html('<div class="mantis-auth-method-label">Recommended for first visit</div>')
+                    st.html('<div class="mantis-auth-method-label">Fast sign-in</div>')
+                    if google_ready and google_auth_url:
+                        safe_google_url = html.escape(google_auth_url, quote=True)
+                        st.html(
+                            f'<a class="mantis-auth-primary-link" href="{safe_google_url}" target="_self" rel="noopener">Continue with Google</a>',
+                        )
+                    else:
+                        if st.button("Continue with Google", use_container_width=True, key="auth_google_btn", disabled=True):
+                            pass
+                        st.info(
+                            f"{google_msg} Add MANTIS_GOOGLE_CLIENT_SECRET or google_client_secret "
+                            "in Streamlit Secrets, then redeploy."
+                        )
+                    st.html('<div class="mantis-auth-divider"></div>')
                     if st.button(
-                        "Start as guest",
+                        "Continue as guest",
                         use_container_width=True,
                         key="auth_continue_guest",
                         help="Enter MANTIS without creating an account. You can upgrade later.",
                     ):
                         _start_guest_session()
                         st.rerun()
-                    st.html(
-                        '<div class="mantis-auth-guest-note">You can create an account later when the project needs recovery or paid access.</div>'
-                    )
-                    st.html('<div class="mantis-auth-divider"></div>')
-                    st.html('<div class="mantis-auth-method-label">Provider sign-in</div>')
-                    social_cols = st.columns(2)
-                    with social_cols[0]:
-                        if google_ready and google_auth_url:
-                            st.link_button(
-                                "Continue with Google",
-                                google_auth_url,
-                                type="primary",
-                                use_container_width=True,
-                            )
-                        else:
-                            if st.button("Continue with Google", use_container_width=True, key="auth_google_btn", disabled=True):
-                                pass
-                            st.info(
-                                f"{google_msg} Add MANTIS_GOOGLE_CLIENT_SECRET or google_client_secret "
-                                "in Streamlit Secrets, then redeploy."
-                            )
-                    with social_cols[1]:
-                        if st.button("Continue with Microsoft", use_container_width=True, key="auth_microsoft_btn"):
-                            st.info("Microsoft login needs OAuth app registration before it can be enabled safely.")
-                    st.html('<div class="mantis-auth-provider-note">Provider accounts are matched by verified email so workspaces stay attached to the same identity.</div>')
                     st.html('<div class="mantis-auth-divider"></div>')
                     auth_tabs = st.tabs(["Sign in", "Create account", "Recover"])
 
@@ -7414,10 +7482,33 @@ def _run_ui():
         metric_cols[3].metric("Storage", "Local")
         st.caption(f"Stored at {kb_file}")
 
-        upload_cols = st.columns([1.2, 1])
-        with upload_cols[0]:
+        categories = stats.get("categories", {}) or {}
+        top_tags = stats.get("top_tags", []) or []
+        with st.container(border=True):
+            st.markdown("### Learning coverage")
+            coverage_cols = st.columns([1.2, 1])
+            with coverage_cols[0]:
+                if not categories:
+                    st.caption("No imported learning material yet.")
+                else:
+                    for category, count in sorted(categories.items(), key=lambda item: item[0]):
+                        st.progress(
+                            min(1.0, count / max(1, stats.get("chunks", 1))),
+                            text=f"{category.title()} - {count} chunk(s)",
+                        )
+            with coverage_cols[1]:
+                if top_tags:
+                    st.markdown("**Top tags**")
+                    st.caption(", ".join(f"{tag} ({count})" for tag, count in top_tags[:10]))
+                else:
+                    st.caption("Tags appear after import and classification.")
+
+        import_tab, search_tab, library_tab = st.tabs(["Import", "Search", "Library"])
+
+        with import_tab:
             with st.container(border=True):
                 st.markdown("### Import learning material")
+                st.caption("Use original summaries, craft notes, public-domain text, or licensed reference material.")
                 uploaded = st.file_uploader(
                     "Upload DOCX, TXT, or Markdown",
                     type=["docx", "txt", "md"],
@@ -7425,79 +7516,110 @@ def _run_ui():
                     help="Use public-domain excerpts or your own summaries/analysis for copyrighted works.",
                 )
                 if uploaded is not None:
+                    st.caption(f"Selected: {uploaded.name} ({len(uploaded.getvalue()):,} bytes)")
                     if st.button("Import to Knowledge Base", type="primary", use_container_width=True, key="knowledge_import"):
                         try:
                             text = extract_text_from_upload(uploaded.name, uploaded.getvalue())
                             result = import_knowledge_document(AppConfig.PROJECTS_DIR, uploaded.name, text)
+                            st.session_state["knowledge_last_import"] = result
                             st.success(
                                 f"Imported {result['chunks']} searchable chunk(s) from {uploaded.name}."
                             )
-                            st.session_state["knowledge_last_import"] = result
                             st.rerun()
                         except Exception as exc:
                             st.error(f"Import failed: {exc}")
-                st.info("MANTIS uses imported material as reference guidance. It should not copy source text into generated chapters.")
-        with upload_cols[1]:
+                last_import = st.session_state.get("knowledge_last_import")
+                if last_import:
+                    st.success(
+                        f"Last import: {last_import.get('chunks', 0)} chunks, "
+                        f"{int(last_import.get('chars', 0) or 0):,} characters."
+                    )
+                st.info("Knowledge Base guides generation and review. World Bible remains the source of story canon.")
+
+        with search_tab:
             with st.container(border=True):
-                st.markdown("### Category mix")
-                categories = stats.get("categories", {}) or {}
-                if not categories:
-                    st.caption("No imported learning material yet.")
-                else:
-                    for category, count in sorted(categories.items(), key=lambda item: item[0]):
-                        st.markdown(f"**{category.title()}**: {count}")
-                top_tags = stats.get("top_tags", []) or []
-                if top_tags:
-                    st.divider()
-                    st.markdown("**Top tags**")
-                    st.caption(", ".join(f"{tag} ({count})" for tag, count in top_tags[:8]))
+                st.markdown("### Search what MANTIS has learned")
+                filter_cols = st.columns([2, 1, 1, 0.7])
+                with filter_cols[0]:
+                    query = st.text_input(
+                        "Search Knowledge Base",
+                        placeholder="e.g., gothic atmosphere, mystery clues, free indirect discourse",
+                        key="knowledge_query",
+                    )
+                category_options = ["All"] + [cat.title() for cat in list_knowledge_categories(AppConfig.PROJECTS_DIR)]
+                source_options = ["All"] + list_knowledge_sources(AppConfig.PROJECTS_DIR)
+                with filter_cols[1]:
+                    selected_category = st.selectbox("Category", category_options, key="knowledge_category_filter")
+                with filter_cols[2]:
+                    selected_source = st.selectbox("Source", source_options, key="knowledge_source_filter")
+                with filter_cols[3]:
+                    result_limit = st.number_input("Results", min_value=3, max_value=20, value=8, step=1, key="knowledge_result_limit")
+                category_filter = "" if selected_category == "All" else selected_category.lower()
+                source_filter = "" if selected_source == "All" else selected_source
+                results = (
+                    search_knowledge_base(
+                        AppConfig.PROJECTS_DIR,
+                        query,
+                        limit=int(result_limit),
+                        category=category_filter,
+                        source=source_filter,
+                    )
+                    if query
+                    else []
+                )
+                if query and not results:
+                    st.warning("No matching reference chunks yet. Import more notes or try broader terms.")
+                p = st.session_state.get("project")
+                for idx, item in enumerate(results, start=1):
+                    with st.container(border=True):
+                        st.markdown(
+                            f"**{idx}. {item.get('category', 'reference').title()}** - "
+                            f"{item.get('source', 'Knowledge Base')} - score {item.get('score')}"
+                        )
+                        tags = ", ".join(item.get("tags", []) or []) or "none"
+                        st.caption(f"Tags: {tags}")
+                        st.write((item.get("text") or "")[:1600])
+                        if p:
+                            add_cols = st.columns(2)
+                            with add_cols[0]:
+                                if st.button("Send to Writing Guidance", key=f"kb_add_soft_{item.get('id')}", use_container_width=True):
+                                    addition = f"\n\nKnowledge Base guidance from {item.get('source', 'reference')}:\n{(item.get('text') or '')[:900]}"
+                                    p.memory_soft = ((p.memory_soft or "") + addition).strip()
+                                    persist_project(p, action="knowledge_to_guidance")
+                                    st.toast("Added to Writing Guidance.")
+                                    st.rerun()
+                            with add_cols[1]:
+                                if st.button("Send to Style Guide", key=f"kb_add_style_{item.get('id')}", use_container_width=True):
+                                    addition = f"\n\nKnowledge Base style reference from {item.get('source', 'reference')}:\n{(item.get('text') or '')[:900]}"
+                                    p.style_guide = ((p.style_guide or "") + addition).strip()
+                                    persist_project(p, action="knowledge_to_style")
+                                    st.toast("Added to Style Guide.")
+                                    st.rerun()
 
-        with st.container(border=True):
-            st.markdown("### Search what MANTIS has learned")
-            query = st.text_input(
-                "Search Knowledge Base",
-                placeholder="e.g., gothic atmosphere, mystery clues, free indirect discourse",
-                key="knowledge_query",
-            )
-            results = search_knowledge_base(AppConfig.PROJECTS_DIR, query, limit=8) if query else []
-            if query and not results:
-                st.warning("No matching reference chunks yet. Import more notes or try broader terms.")
-            for idx, item in enumerate(results, start=1):
-                with st.expander(
-                    f"{idx}. {item.get('category', 'reference').title()} | {item.get('source', 'Knowledge Base')} | score {item.get('score')}",
-                    expanded=idx == 1,
-                ):
-                    tags = ", ".join(item.get("tags", []) or []) or "none"
-                    st.caption(f"Tags: {tags}")
-                    st.write((item.get("text") or "")[:1600])
-                    p = st.session_state.get("project")
-                    if p:
-                        add_cols = st.columns(2)
-                        with add_cols[0]:
-                            if st.button("Add to Writing Guidance", key=f"kb_add_soft_{item.get('id')}", use_container_width=True):
-                                addition = f"\n\nKnowledge Base guidance from {item.get('source', 'reference')}:\n{(item.get('text') or '')[:900]}"
-                                p.memory_soft = ((p.memory_soft or "") + addition).strip()
-                                persist_project(p, action="knowledge_to_guidance")
-                                st.toast("Added to Writing Guidance.")
+        with library_tab:
+            with st.container(border=True):
+                st.markdown("### Imported documents")
+                data = load_knowledge_base(AppConfig.PROJECTS_DIR)
+                documents = data.get("documents", []) or []
+                if not documents:
+                    st.caption("No documents imported yet.")
+                for doc in documents[:20]:
+                    created = time.strftime("%Y-%m-%d %H:%M", time.localtime(float(doc.get("created_at", 0) or 0)))
+                    with st.expander(f"{doc.get('filename', 'Document')} - {doc.get('chunks', 0)} chunks", expanded=False):
+                        st.caption(f"{int(doc.get('chars', 0) or 0):,} chars | Imported {created}")
+                        category_counts = doc.get("category_counts", {}) or {}
+                        if category_counts:
+                            st.caption("Categories: " + ", ".join(f"{k} ({v})" for k, v in sorted(category_counts.items())))
+                        preview_chunks = get_document_chunks(AppConfig.PROJECTS_DIR, str(doc.get("id") or ""), limit=3)
+                        for chunk in preview_chunks:
+                            st.markdown(f"**{chunk.get('category', 'reference').title()}**")
+                            st.write((chunk.get("text") or "")[:500])
+                        if st.button("Delete document", key=f"knowledge_delete_{doc.get('id')}", use_container_width=True):
+                            if delete_knowledge_document(AppConfig.PROJECTS_DIR, str(doc.get("id") or "")):
+                                st.toast("Knowledge document deleted.")
                                 st.rerun()
-                        with add_cols[1]:
-                            if st.button("Add to Style Guide", key=f"kb_add_style_{item.get('id')}", use_container_width=True):
-                                addition = f"\n\nKnowledge Base style reference from {item.get('source', 'reference')}:\n{(item.get('text') or '')[:900]}"
-                                p.style_guide = ((p.style_guide or "") + addition).strip()
-                                persist_project(p, action="knowledge_to_style")
-                                st.toast("Added to Style Guide.")
-                                st.rerun()
-
-        with st.container(border=True):
-            st.markdown("### Imported documents")
-            data = load_knowledge_base(AppConfig.PROJECTS_DIR)
-            documents = data.get("documents", []) or []
-            if not documents:
-                st.caption("No documents imported yet.")
-            for doc in documents[:12]:
-                created = time.strftime("%Y-%m-%d %H:%M", time.localtime(float(doc.get("created_at", 0) or 0)))
-                st.markdown(f"**{doc.get('filename', 'Document')}**")
-                st.caption(f"{doc.get('chunks', 0)} chunks | {int(doc.get('chars', 0) or 0):,} chars | Imported {created}")
+                            else:
+                                st.error("Could not delete that document.")
 
     def render_memory():
         p = st.session_state.project

@@ -190,13 +190,14 @@ def cmd_visual(args: argparse.Namespace) -> int:
             page = context.new_page()
             try:
                 page.goto(base_url, wait_until="domcontentloaded", timeout=45000)
-                page.wait_for_timeout(2200)
+                page.wait_for_timeout(5500)
                 for slug, label in pages:
                     try:
                         btn = page.locator('section[data-testid="stSidebar"]').get_by_role("button", name=label).first
                         if btn.count() > 0 and btn.is_enabled():
                             btn.click(timeout=5000)
-                            page.wait_for_timeout(800)
+                            page.wait_for_timeout(1800)
+                        page.get_by_text(label, exact=False).first.wait_for(timeout=5000)
                         page.evaluate("window.scrollTo(0,0)")
                         out = out_dir / f"{key}_{slug}.png"
                         page.screenshot(path=str(out), full_page=True)

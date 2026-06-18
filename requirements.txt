@@ -12,3 +12,4 @@ pytz
 Pillow
 matplotlib
 tqdm
+playwright

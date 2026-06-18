@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Stability
+- Version bump: updated app metadata and docs to `137.1`.
+- Auth page overhaul: tightened the MANTIS entry screen around one primary Google path, guest access, email tabs, and a smaller professional hierarchy.
+- Google OAuth flow: replaced the provider button with a same-tab Google OAuth link so the hosted Streamlit session survives the sign-in round trip more reliably.
+- Knowledge Base overhaul: reorganized the learning page into Import, Search, and Library tabs with category/source filters, coverage metrics, chunk previews, and document deletion.
+- Coherence Apply Fix fallback: Apply Fix can now replace the best matching chapter passage when an exact excerpt is unavailable, while still explaining the match confidence before applying.
+- Light theme readability: hardened disabled textarea styling so Editor Summary and other read-only text sections remain visible in light mode.
+- Dark theme button contrast: hardened Streamlit's newer button variants so sidebar controls stay readable after light/dark theme changes.
+- Visual QA dependencies: added Playwright to the dependency list and documented the one-time Chromium install needed for screenshot regression.
+- QA evidence: installed Playwright Chromium and reran `scripts/toolbox.py visual --base-url http://localhost:8504` against a fresh Streamlit process with zero visual runner errors.
+- Version bump: updated app metadata and docs to `137.0`.
 - Launcher simulator: wired `/simulator` and `/simulate` to real local drills that save measurable lessons into launcher memory and feed them back into future launcher chat context.
 - Launcher dependencies: synced `requirements.txt` with the launcher runtime package list and added missing `python-docx` and `pypdf` installs for DOCX export/import and PDF upload support.
 - Knowledge Base learning layer: added a local DOCX/TXT/Markdown importer that chunks, classifies, tags, stores, and searches literary/craft reference material for MANTIS.

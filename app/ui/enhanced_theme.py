@@ -868,6 +868,120 @@ def inject_enhanced_theme(theme: Literal["Dark", "Light"] = "Dark", page_key: st
             -webkit-text-fill-color: #173626 !important;
             opacity: 1 !important;
         }
+        .stTextArea textarea:disabled,
+        .stTextArea textarea[disabled],
+        .stTextArea textarea[aria-disabled="true"] {
+            background: #f7faf8 !important;
+            background-color: #f7faf8 !important;
+            border-color: #7f998c !important;
+            color: #123426 !important;
+            -webkit-text-fill-color: #123426 !important;
+            opacity: 1 !important;
+        }
+        .stTextArea textarea:disabled::placeholder,
+        .stTextArea textarea[disabled]::placeholder {
+            color: #607467 !important;
+            -webkit-text-fill-color: #607467 !important;
+            opacity: 1 !important;
+        }
+        """
+    else:
+        final_theme_overrides = """
+        /* === Final Dark-Mode Button Enforcement Layer === */
+        .stButton > button,
+        .stFormSubmitButton > button,
+        .stLinkButton > a,
+        button[data-testid^="baseButton"],
+        button[data-testid^="stBaseButton"] {
+            background: linear-gradient(180deg, #0f1a15, #0b1411) !important;
+            background-color: #0d1713 !important;
+            border-color: #163f2a !important;
+            color: var(--mantis-text) !important;
+            -webkit-text-fill-color: var(--mantis-text) !important;
+            box-shadow: none !important;
+            opacity: 1 !important;
+        }
+
+        .stButton > button *,
+        .stFormSubmitButton > button *,
+        .stLinkButton > a *,
+        button[data-testid^="baseButton"] *,
+        button[data-testid^="stBaseButton"] * {
+            color: var(--mantis-text) !important;
+            -webkit-text-fill-color: var(--mantis-text) !important;
+        }
+
+        .stButton > button:hover,
+        .stFormSubmitButton > button:hover,
+        .stLinkButton > a:hover,
+        button[data-testid^="baseButton"]:hover,
+        button[data-testid^="stBaseButton"]:hover {
+            background: linear-gradient(180deg, #12231b, #0d1b15) !important;
+            background-color: #102019 !important;
+            border-color: var(--mantis-accent) !important;
+            color: #f2fff8 !important;
+            -webkit-text-fill-color: #f2fff8 !important;
+        }
+
+        .stButton > button[kind="primary"],
+        .stFormSubmitButton > button[kind="primary"],
+        .stButton > button[data-testid="baseButton-primary"],
+        button[data-testid="stBaseButton-primary"] {
+            background: linear-gradient(135deg, #18a84f, #159447) !important;
+            border-color: #1fc45f !important;
+            color: #ffffff !important;
+            -webkit-text-fill-color: #ffffff !important;
+            box-shadow: var(--mantis-shadow-button);
+        }
+
+        .stButton > button[kind="primary"] *,
+        .stFormSubmitButton > button[kind="primary"] *,
+        .stButton > button[data-testid="baseButton-primary"] *,
+        button[data-testid="stBaseButton-primary"] * {
+            color: #ffffff !important;
+            -webkit-text-fill-color: #ffffff !important;
+        }
+
+        .stButton > button:disabled,
+        .stFormSubmitButton > button:disabled,
+        .stButton > button[disabled],
+        .stFormSubmitButton > button[disabled],
+        .stButton > button[aria-disabled="true"],
+        .stFormSubmitButton > button[aria-disabled="true"],
+        button[data-testid^="baseButton"]:disabled,
+        button[data-testid^="stBaseButton"]:disabled,
+        button[data-testid^="baseButton"][disabled],
+        button[data-testid^="stBaseButton"][disabled] {
+            background: #111820 !important;
+            background-color: #111820 !important;
+            background-image: none !important;
+            border-color: #283244 !important;
+            color: #9aabbd !important;
+            -webkit-text-fill-color: #9aabbd !important;
+            box-shadow: none !important;
+            opacity: 1 !important;
+        }
+
+        .stButton > button:disabled *,
+        .stFormSubmitButton > button:disabled *,
+        .stButton > button[disabled] *,
+        .stFormSubmitButton > button[disabled] *,
+        .stButton > button[aria-disabled="true"] *,
+        .stFormSubmitButton > button[aria-disabled="true"] * {
+            color: #9aabbd !important;
+            -webkit-text-fill-color: #9aabbd !important;
+            fill: #9aabbd !important;
+        }
+        .stTextArea textarea:disabled,
+        .stTextArea textarea[disabled],
+        .stTextArea textarea[aria-disabled="true"] {
+            background: #0b1216 !important;
+            background-color: #0b1216 !important;
+            border-color: #166534 !important;
+            color: #ecfdf5 !important;
+            -webkit-text-fill-color: #ecfdf5 !important;
+            opacity: 1 !important;
+        }
         """
     
     st.html(

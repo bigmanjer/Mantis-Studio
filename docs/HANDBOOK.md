@@ -35,6 +35,13 @@ python scripts/toolbox.py visual --base-url http://localhost:8501
 python scripts/toolbox.py qa --with-visual
 ```
 
+Visual checks require the Playwright Chromium browser. After dependency install,
+run this once on the machine:
+
+```bash
+python -m playwright install chromium
+```
+
 Canonical pytest target:
 
 ```bash
