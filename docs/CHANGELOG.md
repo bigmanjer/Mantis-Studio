@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Stability
+- Version bump: updated app metadata and docs to `137.2`.
+- Auth simplification: reduced the sign-in page to a cleaner MANTIS-branded entry flow with Google first, guest second, and email as a compact backup path.
+- Auth focus: removed the full site footer from the auth gate so first-time users are not dropped into extra navigation before entering the app.
+- Launcher hardening: fixed the broken batch banner parse path and verified the launcher can detect an existing local runtime on `127.0.0.1:8501`.
+- QA evidence: reran compile checks, targeted auth/launcher tests, the launcher smoke path, and browser verification against the local Streamlit runtime.
 - Version bump: updated app metadata and docs to `137.1`.
 - Auth page overhaul: tightened the MANTIS entry screen around one primary Google path, guest access, email tabs, and a smaller professional hierarchy.
 - Google OAuth flow: replaced the provider button with a same-tab Google OAuth link so the hosted Streamlit session survives the sign-in round trip more reliably.

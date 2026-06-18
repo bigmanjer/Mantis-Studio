@@ -118,7 +118,7 @@ The audit runner writes:
 
 ## Versioning
 
-Current version: `137.1`.
+Current version: `137.2`.
 
 Current version is stored in [VERSION.txt](VERSION.txt).
 

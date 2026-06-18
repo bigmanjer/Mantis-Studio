@@ -9,7 +9,6 @@ cd /d "%~dp0"
 :: CONFIG
 :: ============================================================== 
 set "PROGRESS_STEPS=10"
-set "BLOCK=█"
 set "BLOCK=#"
 set "LOG_RETENTION_DAYS=7"
 set "SERVER_PORT=8501"
@@ -30,6 +29,12 @@ set "CLR_CHAT=0A"
 :: POWERSHELL
 :: ============================================================== 
 where powershell >nul 2>&1 && (set "HAVE_PS=1") || (set "HAVE_PS=0")
+for /F "tokens=1,2 delims=#" %%A in ('"prompt #$H#$E# & echo on & for %%B in (1) do rem"') do set "ESC=%%B"
+set "C_OK=%ESC%[92m"
+set "C_WARN=%ESC%[93m"
+set "C_ERR=%ESC%[91m"
+set "C_CHAT=%ESC%[96m"
+set "C_RESET=%ESC%[0m"
 
 :: ============================================================== 
 :: TIMESTAMP
@@ -58,10 +63,12 @@ for %%P in ("python" "py -3" "py") do (
   )
 )
 
+if /i "%~1"=="--self-test" goto self_test
+
 if not defined PYTHON_CMD (
-  color %CLR_ERR%
+  rem color handled by ANSI line output
   echo.
-  echo [FAIL] PYTHON NOT FOUND.
+  call :say_err "[FAIL] PYTHON NOT FOUND."
   echo.
   pause
   exit /b 1
@@ -78,9 +85,9 @@ for %%F in (
 )
 
 if not defined APP_FILE (
-  color %CLR_ERR%
+  rem color handled by ANSI line output
   echo.
-  echo [FAIL] NO MANTIS APP FILE FOUND.
+  call :say_err "[FAIL] NO MANTIS APP FILE FOUND."
   echo.
   pause
   exit /b 1
@@ -90,39 +97,39 @@ if not defined APP_FILE (
 :: LAUNCH
 :: ============================================================== 
 cls
-color %CLR_WARN%
+rem color handled by ANSI line output
 call :banner
-color %CLR_WARN%
-
+rem color handled by ANSI line output
 echo.
-echo   AWAKENING MANTIS NEURAL INTERFACE...
+call :say_warn "  AWAKENING MANTIS NEURAL INTERFACE..."
 call :sleep 140
 echo.
 
-echo   SYNCHRONIZING CORE FREQUENCIES...
+call :say_warn "  SYNCHRONIZING CORE FREQUENCIES..."
 echo.
 call :progress_bar_fast
-color %CLR_OK%
-echo   CORE FREQUENCIES SYNCHRONIZED.
+rem color handled by ANSI line output
+call :say_ok "  CORE FREQUENCIES SYNCHRONIZED."
 call :sleep 450
-color %CLR_WARN%
+rem color handled by ANSI line output
 echo.
 
-echo   ESTABLISHING SECURE RUNTIME CHANNEL...
+call :say_warn "  ESTABLISHING SECURE RUNTIME CHANNEL..."
 echo.
 call :progress_bar_fast
-color %CLR_OK%
-echo   RUNTIME CHANNEL STAGED.
+rem color handled by ANSI line output
+call :say_ok "  RUNTIME CHANNEL STAGED."
 call :sleep 450
-color %CLR_WARN%
+rem color handled by ANSI line output
 echo.
 cls
-color %CLR_WARN%
+rem color handled by ANSI line output
 call :banner
-color %CLR_WARN%
+rem color handled by ANSI line output
 echo.
-echo VERIFYING DEPENDENCIES...
+call :say_warn "VERIFYING DEPENDENCIES..."
 echo.
+set "INSTALLED_DEPENDENCY=0"
 
 for %%D in (
   streamlit
@@ -141,110 +148,107 @@ for %%D in (
   tqdm
   playwright
 ) do (
-  color %CLR_WARN%
-  echo CHECKING %%D...
   %PYTHON_CMD% -m pip show %%D >nul 2>&1
   if errorlevel 1 (
-    color %CLR_WARN%
-    echo   INSTALLING %%D...
+    set "INSTALLED_DEPENDENCY=1"
+    rem color handled by ANSI line output
+    call :say_warn "  INSTALLING %%D..."
     echo.
     call :progress_bar_fast
     %PYTHON_CMD% -m pip install %%D --quiet >>"%LOG_FILE%" 2>&1
     if errorlevel 1 (
-      color %CLR_ERR%
+      rem color handled by ANSI line output
       echo.
-      echo [FAIL] COULD NOT INSTALL %%D.
-      echo Check "%LOG_FILE%" for details.
+      call :say_err "[FAIL] COULD NOT INSTALL %%D."
+      call :say_err "Check %LOG_FILE% for details."
       echo.
       pause
       exit /b 1
     )
-    color %CLR_OK%
-    echo   OK: %%D
-    echo.
-    call :sleep 90
-  ) else (
-    color %CLR_OK%
-    echo   OK: %%D
+    rem color handled by ANSI line output
+    call :say_ok "  INSTALLED: %%D"
     echo.
     call :sleep 90
   )
 )
 
 echo.
-color %CLR_OK%
-echo DEPENDENCIES ARE GOOD!
+rem color handled by ANSI line output
+if "%INSTALLED_DEPENDENCY%"=="1" (
+  call :say_ok "DEPENDENCIES UPDATED AND READY"
+) else (
+  call :say_ok "DEPENDENCIES ARE GOOD"
+)
 call :sleep 1500
 
 :: ---- QUIET AI PROBE ----
 set "AI_READY=1"
-color %CLR_WARN%
+rem color handled by ANSI line output
 call :banner
-color %CLR_WARN%
+rem color handled by ANSI line output
 echo.
-color %CLR_WARN%
-echo   INITIALIZING NEURAL NETWORK...
+rem color handled by ANSI line output
+call :say_warn "  INITIALIZING NEURAL NETWORK..."
 echo.
 call :progress_bar_neural
 
 echo.
-color %CLR_OK%
-echo NEURAL NETWORK ONLINE!
+rem color handled by ANSI line output
+call :say_ok "NEURAL NETWORK ONLINE"
 call :sleep 450
-color %CLR_WARN%
+rem color handled by ANSI line output
 echo.
-echo CONNECTING TO NEURAL NETWORK...
+call :say_warn "CONNECTING TO NEURAL NETWORK..."
 echo.
 call :progress_bar_neural
 
 echo.
-color %CLR_OK%
-echo CONNECTED!
+rem color handled by ANSI line output
+call :say_ok "CONNECTED"
 call :sleep 650
-color %CLR_WARN%
-
+rem color handled by ANSI line output
 if "%AI_READY%"=="1" (
-  color %CLR_AI%
+  rem color handled by ANSI line output
   call :banner
-  color %CLR_AI%
+  rem color handled by ANSI line output
   echo.
-  echo ================================
-  echo   MANTIS A.I. ONLINE
-  echo ================================
+  call :say_ok "================================"
+  call :say_ok "  MANTIS A.I. ONLINE"
+  call :say_ok "================================"
 ) else (
-  color %CLR_ERR%
+  rem color handled by ANSI line output
   call :banner
-  color %CLR_ERR%
+  rem color handled by ANSI line output
   echo.
   echo.
-  echo AI CORE OFFLINE - SAFE MODE
+  call :say_err "AI CORE OFFLINE - SAFE MODE"
   echo.
 )
 call :sleep 120
 
-color %CLR_WARN%
+rem color handled by ANSI line output
 echo.
-echo   STARTING MANTIS LOCAL SERVER...
+call :say_warn "  STARTING MANTIS LOCAL SERVER..."
 call :start_mantis_server
 call :wait_for_server
 if errorlevel 1 (
-  color %CLR_ERR%
+  rem color handled by ANSI line output
   echo.
   echo.
-  echo [FAIL] MANTIS STUDIO DID NOT ANSWER ON %APP_URL%.
-  echo Check "%STREAMLIT_LOG_FILE%" for details.
+  call :say_err "[FAIL] MANTIS STUDIO DID NOT ANSWER ON %APP_URL%."
+  call :say_err "Check %STREAMLIT_LOG_FILE% for details."
   echo.
   if "%HAVE_PS%"=="1" (
     echo.
-    echo Recent runtime log:
+    call :say_err "Recent runtime log:"
     powershell -NoProfile -Command "if (Test-Path '%STREAMLIT_LOG_FILE%') { Get-Content '%STREAMLIT_LOG_FILE%' -Tail 12 }"
   )
   pause
   exit /b 1
 )
-color %CLR_OK%
+rem color handled by ANSI line output
 echo.
-echo   RUNTIME VERIFIED: %APP_URL%
+call :say_ok "  RUNTIME VERIFIED: %APP_URL%"
 call :sleep 650
 start "" "%APP_URL%"
 call :mantis_chat
@@ -255,13 +259,12 @@ exit /b
 :: HELPERS
 :: ============================================================== 
 :progress_bar_fast
-if "%HAVE_PS%"=="1" (
-  powershell -NoProfile -Command "$full=[string][char]0x2588; $empty=[string][char]0x2591; for($i=1; $i -le %PROGRESS_STEPS%; $i++){ $bar=($full * $i) + ($empty * (%PROGRESS_STEPS% - $i)); [Console]::Write([char]13 + '   [' + $bar + ']'); Start-Sleep -Milliseconds 80 }; Write-Host ''"
+if defined PYTHON_CMD if exist "scripts\mantis_progress.py" (
+  %PYTHON_CMD% "scripts\mantis_progress.py" --steps %PROGRESS_STEPS% --delay 80
   exit /b
 )
 setlocal EnableDelayedExpansion
 for /f %%a in ('copy /Z "%~dpf0" nul') do set "CR=%%a"
-set "spaces=░░░░░░░░░░"
 set "spaces=----------"
 set "bar="
 for /L %%i in (1,1,%PROGRESS_STEPS%) do (
@@ -274,13 +277,12 @@ echo.
 endlocal & exit /b
 
 :progress_bar_neural
-if "%HAVE_PS%"=="1" (
-  powershell -NoProfile -Command "$full=[string][char]0x2588; $empty=[string][char]0x2591; for($i=1; $i -le %PROGRESS_STEPS%; $i++){ $bar=($full * $i) + ($empty * (%PROGRESS_STEPS% - $i)); [Console]::Write([char]13 + '   [' + $bar + ']'); Start-Sleep -Milliseconds 220 }; Write-Host ''"
+if defined PYTHON_CMD if exist "scripts\mantis_progress.py" (
+  %PYTHON_CMD% "scripts\mantis_progress.py" --steps %PROGRESS_STEPS% --delay 220
   exit /b
 )
 setlocal EnableDelayedExpansion
 for /f %%a in ('copy /Z "%~dpf0" nul') do set "CR=%%a"
-set "spaces=░░░░░░░░░░"
 set "spaces=----------"
 set "bar="
 for /L %%i in (1,1,%PROGRESS_STEPS%) do (
@@ -301,7 +303,7 @@ if "%HAVE_PS%"=="1" (
 exit /b
 
 :wait_for_server
-color %CLR_WARN%
+rem color handled by ANSI line output
 echo.
 echo   VERIFYING LOCAL RUNTIME...
 for /L %%i in (1,1,90) do (
@@ -325,7 +327,7 @@ exit /b 1
 if "%HAVE_PS%"=="1" (
   powershell -NoProfile -Command "try { $r = Invoke-WebRequest -UseBasicParsing -Uri '%HEALTH_URL%' -TimeoutSec 2; if ($r.StatusCode -ge 200 -and $r.StatusCode -lt 500) { exit 0 } } catch { exit 1 }" >nul 2>&1
   if not errorlevel 1 (
-    color %CLR_OK%
+    rem color handled by ANSI line output
     echo.
     echo   EXISTING MANTIS RUNTIME DETECTED ON %APP_URL%.
     echo.
@@ -334,7 +336,7 @@ if "%HAVE_PS%"=="1" (
 ) else (
   netstat -ano | findstr ":%SERVER_PORT%" >nul
   if not errorlevel 1 (
-    color %CLR_OK%
+    rem color handled by ANSI line output
     echo.
     echo   EXISTING MANTIS RUNTIME DETECTED ON %APP_URL%.
     echo.
@@ -349,19 +351,19 @@ if "%HAVE_PS%"=="1" (
 exit /b
 
 :mantis_chat
-color %CLR_CHAT%
+rem color handled by ANSI line output
 set "MANTIS_CHATBOT=scripts\mantis_launcher_chat.py"
 if exist "%MANTIS_CHATBOT%" (
   %PYTHON_CMD% "%MANTIS_CHATBOT%" --url "%APP_URL%" --port "%SERVER_PORT%" --log-file "%STREAMLIT_LOG_FILE%" --chat-log-file "%CHAT_LOG_FILE%" --repo-root "%CD%" --handoff
   if not errorlevel 1 exit /b
-  color %CLR_ERR%
+  rem color handled by ANSI line output
   echo MANTIS PYTHON CHAT FAILED TO START. FALLING BACK TO BASIC LAUNCHER CHAT.>>"%CHAT_LOG_FILE%"
   echo.
   echo MANTIS PYTHON CHAT FAILED TO START. FALLING BACK TO BASIC LAUNCHER CHAT.
   echo.
   pause
 )
-color %CLR_ERR%
+rem color handled by ANSI line output
 echo.
 echo   [RUNTIME ] %APP_URL%
 echo   [HELP    ] TYPE /help FOR COMMANDS. EVERYTHING ELSE IS CONVERSATION.
@@ -408,29 +410,23 @@ echo.
 goto mantis_chat_loop
 
 :mantis_status
-color %CLR_WARN%
-echo   MANTIS ^> CHECKING LOCALHOST:%SERVER_PORT%...
+call :say_warn "  MANTIS - CHECKING LOCALHOST:%SERVER_PORT%..."
 if "%HAVE_PS%"=="1" (
   powershell -NoProfile -Command "if (Test-NetConnection -ComputerName 'localhost' -Port %SERVER_PORT% -InformationLevel Quiet) { exit 0 } else { exit 1 }" >nul 2>&1
   if errorlevel 1 (
-    color %CLR_ERR%
-    echo   MANTIS ^> I CANNOT SEE THE SERVER YET. TRY /restart, OR CHECK /logs.
+    call :say_err "  MANTIS - I CANNOT SEE THE SERVER YET. TRY /restart, OR CHECK /logs."
   ) else (
-    color %CLR_OK%
-    echo   MANTIS ^> RUNTIME CHANNEL IS ONLINE.
+    call :say_ok "  MANTIS - RUNTIME CHANNEL IS ONLINE."
   )
 ) else (
   netstat -ano | findstr ":%SERVER_PORT%" >nul
   if errorlevel 1 (
-    color %CLR_ERR%
-    echo   MANTIS ^> I CANNOT SEE THE SERVER YET. TRY /restart, OR CHECK /logs.
+    call :say_err "  MANTIS - I CANNOT SEE THE SERVER YET. TRY /restart, OR CHECK /logs."
   ) else (
-    color %CLR_OK%
-    echo   MANTIS ^> RUNTIME CHANNEL IS ONLINE.
+    call :say_ok "  MANTIS - RUNTIME CHANNEL IS ONLINE."
   )
 )
 echo.
-color %CLR_CHAT%
 goto mantis_chat_loop
 
 :mantis_log
@@ -467,20 +463,45 @@ exit /b
 :: BANNER
 :: ============================================================== 
 
+:say_ok
+echo(%C_OK%%~1%C_RESET%
+exit /b
+
+:say_warn
+echo(%C_WARN%%~1%C_RESET%
+exit /b
+
+:say_err
+echo(%C_ERR%%~1%C_RESET%
+exit /b
+
+:say_chat
+echo(%C_CHAT%%~1%C_RESET%
+exit /b
+
+:self_test
+cls
+call :banner
+echo.
+call :say_warn "  SELF TEST - FAST BAR"
+call :progress_bar_fast
+echo.
+call :say_warn "  SELF TEST - NEURAL BAR"
+call :progress_bar_neural
+echo.
+call :say_ok "  SELF TEST OK"
+exit /b 0
+
 :banner
 cls
 color %CLR_OK%
+if defined PYTHON_CMD if exist "scripts\mantis_banner.py" (
+  %PYTHON_CMD% "scripts\mantis_banner.py"
+  exit /b
+)
 echo.
-echo  ╔═══════════════════════════════════════════════════════════════╗
-echo  ║                                                               ║
-echo  ║       ███╗   ███╗ █████╗ ███╗   ██╗████████╗██╗███████╗       ║
-echo  ║       ████╗ ████║██╔══██╗████╗  ██║╚══██╔══╝██║██╔════╝       ║
-echo  ║       ██ ████ ██║███████║██ ██╗ ██║   ██║   ██║██║            ║
-echo  ║       ██╔████╔██║███████║██╔╗██ ██║   ██║   ██║███████╗       ║
-echo  ║       ██║╚██╔╝██║██╔══██║██║╚██╗██║   ██║   ██║╚════██║       ║
-echo  ║       ██║ ╚═╝ ██║██║  ██║██║ ╚████║   ██║   ██║     ██║       ║
-echo  ║       ██║     ██║██║  ██║██║  ████║   ██║   ██║███████║       ║
-echo  ║       ╚═╝     ╚═╝╚═╝  ╚═╝╚═╝  ╚═══╝   ╚═╝   ╚═╝╚══════╝       ║
-echo  ║         MODULAR AI NARRATIVE TEXT INTELLIGENCE SYSTEM         ║
-echo  ╚═══════════════════════════════════════════════════════════════╝
+echo  +---------------------------------------------------------------+
+echo          MANTIS
+echo          MODULAR AI NARRATIVE TEXT INTELLIGENCE SYSTEM
+echo  +---------------------------------------------------------------+
 exit /b

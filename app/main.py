@@ -3059,7 +3059,10 @@ def _run_ui():
 
     def _release_highlights() -> List[tuple[str, str]]:
         return [
-            ("Access", "Sign-in is now a cleaner MANTIS-themed entry page with one primary Google path, guest access, and compact email recovery."),
+            ("Access", "Sign-in is simpler: one clear Google action, one guest fallback, and email options without the extra selector clutter."),
+            ("Access", "The full app footer no longer appears on the auth gate, reducing scroll and keeping first entry focused."),
+            ("Launcher", "The local launcher now verifies the existing 127.0.0.1 runtime cleanly and avoids the broken decorative batch banner parse path."),
+            ("QA", "Auth, launcher, compile, and browser checks were rerun against the local Streamlit runtime before release."),
             ("Knowledge Base", "Knowledge Base now has Import, Search, and Library tabs with filters, document previews, and document delete controls."),
             ("Apply Fix", "Coherence fixes can now use the best matching chapter passage instead of stopping when the exact excerpt is not found."),
             ("Theme Polish", "Editor summary text and disabled text areas now stay readable in light mode and dark mode."),
@@ -3347,20 +3350,20 @@ def _run_ui():
                 padding: 0.2rem 0 1rem;
             }
             .mantis-auth-hero {
-                padding: 1.15rem 1rem 1rem;
+                padding: 1rem;
                 display: flex;
                 flex-direction: column;
                 justify-content: space-between;
-                gap: 1rem;
-                min-height: 590px;
+                gap: 0.9rem;
+                min-height: 420px;
             }
             .mantis-auth-logo {
-                width: min(360px, 90%);
-                max-height: 108px;
+                width: min(330px, 92%);
+                max-height: 96px;
                 object-fit: contain;
                 object-position: left center;
                 display: block;
-                margin-bottom: 1.05rem;
+                margin-bottom: 1rem;
             }
             .mantis-auth-wordmark {
                 font-size: 1.25rem;
@@ -3375,24 +3378,24 @@ def _run_ui():
                 margin-bottom: 0.5rem;
             }
             .mantis-auth-title {
-                font-size: 1.95rem;
+                font-size: 1.75rem;
                 line-height: 1.12;
-                margin: 0 0 0.65rem 0;
+                margin: 0 0 0.55rem 0;
                 font-weight: 800;
-                max-width: 22ch;
+                max-width: 18ch;
             }
             .mantis-auth-sub {
                 color: var(--mantis-muted);
-                margin-bottom: 0.9rem;
-                max-width: 58ch;
-                font-size: 1rem;
+                margin-bottom: 0.75rem;
+                max-width: 44ch;
+                font-size: 0.95rem;
                 line-height: 1.58;
             }
             .mantis-auth-command {
                 border: 1px solid var(--mantis-card-border);
                 border-radius: 8px;
-                padding: 0.8rem 0.85rem;
-                margin: 0.85rem 0 0.95rem;
+                padding: 0.75rem 0.8rem;
+                margin: 0.75rem 0 0;
                 background: color-mix(in srgb, var(--mantis-primary) 7%, transparent);
             }
             .mantis-auth-command strong {
@@ -3430,10 +3433,11 @@ def _run_ui():
                 line-height: 1.35;
             }
             .mantis-auth-paths {
+                color: var(--mantis-muted);
+                font-size: 0.84rem;
+                line-height: 1.45;
                 border-top: 1px solid var(--mantis-card-border);
-                padding-top: 0.9rem;
-                display: grid;
-                gap: 0.65rem;
+                padding-top: 0.8rem;
             }
             .mantis-auth-path {
                 display: grid;
@@ -3464,12 +3468,12 @@ def _run_ui():
                 padding-top: 0.75rem;
             }
             .mantis-auth-panel {
-                padding: 0.9rem 0.2rem 0.65rem;
+                padding: 0.9rem 0.2rem 0.35rem;
             }
             .mantis-auth-panel h3 {
                 margin-top: 0;
                 margin-bottom: 0.35rem;
-                font-size: 1.65rem;
+                font-size: 1.5rem;
                 line-height: 1.14;
             }
             .mantis-auth-primary-link {
@@ -3497,7 +3501,7 @@ def _run_ui():
                 margin: 0.75rem 0 0.45rem;
             }
             .mantis-auth-method-label {
-                margin: 1rem 0 0.35rem;
+                margin: 0.65rem 0 0.35rem;
                 color: var(--mantis-muted);
                 font-size: 0.86rem;
                 text-transform: uppercase;
@@ -3522,14 +3526,11 @@ def _run_ui():
                 line-height: 1.45;
             }
             .mantis-auth-divider {
-                margin: 0.95rem 0 0.35rem;
+                margin: 0.8rem 0 0.35rem;
                 border-top: 1px solid var(--mantis-card-border);
             }
             .mantis-auth-trust-row {
-                display: grid;
-                grid-template-columns: repeat(3, minmax(0, 1fr));
-                gap: 0.55rem;
-                margin: 0.85rem 0 0.2rem;
+                display: none;
             }
             .mantis-auth-trust-row span {
                 border: 1px solid var(--mantis-card-border);
@@ -3544,7 +3545,7 @@ def _run_ui():
                     min-height: auto;
                 }
                 .mantis-auth-title {
-                    font-size: 1.9rem;
+                    font-size: 1.6rem;
                     max-width: none;
                 }
                 .mantis-auth-signal-strip,
@@ -3578,23 +3579,15 @@ def _run_ui():
                             <div>
                                 {auth_lockup_img}
                                 <div class="mantis-auth-kicker">MANTIS Studio</div>
-                                <h2 class="mantis-auth-title">Let your imagination write with you.</h2>
-                                <div class="mantis-auth-sub">A focused workspace for drafting chapters, building story knowledge, and checking continuity before details drift.</div>
+                                <h2 class="mantis-auth-title">Write faster. Keep canon clean.</h2>
+                                <div class="mantis-auth-sub">A focused workspace for drafting chapters, tracking story knowledge, and catching continuity issues before they spread.</div>
                                 <div class="mantis-auth-command">
-                                    <strong>No account required to try it.</strong>
-                                    <span>Use guest mode for a quick session. Sign in when you want recovery, separated workspaces, and future subscription access.</span>
-                                </div>
-                                <div class="mantis-auth-signal-strip">
-                                    <div class="mantis-auth-signal"><strong>Plan</strong><span>Outline and chapter beats.</span></div>
-                                    <div class="mantis-auth-signal"><strong>Draft</strong><span>Write with AI support.</span></div>
-                                    <div class="mantis-auth-signal"><strong>Check</strong><span>Review canon risk.</span></div>
+                                    <strong>Try it without an account.</strong>
+                                    <span>Guest mode starts immediately. Sign in when you want recovery and account-based workspaces.</span>
                                 </div>
                             </div>
                             <div class="mantis-auth-paths">
-                                <div class="mantis-auth-path"><strong>Guest</strong><span>Fastest way in.</span></div>
-                                <div class="mantis-auth-path"><strong>Account</strong><span>Recovery and separated projects.</span></div>
-                                <div class="mantis-auth-path"><strong>Paid access</strong><span>Ready for billing when connected.</span></div>
-                                <div class="mantis-auth-footnote">MANTIS means Modular AI Narrative Text Intelligence System.</div>
+                                Plan your outline, draft chapters, review canon, and export from one workspace.
                             </div>
                         </div>
                         """
@@ -3608,13 +3601,8 @@ def _run_ui():
                         <div class="mantis-auth-panel">
                             <div>
                                 <div class="mantis-auth-kicker">Access</div>
-                                <h3>Choose how to enter</h3>
-                                <div class="mantis-auth-sub">Use one path now. You can connect more later from User Settings.</div>
-                            </div>
-                            <div class="mantis-auth-trust-row">
-                                <span>Guest</span>
-                                <span>Email</span>
-                                <span>Google</span>
+                                <h3>Sign in to MANTIS</h3>
+                                <div class="mantis-auth-sub">Continue with Google, enter as a guest, or use email.</div>
                             </div>
                         </div>
                         """
@@ -3625,7 +3613,6 @@ def _run_ui():
                         st.error(oauth_error)
                     if oauth_success:
                         st.success(oauth_success)
-                    st.html('<div class="mantis-auth-method-label">Fast sign-in</div>')
                     if google_ready and google_auth_url:
                         safe_google_url = html.escape(google_auth_url, quote=True)
                         st.html(
@@ -3648,10 +3635,10 @@ def _run_ui():
                         _start_guest_session()
                         st.rerun()
                     st.html('<div class="mantis-auth-divider"></div>')
+                    st.html('<div class="mantis-auth-method-label">Email</div>')
                     auth_tabs = st.tabs(["Sign in", "Create account", "Recover"])
 
                     with auth_tabs[0]:
-                        st.html('<div class="mantis-auth-form-note">Return to a saved workspace with your email and password.</div>')
                         with st.form("auth_login_form", clear_on_submit=False):
                             login_email = st.text_input("Email", key="auth_login_email")
                             login_password = st.text_input("Password", type="password", key="auth_login_password")
@@ -3680,9 +3667,7 @@ def _run_ui():
                                 st.rerun()
 
                     with auth_tabs[1]:
-                        st.html(
-                            '<div class="mantis-auth-form-note">Create a local MANTIS identity. Passwords need 10+ characters with uppercase, lowercase, and a number.</div>'
-                        )
+                        st.html('<div class="mantis-auth-form-note">Password needs 10+ characters with uppercase, lowercase, and a number.</div>')
                         with st.form("auth_signup_form", clear_on_submit=False):
                             signup_email = st.text_input("Email", key="auth_signup_email")
                             signup_display_name = st.text_input("Display name", key="auth_signup_display_name")
@@ -3819,7 +3804,6 @@ def _run_ui():
                                                 st.success(msg)
                                         else:
                                             st.error(msg)
-            render_footer(AppConfig.VERSION)
         return False
 
     if not _render_auth_gate():
