@@ -6,8 +6,10 @@ __pycache__/
 logs/
 .codex_streamlit_*.log
 artifacts/
-projects/
+projects/*
 !projects/.gitkeep
+!projects/.backups/
+projects/.backups/*
 !projects/.backups/.gitkeep
 
 # Test coverage

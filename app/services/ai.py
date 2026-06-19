@@ -10,6 +10,7 @@ from typing import Any, Dict, List, Optional
 import requests
 
 from app.config.settings import AppConfig, load_app_config, logger
+from app.services.knowledge_base import build_knowledge_context, build_style_lens_context
 from app.services.projects import Project
 
 
@@ -374,6 +375,8 @@ class StoryEngine:
         if match:
             specific_beat = match.group(1).strip()
             outline_context = f"{outline_context}\n\nCURRENT CHAPTER OBJECTIVE: {specific_beat}"
+        else:
+            specific_beat = ""
 
         prev_chaps = [c for c in project.get_ordered_chapters() if c.index < chapter_index]
         story_so_far = ""
@@ -388,6 +391,50 @@ class StoryEngine:
             story_so_far = "\n".join(story_parts) + "\n"
             prev_text = f"\nIMMEDIATELY PRECEDING SCENE:\n{(prev_chaps[-1].content or '')[-1500:]}\n"
 
+        knowledge_query = " ".join(
+            part
+            for part in [
+                project.title,
+                project.genre,
+                specific_beat,
+                style_guide,
+                soft_guidelines,
+            ]
+            if part
+        )
+        knowledge_context = build_knowledge_context(AppConfig.PROJECTS_DIR, knowledge_query, limit=3)
+        knowledge_block = (
+            "LITERARY KNOWLEDGE BASE GUIDANCE (reference only; do not copy text):\n"
+            f"{knowledge_context[:2600]}\n\n"
+            if knowledge_context
+            else ""
+        )
+        style_lens_context = build_style_lens_context(
+            AppConfig.PROJECTS_DIR,
+            getattr(project, "selected_style_lenses", []) or [],
+            project_goal=knowledge_query,
+            limit_per_author=2,
+        )
+        lens_settings = getattr(project, "style_lens_settings", {}) or {}
+        lens_setting_labels = {
+            "pace": "Pacing intensity",
+            "interiority": "Interior character depth",
+            "imagery": "Imagery density",
+            "dialogue": "Dialogue energy",
+            "atmosphere": "Atmosphere",
+        }
+        lens_settings_text = "\n".join(
+            f"- {lens_setting_labels.get(key, key.title())}: {int(value)}/10"
+            for key, value in lens_settings.items()
+        )
+        style_lens_block = (
+            "AUTHOR & STYLE LENS (craft traits only; original prose required):\n"
+            f"{style_lens_context[:2200]}\n"
+            f"{('Craft control sliders:\n' + lens_settings_text) if lens_settings_text else ''}\n\n"
+            if style_lens_context
+            else ""
+        )
+
         prompt = (
             f"TITLE: {project.title}\nGENRE: {project.genre}\n"
             f"{hard_block}"
@@ -395,6 +442,8 @@ class StoryEngine:
             f"{memory_block}"
             f"{author_block}"
             f"{style_block}"
+            f"{style_lens_block}"
+            f"{knowledge_block}"
             f"OUTLINE CONTEXT:\n{outline_context}\n\n"
             f"{story_so_far}"
             f"{prev_text}\n"

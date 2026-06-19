@@ -1,5 +1,10 @@
 # -*- coding: utf-8 -*-
 
+import sys
+
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
 BANNER = [
     "  \u2554" + "\u2550" * 63 + "\u2557",
     "  \u2551" + " " * 63 + "\u2551",

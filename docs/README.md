@@ -5,6 +5,8 @@ This project keeps only active, non-duplicative docs.
 ## Core Docs
 - [HANDBOOK.md](HANDBOOK.md)
 - [CHANGELOG.md](CHANGELOG.md)
+- [REPO_STRUCTURE.md](REPO_STRUCTURE.md)
+- [../scripts/README.md](../scripts/README.md)
 
 ## QA
 - [qa/LIGHT_MODE_QA_REPORT.md](qa/LIGHT_MODE_QA_REPORT.md)

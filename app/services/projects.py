@@ -157,6 +157,8 @@ class Project:
     memory_soft: str = ""
     author_note: str = ""
     style_guide: str = ""
+    selected_style_lenses: List[str] = field(default_factory=list)
+    style_lens_settings: Dict[str, int] = field(default_factory=dict)
     default_word_count: int = 1000
     world_db: Dict[str, Entity] = field(default_factory=dict)
     chapters: Dict[str, Chapter] = field(default_factory=dict)
@@ -559,6 +561,16 @@ class Project:
         proj.memory_soft = data.get("memory_soft", "")
         proj.author_note = data.get("author_note", data.get("authors_note", ""))
         proj.style_guide = data.get("style_guide", data.get("style_note", ""))
+        lenses = data.get("selected_style_lenses", [])
+        proj.selected_style_lenses = [str(item) for item in lenses] if isinstance(lenses, list) else []
+        settings = data.get("style_lens_settings", {})
+        proj.style_lens_settings = {}
+        if isinstance(settings, dict):
+            for key, value in settings.items():
+                try:
+                    proj.style_lens_settings[str(key)] = max(1, min(10, int(value)))
+                except (TypeError, ValueError):
+                    continue
         proj.default_word_count = data.get("default_word_count", 1000)
         proj.created_at = data.get("created_at", time.time())
         proj.last_modified = data.get("last_modified", time.time())

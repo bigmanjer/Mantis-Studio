@@ -13,7 +13,7 @@ set "BLOCK=#"
 set "LOG_RETENTION_DAYS=7"
 set "SERVER_PORT=8501"
 set "APP_URL=http://localhost:%SERVER_PORT%"
-set "HEALTH_URL=http://127.0.0.1:%SERVER_PORT%"
+set "HEALTH_URL=http://127.0.0.1:%SERVER_PORT%/_stcore/health"
 
 :: ============================================================== 
 :: COLORS
@@ -46,12 +46,20 @@ for /f "usebackq delims=" %%I in (`
 :: ============================================================== 
 :: LOGGING
 :: ============================================================== 
-set "LOG_DIR=%~dp0logs"
-if not exist "%LOG_DIR%" mkdir "%LOG_DIR%"
-set "LOG_FILE=%LOG_DIR%\launcher_%TS%.log"
-set "STREAMLIT_LOG_FILE=%LOG_DIR%\streamlit_%TS%.log"
-set "CHAT_LOG_FILE=%LOG_DIR%\chat_%TS%.log"
-forfiles /P "%LOG_DIR%" /M *.log /D -%LOG_RETENTION_DAYS% /C "cmd /c del /q @path" >nul 2>&1
+set "LOG_ROOT=%~dp0logs"
+set "LAUNCHER_LOG_DIR=%LOG_ROOT%\launcher"
+set "STREAMLIT_LOG_DIR=%LOG_ROOT%\streamlit"
+set "CHAT_LOG_DIR=%LOG_ROOT%\chat"
+if not exist "%LOG_ROOT%" mkdir "%LOG_ROOT%"
+if not exist "%LAUNCHER_LOG_DIR%" mkdir "%LAUNCHER_LOG_DIR%"
+if not exist "%STREAMLIT_LOG_DIR%" mkdir "%STREAMLIT_LOG_DIR%"
+if not exist "%CHAT_LOG_DIR%" mkdir "%CHAT_LOG_DIR%"
+set "LOG_FILE=%LAUNCHER_LOG_DIR%\launcher_%TS%.log"
+set "STREAMLIT_LOG_FILE=%STREAMLIT_LOG_DIR%\streamlit_%TS%.log"
+set "CHAT_LOG_FILE=%CHAT_LOG_DIR%\chat_%TS%.log"
+for %%L in ("%LAUNCHER_LOG_DIR%" "%STREAMLIT_LOG_DIR%" "%CHAT_LOG_DIR%") do (
+  forfiles /P "%%~L" /M *.log /D -%LOG_RETENTION_DAYS% /C "cmd /c del /q @path" >nul 2>&1
+)
 
 :: ============================================================== 
 :: PYTHON DETECTION
@@ -167,8 +175,11 @@ for %%D in (
     )
     rem color handled by ANSI line output
     call :say_ok "  INSTALLED: %%D"
-    echo.
     call :sleep 90
+  ) else (
+    rem color handled by ANSI line output
+    call :say_ok "  OK: %%D"
+    call :sleep 45
   )
 )
 
@@ -308,10 +319,10 @@ echo.
 echo   VERIFYING LOCAL RUNTIME...
 for /L %%i in (1,1,90) do (
   if "%HAVE_PS%"=="1" (
-    powershell -NoProfile -Command "try { $r = Invoke-WebRequest -UseBasicParsing -Uri '%HEALTH_URL%' -TimeoutSec 3; if ($r.StatusCode -ge 200 -and $r.StatusCode -lt 500) { exit 0 } } catch { try { $c = New-Object Net.Sockets.TcpClient; $iar = $c.BeginConnect('127.0.0.1', %SERVER_PORT%, $null, $null); if ($iar.AsyncWaitHandle.WaitOne(700) -and $c.Connected) { $c.Close(); exit 0 }; $c.Close() } catch {}; exit 1 }; exit 1" >nul 2>&1
+    powershell -NoProfile -Command "try { $r = Invoke-WebRequest -UseBasicParsing -Uri '%HEALTH_URL%' -TimeoutSec 3; if ($r.StatusCode -ge 200 -and $r.StatusCode -lt 500) { exit 0 } } catch {}; exit 1" >nul 2>&1
     if not errorlevel 1 exit /b 0
   ) else (
-    netstat -ano | findstr ":%SERVER_PORT%" >nul && exit /b 0
+    curl -fsS --max-time 3 "%HEALTH_URL%" >nul 2>nul && exit /b 0
   )
   <nul set /p ="."
   call :sleep 500
@@ -325,29 +336,11 @@ exit /b 1
 
 :start_mantis_server
 if "%HAVE_PS%"=="1" (
-  powershell -NoProfile -Command "try { $r = Invoke-WebRequest -UseBasicParsing -Uri '%HEALTH_URL%' -TimeoutSec 2; if ($r.StatusCode -ge 200 -and $r.StatusCode -lt 500) { exit 0 } } catch { exit 1 }" >nul 2>&1
-  if not errorlevel 1 (
-    rem color handled by ANSI line output
-    echo.
-    echo   EXISTING MANTIS RUNTIME DETECTED ON %APP_URL%.
-    echo.
-    exit /b 0
-  )
+  powershell -NoProfile -Command "try { Get-NetTCPConnection -LocalPort %SERVER_PORT% -State Listen -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique | ForEach-Object { if ($_ -and $_ -ne $PID) { Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue } } } catch {}" >nul 2>&1
 ) else (
-  netstat -ano | findstr ":%SERVER_PORT%" >nul
-  if not errorlevel 1 (
-    rem color handled by ANSI line output
-    echo.
-    echo   EXISTING MANTIS RUNTIME DETECTED ON %APP_URL%.
-    echo.
-    exit /b 0
-  )
+  for /f "tokens=5" %%P in ('netstat -ano ^| findstr ":%SERVER_PORT% .*LISTENING"') do taskkill /F /PID %%P >nul 2>&1
 )
-if "%HAVE_PS%"=="1" (
-  powershell -NoProfile -ExecutionPolicy Bypass -Command "$py = '%PYTHON_CMD%'; $app = '%APP_FILE%'; $port = '%SERVER_PORT%'; $log = '%STREAMLIT_LOG_FILE%'; $cmd = ('/c {0} -m streamlit run \"{1}\" --server.headless true --server.port {2} >> \"{3}\" 2>&1' -f $py, $app, $port, $log); Start-Process -WindowStyle Hidden -FilePath 'cmd.exe' -ArgumentList $cmd" >nul 2>&1
-) else (
-  start "MANTIS Streamlit Server" /min cmd /c ""%PYTHON_CMD%" -m streamlit run "%APP_FILE%" --server.headless true --server.port %SERVER_PORT% >> "%STREAMLIT_LOG_FILE%" 2>&1"
-)
+start "MANTIS Runtime" /min cmd /c ""%PYTHON_CMD%" -m streamlit run "%APP_FILE%" --server.headless true --server.port %SERVER_PORT% >> "%STREAMLIT_LOG_FILE%" 2>&1"
 exit /b
 
 :mantis_chat

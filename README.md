@@ -22,8 +22,10 @@ from the sidebar when you want user-specific project folders and admin controls.
 3. **Outline**: plan story structure and chapter beats.
 4. **Editor**: draft, revise, summarize, and improve chapters.
 5. **World Bible**: track characters, locations, items, factions, and lore.
-6. **Projects export panel**: generate manuscript/planning outputs from the selected project.
-7. **AI Settings**: configure Groq/OpenAI-compatible providers and models.
+6. **Knowledge Base**: install the Core Library, import User Library references,
+   select Author & Style Lab lenses, and check Knowledge Health.
+7. **Projects export panel**: generate manuscript/planning outputs from the selected project.
+8. **AI Settings**: configure Groq/OpenAI-compatible providers and models.
 
 ## Architecture
 
@@ -118,7 +120,7 @@ The audit runner writes:
 
 ## Versioning
 
-Current version: `137.2`.
+Current version: `138.1`.
 
 Current version is stored in [VERSION.txt](VERSION.txt).
 

@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Stability
+- Version bump: updated app metadata and docs to `138.1`.
+- Auth layout: compacted the sign-in page so email access sits above the fold instead of requiring a scroll.
+- Launcher polish: renamed the background server window from `MANTIS Streamlit Server` to `MANTIS Runtime`.
+- Version bump: updated app metadata and docs to `138.0`.
+- Knowledge Base scan visibility: style-lens scanning now uses a two-step render so the progress panel appears before the scan work begins instead of leaving the page greyed out.
+- Version bump: updated app metadata and docs to `137.9`.
+- Knowledge Base scan feedback: Author & Style Lab now shows a staged loading bar while scanning the current work for recommended style lenses.
+- Version bump: updated app metadata and docs to `137.8`.
+- Launcher health gate: the local launcher now checks Streamlit's server health endpoint after forcing a fresh runtime, so stale blank-shell sessions on port 8501 are not reused.
+- Launcher restart recovery: stale or half-started listeners on port 8501 are cleared before starting a fresh MANTIS server.
+- Startup hardening: the MANTIS health probe now answers before heavier UI/service imports, giving the launcher a reliable app-level readiness signal.
+- Version bump: updated app metadata and docs to `137.7`.
+- Style Lens scanner: Author & Style Lab can now scan the current project and suggest the best author influence profiles with confidence, reasons, and matched story signals.
+- Style Lens workflow: scanning preselects the top recommended lenses so users who do not know which author to choose can still get guided craft controls.
+- Version bump: updated app metadata and docs to `137.6`.
+- Master Knowledge Base expansion: added advanced scene mechanics, plot architecture, prose controls, dialogue/subtext patterns, character design, canon rules, genre lenses, author craft profiles, work references, and revision recipes.
+- Auth page polish: tightened the sign-in/create account layout around a clearer MANTIS hero, Google-first access, guest mode, and compact email backup.
+- Auth scroll fix: added a dedicated auth-gate top reset so opening sign-in/create account does not inherit the previous footer scroll position.
+- Version bump: updated app metadata and docs to `137.5`.
+- Knowledge Base structure: reorganized the learning workspace around Core Library, User Library, Author & Style Lab, and Knowledge Health.
+- Author & Style Lab: added selectable author influence profiles from Knowledge Base author records plus saved craft sliders for pace, interiority, imagery, dialogue, and mood.
+- AI style learning: chapter generation now uses selected style lenses as copyright-safe craft-trait guidance instead of direct author impersonation.
+- Knowledge Health: added readiness metrics for the built-in core library, author profiles, user documents, and retrieval chunks.
+- Version bump: updated app metadata and docs to `137.4`.
+- Knowledge Base built-in library: added a bundled MANTIS Literary Master Knowledge Base with craft guidance, genre patterns, movements, authors, works, motifs, and revision heuristics.
+- Knowledge Base install flow: added one-click install/refresh for the built-in library and protected built-in documents from accidental deletion.
+- Version bump: updated app metadata and docs to `137.3`.
+- Repo organization: corrected ignored runtime-data placeholders so fresh clones preserve the intended `projects/` and backup structure without tracking user work.
+- Repository docs: expanded the structure guide with tracked-vs-runtime data rules and added a scripts index for launcher, QA, audit, and maintenance tools.
 - Version bump: updated app metadata and docs to `137.2`.
 - Auth simplification: reduced the sign-in page to a cleaner MANTIS-branded entry flow with Google first, guest second, and email as a compact backup path.
 - Auth focus: removed the full site footer from the auth gate so first-time users are not dropped into extra navigation before entering the app.

@@ -466,6 +466,10 @@ class TestNavigationParity:
         assert "extract_text_from_upload" in source
         assert "import_knowledge_document" in source
         assert "search_knowledge_base" in source
+        assert "Core Library" in source
+        assert "User Library" in source
+        assert "Author & Style Lab" in source
+        assert "Knowledge Health" in source
 
 
 # ---------------------------------------------------------------------------
@@ -784,7 +788,9 @@ class TestUtilities:
 
     def test_knowledge_base_import_search_and_context(self, tmp_path):
         from app.services.knowledge_base import (
+            builtin_knowledge_status,
             build_knowledge_context,
+            install_builtin_knowledge_base,
             import_knowledge_document,
             knowledge_stats,
             search_knowledge_base,
@@ -816,9 +822,12 @@ class TestUtilities:
 
         from app.services.knowledge_base import (
             delete_knowledge_document,
+            build_style_lens_context,
             get_document_chunks,
+            list_author_style_profiles,
             list_knowledge_categories,
             list_knowledge_sources,
+            suggest_author_style_lenses,
         )
 
         assert "literary_notes.txt" in list_knowledge_sources(str(tmp_path))
@@ -827,16 +836,56 @@ class TestUtilities:
         assert delete_knowledge_document(str(tmp_path), result["document_id"]) is True
         assert knowledge_stats(str(tmp_path))["documents"] == 0
 
+        builtin_status = builtin_knowledge_status(str(tmp_path))
+        assert builtin_status["available"] is True
+        assert builtin_status["installed"] is False
+        builtin_result = install_builtin_knowledge_base(str(tmp_path))
+        assert builtin_result["chunks"] > 600
+        updated_status = builtin_knowledge_status(str(tmp_path))
+        assert updated_status["installed"] is True
+        assert updated_status["current"] is True
+        builtin_results = search_knowledge_base(str(tmp_path), "gothic atmosphere", limit=5)
+        assert builtin_results
+        assert any("gothic" in item["text"].lower() for item in builtin_results)
+        profiles = list_author_style_profiles(str(tmp_path))
+        assert profiles
+        profile_names = {profile["name"] for profile in profiles}
+        assert "Jane Austen" in profile_names
+        lens_context = build_style_lens_context(str(tmp_path), ["Jane Austen"], project_goal="social comedy")
+        assert "STYLE LENS: Jane Austen" in lens_context
+        assert "Craft traits to adapt" in lens_context
+        assert "Do not copy passages" in lens_context
+        suggestions = suggest_author_style_lenses(
+            str(tmp_path),
+            "A comedy of manners about courtship, social observation, irony, class pressure, and free indirect interiority.",
+            limit=5,
+        )
+        assert suggestions
+        assert any(item["name"] == "Jane Austen" for item in suggestions)
+
     def test_app_version(self):
         from app.main import get_app_version
         version = get_app_version()
         assert version  # non-empty string
+        major, minor = version.split(".", 1)
+        assert major.isdigit()
+        assert minor.isdigit()
+        assert int(minor) <= 9
 
     def test_whats_new_uses_real_release_highlights(self):
         source = (ROOT / "app" / "main.py").read_text(encoding="utf-8")
         highlights_block = source[source.index("def _release_highlights()"):source.index("def render_release_summary")]
         assert "def _release_highlights()" in source
-        assert "Knowledge Base now has Import, Search, and Library tabs" in highlights_block
+        assert "email access visible without scrolling" in highlights_block
+        assert "MANTIS Runtime instead of MANTIS Streamlit Server" in highlights_block
+        assert "progress panel before scan work begins" in highlights_block
+        assert "Author & Style Lab now shows a staged loading bar" in highlights_block
+        assert "Author & Style Lab can now scan the current project" in highlights_block
+        assert "Recommended lenses are preselected after scanning" in highlights_block
+        assert "built-in master library now has deeper scene mechanics" in highlights_block
+        assert "Sign-in/create account now uses a tighter MANTIS layout" in highlights_block
+        assert "auth page now resets to the top" in highlights_block
+        assert "Knowledge Base is now organized into Core Library, User Library, Author & Style Lab, and Knowledge Health" in highlights_block
         assert "Coherence fixes can now use the best matching chapter passage" in highlights_block
         assert "Editor summary text and disabled text areas now stay readable" in highlights_block
         assert "Chapter generation now retrieves relevant Knowledge Base guidance" in highlights_block
@@ -855,7 +904,7 @@ class TestUtilities:
         assert "Find and replace now defaults to the first exact match" in source
         assert "Canon Scanner, queued canon suggestions, and Coherence Check now live in Insights" in source
         assert "Relationship graph moved out of World Bible and into Insights" in source
-        assert highlights_block.index("Knowledge Base now has Import") < highlights_block.index("Dashboard no longer repeats")
+        assert highlights_block.index("built-in master library now has deeper scene mechanics") < highlights_block.index("Dashboard no longer repeats")
         assert highlights_block.index("Guest projects now use") < highlights_block.index("Sign-in now uses a clearer")
         assert "Legacy duplicate runtime and UI compatibility shims were removed" not in highlights_block
         assert "What's New in Mantis Studio" not in source
@@ -933,9 +982,40 @@ class TestUtilities:
             assert package in launcher
             assert package in required_packages
 
-        assert 'set "HEALTH_URL=http://127.0.0.1:%SERVER_PORT%"' in launcher
-        assert "EXISTING MANTIS RUNTIME DETECTED" in launcher
+        assert 'set "HEALTH_URL=http://127.0.0.1:%SERVER_PORT%/_stcore/health"' in launcher
+        assert "MANTIS_OK" not in launcher
+        assert "Get-NetTCPConnection -LocalPort %SERVER_PORT% -State Listen" in launcher
+        assert "taskkill /F /PID" in launcher
+        assert "Start-Process -WindowStyle Hidden" not in launcher
+        assert "EXISTING MANTIS RUNTIME DETECTED" not in launcher
+        assert 'start "MANTIS Runtime"' in launcher
+        assert "MANTIS Streamlit Server" not in launcher
         assert "for /L %%i in (1,1,90)" in launcher
+
+    def test_mantis_health_probe_is_before_heavy_ui_imports(self):
+        source = (ROOT / "app" / "main.py").read_text(encoding="utf-8")
+        run_ui_block = source[source.index("def _run_ui():"):source.index("def get_canon_health()")]
+        assert "MANTIS_OK" in run_ui_block
+        assert run_ui_block.index("st.set_page_config") < run_ui_block.index("MANTIS_OK")
+        assert run_ui_block.index("MANTIS_OK") < run_ui_block.index("from app.services.knowledge_base import")
+
+    def test_knowledge_style_lens_scan_has_progress_feedback(self):
+        source = (ROOT / "app" / "main.py").read_text(encoding="utf-8")
+        scan_block = source[
+            source.index('st.session_state.pop("knowledge_style_lens_scan_pending"'):
+            source.index('st.session_state["style_lens_suggestions"]')
+        ]
+        button_block = source[
+            source.index('"Scan current work for best style lenses"'):
+            source.index('suggestions = st.session_state.get("style_lens_suggestions"')
+        ]
+        assert 'st.session_state["knowledge_style_lens_scan_pending"] = True' in button_block
+        assert "st.progress" in scan_block
+        assert "Scanning current work" in scan_block
+        assert "Preparing Knowledge Base scan" in scan_block
+        assert "Collecting project signals" in scan_block
+        assert "Comparing against author style profiles" in scan_block
+        assert "Scoring recommended lenses" in scan_block
 
     def test_launcher_chat_handles_creator_and_learning_truth_locally(self):
         source = (ROOT / "scripts" / "mantis_launcher_chat.py").read_text(encoding="utf-8")
@@ -2439,22 +2519,20 @@ class TestMantisModelAndArchitectUX:
         auth_block = source[source.index("def _render_auth_gate()"):source.index("if not _render_auth_gate()")]
         assert "branding/mantis_lockup.png" in auth_block
         assert "MANTIS Studio" in auth_block
-        assert "Let your imagination write with you." in auth_block
-        assert "font-size: 1.95rem" in auth_block
-        assert "A focused workspace for drafting chapters, building story knowledge, and checking continuity before details drift." in auth_block
-        assert "No account required to try it." in auth_block
-        assert "mantis-auth-signal-strip" in auth_block
+        assert "Write the story. Keep the world straight." in auth_block
+        assert "font-size: 1.34rem" in auth_block
+        assert "min-height: 285px" in auth_block
+        assert "Draft chapters, build canon, and use MANTIS intelligence from one focused workspace." in auth_block
+        assert "Sign in with email, continue with Google, or enter as a guest." in auth_block
+        assert "mantis-auth-benefit-grid" in auth_block
         assert "mantis-auth-paths" in auth_block
-        assert "Plan" in auth_block
         assert "Draft" in auth_block
-        assert "Check" in auth_block
-        assert "Guest" in auth_block
-        assert "Account" in auth_block
-        assert "Paid access" in auth_block
-        assert "MANTIS means Modular AI Narrative Text Intelligence System." in auth_block
+        assert "Canon" in auth_block
+        assert "Learn" in auth_block
         assert "Design benchmark: modern auth screens reduce default form load" not in auth_block
         assert "Access" in auth_block
-        assert "Choose how to enter" in auth_block
+        assert "Access your workspace" in auth_block
+        assert "Email access" in auth_block
         assert 'st.tabs(["Sign in", "Create account", "Recover"])' in auth_block
         assert "Email recovery is ready." in auth_block
         assert "Send reset link" in auth_block
@@ -2469,6 +2547,7 @@ class TestMantisModelAndArchitectUX:
         assert 'target="_self"' in auth_block
         assert "mantis-auth-primary-link" in auth_block
         assert "Continue with Google" in auth_block
+        assert "Continue as guest" in auth_block
         assert "oauth_google_pending_url" not in auth_block
         assert "Open Google sign-in" not in auth_block
         assert "Google sign-in is ready. Use the button below to open Google." not in auth_block
@@ -2482,15 +2561,16 @@ class TestMantisModelAndArchitectUX:
         assert 'key="auth_login_submit"' in auth_block
         assert 'key="auth_signup_submit"' in auth_block
         assert 'key="auth_reset_submit"' in auth_block
-        assert "Continue as guest" in auth_block
-        assert auth_block.index("Continue with Google") < auth_block.index("auth_continue_guest")
+        assert auth_block.index("auth_continue_guest") < auth_block.index("auth_tabs = st.tabs")
+        assert auth_block.index("Email access") < auth_block.index("auth_tabs = st.tabs")
         assert "Sign in or create an account" not in auth_block
         assert "Narrative command center" not in auth_block
         assert "Write with your canon intact." not in auth_block
         assert "MANTIS Studio Access" not in auth_block
         assert "Enter the studio with your canon protected." not in auth_block
         assert "Plan the story. Draft the chapters. Keep canon under control." not in auth_block
-        assert "Paid access" in auth_block
+        assert "Paid access" not in auth_block
+        assert "mantis-auth-choice-note" not in auth_block
         assert "Welcome to MANTIS Studio" not in auth_block
 
     def test_memory_page_does_not_render_coherence_check(self):

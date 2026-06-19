@@ -13,59 +13,20 @@ import json
 import os
 import re
 import socket
+import subprocess
 import sys
 import textwrap
 import urllib.error
 import urllib.parse
 import urllib.request
 import webbrowser
-from html.parser import HTMLParser
-from dataclasses import dataclass
 from pathlib import Path
 
-try:
-    import tomllib
-except ModuleNotFoundError:  # pragma: no cover - Python < 3.11 fallback
-    tomllib = None
-
-
-@dataclass
-class KeySource:
-    label: str
-    key: str
-
-
-class WebTextExtractor(HTMLParser):
-    def __init__(self) -> None:
-        super().__init__()
-        self.title = ""
-        self._in_title = False
-        self._skip_depth = 0
-        self.chunks: list[str] = []
-
-    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
-        if tag in {"script", "style", "noscript", "svg"}:
-            self._skip_depth += 1
-        if tag == "title":
-            self._in_title = True
-
-    def handle_endtag(self, tag: str) -> None:
-        if tag in {"script", "style", "noscript", "svg"} and self._skip_depth:
-            self._skip_depth -= 1
-        if tag == "title":
-            self._in_title = False
-
-    def handle_data(self, data: str) -> None:
-        text = re.sub(r"\s+", " ", data or "").strip()
-        if not text:
-            return
-        if self._in_title:
-            self.title = (self.title + " " + text).strip()
-        elif not self._skip_depth:
-            self.chunks.append(text)
-
-    def text(self, limit: int = 8000) -> str:
-        return re.sub(r"\s+", " ", " ".join(self.chunks)).strip()[:limit]
+from mantis_console_ui import ConsoleUI
+from mantis_learning import WebTextExtractor
+import mantis_logs
+import mantis_secrets
+from mantis_secrets import KeySource
 
 
 class LauncherChat:
@@ -84,14 +45,16 @@ class LauncherChat:
         self.groq_key_source = ""
         self.groq_base_url = "https://api.groq.com/openai/v1"
         self.groq_model = "llama3-8b-8192"
-        self.use_color = self._enable_ansi_color()
-        self.use_native_color = (not self.use_color) and self._supports_native_color()
-        self.use_unicode = False
+        self.ui = ConsoleUI()
+        self.use_color = self.ui.use_color
+        self.use_native_color = self.ui.use_native_color
+        self.use_unicode = self.ui.use_unicode
         self.handoff_mode = bool(getattr(args, "handoff", False))
         self.memory_file = Path(args.memory_file) if args.memory_file else self.repo_root / "projects" / ".mantis_launcher_memory.json"
         self.drills_file = Path(args.drills_file) if args.drills_file else self.repo_root / "scripts" / "mantis_simulator_drills.json"
         self.learned_drills_file = self.repo_root / "scripts" / "mantis_learned_drills.json"
         self.todo_file = self.repo_root / "TODO.md"
+        self.paste_file = self.repo_root / "projects" / "mantis_paste_box.txt"
         self.memory = self._load_memory()
         self._load_groq_settings()
 
@@ -141,8 +104,12 @@ class LauncherChat:
 
         if lowered.startswith("/"):
             return self.handle_command(lowered, text)
+        if lowered.strip() in {"exit", "quit"}:
+            return "Use /exit when you want to close the launcher chat. I will not pretend to pause background learning."
         if self._contains_secret(text):
-            return "That looks like a secret key. I will not send it through chat. Use /save-key so I can store it safely."
+            return "That looks like a secret key. I will not send it through chat. Use /save-key for MANTIS chat or /save-research-key for web research."
+        if self._asks_about_previous_chat(lowered):
+            return self.resume_research_from_logs()
         if self._user_is_claiming_creator_context(lowered):
             return (
                 "Right. You are building MANTIS, not just using it. I should treat your feedback as product direction, "
@@ -163,6 +130,8 @@ class LauncherChat:
                 + "\n\nI will treat that as behavior guidance going forward. "
                 "If you want to inspect what I learned, use /learn."
             )
+        if self._asks_about_learning_job(lowered):
+            return self.learning_job_status("status")
         if self._asks_about_connection(lowered):
             return (
                 "Yes. The better version is research mode: use /research with a topic, and I search sources, "
@@ -175,8 +144,12 @@ class LauncherChat:
 
     def handle_command(self, lowered: str, original: str) -> str:
         command = lowered.strip()
-        if command in {"/help", "/commands", "/?"}:
+        if command in {"/help", "/?"}:
             return self.help_text()
+        if command in {"/guide", "/how", "/howto", "/how-to", "/what-can-you-do"}:
+            return self.command_guide_text()
+        if command in {"/commands", "/help all", "/help full", "/advanced"}:
+            return self.full_help_text()
         if command in {"/restart", "/relaunch", "/reload"}:
             return self.open_browser("I reopened the localhost window.")
         if command in {"/open", "/launch"}:
@@ -192,6 +165,12 @@ class LauncherChat:
             return self.todo_summary()
         if command in {"/mantis", "/mantis-status", "/core", "/core-status", "/ai-status"}:
             return self.ai_status()
+        if command in {"/research-status", "/search-status"}:
+            return self.research_status()
+        if command in {"/resume-research", "/previous-chat", "/review-chat", "/review-chats"}:
+            return self.resume_research_from_logs()
+        if command in {"/pause", "/resume", "/learn-status"}:
+            return self.learning_job_status(command)
         if command == "/memory":
             return self.memory_summary()
         if command in {"/learn", "/learning"}:
@@ -220,15 +199,29 @@ class LauncherChat:
             return self.run_simulator(original.partition(" ")[2].strip())
         if command.startswith("/research"):
             return self.research_topic(original.partition(" ")[2].strip())
+        if command in {"/paste open", "/paste edit"}:
+            return self.open_paste_box()
+        if command in {"/paste show", "/paste preview"}:
+            return self.preview_paste_box()
+        if command in {"/paste clear"}:
+            return self.clear_paste_box()
+        if command in {"/paste learn", "/paste lesson", "/paste lessons"}:
+            return self.learn_from_paste_box()
+        if command in {"/paste remember", "/paste memory", "/paste note"}:
+            return self.remember_from_paste_box()
+        if command in {"/paste", "/pastebox", "/paste-box"}:
+            return self.paste_box_help()
         if command in {"/save-key", "/save-mantis-key", "/key"}:
             return self.save_groq_key_interactive()
+        if command in {"/save-research-key", "/save-search-key", "/research-key"}:
+            return self.save_research_key_interactive()
         if command in {"/clear", "/cls"}:
             self._screen()
             return "Fresh screen. Systems are still awake."
         if command in {"/exit", "/quit"}:
             return "Use exit or /exit at the prompt to close this chat."
         if self._contains_secret(original):
-            return "That looks like a secret key. Use /save-key, then paste it into the hidden prompt."
+            return "That looks like a secret key. Use /save-key for MANTIS chat or /save-research-key for web research, then paste it into the hidden prompt."
         return "I do not know that slash command yet. Use /help to see what I can do."
 
     def ai_or_local(self, text: str, fallback) -> str:
@@ -256,11 +249,12 @@ class LauncherChat:
                     "even then keep it grounded and brief. "
                     "Do not claim you are working in the background, learning autonomously, checking files, "
                     "or providing automatic updates unless a real command/tool has been run. "
+                    "Do not claim there are no previous chats; launcher chat logs exist and local commands can review them. "
                     "Ask one good follow-up when the user is exploring, but be decisive when they want action. "
                     "Launcher actions are slash commands like /help, /restart, /status, /todo, and /logs. "
-                    "If the user casually mentions restarting, logs, simulator, or status, discuss it conversationally unless "
-                    "they use a slash command. If the user asks for a saved todo list or local project notes, treat that as "
-                    "a real save request when the local command layer catches it; never keep telling them to do it themselves. "
+                    "If the user casually mentions restarting, logs, simulator, TODO, local files, or status, discuss it "
+                    "conversationally unless they use a slash command. Do not say you checked logs, TODO, memory, files, "
+                    "or local saves from normal conversation. Tell the user the exact slash command when real access is needed. "
                     "Groq-style model reasoning is not the same thing as web browsing. If asked about current/live facts, say "
                     "MANTIS needs /learn web or another web tool to ingest sources. If the user clearly corrects your behavior, "
                     "the launcher can save that as an auto-learned lesson. Help with writing, app operation, "
@@ -334,6 +328,13 @@ class LauncherChat:
             except urllib.error.HTTPError as exc:
                 body = self._read_http_error(exc)
                 last_error = self._groq_http_error_message(exc.code, body)
+                if exc.code == 400 and "max_completion_tokens" in payload:
+                    retry_payload = dict(payload)
+                    retry_payload["max_tokens"] = retry_payload.pop("max_completion_tokens")
+                    retry_data, retry_error = self._post_groq_once(retry_payload)
+                    if not retry_error:
+                        return retry_data, None
+                    last_error = retry_error or last_error
                 if exc.code in {401, 403} and self._activate_next_key_source():
                     continue
                 return {}, last_error
@@ -346,6 +347,28 @@ class LauncherChat:
                 "Refresh the MANTIS intelligence key in AI Settings or use /save-key."
             )
         return {}, "My higher reasoning layer is not configured yet."
+
+    def _post_groq_once(self, payload: dict[str, object]) -> tuple[dict[str, object], str | None]:
+        request = urllib.request.Request(
+            f"{self.groq_base_url.rstrip('/')}/chat/completions",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={
+                "Authorization": f"Bearer {self.groq_key}",
+                "Content-Type": "application/json",
+                "User-Agent": "MANTIS-Studio-Launcher/1.0",
+                "Accept": "application/json",
+            },
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=30) as response:
+                data = json.loads(response.read().decode("utf-8"))
+            return data, None
+        except urllib.error.HTTPError as exc:
+            body = self._read_http_error(exc)
+            return {}, self._groq_http_error_message(exc.code, body)
+        except Exception as exc:
+            return {}, f"I reached for my higher reasoning layer, but the request failed: {exc}"
 
     def _activate_next_key_source(self) -> bool:
         next_index = self.key_source_index + 1
@@ -383,6 +406,12 @@ class LauncherChat:
             )
         if status == 429:
             return "MANTIS is being rate-limited. Wait a little and try again."
+        if status == 400:
+            return (
+                "The MANTIS intelligence gateway rejected the request as malformed (HTTP 400). "
+                "I tried the compatibility token field as a fallback too."
+                + (f"\nGateway detail: {details}" if details else "")
+            )
         return f"The MANTIS intelligence gateway returned HTTP {status}." + (f"\nGateway detail: {details}" if details else "")
 
     @staticmethod
@@ -456,24 +485,35 @@ class LauncherChat:
         return {"open": is_open, "http": http_status}
 
     def summarize_logs(self) -> str:
-        if not self.log_file.exists():
-            return "I do not see a launcher log yet. The server may still be starting."
+        return mantis_logs.summarize_runtime_log(self.log_file, self._mask_secrets, self.repo_root)
 
-        lines = self._tail(self.log_file, 25)
-        if not lines:
-            return "The launcher log exists, but it is empty right now."
+    def resume_research_from_logs(self) -> str:
+        topics = self._recent_research_topics()
+        if not topics:
+            return (
+                "I checked the recent chat logs, but I did not find a source-backed research topic to resume. "
+                "Start one with /learn research topic or /research topic."
+            )
 
-        issues = [
-            line.strip()
-            for line in lines
-            if re.search(r"\b(error|exception|traceback|failed|warning)\b", line, re.I)
+        lines = [
+            "I checked the recent chat logs. We were working around:",
+            *[f"- {topic}" for topic in topics[:6]],
+            "",
+            "Important correction: I do not have a real background research job to resume yet. That is now on the roadmap.",
+            "To continue for real, run one of these:",
         ]
-        if issues:
-            preview = "\n".join(f"- {self._mask_secrets(line[:180])}" for line in issues[-5:])
-            return f"I found these recent warning/error lines:\n{preview}"
-
-        preview = "\n".join(self._mask_secrets(line.rstrip()) for line in lines[-8:])
-        return f"No obvious recent errors. Latest log tail:\n{preview}"
+        primary = topics[0]
+        lines.append(f"/learn research {primary}")
+        if len(topics) > 1:
+            lines.append(f"/learn research {topics[1]}")
+        if not self._research_api_key():
+            lines.extend(
+                [
+                    "",
+                    "Research key status: not loaded. Use /save-research-key first, then run the research command.",
+                ]
+            )
+        return "\n".join(lines)
 
     def todo_summary(self) -> str:
         note_names = re.compile(r"(todo|to-do|task|roadmap|plan|notes)", re.I)
@@ -623,9 +663,8 @@ class LauncherChat:
         api_key = self._research_api_key()
         if not api_key:
             return (
-                "Research mode needs a search API key before I can search on my own.\n"
-                "Save TAVILY_API_KEY or MANTIS_RESEARCH_API_KEY in .streamlit/secrets.toml, "
-                "then use /research your topic.\n"
+                "Research mode needs a Tavily web-search key before I can search on my own.\n"
+                "Use /save-research-key and paste a tvly- key into the hidden prompt, then use /research your topic.\n"
                 "For now, give me a direct source with /learn web URL."
             )
         data, error = self._tavily_search(query, api_key)
@@ -667,6 +706,13 @@ class LauncherChat:
         except urllib.error.HTTPError as exc:
             body = self._read_http_error(exc)
             details = self._extract_groq_error(body)
+            if exc.code == 401:
+                return {}, (
+                    "Research search was rejected by Tavily (HTTP 401). "
+                    "The saved research key is missing, expired, or not a Tavily tvly- key. "
+                    "Use /save-research-key with a valid Tavily web-search key."
+                    + (f"\nDetail: {details}" if details else "")
+                )
             return {}, f"Research search failed with HTTP {exc.code}." + (f"\nDetail: {details}" if details else "")
         except Exception as exc:
             return {}, f"Research search failed: {exc}"
@@ -755,17 +801,7 @@ class LauncherChat:
         return [f"Web source note: {sentence}" for sentence in useful[:4]]
 
     def log_health(self) -> str:
-        if not self.log_file.exists():
-            return "no log file yet"
-        lines = self._tail(self.log_file, 80)
-        issue_count = sum(
-            1
-            for line in lines
-            if re.search(r"\b(error|exception|traceback|failed)\b", line, re.I)
-        )
-        if issue_count:
-            return f"{issue_count} recent issue-looking line(s); ask 'log' for details"
-        return "no recent error-looking lines"
+        return mantis_logs.log_health(self.log_file, self.repo_root)
 
     def small_talk(self, text: str) -> str:
         lowered = text.lower()
@@ -798,30 +834,103 @@ class LauncherChat:
     def help_text(self) -> str:
         return "\n".join(
             [
-                "Command deck:",
-                "/restart   Reopen the localhost window",
-                "/status    Check the local runtime",
-                "/logs      Read the latest server log lines",
-                "/todo      Scan local TODO/task notes",
-                "/todo add X Save real items into TODO.md",
-                "/mantis    Check the intelligence core",
-                "/memory    Show what launcher MANTIS has actually saved",
-                "/learn     Show notes, lessons, simulator, and auto-learn status",
-                "/learn note X Save a real launcher memory note",
-                "/learn web URL Read a page and save it as lessons",
-                "/learn research X Search sources and save lessons",
-                "/learn run all Run the full local lesson suite",
-                "/learn auto on|off Control correction-based auto-learning",
-                "/research X Search sources and save MANTIS lessons",
-                "/forget X  Remove saved launcher memory notes containing X",
-                "/simulator Alias for /learn",
-                "/simulate all Run the full local lesson suite",
-                "/simulate tone|memory|rag|tools|writing Run a lesson category",
-                "/save-key  Store a new intelligence key safely",
-                "/clear     Redraw this console",
-                "/exit      Close chat; MANTIS Studio keeps running",
+                "Quick help:",
+                "/guide    Explain what the main features are for",
+                "/status   Check if the app is alive",
+                "/restart  Reopen the app window",
+                "/logs     Show recent runtime logs",
+                "/todo     Show the task list",
+                "/learn    Show memory, lessons, and simulator status",
+                "/paste    Paste long text into a file instead of the console",
+                "/research Search the web and save source-backed lessons",
+                "/mantis   Check MANTIS chat intelligence",
                 "",
-                "Everything else is conversation. Just talk to me.",
+                "Normal text is just chat.",
+                "Use /commands for every command.",
+            ]
+        )
+
+    def command_guide_text(self) -> str:
+        return "\n".join(
+            [
+                "MANTIS guide:",
+                "",
+                "Chat:",
+                "Just type normally when you want to talk, brainstorm, write, or ask questions.",
+                "",
+                "Actions:",
+                "Use slash commands when you want MANTIS to really do something, like read logs, restart, save memory, or research.",
+                "",
+                "Learn vs Remember:",
+                "Learn means behavior rules: how MANTIS should act, answer, research, or use commands.",
+                "Remember means facts/preferences: simple things MANTIS should recall about you or the project.",
+                "",
+                "Paste box:",
+                "Use /paste for long text. Paste into the Notepad file, save it, then run /paste learn or /paste remember.",
+                "After MANTIS saves it, the paste box can be cleared.",
+                "",
+                "Research:",
+                "Use /research topic when you want source-backed lessons. This needs a Tavily tvly- key.",
+                "",
+                "Keys:",
+                "/save-key is for MANTIS chat intelligence. /save-research-key is for web research. They are separate on purpose.",
+                "",
+                "Troubleshooting:",
+                "/status checks the local app. /logs reads runtime logs. /restart reopens the localhost window.",
+                "",
+                "Use /commands for the full command list.",
+            ]
+        )
+
+    def full_help_text(self) -> str:
+        return "\n".join(
+            [
+                "Full command list:",
+                "",
+                "App commands:",
+                "/status - Check whether localhost is answering and whether logs show issues.",
+                "/restart - Reopen the MANTIS Studio browser window.",
+                "/open - Open the MANTIS Studio browser window.",
+                "/logs - Show recent runtime log lines for troubleshooting.",
+                "/clear - Redraw the console.",
+                "/exit - Close launcher chat; the app can keep running.",
+                "",
+                "Task commands:",
+                "/todo - Show TODO.md and local task markers.",
+                "/todo add X - Add one or more real project tasks.",
+                "",
+                "MANTIS chat and memory:",
+                "/mantis - Check whether chat intelligence is connected.",
+                "/save-key - Save the dedicated Groq chat key.",
+                "/memory - Show saved memory notes.",
+                "/forget X - Remove saved memory notes containing X.",
+                "",
+                "Learning commands:",
+                "/learn - Show memory, lessons, simulator, and auto-learn status.",
+                "/learn note X - Remember a short fact or preference.",
+                "/learn web URL - Read one web page and save lessons from it.",
+                "/learn research X - Search sources and save lessons from a topic.",
+                "/learn run all - Run the simulator lesson suite.",
+                "/learn auto on|off - Control correction-based auto-learning.",
+                "/simulate all - Run all simulator drills.",
+                "/simulate tone|memory|rag|tools|writing - Run one simulator category.",
+                "",
+                "Research commands:",
+                "/research X - Search the web with Tavily and save source-backed lessons.",
+                "/research-status - Check whether the Tavily research key is saved.",
+                "/save-research-key - Save the dedicated Tavily research key.",
+                "/resume-research - Recover recent research topics from chat logs.",
+                "",
+                "Paste box commands:",
+                "/paste - Explain the paste-box workflow.",
+                "/paste open - Open the Notepad paste box for long text.",
+                "/paste show - Preview what is currently in the paste box.",
+                "/paste learn - Save paste-box text as behavior lessons.",
+                "/paste remember - Save paste-box text as a short memory note.",
+                "/paste clear - Empty the paste box after MANTIS saves it.",
+                "",
+                "Rule of thumb:",
+                "Normal text is conversation. Slash commands are real actions.",
             ]
         )
 
@@ -844,6 +953,39 @@ class LauncherChat:
         if "session key" in source:
             return "temporary session key"
         return "fallback app key saved and hidden"
+
+    def research_status(self) -> str:
+        if self._research_api_key():
+            return (
+                "MANTIS Tavily research key is saved and hidden.\n"
+                "Research commands: /research topic or /learn research topic"
+            )
+        return (
+            "MANTIS research is not connected yet.\n"
+            "Use /save-research-key, paste a Tavily tvly- key into the hidden prompt, then try /research topic."
+        )
+
+    def learning_job_status(self, command: str) -> str:
+        if command in {"/pause", "/resume"}:
+            return (
+                "Pause and resume for long learning jobs are not built yet. "
+                "I added this to the roadmap because it came up in our chat logs."
+            )
+        return (
+            "No background learning job is currently tracked. "
+            "Right now, learning happens when you run /learn note, /learn web, /research, or /learn research. "
+            "A real job queue with progress, pause, and resume is on the roadmap."
+        )
+
+    def _recent_research_topics(self) -> list[str]:
+        return mantis_logs.recent_research_topics(self.repo_root, self.chat_log_file)
+
+    def _recent_chat_lines(self, limit: int = 500) -> list[str]:
+        return mantis_logs.recent_chat_lines(self.repo_root, self.chat_log_file, limit=limit)
+
+    @staticmethod
+    def _clean_research_topic(topic: str) -> str:
+        return mantis_logs.clean_research_topic(topic)
 
     def remember(self, note: str) -> str:
         clean = re.sub(r"\s+", " ", note or "").strip()
@@ -918,12 +1060,17 @@ class LauncherChat:
         lines.extend(
             [
                 "",
+                "Plain meaning:",
+                "- Learn = save behavior rules or lessons that change how MANTIS acts.",
+                "- Remember = save short facts or preferences MANTIS should recall later.",
+                "",
                 "Learning commands:",
                 "/learn note X saves a memory note.",
                 "/learn web URL reads a page and saves lessons.",
                 "/learn research X searches sources and saves lessons.",
                 "/learn run all tests behavior and saves lessons.",
                 "/learn auto on|off controls correction-based auto-learning.",
+                "/paste opens a paste box for long notes or rules.",
             ]
         )
         return "\n".join(lines)
@@ -944,6 +1091,100 @@ class LauncherChat:
 
     def _auto_learn_enabled(self) -> bool:
         return bool(self.memory.get("auto_learn_enabled", True))
+
+    def paste_box_help(self) -> str:
+        self._ensure_paste_box()
+        return (
+            "Paste box workflow:\n"
+            f"- File: {self.paste_file}\n"
+            "- Use this when text is too long or annoying to paste into the console.\n"
+            "- Learn = behavior rules/lessons. Remember = short facts/preferences.\n"
+            "- /paste open opens the file so you can paste a long answer cleanly.\n"
+            "- /paste show previews what is in it.\n"
+            "- /paste learn saves the pasted text as MANTIS behavior lessons and simulator drills.\n"
+            "- /paste remember saves the pasted text as a memory note.\n"
+            "- After /paste learn or /paste remember succeeds, you can delete the pasted text from the file.\n"
+            "- /paste clear empties it for you."
+        )
+
+    def open_paste_box(self) -> str:
+        self._ensure_paste_box()
+        try:
+            os.startfile(str(self.paste_file))  # type: ignore[attr-defined]
+            return f"Opened the MANTIS paste box: {self.paste_file}\nPaste your text there, save it, then run /paste learn or /paste remember. After MANTIS saves it, you can clear the file."
+        except Exception:
+            return f"Paste box is ready here: {self.paste_file}\nOpen it, paste your text, save it, then run /paste learn or /paste remember. After MANTIS saves it, you can clear the file."
+
+    def preview_paste_box(self) -> str:
+        text = self._read_paste_box()
+        if not text:
+            return f"The paste box is empty. Use /paste open, paste text into {self.paste_file}, save it, then run /paste show."
+        preview = text[:1200]
+        suffix = "\n..." if len(text) > len(preview) else ""
+        return f"Paste box preview ({len(text)} characters):\n{self._mask_secrets(preview)}{suffix}"
+
+    def clear_paste_box(self) -> str:
+        self._ensure_paste_box()
+        try:
+            self.paste_file.write_text("", encoding="utf-8")
+        except OSError as exc:
+            return f"I could not clear the paste box: {exc}"
+        return "Cleared the MANTIS paste box."
+
+    def learn_from_paste_box(self) -> str:
+        text = self._read_paste_box()
+        if not text:
+            return "The paste box is empty. Use /paste open first, paste text into the file, save it, then run /paste learn."
+        if self._contains_secret(text):
+            return "That paste contains something that looks like a secret key. I will not save it as a lesson."
+        lessons = self._lessons_from_paste_text(text)
+        saved = self.save_lessons("paste", "paste-box", lessons, "paste-box", lead="Saved paste-box lessons")
+        return saved + "\n\nYou can now delete the pasted text from the paste box, or run /paste clear."
+
+    def remember_from_paste_box(self) -> str:
+        text = self._read_paste_box()
+        if not text:
+            return "The paste box is empty. Use /paste open first, paste text into the file, save it, then run /paste remember."
+        if len(text) > 1400:
+            return "That paste is long, so use /paste learn instead. Memory notes should stay short and durable."
+        return self.remember(text)
+
+    def _ensure_paste_box(self) -> None:
+        self.paste_file.parent.mkdir(parents=True, exist_ok=True)
+        if not self.paste_file.exists():
+            self.paste_file.write_text(
+                "# MANTIS Paste Box\n"
+                "# Paste long rules, notes, or lessons below these comment lines.\n"
+                "# Learn = behavior rules/lessons. Remember = short facts/preferences.\n"
+                "# Save this file, then run /paste learn or /paste remember.\n"
+                "# After MANTIS saves it, you can delete the pasted text or run /paste clear.\n\n",
+                encoding="utf-8",
+            )
+
+    def _read_paste_box(self) -> str:
+        self._ensure_paste_box()
+        try:
+            raw = self.paste_file.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            return ""
+        lines = [
+            line
+            for line in raw.splitlines()
+            if not line.strip().startswith("#")
+        ]
+        return re.sub(r"\s+", " ", "\n".join(lines)).strip()
+
+    def _lessons_from_paste_text(self, text: str) -> list[str]:
+        lines = []
+        for raw in text.splitlines():
+            clean = re.sub(r"\s+", " ", raw).strip(" -*\t")
+            clean = re.sub(r"^\d+[\.)]\s*", "", clean)
+            if clean:
+                lines.append(clean)
+        if len(lines) >= 2:
+            return lines[:8]
+        sentences = re.split(r"(?<=[.!?])\s+", text)
+        return [re.sub(r"\s+", " ", item).strip(" -*\t") for item in sentences if len(item.strip()) >= 20][:8]
 
     def save_lessons(self, category: str, name: str, lessons: list[str], source: str, lead: str = "Saved lessons") -> str:
         clean_lessons = []
@@ -1231,35 +1472,93 @@ class LauncherChat:
         if not sys.stdin.isatty():
             return "Key saving only works in the interactive launcher window."
         print("  MANTIS > Paste the new MANTIS intelligence key. It will be hidden while you type.")
+        print("  MANTIS > If Windows does not paste here, copy the key and press Enter; I will check the clipboard.")
         try:
             key = getpass.getpass("  MANTIS key > ").strip()
         except (EOFError, KeyboardInterrupt):
             return "Key update cancelled."
+        if not mantis_secrets.valid_groq_key(key):
+            clipboard_key = mantis_secrets.valid_groq_key(self._clipboard_text())
+            if clipboard_key:
+                key = clipboard_key
         if not key:
             return "Key update cancelled."
         return self._save_groq_key(key)
 
     def _save_groq_key(self, key: str) -> str:
-        secrets_path = self.repo_root / ".streamlit" / "secrets.toml"
-        secrets_path.parent.mkdir(parents=True, exist_ok=True)
-        try:
-            existing = secrets_path.read_text(encoding="utf-8") if secrets_path.exists() else ""
-            replacement = f'MANTIS_CHAT_GROQ_API_KEY = "{self._toml_escape(key)}"'
-            if re.search(r"(?m)^MANTIS_CHAT_GROQ_API_KEY\s*=", existing):
-                updated = re.sub(r'(?m)^MANTIS_CHAT_GROQ_API_KEY\s*=.*$', replacement, existing)
-            elif re.search(r"(?m)^mantis_chat_groq_api_key\s*=", existing):
-                updated = re.sub(r'(?m)^mantis_chat_groq_api_key\s*=.*$', replacement, existing)
-            else:
-                spacer = "" if not existing or existing.endswith("\n") else "\n"
-                updated = f"{existing}{spacer}{replacement}\n"
-            secrets_path.write_text(updated, encoding="utf-8")
-        except OSError as exc:
-            return f"I could not save the key: {exc}"
+        clean_key = mantis_secrets.valid_groq_key(key)
+        if not clean_key:
+            return (
+                "That does not look like a Groq key. Copy the fresh gsk_ key, run /save-key, "
+                "then press Enter at the hidden prompt if Ctrl+V does not paste."
+            )
+        saved, error = mantis_secrets.save_named_secret(
+            self.repo_root,
+            ["MANTIS_CHAT_GROQ_API_KEY", "mantis_chat_groq_api_key"],
+            "MANTIS_CHAT_GROQ_API_KEY",
+            clean_key,
+        )
+        if not saved:
+            return f"I could not save the key: {error}"
 
         self._load_groq_settings()
         return (
             "Saved the dedicated MANTIS chat intelligence key and reloaded my conversation layer. "
             "Use /mantis to confirm; this key is separate from the main app key and stays hidden. "
+            "If that key was pasted into the visible console, revoke it and save a fresh one."
+        )
+
+    @staticmethod
+    def _clipboard_text() -> str:
+        if os.name != "nt":
+            return ""
+        try:
+            result = subprocess.run(
+                ["powershell", "-NoProfile", "-Command", "Get-Clipboard -Raw"],
+                capture_output=True,
+                text=True,
+                timeout=3,
+                check=False,
+            )
+        except Exception:
+            return ""
+        if result.returncode != 0:
+            return ""
+        return result.stdout or ""
+
+    def save_research_key_interactive(self) -> str:
+        if not sys.stdin.isatty():
+            return "Research key saving only works in the interactive launcher window."
+        print("  MANTIS > Paste the MANTIS research key. It will be hidden while you type.")
+        print("  MANTIS > If Windows does not paste here, copy the key and press Enter; I will check the clipboard.")
+        try:
+            key = getpass.getpass("  research key > ").strip()
+        except (EOFError, KeyboardInterrupt):
+            return "Research key update cancelled."
+        clean_key = mantis_secrets.clean_research_key(key)
+        if not clean_key:
+            clean_key = mantis_secrets.clean_research_key(self._clipboard_text())
+        key = clean_key
+        if not key:
+            return "That does not look like a Tavily research key. Copy a tvly- key, run /save-research-key, then press Enter at the hidden prompt if Ctrl+V does not paste."
+        return self._save_research_key(key)
+
+    def _save_research_key(self, key: str) -> str:
+        clean_key = mantis_secrets.clean_research_key(key)
+        if not clean_key:
+            return "That does not look like a Tavily research key. Paste only the tvly- key text, or copy it and press Enter at the hidden prompt."
+        saved, error = mantis_secrets.save_named_secret(
+            self.repo_root,
+            ["MANTIS_RESEARCH_API_KEY", "TAVILY_API_KEY", "tavily_api_key"],
+            "MANTIS_RESEARCH_API_KEY",
+            clean_key,
+        )
+        if not saved:
+            return f"I could not save the research key: {error}"
+
+        return (
+            "Saved the dedicated MANTIS research key. "
+            "It is separate from the chat intelligence key and will only be used for /research and /learn research. "
             "If that key was pasted into the visible console, revoke it and save a fresh one."
         )
 
@@ -1299,26 +1598,13 @@ class LauncherChat:
         print()
 
     def _print_handoff_row(self, label: str, value: str) -> None:
-        label_text = f"  {label:<8} "
-        value_text = f"{value:<50}"[:50]
-        print(
-            self._color("  |", "green")
-            + self._color(label_text, "cyan")
-            + self._color(value_text, "soft")
-            + self._color("|", "green")
-        )
+        self.ui.print_handoff_row(label, value)
 
     def _prompt(self) -> str:
-        if not self.use_color:
-            self._set_native_color("blue")
-            return "  YOU > "
-        return "\033[94m  YOU \033[96m>\033[0m "
+        return self.ui.prompt()
 
     def _reset_color(self) -> None:
-        if self.use_color:
-            print("\033[0m", end="")
-        elif self.use_native_color:
-            self._set_native_color("soft")
+        self.ui.reset_color()
 
     def _print_banner(self) -> None:
         if self.use_unicode:
@@ -1409,92 +1695,33 @@ class LauncherChat:
         print("\n")
 
     def _bar(self, filled: int, total: int) -> str:
-        return self._color(self._plain_bar(filled, total), "green")
+        return self.ui.bar(filled, total)
 
     @staticmethod
     def _plain_bar(filled: int, total: int) -> str:
-        filled = max(0, min(filled, total))
-        full, empty = "\u2588", "\u2591"
-        encoding = sys.stdout.encoding or ""
-        try:
-            (full + empty).encode(encoding or "utf-8")
-        except (LookupError, UnicodeEncodeError):
-            full, empty = "#", "-"
-        bar = full * filled + empty * (total - filled)
-        return f"[{bar}]"
+        return ConsoleUI.plain_bar(filled, total)
 
     def _color(self, text: str, color: str) -> str:
-        if not self.use_color:
-            return text
-        colors = {
-            "blue": "\033[94m",
-            "cyan": "\033[96m",
-            "green": "\033[92m",
-            "yellow": "\033[93m",
-            "soft": "\033[97m",
-            "dim": "\033[90m",
-            "reset": "\033[0m",
-        }
-        return f"{colors.get(color, '')}{text}{colors['reset']}"
+        return self.ui.color(text, color)
 
     @staticmethod
     def _sleep(seconds: float) -> None:
-        try:
-            import time
-
-            time.sleep(seconds)
-        except Exception:
-            pass
+        ConsoleUI.sleep(seconds)
 
     @staticmethod
     def _supports_unicode() -> bool:
-        encoding = (sys.stdout.encoding or "").lower()
-        return "utf" in encoding or "65001" in encoding
+        return ConsoleUI.supports_unicode()
 
     @staticmethod
     def _enable_ansi_color() -> bool:
-        if not sys.stdout.isatty():
-            return False
-        if os.name != "nt":
-            return True
-        try:
-            import ctypes
-
-            kernel32 = ctypes.windll.kernel32
-            handle = kernel32.GetStdHandle(-11)
-            mode = ctypes.c_uint32()
-            if not kernel32.GetConsoleMode(handle, ctypes.byref(mode)):
-                return False
-            enable_virtual_terminal = 0x0004
-            if kernel32.SetConsoleMode(handle, mode.value | enable_virtual_terminal):
-                return True
-        except Exception:
-            return False
-        return False
+        return ConsoleUI.enable_ansi_color()
 
     @staticmethod
     def _supports_native_color() -> bool:
-        return os.name == "nt" and sys.stdout.isatty()
+        return ConsoleUI.supports_native_color()
 
     def _set_native_color(self, color: str) -> None:
-        if not self.use_native_color:
-            return
-        attrs = {
-            "blue": 0x09,
-            "green": 0x0A,
-            "yellow": 0x0E,
-            "cyan": 0x0B,
-            "soft": 0x0F,
-            "dim": 0x08,
-        }
-        try:
-            import ctypes
-
-            kernel32 = ctypes.windll.kernel32
-            handle = kernel32.GetStdHandle(-11)
-            kernel32.SetConsoleTextAttribute(handle, attrs.get(color, 0x0F))
-        except Exception:
-            pass
+        self.ui.set_native_color(color)
 
     def _connect_groq(self) -> None:
         if self.groq_key:
@@ -1555,15 +1782,9 @@ class LauncherChat:
             (".streamlit/secrets.toml mantis_chat_groq_api_key", secrets.get("mantis_chat_groq_api_key")),
             (".streamlit/secrets.toml [mantis_chat].groq_api_key", self._nested_secret(secrets, "mantis_chat", "groq_api_key")),
             (".streamlit/secrets.toml [mantis_chat].api_key", self._nested_secret(secrets, "mantis_chat", "api_key")),
-            ("GROQ_API_KEY environment variable", os.getenv("GROQ_API_KEY")),
-            ("MANTIS_GROQ_API_KEY environment variable", os.getenv("MANTIS_GROQ_API_KEY")),
-            ("MANTIS saved app config", config.get("groq_api_key")),
-            (".streamlit/secrets.toml groq_api_key", secrets.get("groq_api_key")),
-            (".streamlit/secrets.toml GROQ_API_KEY", secrets.get("GROQ_API_KEY")),
-            (".streamlit/secrets.toml [groq].api_key", self._nested_secret(secrets, "groq", "api_key")),
         ]
         for source, key in key_sources:
-            cleaned = str(key or "").strip()
+            cleaned = mantis_secrets.valid_groq_key(key)
             if cleaned:
                 self.key_sources.append(KeySource(source, cleaned))
         self._activate_next_key_source()
@@ -1621,63 +1842,32 @@ class LauncherChat:
         return list(latest_by_name.values())
 
     def _load_app_config(self) -> dict[str, object]:
-        config_path = Path(
-            os.getenv("MANTIS_CONFIG_PATH")
-            or self.repo_root / "projects" / ".mantis_config.json"
-        )
-        try:
-            with config_path.open("r", encoding="utf-8") as handle:
-                data = json.load(handle)
-            return data if isinstance(data, dict) else {}
-        except (OSError, json.JSONDecodeError):
-            return {}
+        return mantis_secrets.load_app_config(self.repo_root)
 
     def _load_streamlit_secrets(self) -> dict[str, object]:
-        if tomllib is None:
-            return {}
-        secrets_path = self.repo_root / ".streamlit" / "secrets.toml"
-        try:
-            with secrets_path.open("rb") as handle:
-                data = tomllib.load(handle)
-            return data if isinstance(data, dict) else {}
-        except (OSError, tomllib.TOMLDecodeError):
-            return {}
+        return mantis_secrets.load_streamlit_secrets(self.repo_root)
+
+    def _load_streamlit_secrets_lenient(self) -> dict[str, object]:
+        return mantis_secrets.load_streamlit_secrets_lenient(self.repo_root)
 
     def _research_api_key(self) -> str:
-        secrets = self._load_streamlit_secrets()
-        candidates = [
-            os.getenv("MANTIS_RESEARCH_API_KEY"),
-            os.getenv("TAVILY_API_KEY"),
-            secrets.get("MANTIS_RESEARCH_API_KEY"),
-            secrets.get("TAVILY_API_KEY"),
-            secrets.get("tavily_api_key"),
-            self._nested_secret(secrets, "research", "api_key"),
-            self._nested_secret(secrets, "tavily", "api_key"),
-        ]
-        for key in candidates:
-            clean = str(key or "").strip()
-            if clean:
-                return clean
-        return ""
+        return mantis_secrets.research_api_key(self.repo_root)
 
     @staticmethod
     def _nested_secret(data: dict[str, object], section: str, key: str) -> object:
-        value = data.get(section)
-        if isinstance(value, dict):
-            return value.get(key)
-        return None
+        return mantis_secrets.nested_secret(data, section, key)
 
     @staticmethod
     def _toml_escape(value: str) -> str:
-        return value.replace("\\", "\\\\").replace('"', '\\"')
+        return mantis_secrets.toml_escape(value)
+
+    @classmethod
+    def _repair_toml_control_chars(cls, text: str) -> str:
+        return mantis_secrets.repair_toml_control_chars(text)
 
     @staticmethod
     def _tail(path: Path, limit: int) -> list[str]:
-        try:
-            with path.open("r", encoding="utf-8", errors="replace") as handle:
-                return handle.readlines()[-limit:]
-        except OSError:
-            return []
+        return mantis_logs.tail(path, limit)
 
     @staticmethod
     def _slugify(value: str) -> str:
@@ -1738,6 +1928,20 @@ class LauncherChat:
         return bool(
             re.search(r"\b(connect|connected|internet|online|web|live data|real[- ]?time)\b", text)
             and re.search(r"\b(can|could|should|able|possible)\b", text)
+        )
+
+    @staticmethod
+    def _asks_about_previous_chat(text: str) -> bool:
+        return bool(
+            re.search(r"\b(previous|last|old|earlier|where .*left off|resume|continue|pick up)\b", text)
+            and re.search(r"\b(chat|research|conversation|left off|logs?)\b", text)
+        )
+
+    @staticmethod
+    def _asks_about_learning_job(text: str) -> bool:
+        return bool(
+            re.search(r"\b(still learning|are you learning|u still learning|learning status|learn status)\b", text)
+            or re.fullmatch(r"\s*status\s*", text)
         )
 
     @staticmethod

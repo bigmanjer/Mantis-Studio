@@ -528,6 +528,8 @@ class Project:
     memory_soft: str = ""
     author_note: str = ""
     style_guide: str = ""
+    selected_style_lenses: List[str] = field(default_factory=list)
+    style_lens_settings: Dict[str, int] = field(default_factory=dict)
     default_word_count: int = 1000
     world_db: Dict[str, Entity] = field(default_factory=dict)
     chapters: Dict[str, Chapter] = field(default_factory=dict)
@@ -937,6 +939,16 @@ class Project:
         proj.memory_soft = data.get("memory_soft", "")
         proj.author_note = data.get("author_note", data.get("authors_note", ""))
         proj.style_guide = data.get("style_guide", data.get("style_note", ""))
+        lenses = data.get("selected_style_lenses", [])
+        proj.selected_style_lenses = [str(item) for item in lenses] if isinstance(lenses, list) else []
+        settings = data.get("style_lens_settings", {})
+        proj.style_lens_settings = {}
+        if isinstance(settings, dict):
+            for key, value in settings.items():
+                try:
+                    proj.style_lens_settings[str(key)] = max(1, min(10, int(value)))
+                except (TypeError, ValueError):
+                    continue
         proj.default_word_count = data.get("default_word_count", 1000)
         proj.created_at = data.get("created_at", time.time())
         proj.last_modified = data.get("last_modified", time.time())
@@ -1401,6 +1413,31 @@ class StoryEngine:
             if knowledge_context
             else ""
         )
+        style_lens_context = build_style_lens_context(
+            AppConfig.PROJECTS_DIR,
+            getattr(project, "selected_style_lenses", []) or [],
+            project_goal=knowledge_query,
+            limit_per_author=2,
+        )
+        lens_settings = getattr(project, "style_lens_settings", {}) or {}
+        lens_setting_labels = {
+            "pace": "Pacing intensity",
+            "interiority": "Interior character depth",
+            "imagery": "Imagery density",
+            "dialogue": "Dialogue energy",
+            "atmosphere": "Atmosphere",
+        }
+        lens_settings_text = "\n".join(
+            f"- {lens_setting_labels.get(key, key.title())}: {int(value)}/10"
+            for key, value in lens_settings.items()
+        )
+        style_lens_block = (
+            "AUTHOR & STYLE LENS (craft traits only; original prose required):\n"
+            f"{style_lens_context[:2200]}\n"
+            f"{('Craft control sliders:\n' + lens_settings_text) if lens_settings_text else ''}\n\n"
+            if style_lens_context
+            else ""
+        )
 
         prompt = (
             f"TITLE: {project.title}\nGENRE: {project.genre}\n"
@@ -1409,6 +1446,7 @@ class StoryEngine:
             f"{memory_block}"
             f"{author_block}"
             f"{style_block}"
+            f"{style_lens_block}"
             f"{knowledge_block}"
             f"OUTLINE CONTEXT:\n{outline_context}\n\n"
             f"{story_so_far}"
@@ -1597,8 +1635,47 @@ def sanitize_chapter_title(title: str) -> str:
 def _run_ui():
     import streamlit as st
     import streamlit.components.v1 as components
+
+    bootstrap_assets_dir = Path(__file__).resolve().parents[1] / "assets"
+    bootstrap_icon_path = None
+    for bootstrap_icon_name in (
+        "branding/mantis_favicon.png",
+        "mantis_favicon.png",
+        "branding/mantis_emblem.png",
+        "mantis_emblem.png",
+    ):
+        candidate = resolve_asset_path(bootstrap_assets_dir, bootstrap_icon_name)
+        if candidate and candidate.exists():
+            bootstrap_icon_path = candidate
+            break
+    bootstrap_page_icon = (
+        str(bootstrap_icon_path)
+        if bootstrap_icon_path and bootstrap_icon_path.exists()
+        else "M"
+    )
+    try:
+        st.set_page_config(
+            page_title=AppConfig.APP_NAME,
+            page_icon=bootstrap_page_icon,
+            layout="wide",
+        )
+        logger.info("Page config set successfully")
+    except Exception as e:
+        logger.error(f"Failed to set page config: {e}", exc_info=True)
+        raise
+
+    try:
+        health_value = st.query_params.get("health", "")
+        if isinstance(health_value, list):
+            health_value = health_value[0] if health_value else ""
+    except Exception:
+        health_value = ""
+    if str(health_value).strip().lower() == "mantis":
+        logger.info("MANTIS health probe answered.")
+        st.text(f"MANTIS_OK {AppConfig.VERSION}")
+        return
+
     from contextlib import contextmanager
-    from pathlib import Path
     from app.components.buttons import action_card, card, primary_button, section_header, stat_tile
     from app.ui.components import card_block, cta_tile, empty_state, header_bar, render_tag_list
     from app.ui.ui_layout import render_card, render_metric, render_section_header
@@ -1634,16 +1711,21 @@ def _run_ui():
         send_password_reset_email,
     )
     from app.services.knowledge_base import (
+        builtin_knowledge_status,
         extract_text_from_upload,
+        install_builtin_knowledge_base,
         import_knowledge_document,
         delete_knowledge_document,
+        build_style_lens_context,
         get_document_chunks,
         knowledge_base_path,
         knowledge_stats,
         list_knowledge_categories,
+        list_author_style_profiles,
         list_knowledge_sources,
         load_knowledge_base,
         search_knowledge_base,
+        suggest_author_style_lenses,
     )
     # Import enhanced UI feedback components
     from app.ui.feedback import (
@@ -2365,22 +2447,11 @@ def _run_ui():
 
     logger.info("Starting UI initialization...")
     logger.debug(f"Assets directory: {ASSETS_DIR}")
-    
-    icon_path = resolve_first_asset_path(
-        "branding/mantis_favicon.png",
-        "mantis_favicon.png",
-        "branding/mantis_emblem.png",
-        "mantis_emblem.png",
+    logger.debug(
+        "Bootstrap icon path exists: %s, using: %s",
+        bool(bootstrap_icon_path and bootstrap_icon_path.exists()),
+        bootstrap_page_icon,
     )
-    page_icon = str(icon_path) if icon_path and icon_path.exists() else "M"
-    logger.debug(f"Icon path exists: {bool(icon_path and icon_path.exists())}, using: {page_icon}")
-    
-    try:
-        st.set_page_config(page_title=AppConfig.APP_NAME, page_icon=page_icon, layout="wide")
-        logger.info("Page config set successfully")
-    except Exception as e:
-        logger.error(f"Failed to set page config: {e}", exc_info=True)
-        raise
     
     # Theme injection is handled by the enhanced design system below.
     
@@ -3059,6 +3130,22 @@ def _run_ui():
 
     def _release_highlights() -> List[tuple[str, str]]:
         return [
+            ("Access", "Sign-in is more compact now, with email access visible without scrolling."),
+            ("Launcher", "The background server window is now titled MANTIS Runtime instead of MANTIS Streamlit Server."),
+            ("Knowledge Base", "Style-lens scanning now renders the progress panel before scan work begins, so the page no longer just greys out."),
+            ("Knowledge Base", "Author & Style Lab now shows a staged loading bar while scanning the current work for recommended style lenses."),
+            ("Style Lab", "Author & Style Lab can now scan the current project and suggest the best author influence lenses with reasons."),
+            ("Style Lab", "Recommended lenses are preselected after scanning so users do not need to know which author profile fits their draft."),
+            ("Knowledge Base", "The built-in master library now has deeper scene mechanics, genre lenses, author craft profiles, work references, and revision recipes."),
+            ("Access", "Sign-in/create account now uses a tighter MANTIS layout with clearer Google, guest, and email paths."),
+            ("Access", "Opening the auth page now resets to the top so it no longer inherits a previous footer scroll position."),
+            ("Knowledge Base", "Refreshing the Core Library after this update installs the expanded master document."),
+            ("Knowledge Base", "Knowledge Base is now organized into Core Library, User Library, Author & Style Lab, and Knowledge Health."),
+            ("Style Lab", "Projects can save author influence lenses and craft sliders for pace, interiority, imagery, dialogue, and mood."),
+            ("AI Learning", "Chapter generation now uses selected style lenses as copyright-safe craft traits, not direct author impersonation."),
+            ("Knowledge Health", "The Knowledge Base page now shows core library readiness, author profile count, user document count, and retrieval coverage."),
+            ("Knowledge Base", "Built-in MANTIS Literary Master Knowledge Base can now be installed or refreshed in one click."),
+            ("Knowledge Base", "The bundled library includes craft guidance, genre patterns, movements, authors, works, motifs, and revision heuristics."),
             ("Access", "Sign-in is simpler: one clear Google action, one guest fallback, and email options without the extra selector clutter."),
             ("Access", "The full app footer no longer appears on the auth gate, reducing scroll and keeping first entry focused."),
             ("Launcher", "The local launcher now verifies the existing 127.0.0.1 runtime cleanly and avoids the broken decorative batch banner parse path."),
@@ -3342,28 +3429,56 @@ def _run_ui():
             if auth_lockup
             else '<div class="mantis-auth-wordmark">MANTIS Studio</div>'
         )
+        _render_page_position_reset()
+        components.html(
+            """
+            <script>
+            (function () {
+                const reset = () => {
+                    try {
+                        const win = window.parent || window;
+                        const doc = win.document || document;
+                        const targets = [
+                            doc.querySelector('section[data-testid="stMain"]'),
+                            doc.querySelector('[data-testid="stAppViewContainer"]'),
+                            doc.scrollingElement,
+                            doc.documentElement,
+                            doc.body
+                        ].filter(Boolean);
+                        targets.forEach((node) => { try { node.scrollTop = 0; } catch (_) {} });
+                        try { win.scrollTo(0, 0); } catch (_) {}
+                    } catch (_) {}
+                };
+                reset();
+                setTimeout(reset, 60);
+                setTimeout(reset, 240);
+            })();
+            </script>
+            """,
+            height=0,
+        )
 
         st.html(
             """
             <style>
             .mantis-auth-shell {
-                padding: 0.2rem 0 1rem;
+                padding: 0 0 0.25rem;
             }
             .mantis-auth-hero {
-                padding: 1rem;
+                padding: 0.72rem;
                 display: flex;
                 flex-direction: column;
                 justify-content: space-between;
-                gap: 0.9rem;
-                min-height: 420px;
+                gap: 0.55rem;
+                min-height: 285px;
             }
             .mantis-auth-logo {
-                width: min(330px, 92%);
-                max-height: 96px;
+                width: min(250px, 88%);
+                max-height: 62px;
                 object-fit: contain;
                 object-position: left center;
                 display: block;
-                margin-bottom: 1rem;
+                margin-bottom: 0.5rem;
             }
             .mantis-auth-wordmark {
                 font-size: 1.25rem;
@@ -3373,23 +3488,45 @@ def _run_ui():
             .mantis-auth-kicker {
                 letter-spacing: 0.08em;
                 text-transform: uppercase;
-                font-size: 0.72rem;
+                font-size: 0.68rem;
                 color: var(--mantis-muted);
-                margin-bottom: 0.5rem;
+                margin-bottom: 0.35rem;
             }
             .mantis-auth-title {
-                font-size: 1.75rem;
+                font-size: 1.34rem;
                 line-height: 1.12;
-                margin: 0 0 0.55rem 0;
+                margin: 0 0 0.35rem 0;
                 font-weight: 800;
-                max-width: 18ch;
+                max-width: 24ch;
             }
             .mantis-auth-sub {
                 color: var(--mantis-muted);
-                margin-bottom: 0.75rem;
-                max-width: 44ch;
-                font-size: 0.95rem;
-                line-height: 1.58;
+                margin-bottom: 0.45rem;
+                max-width: 52ch;
+                font-size: 0.85rem;
+                line-height: 1.42;
+            }
+            .mantis-auth-benefit-grid {
+                display: grid;
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+                gap: 0.45rem;
+                margin-top: 0.55rem;
+            }
+            .mantis-auth-benefit {
+                border: 1px solid var(--mantis-card-border);
+                border-radius: 8px;
+                padding: 0.5rem;
+                background: color-mix(in srgb, var(--mantis-card-bg) 88%, var(--mantis-primary) 12%);
+            }
+            .mantis-auth-benefit strong {
+                display: block;
+                font-size: 0.82rem;
+                margin-bottom: 0.1rem;
+            }
+            .mantis-auth-benefit span {
+                color: var(--mantis-muted);
+                font-size: 0.72rem;
+                line-height: 1.25;
             }
             .mantis-auth-command {
                 border: 1px solid var(--mantis-card-border);
@@ -3434,10 +3571,10 @@ def _run_ui():
             }
             .mantis-auth-paths {
                 color: var(--mantis-muted);
-                font-size: 0.84rem;
-                line-height: 1.45;
+                font-size: 0.78rem;
+                line-height: 1.32;
                 border-top: 1px solid var(--mantis-card-border);
-                padding-top: 0.8rem;
+                padding-top: 0.5rem;
             }
             .mantis-auth-path {
                 display: grid;
@@ -3468,19 +3605,19 @@ def _run_ui():
                 padding-top: 0.75rem;
             }
             .mantis-auth-panel {
-                padding: 0.9rem 0.2rem 0.35rem;
+                padding: 0.45rem 0.1rem 0.12rem;
             }
             .mantis-auth-panel h3 {
                 margin-top: 0;
-                margin-bottom: 0.35rem;
-                font-size: 1.5rem;
+                margin-bottom: 0.2rem;
+                font-size: 1.15rem;
                 line-height: 1.14;
             }
             .mantis-auth-primary-link {
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                min-height: 2.85rem;
+                min-height: 2.5rem;
                 width: 100%;
                 border-radius: 8px;
                 border: 1px solid var(--mantis-primary-border);
@@ -3497,13 +3634,13 @@ def _run_ui():
             .mantis-auth-action-row {
                 display: grid;
                 grid-template-columns: 1fr 1fr;
-                gap: 0.65rem;
-                margin: 0.75rem 0 0.45rem;
+                gap: 0.55rem;
+                margin: 0.45rem 0 0.35rem;
             }
             .mantis-auth-method-label {
-                margin: 0.65rem 0 0.35rem;
+                margin: 0.35rem 0 0.2rem;
                 color: var(--mantis-muted);
-                font-size: 0.86rem;
+                font-size: 0.76rem;
                 text-transform: uppercase;
                 letter-spacing: 0.05em;
             }
@@ -3515,9 +3652,9 @@ def _run_ui():
             }
             .mantis-auth-form-note {
                 color: var(--mantis-muted);
-                font-size: 0.86rem;
+                font-size: 0.78rem;
                 line-height: 1.45;
-                margin: 0.2rem 0 0.7rem;
+                margin: 0.1rem 0 0.45rem;
             }
             .mantis-auth-guest-note {
                 margin-top: 0.75rem;
@@ -3526,7 +3663,7 @@ def _run_ui():
                 line-height: 1.45;
             }
             .mantis-auth-divider {
-                margin: 0.8rem 0 0.35rem;
+                margin: 0.45rem 0 0.2rem;
                 border-top: 1px solid var(--mantis-card-border);
             }
             .mantis-auth-trust-row {
@@ -3549,6 +3686,7 @@ def _run_ui():
                     max-width: none;
                 }
                 .mantis-auth-signal-strip,
+                .mantis-auth-benefit-grid,
                 .mantis-auth-trust-row,
                 .mantis-auth-action-row {
                     grid-template-columns: 1fr;
@@ -3568,8 +3706,8 @@ def _run_ui():
 
         _, center, _ = st.columns([0.06, 1, 0.06])
         with center:
-            st.html('<div class="mantis-auth-shell"></div>')
-            hero_col, auth_col = st.columns([1.1, 0.9], vertical_alignment="top")
+            st.html('<div id="mantis-auth-top" class="mantis-auth-shell"></div>')
+            hero_col, auth_col = st.columns([0.86, 1.14], vertical_alignment="top")
 
             with hero_col:
                 with st.container(border=True):
@@ -3579,15 +3717,16 @@ def _run_ui():
                             <div>
                                 {auth_lockup_img}
                                 <div class="mantis-auth-kicker">MANTIS Studio</div>
-                                <h2 class="mantis-auth-title">Write faster. Keep canon clean.</h2>
-                                <div class="mantis-auth-sub">A focused workspace for drafting chapters, tracking story knowledge, and catching continuity issues before they spread.</div>
-                                <div class="mantis-auth-command">
-                                    <strong>Try it without an account.</strong>
-                                    <span>Guest mode starts immediately. Sign in when you want recovery and account-based workspaces.</span>
+                                <h2 class="mantis-auth-title">Write the story. Keep the world straight.</h2>
+                                <div class="mantis-auth-sub">Draft chapters, build canon, and use MANTIS intelligence from one focused workspace.</div>
+                                <div class="mantis-auth-benefit-grid">
+                                    <div class="mantis-auth-benefit"><strong>Draft</strong><span>Chapters, rewrites, summaries.</span></div>
+                                    <div class="mantis-auth-benefit"><strong>Canon</strong><span>World Bible and scanner review.</span></div>
+                                    <div class="mantis-auth-benefit"><strong>Learn</strong><span>Knowledge Base and style lenses.</span></div>
                                 </div>
                             </div>
                             <div class="mantis-auth-paths">
-                                Plan your outline, draft chapters, review canon, and export from one workspace.
+                                Start as a guest, then connect an account when you want recovery and separated workspaces.
                             </div>
                         </div>
                         """
@@ -3601,8 +3740,8 @@ def _run_ui():
                         <div class="mantis-auth-panel">
                             <div>
                                 <div class="mantis-auth-kicker">Access</div>
-                                <h3>Sign in to MANTIS</h3>
-                                <div class="mantis-auth-sub">Continue with Google, enter as a guest, or use email.</div>
+                                <h3>Access your workspace</h3>
+                                <div class="mantis-auth-sub">Sign in with email, continue with Google, or enter as a guest.</div>
                             </div>
                         </div>
                         """
@@ -3613,29 +3752,30 @@ def _run_ui():
                         st.error(oauth_error)
                     if oauth_success:
                         st.success(oauth_success)
-                    if google_ready and google_auth_url:
-                        safe_google_url = html.escape(google_auth_url, quote=True)
-                        st.html(
-                            f'<a class="mantis-auth-primary-link" href="{safe_google_url}" target="_self" rel="noopener">Continue with Google</a>',
+                    quick_google_col, quick_guest_col = st.columns(2)
+                    with quick_google_col:
+                        if google_ready and google_auth_url:
+                            safe_google_url = html.escape(google_auth_url, quote=True)
+                            st.html(
+                                f'<a class="mantis-auth-primary-link" href="{safe_google_url}" target="_self" rel="noopener">Continue with Google</a>',
+                            )
+                        else:
+                            if st.button("Continue with Google", use_container_width=True, key="auth_google_btn", disabled=True):
+                                pass
+                    with quick_guest_col:
+                        if st.button(
+                            "Continue as guest",
+                            use_container_width=True,
+                            key="auth_continue_guest",
+                            help="Enter MANTIS without creating an account. You can upgrade later.",
+                        ):
+                            _start_guest_session()
+                            st.rerun()
+                    if not google_ready:
+                        st.caption(
+                            f"{google_msg} Add MANTIS_GOOGLE_CLIENT_SECRET or google_client_secret in Streamlit Secrets, then redeploy."
                         )
-                    else:
-                        if st.button("Continue with Google", use_container_width=True, key="auth_google_btn", disabled=True):
-                            pass
-                        st.info(
-                            f"{google_msg} Add MANTIS_GOOGLE_CLIENT_SECRET or google_client_secret "
-                            "in Streamlit Secrets, then redeploy."
-                        )
-                    st.html('<div class="mantis-auth-divider"></div>')
-                    if st.button(
-                        "Continue as guest",
-                        use_container_width=True,
-                        key="auth_continue_guest",
-                        help="Enter MANTIS without creating an account. You can upgrade later.",
-                    ):
-                        _start_guest_session()
-                        st.rerun()
-                    st.html('<div class="mantis-auth-divider"></div>')
-                    st.html('<div class="mantis-auth-method-label">Email</div>')
+                    st.html('<div class="mantis-auth-method-label">Email access</div>')
                     auth_tabs = st.tabs(["Sign in", "Create account", "Recover"])
 
                     with auth_tabs[0]:
@@ -3667,7 +3807,7 @@ def _run_ui():
                                 st.rerun()
 
                     with auth_tabs[1]:
-                        st.html('<div class="mantis-auth-form-note">Password needs 10+ characters with uppercase, lowercase, and a number.</div>')
+                        st.html('<div class="mantis-auth-form-note">Create a saved workspace. Password needs 10+ characters with uppercase, lowercase, and a number.</div>')
                         with st.form("auth_signup_form", clear_on_submit=False):
                             signup_email = st.text_input("Email", key="auth_signup_email")
                             signup_display_name = st.text_input("Display name", key="auth_signup_display_name")
@@ -7487,11 +7627,44 @@ def _run_ui():
                 else:
                     st.caption("Tags appear after import and classification.")
 
-        import_tab, search_tab, library_tab = st.tabs(["Import", "Search", "Library"])
+        core_tab, user_tab, style_tab, health_tab = st.tabs(
+            ["Core Library", "User Library", "Author & Style Lab", "Knowledge Health"]
+        )
 
-        with import_tab:
+        with core_tab:
+            builtin_status = builtin_knowledge_status(AppConfig.PROJECTS_DIR)
             with st.container(border=True):
-                st.markdown("### Import learning material")
+                st.markdown("### Built-in literary library")
+                st.caption(
+                    "Install the bundled MANTIS literary master document: craft patterns, genres, movements, authors, works, motifs, and revision heuristics."
+                )
+                status_cols = st.columns([1, 1, 1])
+                status_cols[0].metric("Status", "Installed" if builtin_status.get("installed") else "Not installed")
+                status_cols[1].metric("Version", "Current" if builtin_status.get("current") else "Refresh needed")
+                status_cols[2].metric("Chunks", builtin_status.get("chunks", 0))
+                install_label = "Refresh built-in library" if builtin_status.get("installed") else "Install built-in library"
+                if st.button(
+                    install_label,
+                    type="primary",
+                    use_container_width=True,
+                    key="knowledge_install_builtin",
+                    disabled=not builtin_status.get("available", False),
+                ):
+                    try:
+                        result = install_builtin_knowledge_base(AppConfig.PROJECTS_DIR)
+                        st.session_state["knowledge_last_import"] = result
+                        st.success(
+                            f"Built-in library ready: {result['chunks']} searchable chunk(s)."
+                        )
+                        st.rerun()
+                    except Exception as exc:
+                        st.error(f"Built-in library install failed: {exc}")
+                st.info(
+                    "This library is guidance, not canon. It gives MANTIS reusable literary knowledge while your World Bible remains the source of story facts."
+                )
+
+            with st.container(border=True):
+                st.markdown("### Add to User Library")
                 st.caption("Use original summaries, craft notes, public-domain text, or licensed reference material.")
                 uploaded = st.file_uploader(
                     "Upload DOCX, TXT, or Markdown",
@@ -7520,7 +7693,7 @@ def _run_ui():
                     )
                 st.info("Knowledge Base guides generation and review. World Bible remains the source of story canon.")
 
-        with search_tab:
+        with user_tab:
             with st.container(border=True):
                 st.markdown("### Search what MANTIS has learned")
                 filter_cols = st.columns([2, 1, 1, 0.7])
@@ -7580,7 +7753,6 @@ def _run_ui():
                                     st.toast("Added to Style Guide.")
                                     st.rerun()
 
-        with library_tab:
             with st.container(border=True):
                 st.markdown("### Imported documents")
                 data = load_knowledge_base(AppConfig.PROJECTS_DIR)
@@ -7591,6 +7763,8 @@ def _run_ui():
                     created = time.strftime("%Y-%m-%d %H:%M", time.localtime(float(doc.get("created_at", 0) or 0)))
                     with st.expander(f"{doc.get('filename', 'Document')} - {doc.get('chunks', 0)} chunks", expanded=False):
                         st.caption(f"{int(doc.get('chars', 0) or 0):,} chars | Imported {created}")
+                        if doc.get("source_type") == "builtin":
+                            st.success("Built-in MANTIS library. Refresh from the Import tab when MANTIS ships a newer edition.")
                         category_counts = doc.get("category_counts", {}) or {}
                         if category_counts:
                             st.caption("Categories: " + ", ".join(f"{k} ({v})" for k, v in sorted(category_counts.items())))
@@ -7598,12 +7772,164 @@ def _run_ui():
                         for chunk in preview_chunks:
                             st.markdown(f"**{chunk.get('category', 'reference').title()}**")
                             st.write((chunk.get("text") or "")[:500])
-                        if st.button("Delete document", key=f"knowledge_delete_{doc.get('id')}", use_container_width=True):
+                        delete_disabled = bool(doc.get("protected"))
+                        if st.button(
+                            "Delete document",
+                            key=f"knowledge_delete_{doc.get('id')}",
+                            use_container_width=True,
+                            disabled=delete_disabled,
+                            help="Built-in library documents are refreshed from the Import tab instead of deleted." if delete_disabled else None,
+                        ):
                             if delete_knowledge_document(AppConfig.PROJECTS_DIR, str(doc.get("id") or "")):
                                 st.toast("Knowledge document deleted.")
                                 st.rerun()
                             else:
                                 st.error("Could not delete that document.")
+
+        with style_tab:
+            p = st.session_state.get("project")
+            profiles = list_author_style_profiles(AppConfig.PROJECTS_DIR)
+            with st.container(border=True):
+                st.markdown("### Author influence")
+                st.caption(
+                    "Select craft influences for original prose. MANTIS adapts traits such as rhythm, imagery, narration, and pacing instead of copying an author's expression."
+                )
+                if not profiles:
+                    st.warning("Install the built-in literary library or import author notes to unlock style profiles.")
+                else:
+                    if p:
+                        scan_text_parts = [
+                            p.title,
+                            p.genre,
+                            p.outline,
+                            p.memory_soft,
+                            p.style_guide,
+                        ]
+                        scan_text_parts.extend(
+                            (chapter.title + "\n" + (chapter.summary or "") + "\n" + (chapter.content or "")[:1800])
+                            for chapter in p.get_ordered_chapters()[:8]
+                        )
+                        if st.session_state.pop("knowledge_style_lens_scan_pending", False):
+                            with st.container(border=True):
+                                st.markdown("#### Scanning current work")
+                                scan_progress = st.progress(4, text="Preparing Knowledge Base scan...")
+                                scan_status = st.empty()
+                                scan_status.caption("Reading project title, genre, outline, guidance, and recent chapters.")
+                                time.sleep(0.12)
+                                scan_progress.progress(22, text="Collecting project signals...")
+                                scan_payload = "\n\n".join(part for part in scan_text_parts if part)
+                                time.sleep(0.12)
+                                scan_progress.progress(46, text="Comparing against author style profiles...")
+                                scan_status.caption("Matching tone, genre, pacing, narration, imagery, and story signals.")
+                                time.sleep(0.12)
+                                suggestions = suggest_author_style_lenses(
+                                    AppConfig.PROJECTS_DIR,
+                                    scan_payload,
+                                    limit=5,
+                                )
+                                scan_progress.progress(78, text="Scoring recommended lenses...")
+                                scan_status.caption("Ranking profiles by matched craft traits and available Knowledge Base support.")
+                                time.sleep(0.12)
+                                st.session_state["style_lens_suggestions"] = suggestions
+                                if suggestions:
+                                    st.session_state["knowledge_style_lens_select"] = [
+                                        item["name"] for item in suggestions[:3]
+                                    ]
+                                    scan_progress.progress(100, text="Scan complete. Recommendations ready.")
+                                    scan_status.caption(f"Found {len(suggestions)} recommended style lens option(s).")
+                                    st.toast("Style lens suggestions ready.")
+                                else:
+                                    scan_progress.progress(100, text="Scan complete. No strong match found.")
+                                    scan_status.caption("No clear lens match was found from the current text and Knowledge Base coverage.")
+                                    st.warning("MANTIS needs more project text or Knowledge Base coverage to suggest a lens.")
+                                time.sleep(0.35)
+                            st.rerun()
+                        if st.button(
+                            "Scan current work for best style lenses",
+                            use_container_width=True,
+                            key="knowledge_style_lens_scan",
+                        ):
+                            st.session_state["knowledge_style_lens_scan_pending"] = True
+                            st.rerun()
+                    else:
+                        st.info("Open or create a project to scan for recommended style lenses.")
+
+                    suggestions = st.session_state.get("style_lens_suggestions", []) or []
+                    if suggestions:
+                        st.markdown("#### Suggested lenses")
+                        for item in suggestions:
+                            with st.container(border=True):
+                                st.markdown(
+                                    f"**{item.get('name')}** - confidence {float(item.get('confidence', 0)):.0%}"
+                                )
+                                st.caption(item.get("reason", ""))
+                                st.write(f"Craft traits: {item.get('traits', '')}")
+                                terms = ", ".join(item.get("matched_terms", []) or [])
+                                if terms:
+                                    st.caption(f"Matched signals: {terms}")
+
+                    options = [profile["name"] for profile in profiles]
+                    default = []
+                    if p:
+                        default = [name for name in getattr(p, "selected_style_lenses", []) if name in options]
+                    selected_lenses = st.multiselect(
+                        "Style lenses",
+                        options,
+                        default=default,
+                        key="knowledge_style_lens_select",
+                        help="Use these as craft influence profiles, not direct author impersonation.",
+                    )
+                    preview_lookup = {profile["name"]: profile for profile in profiles}
+                    for name in selected_lenses[:5]:
+                        profile = preview_lookup.get(name, {})
+                        st.markdown(f"**{name}**")
+                        st.caption(f"Major works: {profile.get('works', '')}")
+                        st.write(f"Craft traits: {profile.get('traits', '')}")
+
+                    st.markdown("### Craft controls")
+                    slider_cols = st.columns(5)
+                    current_settings = getattr(p, "style_lens_settings", {}) if p else {}
+                    lens_settings = {
+                        "pace": slider_cols[0].slider("Pace", 1, 10, int(current_settings.get("pace", 5)), key="style_lens_pace"),
+                        "interiority": slider_cols[1].slider("Interior", 1, 10, int(current_settings.get("interiority", 5)), key="style_lens_interiority"),
+                        "imagery": slider_cols[2].slider("Imagery", 1, 10, int(current_settings.get("imagery", 5)), key="style_lens_imagery"),
+                        "dialogue": slider_cols[3].slider("Dialogue", 1, 10, int(current_settings.get("dialogue", 5)), key="style_lens_dialogue"),
+                        "atmosphere": slider_cols[4].slider("Mood", 1, 10, int(current_settings.get("atmosphere", 5)), key="style_lens_atmosphere"),
+                    }
+                    if p:
+                        if st.button("Save style lens to project", type="primary", use_container_width=True, key="save_style_lens"):
+                            p.selected_style_lenses = selected_lenses
+                            p.style_lens_settings = lens_settings
+                            persist_project(p, action="save_style_lens")
+                            st.success("Style lens saved. Chapter generation will use these craft controls.")
+                            st.rerun()
+                    else:
+                        st.info("Open or create a project to save style lenses for generation.")
+
+            with st.container(border=True):
+                st.markdown("### Safe style rules")
+                st.write("Use public-domain authors for close historical emulation. For living or recent authors, MANTIS should translate influence into craft traits and produce original prose.")
+
+        with health_tab:
+            with st.container(border=True):
+                st.markdown("### Knowledge health")
+                st.caption("A quick check of what MANTIS can currently retrieve.")
+                health_cols = st.columns(4)
+                health_cols[0].metric("Core library", "Ready" if builtin_status.get("installed") else "Missing")
+                health_cols[1].metric("Author profiles", len(list_author_style_profiles(AppConfig.PROJECTS_DIR)))
+                health_cols[2].metric("User documents", max(0, int(stats.get("documents", 0) or 0) - (1 if builtin_status.get("installed") else 0)))
+                health_cols[3].metric("Retrieval chunks", stats.get("chunks", 0))
+                missing = []
+                if not builtin_status.get("installed"):
+                    missing.append("Install the built-in Core Library.")
+                if not profiles:
+                    missing.append("Add author/style material so Style Lab has profiles to select.")
+                if not top_tags:
+                    missing.append("Import or install material with clear genre, style, or craft tags.")
+                if missing:
+                    st.warning("Next improvements: " + " ".join(missing))
+                else:
+                    st.success("Knowledge Base is ready for guided drafting and review.")
 
     def render_memory():
         p = st.session_state.project

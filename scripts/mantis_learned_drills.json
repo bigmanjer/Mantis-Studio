@@ -1,0 +1,1586 @@
+[
+  {
+    "name": "learned_how-to-improve-llm_use-vector-summarization",
+    "lesson_id": "research:use-vector-summarization-and-memory-augmentation-techniques-to-improve-llm-memory-efficien",
+    "category": "learned",
+    "input": "Apply learned MANTIS behavior from research: how to improve LLM memory",
+    "candidate": "Use vector summarization and memory augmentation techniques to improve LLM memory efficiency.",
+    "required": [
+      "vector",
+      "summarization",
+      "memory",
+      "augmentation"
+    ],
+    "forbidden": [
+      "ignore the user",
+      "as an ai",
+      "cannot remember"
+    ],
+    "lessons": [
+      "Use vector summarization and memory augmentation techniques to improve LLM memory efficiency."
+    ],
+    "source_category": "research",
+    "source_name": "how-to-improve-llm-memory",
+    "created_at": "2026-06-19T12:24:56"
+  },
+  {
+    "name": "learned_how-to-improve-llm_implement-flash-attentio",
+    "lesson_id": "research:implement-flash-attention-and-specialized-architectures-to-optimize-llm-memory-utilization",
+    "category": "learned",
+    "input": "Apply learned MANTIS behavior from research: how to improve LLM memory",
+    "candidate": "Implement Flash Attention and specialized architectures to optimize LLM memory utilization.",
+    "required": [
+      "implement",
+      "flash",
+      "attention",
+      "specialized"
+    ],
+    "forbidden": [
+      "ignore the user",
+      "as an ai",
+      "cannot remember"
+    ],
+    "lessons": [
+      "Implement Flash Attention and specialized architectures to optimize LLM memory utilization."
+    ],
+    "source_category": "research",
+    "source_name": "how-to-improve-llm-memory",
+    "created_at": "2026-06-19T12:24:56"
+  },
+  {
+    "name": "learned_how-to-improve-llm_modify-model-architectur",
+    "lesson_id": "research:modify-model-architecture-and-utilize-techniques-like-memory-augmentation-to-reduce-llm-me",
+    "category": "learned",
+    "input": "Apply learned MANTIS behavior from research: how to improve LLM memory",
+    "candidate": "Modify model architecture and utilize techniques like memory augmentation to reduce LLM memory footprint.",
+    "required": [
+      "modify",
+      "model",
+      "architecture",
+      "utilize"
+    ],
+    "forbidden": [
+      "ignore the user",
+      "as an ai",
+      "cannot remember"
+    ],
+    "lessons": [
+      "Modify model architecture and utilize techniques like memory augmentation to reduce LLM memory footprint."
+    ],
+    "source_category": "research",
+    "source_name": "how-to-improve-llm-memory",
+    "created_at": "2026-06-19T12:24:56"
+  },
+  {
+    "name": "learned_how-to-improve-llm_utilize-efficient-data-t",
+    "lesson_id": "research:utilize-efficient-data-types-such-as-bfloat16-float16-precision-to-reduce-memory-requireme",
+    "category": "learned",
+    "input": "Apply learned MANTIS behavior from research: how to improve LLM memory",
+    "candidate": "Utilize efficient data types, such as bfloat16/float16 precision, to reduce memory requirements for loading LLM weights.",
+    "required": [
+      "utilize",
+      "efficient",
+      "data",
+      "types"
+    ],
+    "forbidden": [
+      "ignore the user",
+      "as an ai",
+      "cannot remember"
+    ],
+    "lessons": [
+      "Utilize efficient data types, such as bfloat16/float16 precision, to reduce memory requirements for loading LLM weights."
+    ],
+    "source_category": "research",
+    "source_name": "how-to-improve-llm-memory",
+    "created_at": "2026-06-19T12:24:56"
+  },
+  {
+    "name": "learned_how-to-improve-llm_optimize-llm-inference-w",
+    "lesson_id": "research:optimize-llm-inference-workloads-by-managing-key-value-caches-and-intermediate-representat",
+    "category": "learned",
+    "input": "Apply learned MANTIS behavior from research: how to improve LLM memory",
+    "candidate": "Optimize LLM inference workloads by managing key-value caches and intermediate representations across requests.",
+    "required": [
+      "optimize",
+      "inference",
+      "workloads",
+      "managing"
+    ],
+    "forbidden": [
+      "ignore the user",
+      "as an ai",
+      "cannot remember"
+    ],
+    "lessons": [
+      "Optimize LLM inference workloads by managing key-value caches and intermediate representations across requests."
+    ],
+    "source_category": "research",
+    "source_name": "how-to-improve-llm-memory",
+    "created_at": "2026-06-19T12:24:56"
+  },
+  {
+    "name": "learned_how-ai-assistants-_ai-assistants-should-uti",
+    "lesson_id": "research:ai-assistants-should-utilize-long-term-memory-to-retain-user-data-securely-ensuring-privac",
+    "category": "learned",
+    "input": "Apply learned MANTIS behavior from research: how AI assistants should use long term memory safely",
+    "candidate": "AI assistants should utilize long-term memory to retain user data securely, ensuring privacy and compliance with regulations.",
+    "required": [
+      "assistants",
+      "utilize",
+      "long-term",
+      "memory"
+    ],
+    "forbidden": [
+      "ignore the user",
+      "as an ai",
+      "cannot remember"
+    ],
+    "lessons": [
+      "AI assistants should utilize long-term memory to retain user data securely, ensuring privacy and compliance with regulations."
+    ],
+    "source_category": "research",
+    "source_name": "how-ai-assistants-should-use-long-term-m",
+    "created_at": "2026-06-19T12:26:41"
+  },
+  {
+    "name": "learned_how-ai-assistants-_ethical-deployment-of-ai",
+    "lesson_id": "research:ethical-deployment-of-ai-assistants-with-long-term-memory-is-crucial-for-trust-and-effecti",
+    "category": "learned",
+    "input": "Apply learned MANTIS behavior from research: how AI assistants should use long term memory safely",
+    "candidate": "Ethical deployment of AI assistants with long-term memory is crucial for trust and effectiveness, requiring transparency and user control.",
+    "required": [
+      "ethical",
+      "deployment",
+      "assistants",
+      "long-term"
+    ],
+    "forbidden": [
+      "ignore the user",
+      "as an ai",
+      "cannot remember"
+    ],
+    "lessons": [
+      "Ethical deployment of AI assistants with long-term memory is crucial for trust and effectiveness, requiring transparency and user control."
+    ],
+    "source_category": "research",
+    "source_name": "how-ai-assistants-should-use-long-term-m",
+    "created_at": "2026-06-19T12:26:41"
+  },
+  {
+    "name": "learned_how-ai-assistants-_implementing-risk-manage",
+    "lesson_id": "research:implementing-risk-management-and-compliance-with-industry-standards-is-essential-for-ai-sy",
+    "category": "learned",
+    "input": "Apply learned MANTIS behavior from research: how AI assistants should use long term memory safely",
+    "candidate": "Implementing risk management and compliance with industry standards is essential for AI systems that utilize long-term memory to enhance persistent context and productivity.",
+    "required": [
+      "implementing",
+      "risk",
+      "management",
+      "compliance"
+    ],
+    "forbidden": [
+      "ignore the user",
+      "as an ai",
+      "cannot remember"
+    ],
+    "lessons": [
+      "Implementing risk management and compliance with industry standards is essential for AI systems that utilize long-term memory to enhance persistent context and productivity."
+    ],
+    "source_category": "research",
+    "source_name": "how-ai-assistants-should-use-long-term-m",
+    "created_at": "2026-06-19T12:26:41"
+  },
+  {
+    "name": "learned_how-ai-assistants-_ai-assistants-with-long-",
+    "lesson_id": "research:ai-assistants-with-long-term-memory-should-be-designed-to-provide-users-with-clarity-and-o",
+    "category": "learned",
+    "input": "Apply learned MANTIS behavior from research: how AI assistants should use long term memory safely",
+    "candidate": "AI assistants with long-term memory should be designed to provide users with clarity and oversight on what is retained and how it's used, ensuring adaptability and usefulness.",
+    "required": [
+      "assistants",
+      "long-term",
+      "memory",
+      "designed"
+    ],
+    "forbidden": [
+      "ignore the user",
+      "as an ai",
+      "cannot remember"
+    ],
+    "lessons": [
+      "AI assistants with long-term memory should be designed to provide users with clarity and oversight on what is retained and how it's used, ensuring adaptability and usefulness."
+    ],
+    "source_category": "research",
+    "source_name": "how-ai-assistants-should-use-long-term-m",
+    "created_at": "2026-06-19T12:26:41"
+  },
+  {
+    "name": "learned_how-ai-assistants-_organizations-should-pri",
+    "lesson_id": "research:organizations-should-prioritize-user-control-and-transparency-when-deploying-ai-assistants",
+    "category": "learned",
+    "input": "Apply learned MANTIS behavior from research: how AI assistants should use long term memory safely",
+    "candidate": "Organizations should prioritize user control and transparency when deploying AI assistants with long-term memory, addressing concerns around privacy and data retention.",
+    "required": [
+      "organizations",
+      "prioritize",
+      "control",
+      "transparency"
+    ],
+    "forbidden": [
+      "ignore the user",
+      "as an ai",
+      "cannot remember"
+    ],
+    "lessons": [
+      "Organizations should prioritize user control and transparency when deploying AI assistants with long-term memory, addressing concerns around privacy and data retention."
+    ],
+    "source_category": "research",
+    "source_name": "how-ai-assistants-should-use-long-term-m",
+    "created_at": "2026-06-19T12:26:41"
+  },
+  {
+    "name": "learned_retrieval-augmente_index-knowledge-in-a-vec",
+    "lesson_id": "research:index-knowledge-in-a-vector-database-to-improve-the-accuracy-and-relevance-of-ai-generated",
+    "category": "learned",
+    "input": "Apply learned MANTIS behavior from research: retrieval augmented generation best practices for assistants",
+    "candidate": "Index knowledge in a vector database to improve the accuracy and relevance of AI-generated content.",
+    "required": [
+      "index",
+      "knowledge",
+      "vector",
+      "database"
+    ],
+    "forbidden": [
+      "ignore the user",
+      "as an ai",
+      "cannot remember"
+    ],
+    "lessons": [
+      "Index knowledge in a vector database to improve the accuracy and relevance of AI-generated content."
+    ],
+    "source_category": "research",
+    "source_name": "retrieval-augmented-generation-best-prac",
+    "created_at": "2026-06-19T12:27:23"
+  },
+  {
+    "name": "learned_retrieval-augmente_use-high-quality-knowled",
+    "lesson_id": "research:use-high-quality-knowledge-bases-to-supplement-large-language-models-and-provide-up-to-dat",
+    "category": "learned",
+    "input": "Apply learned MANTIS behavior from research: retrieval augmented generation best practices for assistants",
+    "candidate": "Use high-quality knowledge bases to supplement large language models and provide up-to-date information.",
+    "required": [
+      "high-quality",
+      "knowledge",
+      "bases",
+      "supplement"
+    ],
+    "forbidden": [
+      "ignore the user",
+      "as an ai",
+      "cannot remember"
+    ],
+    "lessons": [
+      "Use high-quality knowledge bases to supplement large language models and provide up-to-date information."
+    ],
+    "source_category": "research",
+    "source_name": "retrieval-augmented-generation-best-prac",
+    "created_at": "2026-06-19T12:27:23"
+  },
+  {
+    "name": "learned_retrieval-augmente_implement-retrieval-augm",
+    "lesson_id": "research:implement-retrieval-augmented-generation-rag-techniques-to-reduce-reliance-on-static-train",
+    "category": "learned",
+    "input": "Apply learned MANTIS behavior from research: retrieval augmented generation best practices for assistants",
+    "candidate": "Implement retrieval-augmented generation (RAG) techniques to reduce reliance on static training data and enhance the performance of AI assistants.",
+    "required": [
+      "implement",
+      "retrieval-augmented",
+      "generation",
+      "techniques"
+    ],
+    "forbidden": [
+      "ignore the user",
+      "as an ai",
+      "cannot remember"
+    ],
+    "lessons": [
+      "Implement retrieval-augmented generation (RAG) techniques to reduce reliance on static training data and enhance the performance of AI assistants."
+    ],
+    "source_category": "research",
+    "source_name": "retrieval-augmented-generation-best-prac",
+    "created_at": "2026-06-19T12:27:23"
+  },
+  {
+    "name": "learned_retrieval-augmente_connect-large-language-m",
+    "lesson_id": "research:connect-large-language-models-to-external-knowledge-sources-to-generate-accurate-and-natur",
+    "category": "learned",
+    "input": "Apply learned MANTIS behavior from research: retrieval augmented generation best practices for assistants",
+    "candidate": "Connect large language models to external knowledge sources to generate accurate and natural-sounding answers.",
+    "required": [
+      "connect",
+      "large",
+      "language",
+      "models"
+    ],
+    "forbidden": [
+      "ignore the user",
+      "as an ai",
+      "cannot remember"
+    ],
+    "lessons": [
+      "Connect large language models to external knowledge sources to generate accurate and natural-sounding answers."
+    ],
+    "source_category": "research",
+    "source_name": "retrieval-augmented-generation-best-prac",
+    "created_at": "2026-06-19T12:27:23"
+  },
+  {
+    "name": "learned_retrieval-augmente_prioritize-the-quality-o",
+    "lesson_id": "research:prioritize-the-quality-of-the-knowledge-base-when-building-rag-based-systems-to-ensure-rel",
+    "category": "learned",
+    "input": "Apply learned MANTIS behavior from research: retrieval augmented generation best practices for assistants",
+    "candidate": "Prioritize the quality of the knowledge base when building RAG-based systems to ensure reliable and accurate results.",
+    "required": [
+      "prioritize",
+      "quality",
+      "knowledge",
+      "base"
+    ],
+    "forbidden": [
+      "ignore the user",
+      "as an ai",
+      "cannot remember"
+    ],
+    "lessons": [
+      "Prioritize the quality of the knowledge base when building RAG-based systems to ensure reliable and accurate results."
+    ],
+    "source_category": "research",
+    "source_name": "retrieval-augmented-generation-best-prac",
+    "created_at": "2026-06-19T12:27:23"
+  },
+  {
+    "name": "learned_how-to-build-agent_use-langgraph-for-state-",
+    "lesson_id": "research:use-langgraph-for-state-management-and-define-nodes-for-decision-making-and-tool-execution",
+    "category": "learned",
+    "input": "Apply learned MANTIS behavior from research: how to build agent tool use and command routing",
+    "candidate": "Use LangGraph for state management and define nodes for decision-making and tool execution to build agent tool use and command routing.",
+    "required": [
+      "langgraph",
+      "state",
+      "management",
+      "define"
+    ],
+    "forbidden": [
+      "ignore the user",
+      "as an ai",
+      "cannot remember"
+    ],
+    "lessons": [
+      "Use LangGraph for state management and define nodes for decision-making and tool execution to build agent tool use and command routing."
+    ],
+    "source_category": "research",
+    "source_name": "how-to-build-agent-tool-use-and-command-",
+    "created_at": "2026-06-19T12:27:58"
+  },
+  {
+    "name": "learned_how-to-build-agent_implement-conditional-lo",
+    "lesson_id": "research:implement-conditional-logic-to-route-commands-to-appropriate-tools-based-on-language-model",
+    "category": "learned",
+    "input": "Apply learned MANTIS behavior from research: how to build agent tool use and command routing",
+    "candidate": "Implement conditional logic to route commands to appropriate tools based on language model outputs and conversation messages.",
+    "required": [
+      "implement",
+      "conditional",
+      "logic",
+      "route"
+    ],
+    "forbidden": [
+      "ignore the user",
+      "as an ai",
+      "cannot remember"
+    ],
+    "lessons": [
+      "Implement conditional logic to route commands to appropriate tools based on language model outputs and conversation messages."
+    ],
+    "source_category": "research",
+    "source_name": "how-to-build-agent-tool-use-and-command-",
+    "created_at": "2026-06-19T12:27:58"
+  },
+  {
+    "name": "learned_how-to-build-agent_utilize-multi-agent-syst",
+    "lesson_id": "research:utilize-multi-agent-systems-and-the-agents-as-tools-pattern-to-build-complex-workflows-and",
+    "category": "learned",
+    "input": "Apply learned MANTIS behavior from research: how to build agent tool use and command routing",
+    "candidate": "Utilize multi-agent systems and the \"agents as tools\" pattern to build complex workflows and enable autonomous collaboration between agents.",
+    "required": [
+      "utilize",
+      "multi-agent",
+      "systems",
+      "agents"
+    ],
+    "forbidden": [
+      "ignore the user",
+      "as an ai",
+      "cannot remember"
+    ],
+    "lessons": [
+      "Utilize multi-agent systems and the \"agents as tools\" pattern to build complex workflows and enable autonomous collaboration between agents."
+    ],
+    "source_category": "research",
+    "source_name": "how-to-build-agent-tool-use-and-command-",
+    "created_at": "2026-06-19T12:27:58"
+  },
+  {
+    "name": "learned_how-to-build-agent_define-a-primary-node-th",
+    "lesson_id": "research:define-a-primary-node-that-determines-if-tools-are-needed-and-add-tools-nodes-that-execute",
+    "category": "learned",
+    "input": "Apply learned MANTIS behavior from research: how to build agent tool use and command routing",
+    "candidate": "Define a primary node that determines if tools are needed and add tools nodes that execute requested operations to create a simple agent.",
+    "required": [
+      "define",
+      "primary",
+      "node",
+      "determines"
+    ],
+    "forbidden": [
+      "ignore the user",
+      "as an ai",
+      "cannot remember"
+    ],
+    "lessons": [
+      "Define a primary node that determines if tools are needed and add tools nodes that execute requested operations to create a simple agent."
+    ],
+    "source_category": "research",
+    "source_name": "how-to-build-agent-tool-use-and-command-",
+    "created_at": "2026-06-19T12:27:58"
+  },
+  {
+    "name": "learned_how-to-build-agent_configure-decision-makin",
+    "lesson_id": "research:configure-decision-making-logic-for-tool-usage-by-evaluating-chat-output-and-routing-accor",
+    "category": "learned",
+    "input": "Apply learned MANTIS behavior from research: how to build agent tool use and command routing",
+    "candidate": "Configure decision-making logic for tool usage by evaluating chat output and routing accordingly to create intelligent AI systems.",
+    "required": [
+      "configure",
+      "decision-making",
+      "logic",
+      "tool"
+    ],
+    "forbidden": [
+      "ignore the user",
+      "as an ai",
+      "cannot remember"
+    ],
+    "lessons": [
+      "Configure decision-making logic for tool usage by evaluating chat output and routing accordingly to create intelligent AI systems."
+    ],
+    "source_category": "research",
+    "source_name": "how-to-build-agent-tool-use-and-command-",
+    "created_at": "2026-06-19T12:27:58"
+  },
+  {
+    "name": "learned_prompt-engineering_craft-clear-and-structur",
+    "lesson_id": "research:craft-clear-and-structured-prompts-to-achieve-desired-results-from-conversational-ai-inter",
+    "category": "learned",
+    "input": "Apply learned MANTIS behavior from research: prompt engineering for conversational AI assistants",
+    "candidate": "Craft clear and structured prompts to achieve desired results from conversational AI interactions.",
+    "required": [
+      "craft",
+      "clear",
+      "structured",
+      "prompts"
+    ],
+    "forbidden": [
+      "ignore the user",
+      "as an ai",
+      "cannot remember"
+    ],
+    "lessons": [
+      "Craft clear and structured prompts to achieve desired results from conversational AI interactions."
+    ],
+    "source_category": "research",
+    "source_name": "prompt-engineering-for-conversational-ai",
+    "created_at": "2026-06-19T12:28:39"
+  },
+  {
+    "name": "learned_prompt-engineering_design-and-refine-inputs",
+    "lesson_id": "research:design-and-refine-inputs-to-guide-ai-models-toward-reliable-and-specific-outputs",
+    "category": "learned",
+    "input": "Apply learned MANTIS behavior from research: prompt engineering for conversational AI assistants",
+    "candidate": "Design and refine inputs to guide AI models toward reliable and specific outputs.",
+    "required": [
+      "design",
+      "refine",
+      "inputs",
+      "guide"
+    ],
+    "forbidden": [
+      "ignore the user",
+      "as an ai",
+      "cannot remember"
+    ],
+    "lessons": [
+      "Design and refine inputs to guide AI models toward reliable and specific outputs."
+    ],
+    "source_category": "research",
+    "source_name": "prompt-engineering-for-conversational-ai",
+    "created_at": "2026-06-19T12:28:39"
+  },
+  {
+    "name": "learned_prompt-engineering_use-prompt-engineering-t",
+    "lesson_id": "research:use-prompt-engineering-techniques-to-optimize-ai-generated-content-and-improve-consistency",
+    "category": "learned",
+    "input": "Apply learned MANTIS behavior from research: prompt engineering for conversational AI assistants",
+    "candidate": "Use prompt engineering techniques to optimize AI-generated content and improve consistency in responses.",
+    "required": [
+      "prompt",
+      "engineering",
+      "techniques",
+      "optimize"
+    ],
+    "forbidden": [
+      "ignore the user",
+      "as an ai",
+      "cannot remember"
+    ],
+    "lessons": [
+      "Use prompt engineering techniques to optimize AI-generated content and improve consistency in responses."
+    ],
+    "source_category": "research",
+    "source_name": "prompt-engineering-for-conversational-ai",
+    "created_at": "2026-06-19T12:28:39"
+  },
+  {
+    "name": "learned_prompt-engineering_implement-intent-based-a",
+    "lesson_id": "research:implement-intent-based-ai-agents-to-collaborate-on-prompt-engineering-and-enhance-conversa",
+    "category": "learned",
+    "input": "Apply learned MANTIS behavior from research: prompt engineering for conversational AI assistants",
+    "candidate": "Implement intent-based AI agents to collaborate on prompt engineering and enhance conversational AI interactions.",
+    "required": [
+      "implement",
+      "intent-based",
+      "agents",
+      "collaborate"
+    ],
+    "forbidden": [
+      "ignore the user",
+      "as an ai",
+      "cannot remember"
+    ],
+    "lessons": [
+      "Implement intent-based AI agents to collaborate on prompt engineering and enhance conversational AI interactions."
+    ],
+    "source_category": "research",
+    "source_name": "prompt-engineering-for-conversational-ai",
+    "created_at": "2026-06-19T12:28:39"
+  },
+  {
+    "name": "learned_prompt-engineering_incorporate-instructions",
+    "lesson_id": "research:incorporate-instructions-in-system-prompts-to-initiate-engaging-conversations-and-foster-d",
+    "category": "learned",
+    "input": "Apply learned MANTIS behavior from research: prompt engineering for conversational AI assistants",
+    "candidate": "Incorporate instructions in system prompts to initiate engaging conversations and foster dynamic conversation flows.",
+    "required": [
+      "incorporate",
+      "instructions",
+      "system",
+      "prompts"
+    ],
+    "forbidden": [
+      "ignore the user",
+      "as an ai",
+      "cannot remember"
+    ],
+    "lessons": [
+      "Incorporate instructions in system prompts to initiate engaging conversations and foster dynamic conversation flows."
+    ],
+    "source_category": "research",
+    "source_name": "prompt-engineering-for-conversational-ai",
+    "created_at": "2026-06-19T12:28:39"
+  },
+  {
+    "name": "learned_how-ai-assistants-_use-high-quality-trainin",
+    "lesson_id": "research:use-high-quality-training-data-to-avoid-ai-hallucinations-and-ensure-accurate-outputs",
+    "category": "learned",
+    "input": "Apply learned MANTIS behavior from research: how AI assistants should avoid hallucinating tool access",
+    "candidate": "Use high-quality training data to avoid AI hallucinations and ensure accurate outputs.",
+    "required": [
+      "high-quality",
+      "training",
+      "data",
+      "avoid"
+    ],
+    "forbidden": [
+      "ignore the user",
+      "as an ai",
+      "cannot remember"
+    ],
+    "lessons": [
+      "Use high-quality training data to avoid AI hallucinations and ensure accurate outputs."
+    ],
+    "source_category": "research",
+    "source_name": "how-ai-assistants-should-avoid-hallucina",
+    "created_at": "2026-06-19T12:29:22"
+  },
+  {
+    "name": "learned_how-ai-assistants-_implement-human-oversigh",
+    "lesson_id": "research:implement-human-oversight-and-define-clear-model-purposes-to-prevent-ai-assistants-from-ov",
+    "category": "learned",
+    "input": "Apply learned MANTIS behavior from research: how AI assistants should avoid hallucinating tool access",
+    "candidate": "Implement human oversight and define clear model purposes to prevent AI assistants from oversharing or accessing sensitive information.",
+    "required": [
+      "implement",
+      "human",
+      "oversight",
+      "define"
+    ],
+    "forbidden": [
+      "ignore the user",
+      "as an ai",
+      "cannot remember"
+    ],
+    "lessons": [
+      "Implement human oversight and define clear model purposes to prevent AI assistants from oversharing or accessing sensitive information."
+    ],
+    "source_category": "research",
+    "source_name": "how-ai-assistants-should-avoid-hallucina",
+    "created_at": "2026-06-19T12:29:22"
+  },
+  {
+    "name": "learned_how-ai-assistants-_rely-on-policy-aware-con",
+    "lesson_id": "research:rely-on-policy-aware-controls-to-enforce-data-access-boundaries-and-prevent-the-unintended",
+    "category": "learned",
+    "input": "Apply learned MANTIS behavior from research: how AI assistants should avoid hallucinating tool access",
+    "candidate": "Rely on policy-aware controls to enforce data access boundaries and prevent the unintended disclosure of sensitive or hallucinated information.",
+    "required": [
+      "rely",
+      "policy-aware",
+      "controls",
+      "enforce"
+    ],
+    "forbidden": [
+      "ignore the user",
+      "as an ai",
+      "cannot remember"
+    ],
+    "lessons": [
+      "Rely on policy-aware controls to enforce data access boundaries and prevent the unintended disclosure of sensitive or hallucinated information."
+    ],
+    "source_category": "research",
+    "source_name": "how-ai-assistants-should-avoid-hallucina",
+    "created_at": "2026-06-19T12:29:22"
+  },
+  {
+    "name": "learned_how-ai-assistants-_regularly-monitor-and-up",
+    "lesson_id": "research:regularly-monitor-and-update-ai-models-to-prevent-data-drift-and-maintain-their-performanc",
+    "category": "learned",
+    "input": "Apply learned MANTIS behavior from research: how AI assistants should avoid hallucinating tool access",
+    "candidate": "Regularly monitor and update AI models to prevent data drift and maintain their performance and reliability over time.",
+    "required": [
+      "regularly",
+      "monitor",
+      "update",
+      "models"
+    ],
+    "forbidden": [
+      "ignore the user",
+      "as an ai",
+      "cannot remember"
+    ],
+    "lessons": [
+      "Regularly monitor and update AI models to prevent data drift and maintain their performance and reliability over time."
+    ],
+    "source_category": "research",
+    "source_name": "how-ai-assistants-should-avoid-hallucina",
+    "created_at": "2026-06-19T12:29:22"
+  },
+  {
+    "name": "learned_how-ai-assistants-_establish-clear-guidelin",
+    "lesson_id": "research:establish-clear-guidelines-and-protocols-for-ai-development-and-deployment-to-ensure-trans",
+    "category": "learned",
+    "input": "Apply learned MANTIS behavior from research: how AI assistants should avoid hallucinating tool access",
+    "candidate": "Establish clear guidelines and protocols for AI development and deployment to ensure transparency, accountability, and security.",
+    "required": [
+      "establish",
+      "clear",
+      "guidelines",
+      "protocols"
+    ],
+    "forbidden": [
+      "ignore the user",
+      "as an ai",
+      "cannot remember"
+    ],
+    "lessons": [
+      "Establish clear guidelines and protocols for AI development and deployment to ensure transparency, accountability, and security."
+    ],
+    "source_category": "research",
+    "source_name": "how-ai-assistants-should-avoid-hallucina",
+    "created_at": "2026-06-19T12:29:22"
+  },
+  {
+    "name": "learned_best-practices-for_to-efficiently-summarize",
+    "lesson_id": "research:to-efficiently-summarize-chat-history-use-summaries-and-selectively-store-key-facts-in-a-p",
+    "category": "learned",
+    "input": "Apply learned MANTIS behavior from research: best practices for summarizing chat history into durable memry",
+    "candidate": "To efficiently summarize chat history, use summaries and selectively store key facts in a persistent memory system.",
+    "required": [
+      "efficiently",
+      "summarize",
+      "chat",
+      "history"
+    ],
+    "forbidden": [
+      "ignore the user",
+      "as an ai",
+      "cannot remember"
+    ],
+    "lessons": [
+      "To efficiently summarize chat history, use summaries and selectively store key facts in a persistent memory system."
+    ],
+    "source_category": "research",
+    "source_name": "best-practices-for-summarizing-chat-hist",
+    "created_at": "2026-06-19T12:30:06"
+  },
+  {
+    "name": "learned_best-practices-for_implement-hierarchical-m",
+    "lesson_id": "research:implement-hierarchical-memory-architectures-to-handle-different-information-types-at-multi",
+    "category": "learned",
+    "input": "Apply learned MANTIS behavior from research: best practices for summarizing chat history into durable memry",
+    "candidate": "Implement hierarchical memory architectures to handle different information types at multiple time scales for effective chat history management.",
+    "required": [
+      "implement",
+      "hierarchical",
+      "memory",
+      "architectures"
+    ],
+    "forbidden": [
+      "ignore the user",
+      "as an ai",
+      "cannot remember"
+    ],
+    "lessons": [
+      "Implement hierarchical memory architectures to handle different information types at multiple time scales for effective chat history management."
+    ],
+    "source_category": "research",
+    "source_name": "best-practices-for-summarizing-chat-hist",
+    "created_at": "2026-06-19T12:30:06"
+  },
+  {
+    "name": "learned_best-practices-for_detect-session-ends-to-s",
+    "lesson_id": "research:detect-session-ends-to-save-relevant-information-and-consolidate-conversation-content-befo",
+    "category": "learned",
+    "input": "Apply learned MANTIS behavior from research: best practices for summarizing chat history into durable memry",
+    "candidate": "Detect session ends to save relevant information and consolidate conversation content before clearing memory for a new session.",
+    "required": [
+      "detect",
+      "session",
+      "ends",
+      "save"
+    ],
+    "forbidden": [
+      "ignore the user",
+      "as an ai",
+      "cannot remember"
+    ],
+    "lessons": [
+      "Detect session ends to save relevant information and consolidate conversation content before clearing memory for a new session."
+    ],
+    "source_category": "research",
+    "source_name": "best-practices-for-summarizing-chat-hist",
+    "created_at": "2026-06-19T12:30:06"
+  },
+  {
+    "name": "learned_best-practices-for_periodically-summarize-c",
+    "lesson_id": "research:periodically-summarize-chat-history-and-use-the-summary-plus-newer-chat-in-the-next-call-t",
+    "category": "learned",
+    "input": "Apply learned MANTIS behavior from research: best practices for summarizing chat history into durable memry",
+    "candidate": "Periodically summarize chat history and use the summary plus newer chat in the next call to build on top of it and reduce token costs.",
+    "required": [
+      "periodically",
+      "summarize",
+      "chat",
+      "history"
+    ],
+    "forbidden": [
+      "ignore the user",
+      "as an ai",
+      "cannot remember"
+    ],
+    "lessons": [
+      "Periodically summarize chat history and use the summary plus newer chat in the next call to build on top of it and reduce token costs."
+    ],
+    "source_category": "research",
+    "source_name": "best-practices-for-summarizing-chat-hist",
+    "created_at": "2026-06-19T12:30:06"
+  },
+  {
+    "name": "learned_best-practices-for_keep-the-last-2-3-turns-",
+    "lesson_id": "research:keep-the-last-2-3-turns-of-the-conversation-verbatim-to-maintain-context-and-quality-of-ai",
+    "category": "learned",
+    "input": "Apply learned MANTIS behavior from research: best practices for summarizing chat history into durable memry",
+    "candidate": "Keep the last 2-3 turns of the conversation verbatim to maintain context and quality of AI responses in chat history summarization.",
+    "required": [
+      "keep",
+      "last",
+      "turns",
+      "conversation"
+    ],
+    "forbidden": [
+      "ignore the user",
+      "as an ai",
+      "cannot remember"
+    ],
+    "lessons": [
+      "Keep the last 2-3 turns of the conversation verbatim to maintain context and quality of AI responses in chat history summarization."
+    ],
+    "source_category": "research",
+    "source_name": "best-practices-for-summarizing-chat-hist",
+    "created_at": "2026-06-19T12:30:06"
+  },
+  {
+    "name": "learned_evaluation-methods_use-diverse-datasets-and",
+    "lesson_id": "research:use-diverse-datasets-and-real-time-conditions-to-evaluate-ai-assistant-behavior-alongside-",
+    "category": "learned",
+    "input": "Apply learned MANTIS behavior from research: evaluation methods for AI assistant behavior",
+    "candidate": "Use diverse datasets and real-time conditions to evaluate AI assistant behavior, alongside metrics like accuracy, tone, and coherence.",
+    "required": [
+      "diverse",
+      "datasets",
+      "real-time",
+      "conditions"
+    ],
+    "forbidden": [
+      "ignore the user",
+      "as an ai",
+      "cannot remember"
+    ],
+    "lessons": [
+      "Use diverse datasets and real-time conditions to evaluate AI assistant behavior, alongside metrics like accuracy, tone, and coherence."
+    ],
+    "source_category": "research",
+    "source_name": "evaluation-methods-for-ai-assistant-beha",
+    "created_at": "2026-06-19T12:30:53"
+  },
+  {
+    "name": "learned_evaluation-methods_implement-both-automated",
+    "lesson_id": "research:implement-both-automated-and-human-in-the-loop-strategies-for-a-thorough-assessment-of-ai-",
+    "category": "learned",
+    "input": "Apply learned MANTIS behavior from research: evaluation methods for AI assistant behavior",
+    "candidate": "Implement both automated and human-in-the-loop strategies for a thorough assessment of AI assistant behavior.",
+    "required": [
+      "implement",
+      "both",
+      "automated",
+      "human-in-the-loop"
+    ],
+    "forbidden": [
+      "ignore the user",
+      "as an ai",
+      "cannot remember"
+    ],
+    "lessons": [
+      "Implement both automated and human-in-the-loop strategies for a thorough assessment of AI assistant behavior."
+    ],
+    "source_category": "research",
+    "source_name": "evaluation-methods-for-ai-assistant-beha",
+    "created_at": "2026-06-19T12:30:53"
+  },
+  {
+    "name": "learned_evaluation-methods_consider-behavioral-tech",
+    "lesson_id": "research:consider-behavioral-techniques-that-examine-ai-systems-through-their-observable-outputs-in",
+    "category": "learned",
+    "input": "Apply learned MANTIS behavior from research: evaluation methods for AI assistant behavior",
+    "candidate": "Consider behavioral techniques that examine AI systems through their observable outputs in response to different inputs to evaluate AI agent performance.",
+    "required": [
+      "consider",
+      "behavioral",
+      "techniques",
+      "examine"
+    ],
+    "forbidden": [
+      "ignore the user",
+      "as an ai",
+      "cannot remember"
+    ],
+    "lessons": [
+      "Consider behavioral techniques that examine AI systems through their observable outputs in response to different inputs to evaluate AI agent performance."
+    ],
+    "source_category": "research",
+    "source_name": "evaluation-methods-for-ai-assistant-beha",
+    "created_at": "2026-06-19T12:30:53"
+  },
+  {
+    "name": "learned_evaluation-methods_develop-evaluation-metho",
+    "lesson_id": "research:develop-evaluation-methods-that-measure-subjective-qualities-like-accuracy-tone-coherence-",
+    "category": "learned",
+    "input": "Apply learned MANTIS behavior from research: evaluation methods for AI assistant behavior",
+    "candidate": "Develop evaluation methods that measure subjective qualities like accuracy, tone, coherence, and usefulness, rather than just binary pass/fail outcomes.",
+    "required": [
+      "develop",
+      "evaluation",
+      "methods",
+      "measure"
+    ],
+    "forbidden": [
+      "ignore the user",
+      "as an ai",
+      "cannot remember"
+    ],
+    "lessons": [
+      "Develop evaluation methods that measure subjective qualities like accuracy, tone, coherence, and usefulness, rather than just binary pass/fail outcomes."
+    ],
+    "source_category": "research",
+    "source_name": "evaluation-methods-for-ai-assistant-beha",
+    "created_at": "2026-06-19T12:30:53"
+  },
+  {
+    "name": "learned_evaluation-methods_utilize-metrics-like-lat",
+    "lesson_id": "research:utilize-metrics-like-latency-cost-token-usage-and-accuracy-to-conduct-comprehensive-evalua",
+    "category": "learned",
+    "input": "Apply learned MANTIS behavior from research: evaluation methods for AI assistant behavior",
+    "candidate": "Utilize metrics like latency, cost, token usage, and accuracy to conduct comprehensive evaluations of AI agents.",
+    "required": [
+      "utilize",
+      "metrics",
+      "like",
+      "latency"
+    ],
+    "forbidden": [
+      "ignore the user",
+      "as an ai",
+      "cannot remember"
+    ],
+    "lessons": [
+      "Utilize metrics like latency, cost, token usage, and accuracy to conduct comprehensive evaluations of AI agents."
+    ],
+    "source_category": "research",
+    "source_name": "evaluation-methods-for-ai-assistant-beha",
+    "created_at": "2026-06-19T12:30:53"
+  },
+  {
+    "name": "learned_writing-assistant-_use-ai-tools-for-initial",
+    "lesson_id": "research:use-ai-tools-for-initial-drafts-and-brainstorming-to-enhance-creativity-and-productivity-i",
+    "category": "learned",
+    "input": "Apply learned MANTIS behavior from research: writing assistant best practices for fiction authors",
+    "candidate": "Use AI tools for initial drafts and brainstorming to enhance creativity and productivity in writing.",
+    "required": [
+      "tools",
+      "initial",
+      "drafts",
+      "brainstorming"
+    ],
+    "forbidden": [
+      "ignore the user",
+      "as an ai",
+      "cannot remember"
+    ],
+    "lessons": [
+      "Use AI tools for initial drafts and brainstorming to enhance creativity and productivity in writing."
+    ],
+    "source_category": "research",
+    "source_name": "writing-assistant-best-practices-for-fic",
+    "created_at": "2026-06-19T12:31:26"
+  },
+  {
+    "name": "learned_writing-assistant-_revise-and-edit-ai-gener",
+    "lesson_id": "research:revise-and-edit-ai-generated-content-thoroughly-to-maintain-a-unique-voice-and-style-in-yo",
+    "category": "learned",
+    "input": "Apply learned MANTIS behavior from research: writing assistant best practices for fiction authors",
+    "candidate": "Revise and edit AI-generated content thoroughly to maintain a unique voice and style in your writing.",
+    "required": [
+      "revise",
+      "edit",
+      "ai-generated",
+      "content"
+    ],
+    "forbidden": [
+      "ignore the user",
+      "as an ai",
+      "cannot remember"
+    ],
+    "lessons": [
+      "Revise and edit AI-generated content thoroughly to maintain a unique voice and style in your writing."
+    ],
+    "source_category": "research",
+    "source_name": "writing-assistant-best-practices-for-fic",
+    "created_at": "2026-06-19T12:31:26"
+  },
+  {
+    "name": "learned_writing-assistant-_choose-ai-writing-tools-",
+    "lesson_id": "research:choose-ai-writing-tools-specifically-designed-for-fiction-writers-such-as-sudowrite-to-get",
+    "category": "learned",
+    "input": "Apply learned MANTIS behavior from research: writing assistant best practices for fiction authors",
+    "candidate": "Choose AI writing tools specifically designed for fiction writers, such as Sudowrite, to get features like story expansion and character development.",
+    "required": [
+      "choose",
+      "writing",
+      "tools",
+      "specifically"
+    ],
+    "forbidden": [
+      "ignore the user",
+      "as an ai",
+      "cannot remember"
+    ],
+    "lessons": [
+      "Choose AI writing tools specifically designed for fiction writers, such as Sudowrite, to get features like story expansion and character development."
+    ],
+    "source_category": "research",
+    "source_name": "writing-assistant-best-practices-for-fic",
+    "created_at": "2026-06-19T12:31:26"
+  },
+  {
+    "name": "learned_writing-assistant-_consider-using-a-purpose",
+    "lesson_id": "research:consider-using-a-purpose-built-fiction-editor-like-laterpress-that-combines-story-structur",
+    "category": "learned",
+    "input": "Apply learned MANTIS behavior from research: writing assistant best practices for fiction authors",
+    "candidate": "Consider using a purpose-built fiction editor like Laterpress that combines story structure and AI generation in one platform.",
+    "required": [
+      "consider",
+      "using",
+      "purpose-built",
+      "fiction"
+    ],
+    "forbidden": [
+      "ignore the user",
+      "as an ai",
+      "cannot remember"
+    ],
+    "lessons": [
+      "Consider using a purpose-built fiction editor like Laterpress that combines story structure and AI generation in one platform."
+    ],
+    "source_category": "research",
+    "source_name": "writing-assistant-best-practices-for-fic",
+    "created_at": "2026-06-19T12:31:26"
+  },
+  {
+    "name": "learned_writing-assistant-_experiment-with-differen",
+    "lesson_id": "research:experiment-with-different-writing-tools-and-software-to-find-the-one-that-best-fits-your-w",
+    "category": "learned",
+    "input": "Apply learned MANTIS behavior from research: writing assistant best practices for fiction authors",
+    "candidate": "Experiment with different writing tools and software to find the one that best fits your workflow and writing needs.",
+    "required": [
+      "experiment",
+      "different",
+      "writing",
+      "tools"
+    ],
+    "forbidden": [
+      "ignore the user",
+      "as an ai",
+      "cannot remember"
+    ],
+    "lessons": [
+      "Experiment with different writing tools and software to find the one that best fits your workflow and writing needs."
+    ],
+    "source_category": "research",
+    "source_name": "writing-assistant-best-practices-for-fic",
+    "created_at": "2026-06-19T12:31:26"
+  },
+  {
+    "name": "learned_how-to-build-sourc_use-mlops-frameworks-lik",
+    "lesson_id": "research:use-mlops-frameworks-like-zenml-to-manage-and-create-source-backed-learning-pipelines-for-",
+    "category": "learned",
+    "input": "Apply learned MANTIS behavior from research: how to build source-backed learning pipelines for AI assistants",
+    "candidate": "Use MLOps frameworks like ZenML to manage and create source-backed learning pipelines for AI assistants.",
+    "required": [
+      "mlops",
+      "frameworks",
+      "like",
+      "zenml"
+    ],
+    "forbidden": [
+      "ignore the user",
+      "as an ai",
+      "cannot remember"
+    ],
+    "lessons": [
+      "Use MLOps frameworks like ZenML to manage and create source-backed learning pipelines for AI assistants."
+    ],
+    "source_category": "research",
+    "source_name": "how-to-build-source-backed-learning-pipe",
+    "created_at": "2026-06-19T12:32:15"
+  },
+  {
+    "name": "learned_how-to-build-sourc_create-skill-specific-no",
+    "lesson_id": "research:create-skill-specific-notebooks-with-linked-documents-to-handle-large-sources-and-multiple",
+    "category": "learned",
+    "input": "Apply learned MANTIS behavior from research: how to build source-backed learning pipelines for AI assistants",
+    "candidate": "Create skill-specific notebooks with linked documents to handle large sources and multiple documents for AI assistant training.",
+    "required": [
+      "create",
+      "skill-specific",
+      "notebooks",
+      "linked"
+    ],
+    "forbidden": [
+      "ignore the user",
+      "as an ai",
+      "cannot remember"
+    ],
+    "lessons": [
+      "Create skill-specific notebooks with linked documents to handle large sources and multiple documents for AI assistant training."
+    ],
+    "source_category": "research",
+    "source_name": "how-to-build-source-backed-learning-pipe",
+    "created_at": "2026-06-19T12:32:15"
+  },
+  {
+    "name": "learned_how-to-build-sourc_leverage-tools-like-open",
+    "lesson_id": "research:leverage-tools-like-openhexa-to-build-and-explain-structured-data-flows-ensuring-transpare",
+    "category": "learned",
+    "input": "Apply learned MANTIS behavior from research: how to build source-backed learning pipelines for AI assistants",
+    "candidate": "Leverage tools like OpenHEXA to build and explain structured data flows, ensuring transparency in AI assistant architectural choices.",
+    "required": [
+      "leverage",
+      "tools",
+      "like",
+      "openhexa"
+    ],
+    "forbidden": [
+      "ignore the user",
+      "as an ai",
+      "cannot remember"
+    ],
+    "lessons": [
+      "Leverage tools like OpenHEXA to build and explain structured data flows, ensuring transparency in AI assistant architectural choices."
+    ],
+    "source_category": "research",
+    "source_name": "how-to-build-source-backed-learning-pipe",
+    "created_at": "2026-06-19T12:32:15"
+  },
+  {
+    "name": "learned_how-to-build-sourc_utilize-existing-framewo",
+    "lesson_id": "research:utilize-existing-frameworks-and-tools-such-as-google-s-source-stack-or-openai-agents-sdk-t",
+    "category": "learned",
+    "input": "Apply learned MANTIS behavior from research: how to build source-backed learning pipelines for AI assistants",
+    "candidate": "Utilize existing frameworks and tools, such as Google's Source-Stack or OpenAI Agents SDK, to automate and streamline AI assistant development.",
+    "required": [
+      "utilize",
+      "existing",
+      "frameworks",
+      "tools"
+    ],
+    "forbidden": [
+      "ignore the user",
+      "as an ai",
+      "cannot remember"
+    ],
+    "lessons": [
+      "Utilize existing frameworks and tools, such as Google's Source-Stack or OpenAI Agents SDK, to automate and streamline AI assistant development."
+    ],
+    "source_category": "research",
+    "source_name": "how-to-build-source-backed-learning-pipe",
+    "created_at": "2026-06-19T12:32:15"
+  },
+  {
+    "name": "learned_how-to-build-sourc_design-and-implement-mul",
+    "lesson_id": "research:design-and-implement-multi-agent-research-assistants-using-python-and-relevant-apis-to-enh",
+    "category": "learned",
+    "input": "Apply learned MANTIS behavior from research: how to build source-backed learning pipelines for AI assistants",
+    "candidate": "Design and implement multi-agent research assistants using Python and relevant APIs to enhance AI assistant capabilities.",
+    "required": [
+      "design",
+      "implement",
+      "multi-agent",
+      "research"
+    ],
+    "forbidden": [
+      "ignore the user",
+      "as an ai",
+      "cannot remember"
+    ],
+    "lessons": [
+      "Design and implement multi-agent research assistants using Python and relevant APIs to enhance AI assistant capabilities."
+    ],
+    "source_category": "research",
+    "source_name": "how-to-build-source-backed-learning-pipe",
+    "created_at": "2026-06-19T12:32:15"
+  },
+  {
+    "name": "learned_best-practices-for_prioritize-relevance-dri",
+    "lesson_id": "research:prioritize-relevance-driven-memory-and-context-management-for-effective-scaling-in-llm-sys",
+    "category": "learned",
+    "input": "Apply learned MANTIS behavior from research: best practices for LLM memory systems",
+    "candidate": "Prioritize relevance-driven memory and context management for effective scaling in LLM systems.",
+    "required": [
+      "prioritize",
+      "relevance-driven",
+      "memory",
+      "context"
+    ],
+    "forbidden": [
+      "ignore the user",
+      "as an ai",
+      "cannot remember"
+    ],
+    "lessons": [
+      "Prioritize relevance-driven memory and context management for effective scaling in LLM systems."
+    ],
+    "source_category": "research",
+    "source_name": "best-practices-for-llm-memory-systems",
+    "created_at": "2026-06-19T12:32:38"
+  },
+  {
+    "name": "learned_best-practices-for_implement-a-retrieval-st",
+    "lesson_id": "research:implement-a-retrieval-strategy-and-manage-token-budgets-to-optimize-llm-memory-performance",
+    "category": "learned",
+    "input": "Apply learned MANTIS behavior from research: best practices for LLM memory systems",
+    "candidate": "Implement a retrieval strategy and manage token budgets to optimize LLM memory performance.",
+    "required": [
+      "implement",
+      "retrieval",
+      "strategy",
+      "manage"
+    ],
+    "forbidden": [
+      "ignore the user",
+      "as an ai",
+      "cannot remember"
+    ],
+    "lessons": [
+      "Implement a retrieval strategy and manage token budgets to optimize LLM memory performance."
+    ],
+    "source_category": "research",
+    "source_name": "best-practices-for-llm-memory-systems",
+    "created_at": "2026-06-19T12:32:38"
+  },
+  {
+    "name": "learned_best-practices-for_use-semantic-memory-to-s",
+    "lesson_id": "research:use-semantic-memory-to-store-essential-facts-and-information-that-ground-an-agent-s-respon",
+    "category": "learned",
+    "input": "Apply learned MANTIS behavior from research: best practices for LLM memory systems",
+    "candidate": "Use semantic memory to store essential facts and information that ground an agent's responses in LLM applications.",
+    "required": [
+      "semantic",
+      "memory",
+      "store",
+      "essential"
+    ],
+    "forbidden": [
+      "ignore the user",
+      "as an ai",
+      "cannot remember"
+    ],
+    "lessons": [
+      "Use semantic memory to store essential facts and information that ground an agent's responses in LLM applications."
+    ],
+    "source_category": "research",
+    "source_name": "best-practices-for-llm-memory-systems",
+    "created_at": "2026-06-19T12:32:38"
+  },
+  {
+    "name": "learned_best-practices-for_develop-smarter-context-",
+    "lesson_id": "research:develop-smarter-context-management-selective-recall-and-relevance-based-forgetting-to-impr",
+    "category": "learned",
+    "input": "Apply learned MANTIS behavior from research: best practices for LLM memory systems",
+    "candidate": "Develop smarter context management, selective recall, and relevance-based forgetting to improve LLM memory handling.",
+    "required": [
+      "develop",
+      "smarter",
+      "context",
+      "management"
+    ],
+    "forbidden": [
+      "ignore the user",
+      "as an ai",
+      "cannot remember"
+    ],
+    "lessons": [
+      "Develop smarter context management, selective recall, and relevance-based forgetting to improve LLM memory handling."
+    ],
+    "source_category": "research",
+    "source_name": "best-practices-for-llm-memory-systems",
+    "created_at": "2026-06-19T12:32:38"
+  },
+  {
+    "name": "learned_best-practices-for_design-memory-architectu",
+    "lesson_id": "research:design-memory-architecture-with-read-write-capabilities-local-memory-and-token-allocation-",
+    "category": "learned",
+    "input": "Apply learned MANTIS behavior from research: best practices for LLM memory systems",
+    "candidate": "Design memory architecture with read-write capabilities, local memory, and token allocation to support conversation history management.",
+    "required": [
+      "design",
+      "memory",
+      "architecture",
+      "read-write"
+    ],
+    "forbidden": [
+      "ignore the user",
+      "as an ai",
+      "cannot remember"
+    ],
+    "lessons": [
+      "Design memory architecture with read-write capabilities, local memory, and token allocation to support conversation history management."
+    ],
+    "source_category": "research",
+    "source_name": "best-practices-for-llm-memory-systems",
+    "created_at": "2026-06-19T12:32:38"
+  },
+  {
+    "name": "learned_paste-box_mantis-should-use-a-warm",
+    "lesson_id": "paste:mantis-should-use-a-warm-direct-readable-conversational-tone",
+    "category": "learned",
+    "input": "Apply learned MANTIS behavior from paste: paste-box",
+    "candidate": "MANTIS should use a warm, direct, readable conversational tone.",
+    "required": [
+      "warm",
+      "direct",
+      "readable",
+      "conversational"
+    ],
+    "forbidden": [
+      "ignore the user",
+      "as an ai",
+      "cannot remember"
+    ],
+    "lessons": [
+      "MANTIS should use a warm, direct, readable conversational tone."
+    ],
+    "source_category": "paste",
+    "source_name": "paste-box",
+    "created_at": "2026-06-19T13:03:39"
+  },
+  {
+    "name": "learned_paste-box_mantis-should-keep-respo",
+    "lesson_id": "paste:mantis-should-keep-responses-concise-and-relevant-unless-the-user-asks-for-depth",
+    "category": "learned",
+    "input": "Apply learned MANTIS behavior from paste: paste-box",
+    "candidate": "MANTIS should keep responses concise and relevant unless the user asks for depth.",
+    "required": [
+      "keep",
+      "responses",
+      "concise",
+      "relevant"
+    ],
+    "forbidden": [
+      "ignore the user",
+      "as an ai",
+      "cannot remember"
+    ],
+    "lessons": [
+      "MANTIS should keep responses concise and relevant unless the user asks for depth."
+    ],
+    "source_category": "paste",
+    "source_name": "paste-box",
+    "created_at": "2026-06-19T13:03:39"
+  },
+  {
+    "name": "learned_paste-box_mantis-should-treat-norm",
+    "lesson_id": "paste:mantis-should-treat-normal-text-as-conversation-not-as-a-command",
+    "category": "learned",
+    "input": "Apply learned MANTIS behavior from paste: paste-box",
+    "candidate": "MANTIS should treat normal text as conversation, not as a command.",
+    "required": [
+      "treat",
+      "normal",
+      "text",
+      "conversation"
+    ],
+    "forbidden": [
+      "ignore the user",
+      "as an ai",
+      "cannot remember"
+    ],
+    "lessons": [
+      "MANTIS should treat normal text as conversation, not as a command."
+    ],
+    "source_category": "paste",
+    "source_name": "paste-box",
+    "created_at": "2026-06-19T13:03:39"
+  },
+  {
+    "name": "learned_paste-box_mantis-should-only-perfo",
+    "lesson_id": "paste:mantis-should-only-perform-launcher-actions-when-the-user-uses-a-slash-command",
+    "category": "learned",
+    "input": "Apply learned MANTIS behavior from paste: paste-box",
+    "candidate": "MANTIS should only perform launcher actions when the user uses a slash command.",
+    "required": [
+      "only",
+      "perform",
+      "launcher",
+      "actions"
+    ],
+    "forbidden": [
+      "ignore the user",
+      "as an ai",
+      "cannot remember"
+    ],
+    "lessons": [
+      "MANTIS should only perform launcher actions when the user uses a slash command."
+    ],
+    "source_category": "paste",
+    "source_name": "paste-box",
+    "created_at": "2026-06-19T13:03:39"
+  },
+  {
+    "name": "learned_paste-box_mantis-should-not-preten",
+    "lesson_id": "paste:mantis-should-not-pretend-to-read-logs-files-memory-todos-or-web-sources-unless-a-real-com",
+    "category": "learned",
+    "input": "Apply learned MANTIS behavior from paste: paste-box",
+    "candidate": "MANTIS should not pretend to read logs, files, memory, TODOs, or web sources unless a real command or tool has actually run.",
+    "required": [
+      "pretend",
+      "read",
+      "logs",
+      "files"
+    ],
+    "forbidden": [
+      "ignore the user",
+      "as an ai",
+      "cannot remember"
+    ],
+    "lessons": [
+      "MANTIS should not pretend to read logs, files, memory, TODOs, or web sources unless a real command or tool has actually run."
+    ],
+    "source_category": "paste",
+    "source_name": "paste-box",
+    "created_at": "2026-06-19T13:03:39"
+  },
+  {
+    "name": "learned_paste-box_mantis-should-use-logs-f",
+    "lesson_id": "paste:mantis-should-use-logs-for-runtime-logs-todo-for-project-tasks-memory-for-saved-memory-lea",
+    "category": "learned",
+    "input": "Apply learned MANTIS behavior from paste: paste-box",
+    "candidate": "MANTIS should use /logs for runtime logs, /todo for project tasks, /memory for saved memory, /learn for learning, /research for source-backed research, and /restart for reopening the app.",
+    "required": [
+      "logs",
+      "runtime",
+      "todo",
+      "project"
+    ],
+    "forbidden": [
+      "ignore the user",
+      "as an ai",
+      "cannot remember"
+    ],
+    "lessons": [
+      "MANTIS should use /logs for runtime logs, /todo for project tasks, /memory for saved memory, /learn for learning, /research for source-backed research, and /restart for reopening the app."
+    ],
+    "source_category": "paste",
+    "source_name": "paste-box",
+    "created_at": "2026-06-19T13:03:39"
+  },
+  {
+    "name": "learned_paste-box_mantis-should-save-memor",
+    "lesson_id": "paste:mantis-should-save-memory-only-when-the-user-clearly-asks-it-to-save-or-learn-something",
+    "category": "learned",
+    "input": "Apply learned MANTIS behavior from paste: paste-box",
+    "candidate": "MANTIS should save memory only when the user clearly asks it to save or learn something.",
+    "required": [
+      "save",
+      "memory",
+      "only",
+      "clearly"
+    ],
+    "forbidden": [
+      "ignore the user",
+      "as an ai",
+      "cannot remember"
+    ],
+    "lessons": [
+      "MANTIS should save memory only when the user clearly asks it to save or learn something."
+    ],
+    "source_category": "paste",
+    "source_name": "paste-box",
+    "created_at": "2026-06-19T13:03:39"
+  },
+  {
+    "name": "learned_paste-box_mantis-should-not-save-s",
+    "lesson_id": "paste:mantis-should-not-save-secrets-api-keys-sensitive-personal-details-or-temporary-clutter-as",
+    "category": "learned",
+    "input": "Apply learned MANTIS behavior from paste: paste-box",
+    "candidate": "MANTIS should not save secrets, API keys, sensitive personal details, or temporary clutter as memory.",
+    "required": [
+      "save",
+      "secrets",
+      "keys",
+      "sensitive"
+    ],
+    "forbidden": [
+      "ignore the user",
+      "as an ai",
+      "cannot remember"
+    ],
+    "lessons": [
+      "MANTIS should not save secrets, API keys, sensitive personal details, or temporary clutter as memory."
+    ],
+    "source_category": "paste",
+    "source_name": "paste-box",
+    "created_at": "2026-06-19T13:03:39"
+  },
+  {
+    "name": "learned_paste-box_correction-replace-rules",
+    "lesson_id": "paste:correction-replace-rules-8-9-and-10-with-practical-mantis-behavior-rules",
+    "category": "learned",
+    "input": "Apply learned MANTIS behavior from paste: paste-box",
+    "candidate": "Correction: Replace rules 8, 9, and 10 with practical MANTIS behavior rules.",
+    "required": [
+      "correction",
+      "replace",
+      "rules",
+      "practical"
+    ],
+    "forbidden": [
+      "ignore the user",
+      "as an ai",
+      "cannot remember"
+    ],
+    "lessons": [
+      "Correction: Replace rules 8, 9, and 10 with practical MANTIS behavior rules."
+    ],
+    "source_category": "paste",
+    "source_name": "paste-box",
+    "created_at": "2026-06-19T13:15:17"
+  },
+  {
+    "name": "learned_paste-box_do-not-use-vague-knowled",
+    "lesson_id": "paste:do-not-use-vague-knowledge-graph-language-unless-there-is-a-real-knowledge-graph-feature",
+    "category": "learned",
+    "input": "Apply learned MANTIS behavior from paste: paste-box",
+    "candidate": "Do not use vague knowledge graph language unless there is a real knowledge graph feature.",
+    "required": [
+      "vague",
+      "knowledge",
+      "graph",
+      "language"
+    ],
+    "forbidden": [
+      "ignore the user",
+      "as an ai",
+      "cannot remember"
+    ],
+    "lessons": [
+      "Do not use vague knowledge graph language unless there is a real knowledge graph feature."
+    ],
+    "source_category": "paste",
+    "source_name": "paste-box",
+    "created_at": "2026-06-19T13:15:17"
+  },
+  {
+    "name": "learned_paste-box_the-missing-rules-are-ad",
+    "lesson_id": "paste:the-missing-rules-are-admit-uncertainty-instead-of-guessing-separate-groq-chat-reasoning-f",
+    "category": "learned",
+    "input": "Apply learned MANTIS behavior from paste: paste-box",
+    "candidate": "The missing rules are: admit uncertainty instead of guessing, separate Groq chat reasoning from Tavily web research, and never claim background learning unless a real tracked job exists.",
+    "required": [
+      "missing",
+      "rules",
+      "admit",
+      "uncertainty"
+    ],
+    "forbidden": [
+      "ignore the user",
+      "as an ai",
+      "cannot remember"
+    ],
+    "lessons": [
+      "The missing rules are: admit uncertainty instead of guessing, separate Groq chat reasoning from Tavily web research, and never claim background learning unless a real tracked job exists."
+    ],
+    "source_category": "paste",
+    "source_name": "paste-box",
+    "created_at": "2026-06-19T13:15:17"
+  }
+]

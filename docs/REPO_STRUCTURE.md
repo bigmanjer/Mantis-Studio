@@ -10,12 +10,16 @@ age. New code should land in the narrowest folder that owns the behavior.
 - `docs/` - human documentation, audits, and architecture notes.
 - `legal/` - policy markdown rendered by the app.
 - `projects/` - local runtime data only. Ignored by git except placeholders.
-- `scripts/` - developer maintenance scripts.
+- `scripts/` - developer maintenance scripts and local launcher helpers.
 - `tests/` - automated tests.
+- `streamlit_app.py` - Streamlit Cloud deployment shim.
+- `Mantis_Launcher.bat` - Windows local launcher.
+- `VERSION.txt` - source of truth for the displayed app version.
 
 ## Application Code
 
 - `app/config/` - app constants, environment config, and config file I/O.
+- `app/data/` - bundled source-controlled data such as built-in Knowledge Base documents.
 - `app/security/` - encryption, protected storage, signing, and secret handling.
 - `app/services/` - business logic and provider clients.
 - `app/utils/` - small reusable helpers with minimal app knowledge.
@@ -32,6 +36,37 @@ age. New code should land in the narrowest folder that owns the behavior.
 - Page rendering belongs in `app/views/`; avoid adding new large pages to `app/main.py`.
 - Shared styling belongs in `app/layout/` or `app/ui/`, not inside service modules.
 - Runtime data must stay under `projects/`, `logs/`, or `artifacts/`, all ignored by git.
+- Script output must go under `artifacts/`; do not write generated reports into the root.
+- Local secrets stay in `.streamlit/secrets.toml`, which is ignored by git.
+- Keep new top-level files rare. Prefer `docs/`, `scripts/`, `tests/`, `assets/`, or the narrowest `app/` package.
+
+## Runtime Data Layout
+
+Runtime data is intentionally present locally but mostly absent from git:
+
+```text
+projects/
++-- .gitkeep                 # tracked placeholder
++-- .backups/.gitkeep        # tracked placeholder for local save backups
++-- .mantis_config.json      # local app config, ignored
++-- .mantis_users.json       # local users, ignored
++-- .knowledge_base/         # local imported learning docs, ignored
++-- guests/                  # guest workspaces, ignored
++-- users/                   # account workspaces, ignored
+logs/                        # local launcher and Streamlit logs, ignored
+artifacts/                   # generated QA/audit/screenshots, ignored
+```
+
+The app may create these folders at runtime. Do not commit user projects,
+launcher memory, account files, secrets, logs, screenshots, or generated audit
+artifacts.
+
+## Scripts Layout
+
+Use `scripts/README.md` as the index for maintenance tools. Scripts that are
+part of the local launcher can stay beside the launcher support files there.
+If a script grows into application behavior, move it into `app/services/` or
+`app/utils/` and keep `scripts/` as the CLI wrapper only.
 
 ## Current Migration Note
 
