@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter, Literata } from "next/font/google";
 import "./globals.css";
 
@@ -23,9 +23,22 @@ export const metadata: Metadata = {
   twitter: { card: "summary_large_image" },
 };
 
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: dark)", color: "#070b09" },
+    { media: "(prefers-color-scheme: light)", color: "#f6f4ee" },
+  ],
+};
+
+// Applies the saved theme before first paint so pages never flash the wrong colors.
+const themeScript = `try{var t=localStorage.getItem("mantis-theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t}catch(e){}`;
+
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en">
+    <html lang="en" data-theme="dark" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+      </head>
       <body className={`${inter.variable} ${literata.variable} font-sans antialiased`}>{children}</body>
     </html>
   );

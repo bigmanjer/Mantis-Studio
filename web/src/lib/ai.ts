@@ -11,7 +11,7 @@ export const REWRITE_PRESETS: Record<string, string> = {
   Expand: "Add more detail and texture; roughly double the length.",
 };
 
-export type AiAction = "continue" | "rewrite" | "summarize" | "brainstorm" | "outline" | "extract" | "custom";
+export type AiAction = "continue" | "rewrite" | "summarize" | "brainstorm" | "outline" | "extract" | "draft" | "check" | "ask" | "custom";
 
 export interface AiContext {
   project?: {
@@ -82,6 +82,18 @@ export function buildMessages(
       break;
     case "extract":
       user = `Extract story-world canon from the chapter below. Return ONLY a JSON array, no other text. Each item: {"name": string, "category": "Character"|"Location"|"Item"|"Faction"|"Lore", "description": string (1-2 sentences of facts stated in the text)}. Include only named, story-relevant entities. Maximum 20 items.\n\nCHAPTER:\n${t}`;
+      break;
+    case "draft":
+      // Sudowrite-style "write the chapter from its beat".
+      user = `${context}\n\nCHAPTER TO WRITE: ${clip(ctx.chapterTitle, 200)}\nBEAT (what must happen): ${clip(opts.instruction, 1500)}\n${t.trim() ? `\nEXISTING OPENING (continue from here, don't repeat it):\n${t.slice(-4000)}\n` : ""}\nWrite this chapter as finished prose, about ${opts.words ?? 1200} words. Follow the style guide and canon rules, pick up naturally from the story so far, and end on a moment that pulls the reader into the next chapter.`;
+      break;
+    case "check":
+      // Continuity check: compare the chapter against canon rules, the World Bible and earlier summaries.
+      user = `${context}\n\nYou are a meticulous continuity editor. Compare the CHAPTER below against the hard canon rules, the World Bible and the story so far. List every contradiction or likely continuity error (names, ages, timeline, places, who-knows-what, physical details, magic/tech rules). For each one give: the problem, the quote from the chapter, and what canon says. If there are none, say "No continuity issues found." Use a short numbered list. Do not comment on style.\n\nCHAPTER:\n${t}`;
+      break;
+    case "ask":
+      // Q&A about the author's own book.
+      user = `${context}\n\n${t.trim() ? `CURRENT CHAPTER (${clip(ctx.chapterTitle, 120)}):\n${t.slice(-6000)}\n\n` : ""}The author asks about their own book. Answer from the material above only. If the answer isn't established yet, say so and offer 2-3 options that would fit the canon. Be concise.\n\nQUESTION: ${clip(opts.instruction, 1000)}`;
       break;
     default:
       user = `${context ? context + "\n\n" : ""}${clip(opts.instruction, 2000)}${t ? `\n\nTEXT:\n${t}` : ""}`;

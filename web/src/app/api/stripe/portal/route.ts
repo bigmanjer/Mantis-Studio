@@ -6,7 +6,7 @@ export async function POST(req: Request) {
   const { user } = await requireUser();
   if (!user) return NextResponse.redirect(new URL("/login", req.url), { status: 303 });
   const profile = await getProfile(user.id, user.email);
-  if (!profile.stripe_customer_id) return NextResponse.redirect(new URL("/app/settings#plans", req.url), { status: 303 });
+  if (!profile.stripe_customer_id) return NextResponse.redirect(new URL("/app/settings#billing", req.url), { status: 303 });
   const session = await stripe().billingPortal.sessions.create({
     customer: profile.stripe_customer_id,
     return_url: `${siteUrl(req)}/app/settings`,

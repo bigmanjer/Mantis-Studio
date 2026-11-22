@@ -1,8 +1,6 @@
 import { readFile } from "fs/promises";
 import { notFound } from "next/navigation";
 import path from "path";
-import SiteFooter from "@/components/SiteFooter";
-import SiteHeader from "@/components/SiteHeader";
 
 const DOCS = { terms: "terms.md", privacy: "privacy.md" } as const;
 
@@ -71,10 +69,6 @@ export default async function LegalPage({ params }: { params: Promise<{ doc: str
     .replaceAll("{{SUPPORT_EMAIL}}", process.env.NEXT_PUBLIC_SUPPORT_EMAIL || "support@mantis-studio.com")
     .replaceAll("{{EFFECTIVE_DATE}}", process.env.NEXT_PUBLIC_LEGAL_EFFECTIVE_DATE || "the date you first use the Service");
   return (
-    <>
-      <SiteHeader />
-      <main className="mx-auto max-w-3xl space-y-4 px-4 py-16 leading-relaxed">{render(md)}</main>
-      <SiteFooter />
-    </>
+    <article className="mx-auto max-w-3xl space-y-4 px-4 py-16 leading-relaxed sm:py-24">{render(md)}</article>
   );
 }

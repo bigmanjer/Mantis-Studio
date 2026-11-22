@@ -1,7 +1,7 @@
 "use client";
 
 export interface AiRequest {
-  action: "continue" | "rewrite" | "summarize" | "brainstorm" | "outline" | "extract" | "custom";
+  action: "continue" | "rewrite" | "summarize" | "brainstorm" | "outline" | "extract" | "draft" | "check" | "ask" | "custom";
   text?: string;
   preset?: string;
   instruction?: string;

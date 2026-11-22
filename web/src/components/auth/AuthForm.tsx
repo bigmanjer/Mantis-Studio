@@ -62,13 +62,17 @@ export default function AuthForm({ mode }: { mode: "login" | "signup" }) {
   }
 
   return (
-    <div className="card w-full max-w-sm p-8">
-      <h1 className="text-2xl font-semibold">{mode === "login" ? "Welcome back" : "Create your account"}</h1>
-      <p className="mt-1 text-sm text-muted">
-        {mode === "login" ? "Log in to your studio." : "Free forever plan. No credit card needed."}
+    <div className="w-full max-w-sm">
+      <h1 className="font-serif text-3xl font-semibold">{mode === "login" ? "Welcome back" : "Start your book"}</h1>
+      <p className="mt-2 text-sm text-muted">
+        {mode === "login"
+          ? "Log in to pick up where you left off."
+          : plan
+            ? `Create your account, then finish upgrading to ${plan === "studio" ? "Studio" : "Pro"}.`
+            : "Free forever plan. No credit card needed."}
       </p>
       {notConfigured && (
-        <p className="mt-4 rounded-lg border border-danger/40 p-3 text-xs text-danger">
+        <p className="mt-4 rounded-lg border border-danger/30 bg-danger-soft p-3 text-xs text-danger">
           Accounts aren&apos;t configured on this server yet (missing Supabase settings).
         </p>
       )}
@@ -82,47 +86,56 @@ export default function AuthForm({ mode }: { mode: "login" | "signup" }) {
             type="email"
             required
             autoComplete="email"
-            className="input"
+            className="input py-2.5"
+            placeholder="you@example.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
           />
         </div>
         <div>
-          <label className="label" htmlFor="password">
-            Password
-          </label>
+          <div className="flex items-center justify-between">
+            <label className="label" htmlFor="password">
+              Password
+            </label>
+            {mode === "login" && (
+              <button type="button" onClick={resetPassword} className="mb-1.5 cursor-pointer text-xs text-muted hover:text-text">
+                Forgot password?
+              </button>
+            )}
+          </div>
           <input
             id="password"
             type="password"
             required
             minLength={8}
             autoComplete={mode === "login" ? "current-password" : "new-password"}
-            className="input"
+            className="input py-2.5"
+            placeholder={mode === "signup" ? "At least 8 characters" : ""}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
         </div>
-        {msg && <p className={`text-sm ${msg.kind === "error" ? "text-danger" : "text-accent"}`}>{msg.text}</p>}
-        <button type="submit" disabled={busy} className="btn-primary w-full">
+        {msg && (
+          <p
+            role="status"
+            className={`rounded-lg border px-3 py-2 text-sm ${msg.kind === "error" ? "border-danger/30 bg-danger-soft text-danger" : "border-accent/30 bg-accent-soft text-accent"}`}
+          >
+            {msg.text}
+          </p>
+        )}
+        <button type="submit" disabled={busy} className="btn-primary w-full py-2.5">
           {busy ? "Please wait…" : mode === "login" ? "Log in" : "Create account"}
         </button>
       </form>
-      <div className="mt-6 flex justify-between text-sm text-muted">
-        {mode === "login" ? (
-          <>
-            <button type="button" onClick={resetPassword} className="cursor-pointer hover:text-text">
-              Forgot password?
-            </button>
-            <Link href={`/signup${plan ? `?plan=${plan}&interval=${interval}` : ""}`} className="hover:text-text">
-              Create account
-            </Link>
-          </>
-        ) : (
-          <Link href={`/login${plan ? `?plan=${plan}&interval=${interval}` : ""}`} className="hover:text-text">
-            Already have an account? Log in
-          </Link>
-        )}
-      </div>
+      <p className="mt-8 text-center text-sm text-muted">
+        {mode === "login" ? "New to MANTIS? " : "Already have an account? "}
+        <Link
+          href={`/${mode === "login" ? "signup" : "login"}${plan ? `?plan=${plan}&interval=${interval}` : ""}`}
+          className="font-medium text-accent hover:underline"
+        >
+          {mode === "login" ? "Create a free account" : "Log in"}
+        </Link>
+      </p>
     </div>
   );
 }

@@ -4,7 +4,7 @@ import { decrypt } from "@/lib/crypto";
 import { currentPeriod, getPlan } from "@/lib/plans";
 import { createAdminClient, getProfile, requireUser } from "@/lib/supabase/server";
 
-const ACTIONS: AiAction[] = ["continue", "rewrite", "summarize", "brainstorm", "outline", "extract", "custom"];
+const ACTIONS: AiAction[] = ["continue", "rewrite", "summarize", "brainstorm", "outline", "extract", "draft", "check", "ask", "custom"];
 
 export async function POST(req: Request) {
   const { user } = await requireUser();
@@ -69,7 +69,8 @@ export async function POST(req: Request) {
       instruction: body.instruction,
       words: typeof body.words === "number" ? Math.min(Math.max(body.words, 50), 2000) : undefined,
     });
-    const maxTokens = action === "continue" ? Math.ceil(((body.words as number) || 400) * 2) : action === "outline" ? 3000 : 2000;
+    const wordsReq = Math.min(Math.max(Number(body.words) || (action === "draft" ? 1200 : 400), 50), 2000);
+    const maxTokens = action === "continue" || action === "draft" ? Math.ceil(wordsReq * 2) : action === "outline" ? 3000 : 2000;
     const result = await callModel({ provider, apiKey, model, messages, maxTokens });
     if (usingIncluded) {
       await admin.rpc("add_ai_usage", { p_user: user.id, p_period: period, p_tokens: result.tokens });

@@ -33,6 +33,67 @@ export async function createProject(formData: FormData): Promise<{ error?: strin
   redirect(`/app/projects/${data.id}`);
 }
 
+const MAX_IMPORT_BYTES = 6 * 1024 * 1024;
+
+/** Create a project from an uploaded manuscript (.docx, .md or .txt), split into chapters by its headings. */
+export async function importProject(formData: FormData): Promise<{ error?: string } | void> {
+  const { supabase, user } = await requireUser();
+  if (!user) redirect("/login");
+
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) return { error: "Choose a file to import." };
+  if (file.size > MAX_IMPORT_BYTES) return { error: "That file is over 6 MB. Try saving it as plain text first." };
+  const ext = file.name.toLowerCase().split(".").pop() ?? "";
+  if (!["docx", "md", "markdown", "txt"].includes(ext)) return { error: "Import a Word (.docx), Markdown (.md) or text (.txt) file." };
+
+  const profile = await getProfile(user.id, user.email);
+  const plan = getPlan(profile.plan);
+  const { count } = await supabase.from("projects").select("id", { count: "exact", head: true });
+  if ((count ?? 0) >= plan.maxProjects) {
+    return { error: `The ${plan.name} plan includes ${plan.maxProjects} projects. Upgrade to import more.` };
+  }
+
+  let text: string;
+  try {
+    if (ext === "docx") {
+      const mammoth = await import("mammoth");
+      text = (await mammoth.extractRawText({ buffer: Buffer.from(await file.arrayBuffer()) })).value;
+    } else {
+      text = await file.text();
+    }
+  } catch {
+    return { error: "We couldn't read that file. If it's a Word document, try re-saving it as .docx." };
+  }
+
+  const { splitManuscript } = await import("@/lib/manuscript");
+  const chapters = splitManuscript(text);
+  const totalWords = chapters.reduce((a, c) => a + c.word_count, 0);
+  if (!totalWords) return { error: "That file doesn't seem to contain any text." };
+
+  const title =
+    String(formData.get("title") || "").trim().slice(0, 200) ||
+    file.name.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ").trim().slice(0, 200) ||
+    "Imported manuscript";
+  const { data: project, error } = await supabase
+    .from("projects")
+    .insert({ title, user_id: user.id, target_words: Math.max(80000, Math.ceil(totalWords / 10000) * 10000) })
+    .select("id")
+    .single();
+  if (error) {
+    return { error: error.message.includes("PLAN_LIMIT") ? error.message.replace(/^.*PLAN_LIMIT:\s*/, "") : error.message };
+  }
+
+  const rows = chapters.map((c, i) => ({ project_id: project.id, user_id: user.id, position: i + 1, title: c.title, content: c.content, word_count: c.word_count }));
+  for (let i = 0; i < rows.length; i += 50) {
+    const { error: chErr } = await supabase.from("chapters").insert(rows.slice(i, i + 50));
+    if (chErr) {
+      await supabase.from("projects").delete().eq("id", project.id);
+      return { error: "Import failed while saving chapters. Nothing was created; please try again." };
+    }
+  }
+  redirect(`/app/projects/${project.id}`);
+}
+
 export async function deleteProject(projectId: string) {
   const { supabase, user } = await requireUser();
   if (!user) redirect("/login");
