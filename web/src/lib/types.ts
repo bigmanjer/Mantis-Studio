@@ -1,0 +1,43 @@
+export interface Project {
+  id: string;
+  user_id: string;
+  title: string;
+  author: string;
+  genre: string;
+  premise: string;
+  outline: string;
+  canon_rules: string;
+  style_guide: string;
+  target_words: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Chapter {
+  id: string;
+  project_id: string;
+  position: number;
+  title: string;
+  content: string;
+  summary: string;
+  word_count: number;
+  updated_at: string;
+}
+
+export const ENTITY_CATEGORIES = ["Character", "Location", "Item", "Faction", "Lore"] as const;
+export type EntityCategory = (typeof ENTITY_CATEGORIES)[number];
+
+export interface Entity {
+  id: string;
+  project_id: string;
+  name: string;
+  category: EntityCategory;
+  description: string;
+  aliases: string[];
+  created_at: string;
+}
+
+export function countWords(text: string): number {
+  const m = text.trim().match(/\S+/g);
+  return m ? m.length : 0;
+}

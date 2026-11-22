@@ -24,3 +24,4 @@ assets/.generated_branding/
 
 # Local Streamlit secrets
 .streamlit/secrets.toml
+.venv/
