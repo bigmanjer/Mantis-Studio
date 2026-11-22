@@ -14,9 +14,9 @@ export default async function PricingPage() {
       <div className="relative mx-auto max-w-6xl px-4 py-16 sm:py-24">
         <div className="mb-12 text-center">
           <p className="eyebrow">Pricing</p>
-          <h1 className="mt-3 font-serif text-4xl font-semibold sm:text-5xl">Simple, honest pricing</h1>
+          <h1 className="mt-3 font-serif text-4xl font-semibold sm:text-5xl">Pricing</h1>
           <p className="mx-auto mt-4 max-w-xl text-muted">
-            Start free with AI included. Upgrade for unlimited projects, Word export and a million AI tokens a month.
+            Start free. Pay when it’s worth it to you. Cancel whenever you like.
           </p>
         </div>
         <PricingTable signedIn={!!user} currentPlan={profile?.plan} />
@@ -25,7 +25,7 @@ export default async function PricingPage() {
           <Comparison />
         </div>
         <div className="mx-auto mt-24 max-w-3xl">
-          <h2 className="mb-8 text-center font-serif text-3xl font-semibold">Questions, answered</h2>
+          <h2 className="mb-8 text-center font-serif text-3xl font-semibold">Good questions</h2>
           <Faq />
         </div>
       </div>

@@ -5,7 +5,7 @@ import ThemeToggle from "@/components/ui/ThemeToggle";
 
 const POINTS = [
   "Free forever plan with 2 projects",
-  "Free AI every month, no key needed",
+  "Free AI every month, nothing to set up",
   "Outline, chapter editor and World Bible",
   "Export your book any time",
 ];
@@ -37,7 +37,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
           <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-accent-soft text-accent">
             <BookMarked size={20} />
           </span>
-          <h2 className="mt-6 font-serif text-4xl leading-tight font-semibold">Your book, organized. Your canon, protected.</h2>
+          <h2 className="mt-6 font-serif text-4xl leading-tight font-semibold">Your whole book, in one place.</h2>
           <ul className="mt-8 space-y-3">
             {POINTS.map((p) => (
               <li key={p} className="flex items-center gap-3 text-sm">
@@ -47,7 +47,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
           </ul>
           <div className="mt-10 rounded-2xl border border-line bg-panel-2 p-5">
             <p className="flex items-center gap-2 text-xs font-semibold text-accent">
-              <Sparkles size={14} /> AI that remembers your story
+              <Sparkles size={14} /> An AI that remembers
             </p>
             <p className="mt-2 font-serif text-sm leading-relaxed text-muted">
               Every suggestion reads your outline, canon rules and World Bible first, so your detective never forgets she&apos;s

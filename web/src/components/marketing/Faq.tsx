@@ -2,16 +2,16 @@ import { ChevronDown } from "lucide-react";
 
 export const FAQ: [string, string][] = [
   [
-    "Do I need to know anything about AI to use MANTIS?",
-    "No. Every account includes free AI each month with nothing to set up, and Studio includes 1M tokens a month. Bringing your own key is optional.",
+    "Do I need to know anything about AI?",
+    "Nope. Every account gets some free AI each month with nothing to set up. If you write a lot, Studio includes a million tokens a month. Bringing your own key is optional.",
   ],
   [
     "What does “bring your own key” mean?",
     "You can paste an API key from Groq (which has a free tier) or OpenAI into Settings. AI requests then bill to that account instead of using your monthly allowance. Your key is encrypted before it's stored.",
   ],
   [
-    "Is my writing private? Do you train AI on it?",
-    "Your projects are only visible to your account, and we never sell your writing or use it to train AI models. When you use an AI feature, only the text needed for that request is sent to the AI provider.",
+    "Is my writing private? Will you train AI on it?",
+    "Your projects are visible to your account and nobody else. We don’t sell your writing and we don’t train AI on it. When you use an AI feature, only the text that request needs is sent to the AI provider.",
   ],
   [
     "What happens on Studio when I use up the included AI?",
@@ -22,7 +22,7 @@ export const FAQ: [string, string][] = [
     "What happens to my projects if I downgrade?",
     "Nothing is deleted. On Free you can still open, edit and export everything; you just can't create new projects beyond the limit.",
   ],
-  ["Can I get my book out?", "Any time. Export Markdown or plain text on every plan, and a formatted Word manuscript on Pro and Studio."],
+  ["Can I take my book elsewhere?", "Any time, on any plan. Download plain text or Markdown, or a formatted Word manuscript on Pro and Studio. It’s your book."],
 ];
 
 export default function Faq({ items = FAQ }: { items?: [string, string][] }) {

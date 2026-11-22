@@ -29,7 +29,7 @@ export default function SiteFooter() {
         <div>
           <Logo />
           <p className="mt-4 max-w-xs text-sm text-muted">
-            The writing studio for novelists. Plan the book, write the chapters and keep the canon straight.
+            A writing studio for people writing long books. Plan it, write it, and keep track of every detail.
           </p>
         </div>
         {COLUMNS.map((c) => (
