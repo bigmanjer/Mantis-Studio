@@ -76,22 +76,6 @@ export function getPlan(id: string | null | undefined): Plan {
   return PLANS[(id as PlanId) in PLANS ? (id as PlanId) : "free"];
 }
 
-/** Stripe price id for a paid plan and billing interval, from env. Server only. */
-export function priceIdFor(plan: PlanId, interval: Interval = "month"): string | undefined {
-  const env = process.env;
-  if (plan === "pro") return interval === "year" ? env.STRIPE_PRICE_PRO_YEARLY : env.STRIPE_PRICE_PRO;
-  if (plan === "studio") return interval === "year" ? env.STRIPE_PRICE_STUDIO_YEARLY : env.STRIPE_PRICE_STUDIO;
-  return undefined;
-}
-
-export function planForPriceId(priceId: string | null | undefined): PlanId {
-  if (!priceId) return "free";
-  const env = process.env;
-  if (priceId === env.STRIPE_PRICE_STUDIO || priceId === env.STRIPE_PRICE_STUDIO_YEARLY) return "studio";
-  if (priceId === env.STRIPE_PRICE_PRO || priceId === env.STRIPE_PRICE_PRO_YEARLY) return "pro";
-  return "free";
-}
-
 export function currentPeriod(d = new Date()): string {
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
 }

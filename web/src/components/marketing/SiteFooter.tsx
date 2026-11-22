@@ -1,7 +1,7 @@
 import Link from "next/link";
 import Logo from "@/components/ui/Logo";
 
-const support = process.env.NEXT_PUBLIC_SUPPORT_EMAIL || "support@mantis-studio.com";
+const support = process.env.NEXT_PUBLIC_SUPPORT_EMAIL || "rebusinessmatters@gmail.com";
 
 const COLUMNS = [
   {

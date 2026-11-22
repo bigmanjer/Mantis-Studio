@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, Literata } from "next/font/google";
 import "./globals.css";
+import { siteUrl } from "@/lib/env";
 
 const inter = Inter({ variable: "--font-inter", subsets: ["latin"] });
 const literata = Literata({ variable: "--font-literata", subsets: ["latin"] });
@@ -9,7 +10,7 @@ const description =
   "Plan, draft and keep your story's canon straight. Outlines, a chapter editor, a World Bible and AI assistance in one place. Free to start.";
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"),
+  metadataBase: new URL(siteUrl()),
   title: { default: "MANTIS Studio — the AI writing studio for novelists", template: "%s — MANTIS Studio" },
   description,
   icons: { icon: "/mantis_favicon.png" },

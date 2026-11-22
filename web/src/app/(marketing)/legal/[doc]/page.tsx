@@ -66,7 +66,7 @@ export default async function LegalPage({ params }: { params: Promise<{ doc: str
   const file = DOCS[doc as keyof typeof DOCS];
   if (!file) notFound();
   const md = (await readFile(path.join(process.cwd(), "content", "legal", file), "utf8"))
-    .replaceAll("{{SUPPORT_EMAIL}}", process.env.NEXT_PUBLIC_SUPPORT_EMAIL || "support@mantis-studio.com")
+    .replaceAll("{{SUPPORT_EMAIL}}", process.env.NEXT_PUBLIC_SUPPORT_EMAIL || "rebusinessmatters@gmail.com")
     .replaceAll("{{EFFECTIVE_DATE}}", process.env.NEXT_PUBLIC_LEGAL_EFFECTIVE_DATE || "the date you first use the Service");
   return (
     <article className="mx-auto max-w-3xl space-y-4 px-4 py-16 leading-relaxed sm:py-24">{render(md)}</article>

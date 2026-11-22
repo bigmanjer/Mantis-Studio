@@ -3,6 +3,7 @@ import { AiError, buildMessages, callModel, type AiAction, type AiContext, type 
 import { decrypt } from "@/lib/crypto";
 import { currentPeriod, getPlan } from "@/lib/plans";
 import { createAdminClient, getProfile, requireUser } from "@/lib/supabase/server";
+import { env } from "@/lib/env";
 
 const ACTIONS: AiAction[] = ["continue", "rewrite", "summarize", "brainstorm", "outline", "extract", "draft", "check", "ask", "custom"];
 
@@ -36,12 +37,12 @@ export async function POST(req: Request) {
     return null;
   };
   const tryIncluded = async () => {
-    if (apiKey || plan.includedAiTokens <= 0 || !process.env.MANTIS_GROQ_API_KEY) return;
+    if (apiKey || plan.includedAiTokens <= 0 || !env.groqKey) return;
     const { data: usage } = await admin.from("ai_usage").select("tokens").eq("user_id", user.id).eq("period", period).maybeSingle();
     if ((usage?.tokens ?? 0) < plan.includedAiTokens) {
       provider = "groq";
-      apiKey = process.env.MANTIS_GROQ_API_KEY;
-      model = process.env.MANTIS_DEFAULT_MODEL || null;
+      apiKey = env.groqKey;
+      model = env.defaultModel;
       usingIncluded = true;
     }
   };

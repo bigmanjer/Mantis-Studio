@@ -1,9 +1,10 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { SUPABASE_ANON_KEY, SUPABASE_URL, supabaseConfigured } from "./config";
 
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+  if (!supabaseConfigured()) {
     // Not configured yet: let public pages render; the app area needs auth.
     if (request.nextUrl.pathname.startsWith("/app")) {
       return NextResponse.redirect(new URL("/login?setup=1", request.url));
@@ -11,8 +12,8 @@ export async function updateSession(request: NextRequest) {
     return response;
   }
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    SUPABASE_URL,
+    SUPABASE_ANON_KEY,
     {
       cookies: {
         getAll: () => request.cookies.getAll(),

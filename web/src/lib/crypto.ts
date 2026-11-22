@@ -1,11 +1,10 @@
 import "server-only";
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "crypto";
+import { encryptionSecret } from "./env";
 
-// Encrypts users' own AI keys at rest. Set MANTIS_ENCRYPTION_SECRET to a long random string.
+// Encrypts users' own AI keys at rest (see encryptionSecret() for where the secret comes from).
 function key(): Buffer {
-  const secret = process.env.MANTIS_ENCRYPTION_SECRET;
-  if (!secret || secret.length < 32) throw new Error("MANTIS_ENCRYPTION_SECRET must be at least 32 characters");
-  return createHash("sha256").update(secret).digest();
+  return createHash("sha256").update(encryptionSecret()).digest();
 }
 
 export function encrypt(plain: string): string {

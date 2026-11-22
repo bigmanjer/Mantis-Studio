@@ -1,6 +1,7 @@
 import SettingsView from "@/components/app/SettingsView";
 import { decrypt, maskKey } from "@/lib/crypto";
 import { currentPeriod, getPlan } from "@/lib/plans";
+import { syncCustomer } from "@/lib/stripe";
 import { getProfile, requireUser } from "@/lib/supabase/server";
 
 export const metadata = { title: "Settings" };
@@ -8,6 +9,9 @@ export const metadata = { title: "Settings" };
 export default async function SettingsPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const sp = await searchParams;
   const { supabase, user } = await requireUser();
+  // Re-check the plan with Stripe so it's right even if a payment webhook was missed.
+  const before = await getProfile(user!.id, user!.email);
+  if (before.stripe_customer_id) await syncCustomer(before.stripe_customer_id, user!.id).catch(() => undefined);
   const [profile, { data: usage }] = await Promise.all([
     getProfile(user!.id, user!.email),
     supabase.from("ai_usage").select("tokens").eq("period", currentPeriod()).maybeSingle(),

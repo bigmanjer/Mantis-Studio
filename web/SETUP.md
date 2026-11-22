@@ -1,11 +1,27 @@
 # MANTIS Studio Web — Setup Guide
 
 The website lives in this `web/` folder. It's a Next.js app that uses **Supabase** for accounts and data,
-**Stripe** for subscriptions, and is designed to be hosted on **Vercel**.
+**Stripe** for subscriptions, **Groq** for included AI, and is hosted on **Vercel**
+(live at https://mantis-studio-lac.vercel.app, deployed automatically from `main`).
 
-You only need to do the account steps once. Use **test mode** in Stripe until everything works.
+## Fastest path: Vercel integrations (no keys to copy)
 
----
+In Vercel → project **mantis-studio** → **Integrations** (or the Marketplace), add:
+
+1. **Supabase** → creates a database and injects `NEXT_PUBLIC_SUPABASE_URL`, the anon/publishable key and
+   the service role key automatically. Then open the Supabase SQL editor and run `supabase/schema.sql` once.
+2. **Stripe** (start in sandbox/test mode) → injects `STRIPE_SECRET_KEY`. Products and prices for Pro and
+   Studio (monthly + yearly) are **created automatically** on the first checkout. No price IDs to copy.
+3. **Groq** → injects `GROQ_API_KEY` for the AI included in plans. Set a spend limit in the Groq console.
+
+Then redeploy. That's it. Notes:
+- The site URL comes from Vercel automatically; set `NEXT_PUBLIC_SITE_URL` only for a custom domain.
+- `MANTIS_ENCRYPTION_SECRET` is optional; without it, users' own AI keys are encrypted with a key derived
+  from the Supabase service key (rotating that key means users re-enter their AI keys).
+- A Stripe webhook is optional: plans are re-checked with Stripe when people return from checkout or open
+  Settings. Adding one (below) just makes cancellations show up instantly.
+
+The manual setup below still works if you prefer to manage keys yourself.
 
 ## 1. Supabase (accounts + database) — free tier is fine
 
