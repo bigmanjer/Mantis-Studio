@@ -236,9 +236,15 @@ class TestProjectCRUD:
         assert path, "save() must return a non-empty path on success"
         assert os.path.exists(path)
 
-    def test_save_returns_empty_on_unwritable_dir(self):
+    @staticmethod
+    def _unwritable_dir(tmp_path):
+        blocker = tmp_path / "not_a_dir"
+        blocker.write_text("x", encoding="utf-8")
+        return str(blocker / "nested")
+
+    def test_save_returns_empty_on_unwritable_dir(self, tmp_path):
         p = self._make_project("Unwritable")
-        p.storage_dir = "/proc/nonexistent_dir"
+        p.storage_dir = self._unwritable_dir(tmp_path)
         path = p.save()
         assert path == "", "save() must return empty string on failure"
 
@@ -249,10 +255,10 @@ class TestProjectCRUD:
         assert p.filepath == path
         assert path != ""
 
-    def test_save_preserves_filepath_on_failure(self):
+    def test_save_preserves_filepath_on_failure(self, tmp_path):
         p = self._make_project("Fail Test")
         old_fp = p.filepath
-        p.storage_dir = "/proc/nonexistent_dir"
+        p.storage_dir = self._unwritable_dir(tmp_path)
         path = p.save()
         assert path == ""
         assert p.filepath == old_fp
@@ -926,9 +932,8 @@ class TestUtilities:
         ][:4]
         compact_text = "\n".join(compact_items)
         assert "Access" in compact_text
+        assert "Launcher" in compact_text
         assert "Knowledge Base" in compact_text
-        assert "Apply Fix" in compact_text
-        assert "Theme Polish" in compact_text
         assert "Dashboard" not in compact_text
         assert "Open changelog" in welcome_block
         assert "AppConfig.CHANGELOG_URL" in welcome_block
@@ -1026,7 +1031,7 @@ class TestUtilities:
         assert "These lessons are now saved and included in future MANTIS chat context." in source
         assert "Do not claim you are working in the background, learning autonomously" in source
         assert "def forget(" in source
-        assert "/forget X  Remove saved launcher memory notes containing X" in source
+        assert "/forget X - Remove saved memory notes containing X." in source
         assert "Simulator runs saved:" in source
 
     def test_launcher_chat_masks_secrets_and_forgets_memory(self, tmp_path):

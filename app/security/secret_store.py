@@ -8,14 +8,18 @@ from __future__ import annotations
 
 import base64
 import ctypes
-import ctypes.wintypes
 import os
 from typing import Dict, Tuple
+
+# DWORD is a 32-bit unsigned int. Using ctypes.c_uint32 directly (instead of importing
+# ctypes.wintypes) keeps this module importable on Linux hosts such as Streamlit Cloud,
+# where some Python versions raise ValueError on `import ctypes.wintypes`.
+_DWORD = ctypes.c_uint32
 
 
 class _DATA_BLOB(ctypes.Structure):
     _fields_ = [
-        ("cbData", ctypes.wintypes.DWORD),
+        ("cbData", _DWORD),
         ("pbData", ctypes.POINTER(ctypes.c_char)),
     ]
 
