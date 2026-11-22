@@ -22,7 +22,13 @@ import urllib.request
 import webbrowser
 from pathlib import Path
 
-from mantis_console_ui import ConsoleUI
+# Sibling helper modules live next to this file; make them importable whether the
+# script is run directly (launcher) or imported as scripts.mantis_launcher_chat (tests).
+_SCRIPTS_DIR = str(Path(__file__).resolve().parent)
+if _SCRIPTS_DIR not in sys.path:
+    sys.path.insert(0, _SCRIPTS_DIR)
+
+from mantis_console_ui import ConsoleUI  # noqa: E402
 from mantis_learning import WebTextExtractor
 import mantis_logs
 import mantis_secrets
