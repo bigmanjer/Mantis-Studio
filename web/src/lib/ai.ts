@@ -107,6 +107,8 @@ export function buildMessages(
 export const PROVIDERS = {
   groq: { url: "https://api.groq.com/openai/v1/chat/completions", defaultModel: "llama-3.3-70b-versatile" },
   openai: { url: "https://api.openai.com/v1/chat/completions", defaultModel: "gpt-4o-mini" },
+  // Vercel AI Gateway (OpenAI-compatible). Used for the AI included in plans when no Groq key is set.
+  gateway: { url: "https://ai-gateway.vercel.sh/v1/chat/completions", defaultModel: "google/gemini-2.5-flash-lite" },
 } as const;
 
 export type ProviderId = keyof typeof PROVIDERS;

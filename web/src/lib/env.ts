@@ -1,4 +1,5 @@
 import "server-only";
+import { getVercelOidcToken } from "@vercel/oidc";
 import { createHash } from "crypto";
 
 /**
@@ -42,4 +43,24 @@ export function encryptionSecret(): string {
     return createHash("sha256").update(`mantis-byok-v1:${env.supabaseServiceKey}`).digest("hex");
   }
   throw new Error("Set MANTIS_ENCRYPTION_SECRET (32+ chars) or connect Supabase.");
+}
+
+/**
+ * Credentials for the AI that's included in plans (paid for by MANTIS, not the user).
+ * Order: a Groq key if set; else a Vercel AI Gateway key; else, when running on Vercel,
+ * the deployment's built-in OIDC token for AI Gateway (no key needed). Returns null if none.
+ */
+export async function includedAiCredentials(): Promise<{ provider: "groq" | "gateway"; apiKey: string; model: string } | null> {
+  if (env.groqKey) return { provider: "groq", apiKey: env.groqKey, model: process.env.MANTIS_DEFAULT_MODEL || "llama-3.3-70b-versatile" };
+  const gatewayModel = process.env.MANTIS_GATEWAY_MODEL || "google/gemini-2.5-flash-lite";
+  if (process.env.AI_GATEWAY_API_KEY) return { provider: "gateway", apiKey: process.env.AI_GATEWAY_API_KEY, model: gatewayModel };
+  if (process.env.VERCEL) {
+    try {
+      const token = await getVercelOidcToken();
+      if (token) return { provider: "gateway", apiKey: token, model: gatewayModel };
+    } catch {
+      /* not available in this environment */
+    }
+  }
+  return null;
 }

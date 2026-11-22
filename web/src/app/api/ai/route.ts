@@ -3,7 +3,7 @@ import { AiError, buildMessages, callModel, type AiAction, type AiContext, type 
 import { decrypt } from "@/lib/crypto";
 import { currentPeriod, getPlan } from "@/lib/plans";
 import { createAdminClient, getProfile, requireUser } from "@/lib/supabase/server";
-import { env } from "@/lib/env";
+import { includedAiCredentials } from "@/lib/env";
 
 const ACTIONS: AiAction[] = ["continue", "rewrite", "summarize", "brainstorm", "outline", "extract", "draft", "check", "ask", "custom"];
 
@@ -37,12 +37,14 @@ export async function POST(req: Request) {
     return null;
   };
   const tryIncluded = async () => {
-    if (apiKey || plan.includedAiTokens <= 0 || !env.groqKey) return;
+    if (apiKey || plan.includedAiTokens <= 0) return;
+    const creds = await includedAiCredentials();
+    if (!creds) return;
     const { data: usage } = await admin.from("ai_usage").select("tokens").eq("user_id", user.id).eq("period", period).maybeSingle();
     if ((usage?.tokens ?? 0) < plan.includedAiTokens) {
-      provider = "groq";
-      apiKey = env.groqKey;
-      model = env.defaultModel;
+      provider = creds.provider;
+      apiKey = creds.apiKey;
+      model = creds.model;
       usingIncluded = true;
     }
   };
