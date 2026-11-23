@@ -5,7 +5,7 @@ import { currentPeriod, planFor } from "@/lib/plans";
 import { createAdminClient, getProfile, requireUser } from "@/lib/supabase/server";
 import { includedAiCredentials } from "@/lib/env";
 
-const ACTIONS: AiAction[] = ["continue", "rewrite", "summarize", "brainstorm", "outline", "extract", "draft", "check", "ask", "custom"];
+const ACTIONS: AiAction[] = ["continue", "rewrite", "summarize", "brainstorm", "outline", "extract", "draft", "check", "ask", "autofill", "custom"];
 
 export async function POST(req: Request) {
   const { user } = await requireUser();

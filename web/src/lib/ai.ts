@@ -11,7 +11,7 @@ export const REWRITE_PRESETS: Record<string, string> = {
   Expand: "Add more detail and texture; roughly double the length.",
 };
 
-export type AiAction = "continue" | "rewrite" | "summarize" | "brainstorm" | "outline" | "extract" | "draft" | "check" | "ask" | "custom";
+export type AiAction = "continue" | "rewrite" | "summarize" | "brainstorm" | "outline" | "extract" | "draft" | "check" | "ask" | "autofill" | "custom";
 
 export interface AiContext {
   project?: {
@@ -94,6 +94,16 @@ export function buildMessages(
     case "ask":
       // Q&A about the author's own book.
       user = `${context}\n\n${t.trim() ? `CURRENT CHAPTER (${clip(ctx.chapterTitle, 120)}):\n${t.slice(-6000)}\n\n` : ""}The author asks about their own book. Answer from the material above only. If the answer isn't established yet, say so and offer 2-3 options that would fit the canon. Be concise.\n\nQUESTION: ${clip(opts.instruction, 1000)}`;
+      break;
+    case "autofill":
+      // Fill in a project's planning fields from whatever the author already has.
+      user = `${context}\n\n${t.trim() ? `SAMPLE OF THE MANUSCRIPT:\n${t.slice(0, 6000)}\n\n` : ""}${opts.instruction ? `AUTHOR NOTES: ${clip(opts.instruction, 600)}\n\n` : ""}Based only on the material above, propose planning details for this novel. Return ONLY a JSON object, no other text, with these string fields:
+{"title": a compelling working title (max 8 words),
+ "genre": a short genre label like "Fantasy" or "Psychological thriller",
+ "premise": 2-3 sentences: who the protagonist is, what they want, and what stands in the way,
+ "canon_rules": 3-6 short facts the story must never contradict (ages, rules of the world, timeline), one per line,
+ "style_guide": 1-2 sentences describing POV, tense, voice and tone as they appear in the writing}
+Where the material already states something, keep it consistent with that.`;
       break;
     default:
       user = `${context ? context + "\n\n" : ""}${clip(opts.instruction, 2000)}${t ? `\n\nTEXT:\n${t}` : ""}`;

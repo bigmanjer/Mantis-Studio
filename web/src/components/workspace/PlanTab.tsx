@@ -95,6 +95,54 @@ export default function PlanTab({ project, setProject, chapters, setChapters, ai
     setAiBusy(false);
   }
 
+  const [fillBusy, setFillBusy] = useState(false);
+  const [fillMsg, setFillMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const isBlank = (k: "title" | "genre" | "premise" | "canon_rules" | "style_guide") => {
+    const v = (latest.current[k] ?? "").trim();
+    return !v || (k === "title" && /^untitled( project)?$/i.test(v));
+  };
+  const sampleText = chapters
+    .slice()
+    .sort((a, b) => a.position - b.position)
+    .map((c) => c.content)
+    .join("\n\n")
+    .slice(0, 6000);
+  const hasMaterial = !!(project.premise.trim() || project.outline.trim() || sampleText.trim() || !isBlank("title"));
+
+  /** Fill only the empty planning fields from what the author already has (like the original MANTIS). */
+  async function autofill() {
+    setFillBusy(true);
+    setFillMsg(null);
+    try {
+      const raw = await runAi({ action: "autofill", text: sampleText, context: aiContext });
+      const json = JSON.parse(raw.slice(raw.indexOf("{"), raw.lastIndexOf("}") + 1)) as Record<string, unknown>;
+      const filled: string[] = [];
+      const fields = [
+        ["title", "title"],
+        ["genre", "genre"],
+        ["premise", "premise"],
+        ["canon_rules", "canon rules"],
+        ["style_guide", "style guide"],
+      ] as const;
+      for (const [key, label] of fields) {
+        const val = json[key];
+        const text = Array.isArray(val) ? val.join("\n") : typeof val === "string" ? val.trim() : "";
+        if (text && isBlank(key)) {
+          set(key, text.slice(0, key === "title" ? 200 : 4000));
+          filled.push(label);
+        }
+      }
+      setFillMsg(
+        filled.length
+          ? { ok: true, text: `Filled in: ${filled.join(", ")}. Edit anything you like.` }
+          : { ok: true, text: "Everything already had something in it, so nothing was changed." },
+      );
+    } catch (e) {
+      setFillMsg({ ok: false, text: e instanceof AiClientError ? e.message : "The AI's answer couldn't be read. Please try again." });
+    }
+    setFillBusy(false);
+  }
+
   const parsed = parseOutline(project.outline);
   const existingTitles = new Set(chapters.map((c) => c.title.toLowerCase()));
   const newFromOutline = parsed.filter((p) => !existingTitles.has(p.title.toLowerCase()));
@@ -144,7 +192,31 @@ export default function PlanTab({ project, setProject, chapters, setChapters, ai
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div className="space-y-6">
-          <Panel icon={BookOpen} title="The basics">
+          <Panel
+            icon={BookOpen}
+            title="The basics"
+            hint="Write a premise, a few paragraphs or an outline, then let AI fill in whatever is still empty."
+            action={
+              <button
+                onClick={autofill}
+                disabled={fillBusy || !hasMaterial}
+                className="btn-ghost"
+                title={hasMaterial ? "Fill empty fields with AI (never overwrites your text)" : "Add a premise, title, outline or some chapter text first"}
+              >
+                {fillBusy ? <Loader2 size={15} className="animate-spin" /> : <Sparkles size={15} />}
+                {fillBusy ? "Filling in…" : "Fill in with AI"}
+              </button>
+            }
+          >
+            {fillMsg && (
+              <p
+                className={`mb-4 rounded-lg border px-3 py-2 text-sm ${
+                  fillMsg.ok ? "border-accent/30 bg-accent-soft text-accent" : "border-danger/30 bg-danger-soft text-danger"
+                }`}
+              >
+                {fillMsg.text}
+              </p>
+            )}
             <div className="grid gap-4 sm:grid-cols-6">
               <div className="sm:col-span-4">
                 <label className="label" htmlFor="p-title">
