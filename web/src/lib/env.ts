@@ -16,7 +16,7 @@ export const env = {
     "",
   supabaseServiceKey: process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY || "",
   groqKey: process.env.MANTIS_GROQ_API_KEY || process.env.GROQ_API_KEY || "",
-  defaultModel: process.env.MANTIS_DEFAULT_MODEL || "llama-3.3-70b-versatile",
+  defaultModel: process.env.MANTIS_DEFAULT_MODEL || "openai/gpt-oss-120b",
   stripeSecretKey: process.env.STRIPE_SECRET_KEY || "",
   stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET || "",
 };
@@ -51,7 +51,7 @@ export function encryptionSecret(): string {
  * the deployment's built-in OIDC token for AI Gateway (no key needed). Returns null if none.
  */
 export async function includedAiCredentials(): Promise<{ provider: "groq" | "gateway"; apiKey: string; model: string } | null> {
-  if (env.groqKey) return { provider: "groq", apiKey: env.groqKey, model: process.env.MANTIS_DEFAULT_MODEL || "llama-3.3-70b-versatile" };
+  if (env.groqKey) return { provider: "groq", apiKey: env.groqKey, model: process.env.MANTIS_DEFAULT_MODEL || "openai/gpt-oss-120b" };
   const gatewayModel = process.env.MANTIS_GATEWAY_MODEL || "google/gemini-2.5-flash-lite";
   if (process.env.AI_GATEWAY_API_KEY) return { provider: "gateway", apiKey: process.env.AI_GATEWAY_API_KEY, model: gatewayModel };
   if (process.env.VERCEL) {

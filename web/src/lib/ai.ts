@@ -146,13 +146,44 @@ Where the material already states something, keep it consistent with that.`;
 }
 
 export const PROVIDERS = {
-  groq: { url: "https://api.groq.com/openai/v1/chat/completions", defaultModel: "llama-3.3-70b-versatile" },
+  groq: { url: "https://api.groq.com/openai/v1/chat/completions", defaultModel: "openai/gpt-oss-120b" },
   openai: { url: "https://api.openai.com/v1/chat/completions", defaultModel: "gpt-4o-mini" },
   // Vercel AI Gateway (OpenAI-compatible). Used for the AI included in plans when no Groq key is set.
   gateway: { url: "https://ai-gateway.vercel.sh/v1/chat/completions", defaultModel: "google/gemini-2.5-flash-lite" },
 } as const;
 
 export type ProviderId = keyof typeof PROVIDERS;
+
+// Providers retire models without notice. If the configured model is gone, we look up what the key
+// can use and pick the best text model, so the app keeps working instead of failing for every writer.
+const MODEL_PREFERENCE = [/gpt-oss-120b/, /llama-4-maverick/, /llama-3\.3-70b/, /70b/, /qwen3?-32b/, /gpt-oss-20b/, /llama-4-scout/, /gpt-4o-mini/, /gpt-4\.1-mini/];
+const fallbackModels = new Map<string, string>();
+
+async function pickAvailableModel(provider: ProviderId, apiKey: string): Promise<string | null> {
+  const cacheKey = `${provider}:${apiKey.slice(-6)}`;
+  const cached = fallbackModels.get(cacheKey);
+  if (cached) return cached;
+  try {
+    const res = await fetch(PROVIDERS[provider].url.replace(/chat\/completions$/, "models"), {
+      headers: { Authorization: `Bearer ${apiKey}` },
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!res.ok) return null;
+    const ids: string[] = ((await res.json()).data ?? []).map((m: { id: string }) => m.id);
+    const usable = ids.filter((id) => !/whisper|guard|tts|embed|vision|audio|orpheus|prompt|compound|image|dall|moderation/i.test(id));
+    for (const re of MODEL_PREFERENCE) {
+      const hit = usable.find((id) => re.test(id));
+      if (hit) {
+        fallbackModels.set(cacheKey, hit);
+        return hit;
+      }
+    }
+    if (usable[0]) fallbackModels.set(cacheKey, usable[0]);
+    return usable[0] ?? null;
+  } catch {
+    return null;
+  }
+}
 
 export async function callModel(opts: {
   provider: ProviderId;
@@ -162,19 +193,35 @@ export async function callModel(opts: {
   maxTokens?: number;
 }): Promise<{ text: string; tokens: number }> {
   const p = PROVIDERS[opts.provider];
-  const res = await fetch(p.url, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${opts.apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: opts.model || p.defaultModel,
-      messages: opts.messages,
-      temperature: 0.8,
-      max_tokens: opts.maxTokens ?? 1500,
-    }),
-    signal: AbortSignal.timeout(60_000),
-  });
+  const send = (model: string) =>
+    fetch(p.url, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${opts.apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model,
+        messages: opts.messages,
+        temperature: 0.8,
+        max_tokens: opts.maxTokens ?? 1500,
+      }),
+      signal: AbortSignal.timeout(60_000),
+    });
+  const cacheKey = `${opts.provider}:${opts.apiKey.slice(-6)}`;
+  let model = fallbackModels.get(cacheKey) || opts.model || p.defaultModel;
+  let res = await send(model);
+  let body = "";
   if (!res.ok) {
-    const body = await res.text().catch(() => "");
+    body = await res.text().catch(() => "");
+    if ((res.status === 404 || res.status === 400) && /model_not_found|decommissioned|does not exist|not supported/i.test(body)) {
+      const alt = await pickAvailableModel(opts.provider, opts.apiKey);
+      if (alt && alt !== model) {
+        console.warn(`AI provider ${opts.provider}: model ${model} unavailable, using ${alt}`);
+        model = alt;
+        res = await send(model);
+        body = res.ok ? "" : await res.text().catch(() => "");
+      }
+    }
+  }
+  if (!res.ok) {
     // Full details go to the server log only; writers get a plain, safe message.
     console.error(`AI provider ${opts.provider} returned ${res.status}: ${body.slice(0, 500)}`);
     if (res.status === 429) throw new AiError("The AI is busy right now. Please try again in a minute.", 429);
@@ -187,7 +234,9 @@ export async function callModel(opts: {
     throw new AiError("The AI couldn't respond just now. Please try again.", 502);
   }
   const data = await res.json();
-  const text: string = data.choices?.[0]?.message?.content ?? "";
+  let text: string = data.choices?.[0]?.message?.content ?? "";
+  // Some reasoning models wrap their thinking in <think> tags; writers only want the answer.
+  text = text.replace(/<think>[\s\S]*?<\/think>/g, "");
   const tokens: number = data.usage?.total_tokens ?? Math.ceil(JSON.stringify(opts.messages).length / 4 + text.length / 4);
   return { text: text.trim(), tokens };
 }

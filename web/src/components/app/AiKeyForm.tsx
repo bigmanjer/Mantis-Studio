@@ -35,7 +35,7 @@ export default function AiKeyForm({ provider, model, maskedKey }: { provider: st
       </div>
       <div>
         <label className="label">Model (optional)</label>
-        <input name="model" className="input" defaultValue={model} placeholder={prov === "groq" ? "llama-3.3-70b-versatile" : "gpt-4o-mini"} />
+        <input name="model" className="input" defaultValue={model} placeholder={prov === "groq" ? "openai/gpt-oss-120b" : "gpt-4o-mini"} />
       </div>
       <div className="flex flex-wrap items-center gap-3 sm:col-span-3">
         <button type="submit" disabled={pending} className="btn-primary">
