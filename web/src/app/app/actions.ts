@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { PROVIDERS, type ProviderId } from "@/lib/ai";
 import { encrypt } from "@/lib/crypto";
-import { getPlan } from "@/lib/plans";
+import { planFor } from "@/lib/plans";
 import { createAdminClient, getProfile, requireUser } from "@/lib/supabase/server";
 
 export async function createProject(formData: FormData): Promise<{ error?: string } | void> {
@@ -12,7 +12,7 @@ export async function createProject(formData: FormData): Promise<{ error?: strin
   if (!user) redirect("/login");
 
   const profile = await getProfile(user.id, user.email);
-  const plan = getPlan(profile.plan);
+  const plan = planFor(profile);
   const { count } = await supabase.from("projects").select("id", { count: "exact", head: true });
   if ((count ?? 0) >= plan.maxProjects) {
     return { error: `The ${plan.name} plan includes ${plan.maxProjects} projects. Upgrade for unlimited projects.` };
@@ -47,7 +47,7 @@ export async function importProject(formData: FormData): Promise<{ error?: strin
   if (!["docx", "md", "markdown", "txt"].includes(ext)) return { error: "Import a Word (.docx), Markdown (.md) or text (.txt) file." };
 
   const profile = await getProfile(user.id, user.email);
-  const plan = getPlan(profile.plan);
+  const plan = planFor(profile);
   const { count } = await supabase.from("projects").select("id", { count: "exact", head: true });
   if ((count ?? 0) >= plan.maxProjects) {
     return { error: `The ${plan.name} plan includes ${plan.maxProjects} projects. Upgrade to import more.` };

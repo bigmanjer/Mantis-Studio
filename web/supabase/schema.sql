@@ -17,6 +17,7 @@ create table if not exists public.profiles (
   ai_provider text not null default 'groq' check (ai_provider in ('groq', 'openai')),
   ai_model text,
   ai_key_encrypted text,           -- bring-your-own key, AES-GCM encrypted by the server
+  is_admin boolean not null default false,  -- owner accounts: full access, see /app/admin
   created_at timestamptz not null default now()
 );
 
@@ -121,9 +122,13 @@ create or replace function public.enforce_project_limit()
 returns trigger language plpgsql security definer set search_path = public as $$
 declare
   user_plan text;
+  admin boolean;
   owned integer;
 begin
-  select plan into user_plan from public.profiles where id = new.user_id;
+  select plan, is_admin into user_plan, admin from public.profiles where id = new.user_id;
+  if coalesce(admin, false) then
+    return new;
+  end if;
   if coalesce(user_plan, 'free') = 'free' then
     select count(*) into owned from public.projects where user_id = new.user_id;
     if owned >= 2 then
@@ -158,3 +163,8 @@ returns void language sql security definer set search_path = public as $$
   do update set requests = ai_usage.requests + 1, tokens = ai_usage.tokens + excluded.tokens;
 $$;
 revoke execute on function public.add_ai_usage(uuid, text, integer) from public, anon, authenticated;
+
+-- Existing databases: add the admin flag (safe to re-run).
+alter table public.profiles add column if not exists is_admin boolean not null default false;
+-- Make an account admin:
+-- update public.profiles set is_admin = true where email = 'you@example.com';

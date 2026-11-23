@@ -76,6 +76,11 @@ export function getPlan(id: string | null | undefined): Plan {
   return PLANS[(id as PlanId) in PLANS ? (id as PlanId) : "free"];
 }
 
+/** The plan a profile actually gets. Admin accounts (the business owner) get everything. */
+export function planFor(profile: { plan?: string | null; is_admin?: boolean | null }): Plan {
+  return getPlan(profile.is_admin ? "studio" : profile.plan);
+}
+
 export function currentPeriod(d = new Date()): string {
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
 }

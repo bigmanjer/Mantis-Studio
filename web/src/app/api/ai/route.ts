@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { AiError, buildMessages, callModel, type AiAction, type AiContext, type ProviderId } from "@/lib/ai";
 import { decrypt } from "@/lib/crypto";
-import { currentPeriod, getPlan } from "@/lib/plans";
+import { currentPeriod, planFor } from "@/lib/plans";
 import { createAdminClient, getProfile, requireUser } from "@/lib/supabase/server";
 import { includedAiCredentials } from "@/lib/env";
 
@@ -16,7 +16,7 @@ export async function POST(req: Request) {
   if (!ACTIONS.includes(action)) return NextResponse.json({ error: "Unknown AI action." }, { status: 400 });
 
   const profile = await getProfile(user.id, user.email);
-  const plan = getPlan(profile.plan);
+  const plan = planFor(profile);
   const admin = createAdminClient();
   const period = currentPeriod();
 

@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import AppShell from "@/components/app/AppShell";
-import { currentPeriod, getPlan } from "@/lib/plans";
+import { currentPeriod, planFor } from "@/lib/plans";
 import { getProfile, requireUser } from "@/lib/supabase/server";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -10,16 +10,17 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     getProfile(user.id, user.email),
     supabase.from("ai_usage").select("tokens").eq("period", currentPeriod()).maybeSingle(),
   ]);
-  const plan = getPlan(profile.plan);
+  const plan = planFor(profile);
 
   return (
     <AppShell
       user={{
         email: user.email ?? "",
         planId: plan.id,
-        planName: plan.name,
+        planName: profile.is_admin ? "Admin" : plan.name,
         aiUsed: usage?.tokens ?? 0,
         aiLimit: plan.includedAiTokens,
+        isAdmin: !!profile.is_admin,
       }}
     >
       {children}

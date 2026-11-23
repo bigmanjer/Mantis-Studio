@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import Workspace from "@/components/workspace/Workspace";
-import { getPlan } from "@/lib/plans";
+import { planFor } from "@/lib/plans";
 import { getProfile, requireUser } from "@/lib/supabase/server";
 import type { Chapter, Entity, Project } from "@/lib/types";
 
@@ -19,7 +19,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
       initialProject={project as Project}
       initialChapters={(chapters ?? []) as Chapter[]}
       initialEntities={(entities ?? []) as Entity[]}
-      docxExport={getPlan(profile.plan).docxExport}
+      docxExport={planFor(profile).docxExport}
     />
   );
 }

@@ -1,5 +1,5 @@
 "use client";
-import { CreditCard, FolderOpen, LogOut, Menu, Settings, Sparkles, X } from "lucide-react";
+import { CreditCard, FolderOpen, LogOut, Menu, Settings, ShieldCheck, Sparkles, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -15,7 +15,10 @@ export interface ShellUser {
   planName: string;
   aiUsed: number;
   aiLimit: number;
+  isAdmin?: boolean;
 }
+
+const ADMIN_NAV = { href: "/app/admin", label: "Admin", icon: ShieldCheck, match: (p: string) => p === "/app/admin" };
 
 const NAV = [
   { href: "/app", label: "Projects", icon: FolderOpen, match: (p: string) => p === "/app" || p.startsWith("/app/projects") },
@@ -31,7 +34,7 @@ function SidebarBody({ user, pathname, onNavigate }: { user: ShellUser; pathname
         <Logo href="/app" />
       </div>
       <nav className="mt-8 space-y-0.5" aria-label="App">
-        {NAV.map((n) => {
+        {[...NAV, ...(user.isAdmin ? [ADMIN_NAV] : [])].map((n) => {
           const active = n.match(pathname);
           return (
             <Link
@@ -69,7 +72,7 @@ function SidebarBody({ user, pathname, onNavigate }: { user: ShellUser; pathname
               <ProgressBar value={pct} className="mt-1.5" />
             </>
           )}
-          {user.planId !== "studio" && (
+          {user.planId !== "studio" && !user.isAdmin && (
             <Link href="/app/settings#billing" onClick={onNavigate} className="btn-primary mt-3 w-full py-1.5 text-xs">
               Upgrade
             </Link>

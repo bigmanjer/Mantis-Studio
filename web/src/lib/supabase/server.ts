@@ -64,6 +64,7 @@ export interface Profile {
   ai_provider: "groq" | "openai";
   ai_model: string | null;
   ai_key_encrypted: string | null;
+  is_admin?: boolean;
 }
 
 /** Profile for a user id, created on demand if the signup trigger hasn't run. Server only. */

@@ -1,6 +1,6 @@
 import SettingsView from "@/components/app/SettingsView";
 import { decrypt, maskKey } from "@/lib/crypto";
-import { currentPeriod, getPlan } from "@/lib/plans";
+import { currentPeriod, planFor } from "@/lib/plans";
 import { syncCustomer } from "@/lib/stripe";
 import { getProfile, requireUser } from "@/lib/supabase/server";
 
@@ -30,7 +30,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
     <SettingsView
       data={{
         email: user!.email ?? "",
-        plan: getPlan(profile.plan),
+        plan: planFor(profile),
         subscriptionStatus: profile.subscription_status,
         periodEnd: profile.current_period_end,
         hasBillingAccount: !!profile.stripe_customer_id,

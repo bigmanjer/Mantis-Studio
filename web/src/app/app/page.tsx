@@ -1,5 +1,5 @@
 import ProjectsView, { type ProjectSummary } from "@/components/app/ProjectsView";
-import { getPlan } from "@/lib/plans";
+import { planFor } from "@/lib/plans";
 import { getProfile, requireUser } from "@/lib/supabase/server";
 
 export const metadata = { title: "Projects" };
@@ -7,7 +7,7 @@ export const metadata = { title: "Projects" };
 export default async function ProjectsPage() {
   const { supabase, user } = await requireUser();
   const profile = await getProfile(user!.id, user!.email);
-  const plan = getPlan(profile.plan);
+  const plan = planFor(profile);
 
   const { data } = await supabase
     .from("projects")

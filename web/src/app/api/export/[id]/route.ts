@@ -1,6 +1,6 @@
 import { AlignmentType, Document, HeadingLevel, Packer, PageBreak, Paragraph, TextRun } from "docx";
 import { NextResponse } from "next/server";
-import { getPlan } from "@/lib/plans";
+import { planFor } from "@/lib/plans";
 import { getProfile, requireUser } from "@/lib/supabase/server";
 import type { Chapter, Project } from "@/lib/types";
 
@@ -28,7 +28,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
 
   if (format === "docx") {
     const profile = await getProfile(user.id, user.email);
-    if (!getPlan(profile.plan).docxExport) {
+    if (!planFor(profile).docxExport) {
       return NextResponse.json({ error: "Word export is available on Pro and Studio." }, { status: 402 });
     }
     const body: Paragraph[] = [
