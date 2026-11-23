@@ -1,3 +1,4 @@
+import { Analytics } from "@vercel/analytics/next";
 import type { Metadata, Viewport } from "next";
 import { Inter, Literata } from "next/font/google";
 import "./globals.css";
@@ -40,7 +41,10 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
-      <body className={`${inter.variable} ${literata.variable} font-sans antialiased`}>{children}</body>
+      <body className={`${inter.variable} ${literata.variable} font-sans antialiased`}>
+        {children}
+        <Analytics />
+      </body>
     </html>
   );
 }

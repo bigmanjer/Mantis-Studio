@@ -147,3 +147,33 @@ export async function saveAiSettings(formData: FormData): Promise<{ error?: stri
   revalidatePath("/app/settings");
   return { ok: true };
 }
+
+export async function setDailyGoal(goal: number): Promise<{ error?: string; ok?: boolean }> {
+  const { user } = await requireUser();
+  if (!user) return { error: "Please log in." };
+  const value = Math.round(Number(goal));
+  if (!Number.isFinite(value) || value < 50 || value > 20000) return { error: "Pick a goal between 50 and 20,000 words." };
+  await getProfile(user.id, user.email);
+  const { error } = await createAdminClient().from("profiles").update({ daily_goal: value }).eq("id", user.id);
+  if (error) return { error: error.message };
+  revalidatePath("/app");
+  return { ok: true };
+}
+
+/** One-click sample book so new writers see a filled-in workspace instead of a blank page. */
+export async function createSampleProject(): Promise<{ error?: string } | void> {
+  const { supabase, user } = await requireUser();
+  if (!user) redirect("/login");
+  const { SAMPLE } = await import("@/lib/sample-project");
+  const { data: project, error } = await supabase
+    .from("projects")
+    .insert({ ...SAMPLE.project, user_id: user.id })
+    .select("id")
+    .single();
+  if (error) {
+    return { error: error.message.includes("PLAN_LIMIT") ? error.message.replace(/^.*PLAN_LIMIT:\s*/, "") : error.message };
+  }
+  await supabase.from("chapters").insert(SAMPLE.chapters.map((c, i) => ({ ...c, position: i + 1, project_id: project.id, user_id: user.id })));
+  await supabase.from("entities").insert(SAMPLE.entities.map((e) => ({ ...e, project_id: project.id, user_id: user.id })));
+  redirect(`/app/projects/${project.id}`);
+}

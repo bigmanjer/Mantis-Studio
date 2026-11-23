@@ -28,5 +28,28 @@ export default async function ProjectsPage() {
     };
   });
 
-  return <ProjectsView projects={projects} planName={plan.name} maxProjects={plan.maxProjects} email={user!.email ?? ""} />;
+  const since = new Date(Date.now() - 62 * 86_400_000).toISOString().slice(0, 10);
+  const [{ data: days }, { count: entityCount }, { data: usage }] = await Promise.all([
+    supabase.from("writing_days").select("day, words").gte("day", since),
+    supabase.from("entities").select("id", { count: "exact", head: true }),
+    supabase.from("ai_usage").select("requests"),
+  ]);
+  const totalWords = projects.reduce((a, p) => a + p.words, 0);
+
+  return (
+    <ProjectsView
+      projects={projects}
+      planName={plan.name}
+      maxProjects={plan.maxProjects}
+      email={user!.email ?? ""}
+      writing={{ days: (days ?? []) as { day: string; words: number }[], goal: (profile as { daily_goal?: number }).daily_goal ?? 500 }}
+      onboarding={{
+        hasProject: projects.length > 0,
+        wrote100: totalWords >= 100,
+        usedAi: (usage ?? []).some((u) => (u.requests ?? 0) > 0),
+        hasWorldEntry: (entityCount ?? 0) > 0,
+        atLimit: projects.length >= plan.maxProjects,
+      }}
+    />
+  );
 }

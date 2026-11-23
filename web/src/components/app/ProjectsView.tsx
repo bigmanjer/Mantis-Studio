@@ -3,8 +3,10 @@ import Link from "next/link";
 import EmptyState from "@/components/ui/EmptyState";
 import { ProgressBar } from "@/components/ui/Progress";
 import { compact, coverFor, timeAgo } from "@/lib/format";
+import GettingStarted, { type OnboardingState } from "./GettingStarted";
 import ImportDialog from "./ImportDialog";
 import NewProjectForm from "./NewProjectForm";
+import WritingStreak from "./WritingStreak";
 
 export interface ProjectSummary {
   id: string;
@@ -22,11 +24,15 @@ export default function ProjectsView({
   planName,
   maxProjects,
   email,
+  writing,
+  onboarding,
 }: {
   projects: ProjectSummary[];
   planName: string;
   maxProjects: number;
   email: string;
+  writing?: { days: { day: string; words: number }[]; goal: number };
+  onboarding?: OnboardingState;
 }) {
   const atLimit = projects.length >= maxProjects;
   const totalWords = projects.reduce((a, p) => a + p.words, 0);
@@ -51,8 +57,15 @@ export default function ProjectsView({
         </div>
       </header>
 
+      {(onboarding || writing) && (
+        <div className="mt-8 space-y-4">
+          {onboarding && <GettingStarted state={onboarding} />}
+          {writing && projects.length > 0 && <WritingStreak days={writing.days} goal={writing.goal} />}
+        </div>
+      )}
+
       {projects.length > 0 && (
-        <div className="mt-8 grid gap-4 sm:grid-cols-3">
+        <div className="mt-4 grid gap-4 sm:grid-cols-3">
           {[
             { icon: BookOpen, label: "Projects", value: maxProjects === Infinity ? `${projects.length}` : `${projects.length} / ${maxProjects}` },
             { icon: FileText, label: "Chapters", value: compact(totalChapters) },

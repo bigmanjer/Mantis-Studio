@@ -10,6 +10,7 @@ In Vercel → project **mantis-studio** → **Integrations** (or the Marketplace
 
 1. **Supabase** → creates a database and injects `NEXT_PUBLIC_SUPABASE_URL`, the anon/publishable key and
    the service role key automatically. Then open the Supabase SQL editor and run `supabase/schema.sql` once.
+   Then run each file in `supabase/migrations/` in order (e.g. `002_versions_streaks.sql`).
 2. **Stripe** (start in sandbox/test mode) → injects `STRIPE_SECRET_KEY`. Products and prices for Pro and
    Studio (monthly + yearly) are **created automatically** on the first checkout. No price IDs to copy.
 3. **Groq** → injects `GROQ_API_KEY` for the AI included in plans. Set a spend limit in the Groq console.

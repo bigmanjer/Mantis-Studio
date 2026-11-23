@@ -26,6 +26,7 @@ import { createClient } from "@/lib/supabase/client";
 import { countWords, type Chapter, type Entity, type EntityCategory, type Project } from "@/lib/types";
 import { AiClientError, runAi } from "./aiClient";
 import { SaveBadge, useAutosave } from "./autosave";
+import VersionHistory from "./VersionHistory";
 
 const PRESETS = ["Improve Flow", "Fix Grammar", "Tighten", "Sensory Expansion", "Deepen POV", "Make Witty", "Make Darker", "Expand"];
 const READ_WPM = 250;
@@ -197,12 +198,67 @@ function ChapterEditor({
 }) {
   const supabase = createClient();
   const textRef = useRef<HTMLTextAreaElement>(null);
-  const { state, schedule } = useAutosave<Chapter>(async (patch) => {
+  // --- Version history + daily word log ---
+  // The chapter as it was when opened, so the first save of a session can keep a "before" copy.
+  const sessionStart = useRef({ title: chapter.title, content: chapter.content, words: chapter.word_count, saved: false });
+  const lastSnapshotAt = useRef(Date.now());
+  const loggedWords = useRef(chapter.word_count);
+  const latest = useRef(chapter);
+  latest.current = chapter;
+
+  async function snapshot(title: string, content: string, words: number, reason: string) {
+    if (!content.trim()) return;
+    await supabase.from("chapter_versions").insert({
+      chapter_id: chapter.id,
+      project_id: project.id,
+      user_id: project.user_id,
+      title,
+      content,
+      word_count: words,
+      reason,
+    });
+  }
+
+  const localDay = () => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  };
+
+  const { state, schedule, flush } = useAutosave<Chapter>(async (patch) => {
     const now = new Date().toISOString();
+    if ("content" in patch) {
+      const s = sessionStart.current;
+      if (!s.saved) {
+        s.saved = true;
+        await snapshot(s.title, s.content, s.words, "Before this session");
+        lastSnapshotAt.current = Date.now();
+      } else if (Date.now() - lastSnapshotAt.current > 10 * 60_000) {
+        const c = latest.current;
+        await snapshot(c.title, c.content, c.word_count, "Autosave");
+        lastSnapshotAt.current = Date.now();
+      }
+    }
     const { error } = await supabase.from("chapters").update({ ...patch, updated_at: now }).eq("id", chapter.id);
-    if (!error) await supabase.from("projects").update({ updated_at: now }).eq("id", project.id);
+    if (!error) {
+      await supabase.from("projects").update({ updated_at: now }).eq("id", project.id);
+      if (typeof patch.word_count === "number") {
+        const delta = patch.word_count - loggedWords.current;
+        loggedWords.current = patch.word_count;
+        if (delta > 0) await supabase.rpc("log_words", { p_words: delta, p_day: localDay() });
+      }
+    }
     return { error };
   });
+
+  async function restoreVersion(v: { title: string; content: string; word_count: number }) {
+    await flush();
+    const c = latest.current;
+    await snapshot(c.title, c.content, c.word_count, "Before restore");
+    loggedWords.current = v.word_count; // restoring isn't new writing
+    set("title", v.title);
+    set("content", v.content);
+    await flush();
+  }
 
   const [mode, setMode] = useState<AiMode>("draft");
   const [busy, setBusy] = useState<string | null>(null);
@@ -338,6 +394,13 @@ function ChapterEditor({
 
   function applyResult(how: "append" | "replace" | "insert") {
     if (!result) return;
+    // Keep a copy before any AI change, so it can always be undone from History.
+    void snapshot(chapter.title, chapter.content, chapter.word_count, "Before AI edit");
+    lastSnapshotAt.current = Date.now();
+    if (result.kind === "continue" || result.kind === "draft") {
+      // AI-written words don't count toward the writer's own daily goal.
+      loggedWords.current += countWords(result.text);
+    }
     let next = chapter.content;
     if (how === "replace" && result.range) next = next.slice(0, result.range[0]) + result.text + next.slice(result.range[1]);
     else if (how === "insert" && result.range) next = next.slice(0, result.range[1]) + "\n\n" + result.text + next.slice(result.range[1]);
@@ -382,6 +445,7 @@ function ChapterEditor({
           </span>
           <span className="flex items-center gap-4">
             <SaveBadge state={state} />
+            <VersionHistory chapterId={chapter.id} onRestore={restoreVersion} />
             <button
               onClick={() => setFocus(!focus)}
               className="flex cursor-pointer items-center gap-1.5 hover:text-text"
