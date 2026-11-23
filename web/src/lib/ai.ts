@@ -193,18 +193,23 @@ export async function callModel(opts: {
   maxTokens?: number;
 }): Promise<{ text: string; tokens: number }> {
   const p = PROVIDERS[opts.provider];
-  const send = (model: string) =>
-    fetch(p.url, {
+  const send = (model: string) => {
+    // Reasoning models (gpt-oss, o-series, qwen3) think before answering and that thinking uses the
+    // token budget, so keep the thinking short and give it extra room or the answer comes back empty.
+    const reasoning = /gpt-oss|qwen3|o\d/.test(model);
+    return fetch(p.url, {
       method: "POST",
       headers: { Authorization: `Bearer ${opts.apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         model,
         messages: opts.messages,
         temperature: 0.8,
-        max_tokens: opts.maxTokens ?? 1500,
+        max_tokens: (opts.maxTokens ?? 1500) + (reasoning ? 2048 : 0),
+        ...(reasoning && opts.provider === "groq" ? { reasoning_effort: /qwen3/.test(model) ? "none" : "low" } : {}),
       }),
       signal: AbortSignal.timeout(60_000),
     });
+  };
   const cacheKey = `${opts.provider}:${opts.apiKey.slice(-6)}`;
   let model = fallbackModels.get(cacheKey) || opts.model || p.defaultModel;
   let res = await send(model);
@@ -237,6 +242,7 @@ export async function callModel(opts: {
   let text: string = data.choices?.[0]?.message?.content ?? "";
   // Some reasoning models wrap their thinking in <think> tags; writers only want the answer.
   text = text.replace(/<think>[\s\S]*?<\/think>/g, "");
+  if (!text.trim()) throw new AiError("The AI came back empty. Please try again.", 502);
   const tokens: number = data.usage?.total_tokens ?? Math.ceil(JSON.stringify(opts.messages).length / 4 + text.length / 4);
   return { text: text.trim(), tokens };
 }
