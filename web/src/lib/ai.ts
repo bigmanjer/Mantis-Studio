@@ -134,9 +134,16 @@ export async function callModel(opts: {
   });
   if (!res.ok) {
     const body = await res.text().catch(() => "");
-    if (res.status === 401) throw new AiError("The AI provider rejected the API key.", 400);
-    if (res.status === 429) throw new AiError("The AI provider is rate-limiting requests. Try again in a minute.", 429);
-    throw new AiError(`AI provider error (${res.status}). ${body.slice(0, 200)}`, 502);
+    // Full details go to the server log only; writers get a plain, safe message.
+    console.error(`AI provider ${opts.provider} returned ${res.status}: ${body.slice(0, 500)}`);
+    if (res.status === 429) throw new AiError("The AI is busy right now. Please try again in a minute.", 429);
+    if (opts.provider === "gateway") {
+      throw new AiError("The built-in AI isn't available right now. Please try again later, or add your own AI key in Settings.", 503);
+    }
+    if (res.status === 401 || res.status === 403) {
+      throw new AiError("Your AI key was rejected. Please check it in Settings.", 400);
+    }
+    throw new AiError("The AI couldn't respond just now. Please try again.", 502);
   }
   const data = await res.json();
   const text: string = data.choices?.[0]?.message?.content ?? "";
