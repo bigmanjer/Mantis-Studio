@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import type { Interval, PlanId } from "@/lib/plans";
-import { ensurePriceId, stripe, stripeConfigured } from "@/lib/stripe";
+import { ensurePortalConfiguration, ensurePriceId, stripe, stripeConfigured } from "@/lib/stripe";
 import { createAdminClient, getProfile, requireUser } from "@/lib/supabase/server";
 
 export async function POST(req: Request) {
@@ -17,7 +17,11 @@ export async function POST(req: Request) {
 
   // Already subscribed: plan changes and cancellation happen in Stripe's customer portal.
   if (profile.stripe_customer_id && profile.plan !== "free" && profile.subscription_status !== "canceled") {
-    const portal = await s.billingPortal.sessions.create({ customer: profile.stripe_customer_id, return_url: `${base}/app/settings` });
+    const portal = await s.billingPortal.sessions.create({
+      configuration: await ensurePortalConfiguration(),
+      customer: profile.stripe_customer_id,
+      return_url: `${base}/app/settings`,
+    });
     return NextResponse.json({ url: portal.url });
   }
 

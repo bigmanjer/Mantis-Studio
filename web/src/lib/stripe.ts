@@ -85,6 +85,49 @@ export function planForPrice(price: Stripe.Price | null | undefined): PlanId {
   return "free";
 }
 
+// ---------- Customer portal ----------
+let portalConfigId: string | null = null;
+
+/**
+ * New Stripe accounts have no customer-portal configuration, which makes
+ * billingPortal.sessions.create fail. Create one on first use: invoices, card updates,
+ * cancel at period end, and switching between Pro/Studio monthly/yearly.
+ */
+export async function ensurePortalConfiguration(): Promise<string> {
+  if (portalConfigId) return portalConfigId;
+  const s = stripe();
+  const existing = await s.billingPortal.configurations.list({ active: true, limit: 1 });
+  if (existing.data[0]) return (portalConfigId = existing.data[0].id);
+
+  const [proM, proY, stuM, stuY] = await Promise.all([
+    ensurePriceId("pro", "month"),
+    ensurePriceId("pro", "year"),
+    ensurePriceId("studio", "month"),
+    ensurePriceId("studio", "year"),
+  ]);
+  const proPrice = await s.prices.retrieve(proM);
+  const stuPrice = await s.prices.retrieve(stuM);
+  const config = await s.billingPortal.configurations.create({
+    business_profile: { headline: "Manage your MANTIS Studio subscription" },
+    features: {
+      invoice_history: { enabled: true },
+      payment_method_update: { enabled: true },
+      customer_update: { enabled: true, allowed_updates: ["email", "address"] },
+      subscription_cancel: { enabled: true, mode: "at_period_end" },
+      subscription_update: {
+        enabled: true,
+        default_allowed_updates: ["price"],
+        proration_behavior: "create_prorations",
+        products: [
+          { product: proPrice.product as string, prices: [proM, proY] },
+          { product: stuPrice.product as string, prices: [stuM, stuY] },
+        ],
+      },
+    },
+  });
+  return (portalConfigId = config.id);
+}
+
 // ---------- Subscription sync ----------
 const ACTIVE = new Set(["active", "trialing", "past_due"]);
 

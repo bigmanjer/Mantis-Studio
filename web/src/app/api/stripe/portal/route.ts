@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { stripe, stripeConfigured } from "@/lib/stripe";
+import { ensurePortalConfiguration, stripe, stripeConfigured } from "@/lib/stripe";
 import { getProfile, requireUser } from "@/lib/supabase/server";
 
 export async function POST(req: Request) {
@@ -10,6 +10,7 @@ export async function POST(req: Request) {
     return NextResponse.redirect(new URL("/app/settings#billing", req.url), { status: 303 });
   }
   const session = await stripe().billingPortal.sessions.create({
+    configuration: await ensurePortalConfiguration(),
     customer: profile.stripe_customer_id,
     return_url: `${new URL(req.url).origin}/app/settings`,
   });
