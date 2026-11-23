@@ -196,7 +196,7 @@ export async function callModel(opts: {
   const send = (model: string) => {
     // Reasoning models (gpt-oss, o-series, qwen3) think before answering and that thinking uses the
     // token budget, so keep the thinking short and give it extra room or the answer comes back empty.
-    const reasoning = /gpt-oss|qwen3|^od/.test(model);
+    const reasoning = /gpt-oss|qwen3|^o\d/.test(model);
     return fetch(p.url, {
       method: "POST",
       headers: { Authorization: `Bearer ${opts.apiKey}`, "Content-Type": "application/json" },
