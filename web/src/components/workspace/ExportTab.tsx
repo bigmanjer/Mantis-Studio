@@ -1,5 +1,5 @@
 "use client";
-import { FileDown, FileText, FileType2, Lock } from "lucide-react";
+import { DatabaseBackup, FileDown, FileText, FileType2, Lock } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import type { Chapter, Project } from "@/lib/types";
@@ -13,6 +13,13 @@ export default function ExportTab({ project, chapters, docxExport }: { project: 
     { id: "docx", icon: FileType2, title: "Word manuscript", ext: ".docx", body: "Standard manuscript format: Times New Roman, double-spaced, each chapter on a new page.", locked: !docxExport },
     { id: "md", icon: FileText, title: "Markdown", ext: ".md", body: "Clean text with headings. Great for Scrivener, Obsidian, Vellum or GitHub." },
     { id: "txt", icon: FileDown, title: "Plain text", ext: ".txt", body: "Just the words. Opens anywhere." },
+    {
+      id: "json",
+      icon: DatabaseBackup,
+      title: "Full backup",
+      ext: ".json",
+      body: "Everything: chapters, outline, canon rules, style and World Bible. Re-import it any time from Projects.",
+    },
   ];
 
   return (
@@ -27,7 +34,7 @@ export default function ExportTab({ project, chapters, docxExport }: { project: 
         Include the premise and outline at the start
       </label>
 
-      <div className="mt-6 grid gap-4 sm:grid-cols-3">
+      <div className="mt-6 grid gap-4 sm:grid-cols-2">
         {FORMATS.map((f) =>
           f.locked ? (
             <Link key={f.id} href="/app/settings#billing" className="card group flex flex-col p-5 opacity-80 transition hover:opacity-100">

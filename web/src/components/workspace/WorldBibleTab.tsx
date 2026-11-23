@@ -1,9 +1,10 @@
 "use client";
-import { BookMarked, Building2, Gem, MapPin, Plus, ScrollText, Search, Trash2, UserRound, X, type LucideIcon } from "lucide-react";
+import { BookMarked, Building2, Gem, Loader2, MapPin, Plus, ScrollText, Search, Sparkles, Trash2, UserRound, X, type LucideIcon } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import EmptyState from "@/components/ui/EmptyState";
 import { createClient } from "@/lib/supabase/client";
+import { AiClientError, runAi } from "./aiClient";
 import { ENTITY_CATEGORIES, type Entity, type EntityCategory, type Project } from "@/lib/types";
 
 export const CATEGORY_ICONS: Record<EntityCategory, LucideIcon> = {
@@ -31,6 +32,35 @@ export default function WorldBibleTab({
   const [draft, setDraft] = useState({ name: "", category: "Character" as EntityCategory, description: "", aliases: "" });
   const [err, setErr] = useState("");
   const [saving, setSaving] = useState(false);
+  const [expanding, setExpanding] = useState(false);
+
+  /** Expand the open entry's notes with AI (original MANTIS "enrich entity"). Appends; never deletes. */
+  async function expand() {
+    if (!draft.name.trim()) return setErr("Give this entry a name first.");
+    setExpanding(true);
+    setErr("");
+    try {
+      const text = await runAi({
+        action: "enrich",
+        text: draft.description,
+        instruction: `${draft.name.trim()} (${draft.category})`,
+        context: {
+          project: {
+            title: project.title,
+            genre: project.genre,
+            premise: project.premise,
+            canon_rules: project.canon_rules,
+            style_guide: project.style_guide,
+          },
+          entities: entities.filter((e) => e.id !== editing?.id).map((e) => ({ name: e.name, category: e.category, description: e.description })),
+        },
+      });
+      setDraft((d) => ({ ...d, description: d.description.trim() ? `${d.description.trim()}\n${text.trim()}` : text.trim() }));
+    } catch (e) {
+      setErr(e instanceof AiClientError ? e.message : "AI request failed.");
+    }
+    setExpanding(false);
+  }
 
   const shown = useMemo(() => {
     const q = query.toLowerCase();
@@ -221,9 +251,20 @@ export default function WorldBibleTab({
                 <input id="wb-aliases" className="input" value={draft.aliases} onChange={(e) => setDraft({ ...draft, aliases: e.target.value })} />
               </div>
               <div>
-                <label className="label" htmlFor="wb-desc">
-                  Notes
-                </label>
+                <div className="flex items-center justify-between">
+                  <label className="label" htmlFor="wb-desc">
+                    Notes
+                  </label>
+                  <button
+                    type="button"
+                    onClick={expand}
+                    disabled={expanding}
+                    className="mb-1.5 flex cursor-pointer items-center gap-1 text-xs text-accent hover:underline disabled:opacity-50"
+                  >
+                    {expanding ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
+                    {expanding ? "Expanding\u2026" : "Expand with AI"}
+                  </button>
+                </div>
                 <textarea
                   id="wb-desc"
                   rows={9}

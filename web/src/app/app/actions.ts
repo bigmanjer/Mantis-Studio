@@ -44,7 +44,9 @@ export async function importProject(formData: FormData): Promise<{ error?: strin
   if (!(file instanceof File) || file.size === 0) return { error: "Choose a file to import." };
   if (file.size > MAX_IMPORT_BYTES) return { error: "That file is over 6 MB. Try saving it as plain text first." };
   const ext = file.name.toLowerCase().split(".").pop() ?? "";
-  if (!["docx", "md", "markdown", "txt"].includes(ext)) return { error: "Import a Word (.docx), Markdown (.md) or text (.txt) file." };
+  if (!["docx", "md", "markdown", "txt", "json"].includes(ext)) {
+    return { error: "Import a Word (.docx), Markdown (.md), text (.txt) or MANTIS backup (.json) file." };
+  }
 
   const profile = await getProfile(user.id, user.email);
   const plan = planFor(profile);
@@ -52,6 +54,8 @@ export async function importProject(formData: FormData): Promise<{ error?: strin
   if ((count ?? 0) >= plan.maxProjects) {
     return { error: `The ${plan.name} plan includes ${plan.maxProjects} projects. Upgrade to import more.` };
   }
+
+  if (ext === "json") return importBackup(await file.text(), user.id, String(formData.get("title") || "").trim());
 
   let text: string;
   try {
@@ -91,6 +95,41 @@ export async function importProject(formData: FormData): Promise<{ error?: strin
       return { error: "Import failed while saving chapters. Nothing was created; please try again." };
     }
   }
+  redirect(`/app/projects/${project.id}`);
+}
+
+/** Restore a MANTIS backup (.mantis.json) or an original MANTIS Studio project file. */
+async function importBackup(text: string, userId: string, titleOverride: string): Promise<{ error?: string } | void> {
+  const { supabase } = await requireUser();
+  const { parseProjectJson } = await import("@/lib/project-import");
+  let book;
+  try {
+    book = parseProjectJson(text);
+  } catch {
+    return { error: "That JSON file isn't a MANTIS project or backup." };
+  }
+  const { style_dials, ...fields } = book.project;
+  const { data: project, error } = await supabase
+    .from("projects")
+    .insert({ ...fields, ...(style_dials ? { style_dials } : {}), title: titleOverride.slice(0, 200) || fields.title, user_id: userId })
+    .select("id")
+    .single();
+  if (error) {
+    return { error: error.message.includes("PLAN_LIMIT") ? error.message.replace(/^.*PLAN_LIMIT:\s*/, "") : error.message };
+  }
+  const fail = async () => {
+    await supabase.from("projects").delete().eq("id", project.id);
+    return { error: "Import failed partway through. Nothing was created; please try again." };
+  };
+  const chapterRows = book.chapters.map((c, i) => ({ ...c, position: i + 1, project_id: project.id, user_id: userId }));
+  for (let i = 0; i < chapterRows.length; i += 50) {
+    if ((await supabase.from("chapters").insert(chapterRows.slice(i, i + 50))).error) return fail();
+  }
+  const entityRows = book.entities.map((e) => ({ ...e, project_id: project.id, user_id: userId }));
+  for (let i = 0; i < entityRows.length; i += 100) {
+    if ((await supabase.from("entities").insert(entityRows.slice(i, i + 100))).error) return fail();
+  }
+  if (!chapterRows.length) await supabase.from("chapters").insert({ project_id: project.id, user_id: userId, position: 1, title: "Chapter 1" });
   redirect(`/app/projects/${project.id}`);
 }
 

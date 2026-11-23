@@ -9,6 +9,7 @@ export interface Project {
   canon_rules: string;
   style_guide: string;
   target_words: number;
+  style_dials?: Record<string, number> | null;
   created_at: string;
   updated_at: string;
 }

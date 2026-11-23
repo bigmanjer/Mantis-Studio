@@ -28,7 +28,7 @@ import { AiClientError, runAi } from "./aiClient";
 import { SaveBadge, useAutosave } from "./autosave";
 import VersionHistory from "./VersionHistory";
 
-const PRESETS = ["Improve Flow", "Fix Grammar", "Tighten", "Sensory Expansion", "Deepen POV", "Make Witty", "Make Darker", "Expand"];
+const PRESETS = ["Custom", "Improve Flow", "Fix Grammar", "Tighten", "Sensory Expansion", "Deepen POV", "Make Witty", "Make Darker", "Expand"];
 const READ_WPM = 250;
 
 interface Props {
@@ -174,8 +174,9 @@ export default function EditorTab({ project, chapters, setChapters, entities, se
   );
 }
 
+type Issue = { problem: string; quote: string; canon: string; fix: string };
 type AiMode = "draft" | "rewrite" | "canon" | "ask";
-type Suggestion = { name: string; category: EntityCategory; description: string };
+type Suggestion = { name: string; category: EntityCategory; description: string; existingId?: string; newFacts?: string[] };
 
 function ChapterEditor({
   chapter,
@@ -269,7 +270,9 @@ function ChapterEditor({
     text: string;
     range?: [number, number];
   } | null>(null);
-  const [preset, setPreset] = useState(PRESETS[0]);
+  const [preset, setPreset] = useState(PRESETS[1]);
+  const [customRewrite, setCustomRewrite] = useState("");
+  const [issues, setIssues] = useState<Issue[] | null>(null);
   const [words, setWords] = useState(400);
   const [direction, setDirection] = useState("");
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
@@ -331,7 +334,14 @@ function ChapterEditor({
       return;
     }
     return ai("rewrite", async () => {
-      const text = await runAi({ action: "rewrite", text: chapter.content.slice(...range), preset, context: aiContext });
+      if (preset === "Custom" && !customRewrite.trim()) throw new AiClientError("Type how you want the passage rewritten first.");
+      const text = await runAi({
+        action: "rewrite",
+        text: chapter.content.slice(...range),
+        preset: preset === "Custom" ? undefined : preset,
+        instruction: preset === "Custom" ? customRewrite : undefined,
+        context: aiContext,
+      });
       setResult({ kind: "rewrite", text, range });
     });
   };
@@ -344,9 +354,33 @@ function ChapterEditor({
 
   const doCheck = () =>
     ai("check", async () => {
-      const text = await runAi({ action: "check", text: chapter.content, context: aiContext });
-      setResult({ kind: "check", text });
+      const raw = await runAi({ action: "check", text: chapter.content, context: aiContext });
+      let list: Issue[] = [];
+      try {
+        const parsed = JSON.parse(raw.slice(raw.indexOf("["), raw.lastIndexOf("]") + 1));
+        list = (Array.isArray(parsed) ? parsed : [])
+          .filter((i) => i && typeof i.problem === "string")
+          .map((i) => ({ problem: String(i.problem), quote: String(i.quote ?? ""), canon: String(i.canon ?? ""), fix: String(i.fix ?? "") }));
+      } catch {
+        // Model didn't return JSON: show its text as a plain report instead.
+        setResult({ kind: "check", text: raw });
+        return;
+      }
+      setIssues(list);
     });
+
+  /** Replace the quoted passage with the suggested fix. Refuses (rather than appending) if the quote isn't found. */
+  function applyFix(i: Issue, idx: number) {
+    const at = i.quote ? chapter.content.indexOf(i.quote) : -1;
+    if (at < 0 || !i.fix) {
+      setErr("Couldn't find that exact passage any more, so nothing was changed. Edit it by hand.");
+      return;
+    }
+    void snapshot(chapter.title, chapter.content, chapter.word_count, "Before continuity fix");
+    lastSnapshotAt.current = Date.now();
+    set("content", chapter.content.slice(0, at) + i.fix + chapter.content.slice(at + i.quote.length));
+    setIssues((prev) => (prev ? prev.filter((_, j) => j !== idx) : prev));
+  }
 
   const doAsk = (e: React.FormEvent) => {
     e.preventDefault();
@@ -374,13 +408,44 @@ function ChapterEditor({
       } catch {
         throw new AiClientError("The AI returned something unreadable. Please try again.");
       }
-      const known = new Set(entities.map((e) => e.name.toLowerCase()));
       const cats = ["Character", "Location", "Item", "Faction", "Lore"];
-      setSuggestions(items.filter((i) => i?.name && cats.includes(i.category) && !known.has(i.name.toLowerCase())));
+      const byName = new Map<string, Entity>();
+      for (const e of entities) {
+        byName.set(e.name.toLowerCase(), e);
+        for (const a of e.aliases) byName.set(a.toLowerCase(), e);
+      }
+      const out: Suggestion[] = [];
+      for (const i of items) {
+        if (!i?.name || !cats.includes(i.category)) continue;
+        const existing = byName.get(i.name.toLowerCase());
+        if (!existing) {
+          out.push(i);
+          continue;
+        }
+        // Known entity: keep only sentences that add something new (like the original MANTIS merge).
+        const have = existing.description.toLowerCase();
+        const facts = (i.description || "")
+          .split(/(?<=[.!?])\s+/)
+          .map((f) => f.trim())
+          .filter((f) => f.length > 3 && !have.includes(f.toLowerCase().replace(/[.!?]$/, "")));
+        if (facts.length) out.push({ ...i, name: existing.name, existingId: existing.id, newFacts: facts });
+      }
+      setSuggestions(out);
       setScanned(true);
     });
 
   async function addSuggestion(s: Suggestion) {
+    if (s.existingId && s.newFacts) {
+      const existing = entities.find((e) => e.id === s.existingId);
+      if (!existing) return;
+      const merged = [existing.description.trim(), ...s.newFacts.map((f) => `- ${f}`)].filter(Boolean).join("\n");
+      const { error } = await supabase.from("entities").update({ description: merged }).eq("id", existing.id);
+      if (!error) {
+        setEntities((prev) => prev.map((e) => (e.id === existing.id ? { ...e, description: merged } : e)));
+        setSuggestions((list) => list.filter((x) => x !== s));
+      }
+      return;
+    }
     const { data, error } = await supabase
       .from("entities")
       .insert({ project_id: project.id, user_id: project.user_id, name: s.name, category: s.category, description: s.description })
@@ -548,6 +613,16 @@ function ChapterEditor({
                     </button>
                   ))}
                 </div>
+                {preset === "Custom" && (
+                  <textarea
+                    rows={2}
+                    className="input"
+                    placeholder="e.g. “Make her angrier but keep it quiet” or “Rewrite as a letter”"
+                    value={customRewrite}
+                    onChange={(e) => setCustomRewrite(e.target.value)}
+                    aria-label="Custom rewrite instruction"
+                  />
+                )}
                 <button onClick={doRewrite} disabled={!!busy} className="btn-primary w-full">
                   {busy === "rewrite" ? <Loader2 size={15} className="animate-spin" /> : <Wand2 size={15} />}
                   Rewrite selection
@@ -571,6 +646,37 @@ function ChapterEditor({
                   {busy === "check" ? <Loader2 size={15} className="animate-spin" /> : <ShieldCheck size={15} />}
                   {busy === "check" ? "Checking continuity…" : "Check continuity"}
                 </button>
+                {issues && issues.length === 0 && (
+                  <p className="rounded-lg border border-accent/30 bg-accent-soft px-3 py-2 text-center text-xs text-accent">
+                    No continuity problems found in this chapter.
+                  </p>
+                )}
+                {issues && issues.length > 0 && (
+                  <ul className="space-y-2">
+                    {issues.map((i, idx) => (
+                      <li key={idx} className="rounded-xl border border-warning/30 bg-panel p-3 text-sm">
+                        <p className="font-medium">{i.problem}</p>
+                        {i.quote && <p className="mt-1.5 border-l-2 border-warning/60 pl-2 font-serif text-xs text-muted">“{i.quote}”</p>}
+                        {i.canon && <p className="mt-1.5 text-xs text-muted">Canon: {i.canon}</p>}
+                        {i.fix && (
+                          <p className="mt-1.5 text-xs">
+                            Suggested: <span className="font-serif text-accent">{i.fix}</span>
+                          </p>
+                        )}
+                        <div className="mt-2 flex gap-2">
+                          {i.fix && i.quote && (
+                            <button onClick={() => applyFix(i, idx)} className="btn-primary h-7 px-2.5 text-xs">
+                              Apply fix
+                            </button>
+                          )}
+                          <button onClick={() => setIssues((prev) => (prev ? prev.filter((_, j) => j !== idx) : prev))} className="btn-quiet h-7 px-2.5 text-xs">
+                            Ignore
+                          </button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
                 <button onClick={doExtract} disabled={!!busy || !chapter.content.trim()} className="btn-ghost w-full">
                   {busy === "extract" ? <Loader2 size={15} className="animate-spin" /> : <ScanSearch size={15} />}
                   Scan chapter for new canon
@@ -583,11 +689,19 @@ function ChapterEditor({
                         <div className="flex items-center justify-between gap-2">
                           <span className="font-medium">{s.name}</span>
                           <button onClick={() => addSuggestion(s)} className="btn-quiet h-6 gap-1 px-2 text-xs text-accent">
-                            <Plus size={12} /> Add
+                            <Plus size={12} /> {s.existingId ? "Merge" : "Add"}
                           </button>
                         </div>
-                        <p className="text-[11px] text-accent">{s.category}</p>
-                        <p className="mt-1 text-xs text-muted">{s.description}</p>
+                        <p className="text-[11px] text-accent">{s.existingId ? `New details for an existing ${s.category.toLowerCase()}` : s.category}</p>
+                        {s.newFacts ? (
+                          <ul className="mt-1 list-disc pl-4 text-xs text-muted">
+                            {s.newFacts.map((f) => (
+                              <li key={f}>{f}</li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <p className="mt-1 text-xs text-muted">{s.description}</p>
+                        )}
                       </li>
                     ))}
                   </ul>

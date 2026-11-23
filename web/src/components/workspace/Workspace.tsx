@@ -47,6 +47,7 @@ export default function Workspace({ initialProject, initialChapters, initialEnti
         outline: project.outline,
         canon_rules: project.canon_rules,
         style_guide: project.style_guide,
+        style_dials: project.style_dials ?? null,
       },
       entities: entities.map((e) => ({ name: e.name, category: e.category, description: e.description })),
     }),

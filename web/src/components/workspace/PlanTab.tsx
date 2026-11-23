@@ -1,5 +1,5 @@
 "use client";
-import { BookOpen, Feather, ListPlus, ListTree, Loader2, ScrollText, ShieldAlert, Sparkles, Trash2, type LucideIcon } from "lucide-react";
+import { BookOpen, Feather, ListPlus, ListTree, Loader2, ScrollText, ShieldAlert, SlidersHorizontal, Sparkles, Trash2, type LucideIcon } from "lucide-react";
 import { useRef, useState, useTransition } from "react";
 import { deleteProject } from "@/app/app/actions";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
@@ -16,6 +16,15 @@ interface Props {
   aiContext: unknown;
   goToWrite: () => void;
 }
+
+// Mirrors STYLE_DIALS in lib/ai.ts (kept here so this client file doesn't import server code).
+const DIALS = [
+  { key: "pace", label: "Pace", low: "slower, lingering", high: "faster, propulsive", lowShort: "Slow", highShort: "Fast" },
+  { key: "interiority", label: "Interiority", low: "more external", high: "deeper in their head", lowShort: "Action", highShort: "Inner" },
+  { key: "imagery", label: "Imagery", low: "plainer", high: "richer, more sensory", lowShort: "Spare", highShort: "Lush" },
+  { key: "dialogue", label: "Dialogue", low: "more narration", high: "more dialogue", lowShort: "Narration", highShort: "Dialogue" },
+  { key: "mood", label: "Mood", low: "lighter", high: "darker, tenser", lowShort: "Light", highShort: "Dark" },
+];
 
 /** Parse "Chapter 3: Title — beat" lines from an outline. */
 export function parseOutline(outline: string): { title: string; beat: string }[] {
@@ -89,6 +98,27 @@ export default function PlanTab({ project, setProject, chapters, setChapters, ai
       // Merge into the outline as it is now (the user may have kept typing while the AI worked).
       const current = latest.current.outline.trim();
       set("outline", current ? `${current}\n\n--- AI draft ---\n${text}` : text);
+    } catch (e) {
+      setAiErr(e instanceof AiClientError ? e.message : "AI request failed.");
+    }
+    setAiBusy(false);
+  }
+
+  const hasChapterText = chapters.some((c) => c.content.trim().length > 200);
+
+  /** Build an outline from chapters already written (original MANTIS "reverse engineer outline"). */
+  async function outlineFromChapters() {
+    setAiBusy(true);
+    setAiErr("");
+    try {
+      const digest = chapters
+        .slice()
+        .sort((a, b) => a.position - b.position)
+        .map((c, i) => `Chapter ${i + 1}: ${c.title}\n${c.summary || c.content.slice(0, 900)}`)
+        .join("\n\n");
+      const text = await runAi({ action: "reverse_outline", text: digest, context: aiContext });
+      const current = latest.current.outline.trim();
+      set("outline", current ? `${current}\n\n--- Outline from chapters ---\n${text}` : text);
     } catch (e) {
       setAiErr(e instanceof AiClientError ? e.message : "AI request failed.");
     }
@@ -292,6 +322,16 @@ export default function PlanTab({ project, setProject, chapters, setChapters, ai
                   {aiBusy ? <Loader2 size={15} className="animate-spin" /> : <Sparkles size={15} />}
                   {aiBusy ? "Drafting…" : "Draft with AI"}
                 </button>
+                {hasChapterText && (
+                  <button
+                    onClick={outlineFromChapters}
+                    disabled={aiBusy}
+                    className="btn-ghost"
+                    title="Build an outline from the chapters you've already written, plus ideas for what comes next"
+                  >
+                    <ListTree size={15} /> From my chapters
+                  </button>
+                )}
               </div>
             }
           >
@@ -338,6 +378,35 @@ export default function PlanTab({ project, setProject, chapters, setChapters, ai
               placeholder="Close third person, past tense. Spare, lyrical prose."
               onChange={(e) => set("style_guide", e.target.value)}
             />
+          </Panel>
+          <Panel icon={SlidersHorizontal} title="Style dials" hint="Nudge how the AI writes for this book. The middle means no preference.">
+            <div className="space-y-4">
+              {DIALS.map((d) => {
+                const v = project.style_dials?.[d.key] ?? 50;
+                return (
+                  <div key={d.key}>
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-medium">{d.label}</span>
+                      <span className="text-muted">{v === 50 ? "no preference" : v > 50 ? d.high : d.low}</span>
+                    </div>
+                    <input
+                      type="range"
+                      min={0}
+                      max={100}
+                      step={5}
+                      value={v}
+                      onChange={(e) => set("style_dials", { ...(project.style_dials ?? {}), [d.key]: Number(e.target.value) })}
+                      className="mt-1 w-full accent-[var(--accent)]"
+                      aria-label={d.label}
+                    />
+                    <div className="flex justify-between text-[10px] text-muted">
+                      <span>{d.lowShort}</span>
+                      <span>{d.highShort}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </Panel>
           <Panel icon={ScrollText} title="Project" hint="Deleting removes every chapter and World Bible entry.">
             <button onClick={onDelete} disabled={deleting} className="btn-danger w-full">

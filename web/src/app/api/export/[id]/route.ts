@@ -26,6 +26,34 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   const chs = (chapters ?? []) as Chapter[];
   const name = safeName(p.title);
 
+  if (format === "json") {
+    // Full backup: everything needed to restore or move the book (re-importable on the Projects page).
+    const { data: entities } = await supabase.from("entities").select("name, category, description, aliases").eq("project_id", id);
+    const backup = {
+      mantis_web: 1,
+      exported_at: new Date().toISOString(),
+      project: {
+        title: p.title,
+        author: p.author,
+        genre: p.genre,
+        premise: p.premise,
+        outline: p.outline,
+        canon_rules: p.canon_rules,
+        style_guide: p.style_guide,
+        target_words: p.target_words,
+        style_dials: (p as Project & { style_dials?: unknown }).style_dials ?? null,
+      },
+      chapters: chs.map((c) => ({ title: c.title, content: c.content, summary: c.summary, word_count: c.word_count })),
+      entities: entities ?? [],
+    };
+    return new NextResponse(JSON.stringify(backup, null, 2), {
+      headers: {
+        "Content-Type": "application/json; charset=utf-8",
+        "Content-Disposition": `attachment; filename="${name}.mantis.json"`,
+      },
+    });
+  }
+
   if (format === "docx") {
     const profile = await getProfile(user.id, user.email);
     if (!planFor(profile).docxExport) {

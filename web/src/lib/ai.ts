@@ -11,7 +11,7 @@ export const REWRITE_PRESETS: Record<string, string> = {
   Expand: "Add more detail and texture; roughly double the length.",
 };
 
-export type AiAction = "continue" | "rewrite" | "summarize" | "brainstorm" | "outline" | "extract" | "draft" | "check" | "ask" | "autofill" | "custom";
+export type AiAction = "continue" | "rewrite" | "summarize" | "brainstorm" | "outline" | "extract" | "draft" | "check" | "ask" | "autofill" | "reverse_outline" | "enrich" | "custom";
 
 export interface AiContext {
   project?: {
@@ -21,6 +21,7 @@ export interface AiContext {
     outline?: string;
     canon_rules?: string;
     style_guide?: string;
+    style_dials?: Record<string, number> | null;
   };
   chapterTitle?: string;
   previousSummaries?: string[];
@@ -28,6 +29,26 @@ export interface AiContext {
 }
 
 const clip = (s: string | undefined, n: number) => (s ?? "").slice(0, n);
+
+// Style dials: 0-100 sliders from the original MANTIS "Author & Style Lab" craft controls.
+export const STYLE_DIALS = [
+  { key: "pace", label: "Pace", low: "slow and lingering", high: "fast and propulsive" },
+  { key: "interiority", label: "Interiority", low: "external, show through action", high: "deep inside the character's head" },
+  { key: "imagery", label: "Imagery", low: "plain and spare", high: "rich, lyrical and sensory" },
+  { key: "dialogue", label: "Dialogue", low: "mostly narration", high: "dialogue-driven" },
+  { key: "mood", label: "Mood", low: "light and warm", high: "dark and tense" },
+] as const;
+
+function describeDials(d: Record<string, number> | null | undefined): string {
+  if (!d) return "";
+  return STYLE_DIALS.filter((x) => typeof d[x.key] === "number" && Math.abs(d[x.key] - 50) >= 10)
+    .map((x) => {
+      const v = d[x.key];
+      const strength = Math.abs(v - 50) >= 35 ? "strongly" : "somewhat";
+      return `- ${x.label}: ${strength} ${v > 50 ? x.high : x.low}`;
+    })
+    .join("\n");
+}
 
 function projectBlock(ctx: AiContext): string {
   const p = ctx.project ?? {};
@@ -37,6 +58,8 @@ function projectBlock(ctx: AiContext): string {
   if (p.premise) parts.push(`PREMISE:\n${clip(p.premise, 1500)}`);
   if (p.canon_rules) parts.push(`HARD CANON RULES (never contradict):\n${clip(p.canon_rules, 1500)}`);
   if (p.style_guide) parts.push(`STYLE GUIDE:\n${clip(p.style_guide, 1200)}`);
+  const dials = describeDials(p.style_dials);
+  if (dials) parts.push(`STYLE DIALS (apply to anything you write):\n${dials}`);
   if (p.outline) parts.push(`OUTLINE:\n${clip(p.outline, 3000)}`);
   if (ctx.previousSummaries?.length)
     parts.push(`STORY SO FAR:\n${ctx.previousSummaries.slice(-5).map((s) => `- ${clip(s, 400)}`).join("\n")}`);
@@ -89,7 +112,15 @@ export function buildMessages(
       break;
     case "check":
       // Continuity check: compare the chapter against canon rules, the World Bible and earlier summaries.
-      user = `${context}\n\nYou are a meticulous continuity editor. Compare the CHAPTER below against the hard canon rules, the World Bible and the story so far. List every contradiction or likely continuity error (names, ages, timeline, places, who-knows-what, physical details, magic/tech rules). For each one give: the problem, the quote from the chapter, and what canon says. If there are none, say "No continuity issues found." Use a short numbered list. Do not comment on style.\n\nCHAPTER:\n${t}`;
+      user = `${context}\n\nYou are a meticulous continuity editor. Compare the CHAPTER below against the hard canon rules, the World Bible and the story so far. Find contradictions or likely continuity errors (names, ages, timeline, places, who-knows-what, physical details, magic/tech rules). Do not comment on style.\nReturn ONLY a JSON array, no other text. Each item: {"problem": short explanation, "quote": the exact sentence or phrase from the chapter, copied character-for-character, "canon": what canon says, "fix": replacement text for the quote that resolves the problem}. Return [] if there are no issues. Maximum 10 items.\n\nCHAPTER:\n${t}`;
+      break;
+    case "reverse_outline":
+      // Outline from existing chapters (original MANTIS "reverse engineer outline").
+      user = `${context}\n\nCHAPTERS (title and opening or summary):\n${t.slice(0, 20000)}\n\nWrite an outline of the book as it exists, one line per chapter in exactly this format:\nChapter 1: <title> \u2014 <2-3 sentence beat describing what happens>\nThen, under a line "Next:", suggest 3 possible next chapters in the same format.`;
+      break;
+    case "enrich":
+      // Expand a World Bible entry (original MANTIS "enrich entity").
+      user = `${context}\n\nENTRY TO EXPAND: ${clip(opts.instruction, 300)}\nCURRENT NOTES:\n${t.slice(0, 4000) || "(none)"}\n\nExpand these notes into a richer World Bible entry as short bullet points (appearance, history, motivations or function, relationships, secrets or open questions). Keep everything consistent with the canon and existing notes, keep facts already stated, and mark any new invention with "(idea)". Return only the bullet points.`;
       break;
     case "ask":
       // Q&A about the author's own book.

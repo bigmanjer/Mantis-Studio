@@ -47,7 +47,7 @@ export default function ImportDialog({ atLimit }: { atLimit: boolean }) {
           <div className="flex items-start justify-between">
             <div>
               <h2 className="font-serif text-2xl font-semibold">Import a manuscript</h2>
-              <p className="mt-1 text-sm text-muted">We&apos;ll split it into chapters using its headings (Chapter 1, Prologue, # Heading…).</p>
+              <p className="mt-1 text-sm text-muted">Manuscripts are split into chapters by their headings. MANTIS backups and project files from the original MANTIS app restore everything, including the World Bible.</p>
             </div>
             <button type="button" onClick={() => dialog.current?.close()} className="btn-quiet h-8 w-8 p-0" aria-label="Close">
               <X size={16} />
@@ -78,10 +78,10 @@ export default function ImportDialog({ atLimit }: { atLimit: boolean }) {
             ) : (
               <>
                 <span className="font-medium">Drop a file here, or click to browse</span>
-                <span className="text-xs text-muted">Word (.docx), Markdown (.md) or text (.txt), up to 6 MB</span>
+                <span className="text-xs text-muted">Word, Markdown or text manuscript, or a MANTIS backup (.json), up to 6 MB</span>
               </>
             )}
-            <input type="file" accept=".docx,.md,.markdown,.txt" className="sr-only" onChange={(e) => pick(e.target.files?.[0])} />
+            <input type="file" accept=".docx,.md,.markdown,.txt,.json" className="sr-only" onChange={(e) => pick(e.target.files?.[0])} />
           </label>
 
           <div className="mt-4">
