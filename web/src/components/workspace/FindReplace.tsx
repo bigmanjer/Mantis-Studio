@@ -96,8 +96,11 @@ export default function FindReplace({
       setEntities((prev) => prev.map((e) => renamed.find((r) => r.id === e.id) ?? e));
     }
     setBusy(false);
+    const world = renamed.length ? `${renamed.length} World Bible ${renamed.length === 1 ? "entry" : "entries"}` : "";
     setDone(
-      `Replaced ${total} ${total === 1 ? "match" : "matches"} in ${updated.length} ${updated.length === 1 ? "chapter" : "chapters"}${renamed.length ? ` and updated ${renamed.length} World Bible ${renamed.length === 1 ? "entry" : "entries"}` : ""}. Changed chapters have a copy in History.`,
+      updated.length
+        ? `Replaced ${total} ${total === 1 ? "match" : "matches"} in ${updated.length} ${updated.length === 1 ? "chapter" : "chapters"}${world ? ` and updated ${world}` : ""}. Changed chapters have a copy in History.`
+        : `Updated ${world || "nothing"}.`,
     );
   }
 
@@ -150,7 +153,7 @@ export default function FindReplace({
           )}
           {find && !done && (
             <p className="text-sm text-muted" aria-live="polite">
-              {total ? `${total} ${total === 1 ? "match" : "matches"} in ${hits.map((h) => h.c.title || "Untitled").slice(0, 5).join(", ")}${hits.length > 5 ? ` and ${hits.length - 5} more` : ""}.` : "No matches."}
+              {total ? `${total} ${total === 1 ? "match" : "matches"} in ${hits.map((h) => h.c.title || "Untitled").slice(0, 5).join(", ")}${hits.length > 5 ? ` and ${hits.length - 5} more` : ""}.` : worldHits.length ? "Not in any chapter." : "No matches."}
             </p>
           )}
           {done && <p className="rounded-lg border border-accent/30 bg-accent-soft px-3 py-2 text-sm text-accent">{done}</p>}
