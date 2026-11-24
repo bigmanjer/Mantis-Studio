@@ -225,9 +225,9 @@ export default function InsightsTab({
                 <div className="pointer-events-none absolute inset-x-0 border-t border-dashed border-muted/50" style={{ bottom: `${(ins.avgWords / maxLen) * 100}%` }} />
               )}
               {ins.lengths.map((l, i) => (
-                <div key={l.id} className="group relative flex h-full flex-1 items-end" title={`${l.title}: ${l.words.toLocaleString()} words`}>
+                <div key={l.id} className="group relative flex h-full flex-1 items-end justify-center" title={`${l.title}: ${l.words.toLocaleString()} words`}>
                   <div
-                    className={`w-full rounded-t-[4px] ${l.flag ? "bg-accent/45" : "bg-accent"}`}
+                    className={`w-full max-w-[28px] rounded-t-[4px] ${l.flag ? "bg-accent/45" : "bg-accent"}`}
                     style={{ height: `${Math.max(l.words ? 2 : 0, (l.words / maxLen) * 100)}%` }}
                   />
                   <span className="pointer-events-none absolute -top-6 left-1/2 hidden -translate-x-1/2 rounded bg-panel-3 px-1.5 py-0.5 text-[10px] whitespace-nowrap group-hover:block">
@@ -250,7 +250,7 @@ export default function InsightsTab({
               <div className="mt-4 flex h-32 items-end gap-[2px]" role="img" aria-label="Words written per day, last 14 days">
                 {last14.map((d) => (
                   <div key={d.key} className="group relative flex h-full flex-1 flex-col items-center justify-end" title={`${d.date}: ${d.words.toLocaleString()} words`}>
-                    <div className={`w-full rounded-t-[4px] ${d.words ? "bg-accent" : "bg-panel-3"}`} style={{ height: `${d.words ? Math.max(3, (d.words / maxDay) * 100) : 3}%` }} />
+                    <div className={`w-full max-w-[28px] rounded-t-[4px] ${d.words ? "bg-accent" : "bg-panel-3"}`} style={{ height: `${d.words ? Math.max(3, (d.words / maxDay) * 100) : 3}%` }} />
                     <span className="pointer-events-none absolute -top-6 hidden rounded bg-panel-3 px-1.5 py-0.5 text-[10px] whitespace-nowrap group-hover:block">{d.words.toLocaleString()}</span>
                   </div>
                 ))}
