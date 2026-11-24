@@ -12,6 +12,8 @@ export interface Project {
   style_dials?: Record<string, number> | null;
   /** Keep the World Bible, canon rules and summaries updated by AI as the writer works (default on). */
   auto_canon?: boolean;
+  /** Fix clear continuity slips automatically while writing (default on). */
+  auto_fix?: boolean;
   /** Let the AI read the Knowledge Base for this book (default on). */
   use_knowledge?: boolean;
   /** Up to 3 author style lenses (names from the built-in library). */

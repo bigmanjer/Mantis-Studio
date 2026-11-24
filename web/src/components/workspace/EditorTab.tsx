@@ -371,15 +371,72 @@ function ChapterEditor({
     scannedWords.set(chapter.id, words);
     setAutoState("scanning");
     try {
-      const raw = await runAi({ action: "extract", text: latest.current.content, context: aiContext });
-      const plan = planScan(parseScan(raw), entitiesRef.current, projectRef.current.canon_rules);
-      if (plan.summary && !latest.current.summary.trim()) set("summary", plan.summary);
-      if (!planIsEmpty(plan)) setAutoLog(await saveScan(plan));
-      await autoFillPlan();
+      if (autoOn) {
+        const raw = await runAi({ action: "extract", text: latest.current.content, context: aiContext });
+        const plan = planScan(parseScan(raw), entitiesRef.current, projectRef.current.canon_rules);
+        if (plan.summary && !latest.current.summary.trim()) set("summary", plan.summary);
+        if (!planIsEmpty(plan)) setAutoLog(await saveScan(plan));
+        await autoFillPlan();
+      }
+      if (autoFixOn) await autoFix();
       setAutoState("idle");
     } catch {
       setAutoState("error");
     }
+  }
+
+  // --- Automatic continuity fixes ---
+  // After a pause, MANTIS checks the chapter against canon and fixes clear slips (a wrong age, a
+  // renamed place) in place. A History copy is saved first, every change is listed, and Undo reverts them.
+  const autoFixOn = project.auto_fix !== false;
+  const [fixLog, setFixLog] = useState<{ quote: string; fix: string; problem: string }[] | null>(null);
+
+  async function autoFix() {
+    const before = latest.current;
+    const raw = await runAi({ action: "check", text: before.content, context: aiContext });
+    let issues: Issue[] = [];
+    try {
+      const parsed = JSON.parse(raw.slice(raw.indexOf("["), raw.lastIndexOf("]") + 1));
+      issues = (Array.isArray(parsed) ? parsed : []).map((i) => ({ problem: String(i?.problem ?? ""), quote: String(i?.quote ?? ""), canon: String(i?.canon ?? ""), fix: String(i?.fix ?? "") }));
+    } catch {
+      return;
+    }
+    // Only safe, unambiguous fixes: the exact passage appears once, and the fix is a similar size.
+    const count = (hay: string, needle: string) => hay.split(needle).length - 1;
+    const safe = issues.filter(
+      (i) => i.quote.trim().length >= 3 && i.quote.length <= 400 && i.fix.trim() && i.fix !== i.quote && i.fix.length <= i.quote.length * 2 + 120 && count(before.content, i.quote) === 1,
+    );
+    if (!safe.length) return;
+    // The writer may have typed while the AI was reading: apply to the latest text, and skip any passage that changed.
+    let next = latest.current.content;
+    const applied: { quote: string; fix: string; problem: string }[] = [];
+    for (const i of safe) {
+      if (count(next, i.quote) !== 1) continue;
+      next = next.replace(i.quote, () => i.fix);
+      applied.push({ quote: i.quote, fix: i.fix, problem: i.problem });
+    }
+    if (!applied.length) return;
+    await snapshot(latest.current.title, latest.current.content, latest.current.word_count, "Before auto-fix");
+    lastSnapshotAt.current = Date.now();
+    loggedWords.current += countWords(next) - latest.current.word_count; // fixes aren't the writer's own words
+    set("content", next);
+    setFixLog(applied);
+  }
+
+  function undoFixes() {
+    if (!fixLog) return;
+    let next = latest.current.content;
+    for (const f of [...fixLog].reverse()) {
+      if (next.includes(f.fix)) next = next.replace(f.fix, () => f.quote);
+    }
+    loggedWords.current += countWords(next) - latest.current.word_count;
+    set("content", next);
+    setFixLog(null);
+  }
+
+  async function setAutoFix(on: boolean) {
+    setProject((prev) => ({ ...prev, auto_fix: on }));
+    await supabase.from("projects").update({ auto_fix: on }).eq("id", project.id);
   }
 
   /** Once there's real writing, fill the book's empty planning fields (never overwrites the writer's text). */
@@ -405,13 +462,13 @@ function ChapterEditor({
   }
 
   useEffect(() => {
-    if (!autoOn || busy) return;
+    if ((!autoOn && !autoFixOn) || busy) return;
     const since = chapter.word_count - (scannedWords.get(chapter.id) ?? 0);
     if (chapter.word_count < 120 || since < 150) return;
     const t = setTimeout(() => void autoScan(), 20_000);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chapter.content, autoOn, busy]);
+  }, [chapter.content, autoOn, autoFixOn, busy]);
 
   async function undoAuto() {
     if (!autoLog) return;
@@ -723,11 +780,37 @@ function ChapterEditor({
           )}
 
 
+          {fixLog && fixLog.length > 0 && (
+            <div className="mt-3 rounded-lg border border-accent/40 bg-accent-soft/40 px-3 py-2 text-[11px]" role="status">
+              <p className="flex items-center justify-between gap-2 font-medium text-text">
+                <span>
+                  Fixed {fixLog.length} continuity {fixLog.length === 1 ? "slip" : "slips"}
+                </span>
+                <span className="flex items-center gap-2">
+                  <button onClick={undoFixes} className="cursor-pointer text-accent hover:underline">
+                    Undo
+                  </button>
+                  <button onClick={() => setFixLog(null)} className="cursor-pointer text-muted hover:text-text" aria-label="Dismiss">
+                    ✕
+                  </button>
+                </span>
+              </p>
+              <ul className="mt-1 space-y-1 text-muted">
+                {fixLog.map((f, i) => (
+                  <li key={i}>
+                    <span className="line-through decoration-danger/60">{f.quote.length > 90 ? `${f.quote.slice(0, 90)}…` : f.quote}</span> →{" "}
+                    <span className="text-text/90">{f.fix.length > 90 ? `${f.fix.slice(0, 90)}…` : f.fix}</span>
+                    {f.problem && <span className="block text-muted/80">{f.problem}</span>}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           {(autoLog || autoState !== "idle") && (
             <div className="mt-3 rounded-lg border border-line bg-panel px-3 py-2 text-[11px] text-muted" aria-live="polite">
               {autoState === "scanning" ? (
                 <span className="flex items-center gap-1.5">
-                  <Loader2 size={11} className="animate-spin" /> Updating the World Bible from this chapter…
+                  <Loader2 size={11} className="animate-spin" /> {autoOn && autoFixOn ? "Updating the World Bible and checking continuity…" : autoOn ? "Updating the World Bible from this chapter…" : "Checking this chapter for continuity slips…"}
                 </span>
               ) : autoState === "error" ? (
                 <span>Couldn&apos;t update the World Bible automatically just now. It will try again as you write.</span>
@@ -834,6 +917,15 @@ function ChapterEditor({
                     <span className="font-medium text-text">Keep the World Bible up to date automatically</span>
                     <span className="mt-0.5 block text-muted">
                       When you pause, MANTIS adds new characters, places and details, records firm facts as canon rules and fills in the chapter summary. You can edit or undo anything.
+                    </span>
+                  </span>
+                </label>
+                <label className="flex cursor-pointer items-start gap-2 rounded-xl border border-line bg-panel p-3 text-xs">
+                  <input type="checkbox" className="mt-0.5 accent-[var(--color-accent)]" checked={autoFixOn} onChange={(e) => void setAutoFix(e.target.checked)} />
+                  <span>
+                    <span className="font-medium text-text">Fix continuity slips as I write</span>
+                    <span className="mt-0.5 block text-muted">
+                      When you pause, MANTIS checks the chapter against your canon and fixes clear mistakes, like a wrong age or a misnamed place. It keeps a copy in History and shows every change with Undo.
                     </span>
                   </span>
                 </label>
