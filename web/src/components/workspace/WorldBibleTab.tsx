@@ -1,11 +1,13 @@
 "use client";
-import { BookMarked, Building2, Gem, Loader2, MapPin, Plus, ScrollText, Search, Sparkles, Trash2, UserRound, X, type LucideIcon } from "lucide-react";
+import { BookMarked, Building2, Gem, Loader2, MapPin, Plus, ScanSearch, ScrollText, Search, Sparkles, Trash2, UserRound, X, type LucideIcon } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import EmptyState from "@/components/ui/EmptyState";
 import { createClient } from "@/lib/supabase/client";
 import { AiClientError, runAi } from "./aiClient";
-import { ENTITY_CATEGORIES, type Entity, type EntityCategory, type Project } from "@/lib/types";
+import { ENTITY_CATEGORIES, type Chapter, type Entity, type EntityCategory, type Project } from "@/lib/types";
+import { mentionedIn } from "@/lib/world-context";
+import { applyScan, parseScan, planIsEmpty, planScan } from "./canonScan";
 
 export const CATEGORY_ICONS: Record<EntityCategory, LucideIcon> = {
   Character: UserRound,
@@ -15,12 +17,18 @@ export const CATEGORY_ICONS: Record<EntityCategory, LucideIcon> = {
   Lore: ScrollText,
 };
 
+type SortMode = "name" | "mentions" | "newest";
+
 export default function WorldBibleTab({
   project,
+  setProject,
+  chapters,
   entities,
   setEntities,
 }: {
   project: Project;
+  setProject: React.Dispatch<React.SetStateAction<Project>>;
+  chapters: Chapter[];
   entities: Entity[];
   setEntities: React.Dispatch<React.SetStateAction<Entity[]>>;
 }) {
@@ -33,6 +41,65 @@ export default function WorldBibleTab({
   const [err, setErr] = useState("");
   const [saving, setSaving] = useState(false);
   const [expanding, setExpanding] = useState(false);
+  const [sort, setSort] = useState<SortMode>("name");
+  const [unusedOnly, setUnusedOnly] = useState(false);
+  const [scanAll, setScanAll] = useState<{ done: number; total: number } | null>(null);
+  const [scanMsg, setScanMsg] = useState("");
+
+  // Which chapters mention each entry (original MANTIS "source markers" and "orphaned" filter).
+  const ordered = useMemo(() => [...chapters].sort((a, b) => a.position - b.position), [chapters]);
+  const appearsIn = useMemo(() => {
+    const map = new Map<string, Chapter[]>();
+    for (const c of ordered) for (const e of mentionedIn(entities, c.content)) map.set(e.id, [...(map.get(e.id) ?? []), c]);
+    return map;
+  }, [ordered, entities]);
+
+  /** Read every chapter and update the World Bible and canon rules (original "Scan All Chapters"). */
+  async function scanAllChapters() {
+    const todo = ordered.filter((c) => c.content.trim().split(/\s+/).length >= 50);
+    if (!todo.length) return setScanMsg("Write a little in a chapter first, then scan.");
+    setScanMsg("");
+    setScanAll({ done: 0, total: todo.length });
+    let known = entities;
+    let canon = project.canon_rules;
+    const totals = { added: 0, updated: 0, facts: 0 };
+    try {
+      for (const [i, c] of todo.entries()) {
+        const raw = await runAi({
+          action: "extract",
+          text: c.content,
+          context: { project: { canon_rules: canon }, entities: known.map((e) => ({ name: e.name, category: e.category, description: "" })) },
+        });
+        const plan = planScan(parseScan(raw), known, canon);
+        if (plan.summary && !c.summary.trim()) await supabase.from("chapters").update({ summary: plan.summary }).eq("id", c.id);
+        if (!planIsEmpty(plan)) {
+          const applied = await applyScan(supabase, plan, { id: project.id, user_id: project.user_id, canon_rules: canon }, { includeFacts: true });
+          known = known.map((e) => {
+            const m = plan.merges.find((x) => x.entity.id === e.id);
+            return m && applied.updated.some((u) => u.id === e.id)
+              ? { ...e, description: [e.description.trim(), ...m.newFacts.map((f) => `- ${f}`)].filter(Boolean).join("\n"), aliases: [...e.aliases, ...m.newAliases].slice(0, 30) }
+              : e;
+          });
+          known = [...known, ...applied.created];
+          if (applied.factsAdded.length) canon = [canon.trim(), ...applied.factsAdded].filter(Boolean).join("\n");
+          totals.added += applied.created.length;
+          totals.updated += applied.updated.length;
+          totals.facts += applied.factsAdded.length;
+          setEntities(known);
+          setProject((prev) => ({ ...prev, canon_rules: canon }));
+        }
+        setScanAll({ done: i + 1, total: todo.length });
+      }
+      setScanMsg(
+        totals.added + totals.updated + totals.facts
+          ? `Done: ${totals.added} new ${totals.added === 1 ? "entry" : "entries"}, ${totals.updated} updated, ${totals.facts} canon ${totals.facts === 1 ? "rule" : "rules"} added.`
+          : "Done. Everything was already up to date.",
+      );
+    } catch (e) {
+      setScanMsg(e instanceof AiClientError ? e.message : "The scan stopped partway. What was found so far has been saved.");
+    }
+    setScanAll(null);
+  }
 
   /** Expand the open entry's notes with AI (original MANTIS "enrich entity"). Appends; never deletes. */
   async function expand() {
@@ -73,8 +140,15 @@ export default function WorldBibleTab({
           e.description.toLowerCase().includes(q) ||
           e.aliases.some((a) => a.toLowerCase().includes(q)),
       )
-      .sort((a, b) => a.name.localeCompare(b.name));
-  }, [entities, filter, query]);
+      .filter((e) => !unusedOnly || !appearsIn.has(e.id))
+      .sort((a, b) =>
+        sort === "mentions"
+          ? (appearsIn.get(b.id)?.length ?? 0) - (appearsIn.get(a.id)?.length ?? 0) || a.name.localeCompare(b.name)
+          : sort === "newest"
+            ? b.created_at.localeCompare(a.created_at)
+            : a.name.localeCompare(b.name),
+      );
+  }, [entities, filter, query, unusedOnly, sort, appearsIn]);
 
   function startNew() {
     const category = filter === "All" ? "Character" : filter;
@@ -136,10 +210,17 @@ export default function WorldBibleTab({
           <h1 className="font-serif text-2xl font-semibold">World Bible</h1>
           <p className="mt-1 text-sm text-muted">The AI reads these entries before it writes, so your world stays consistent.</p>
         </div>
-        <button onClick={startNew} className="btn-primary">
-          <Plus size={16} /> New entry
-        </button>
+        <div className="flex gap-2">
+          <button onClick={scanAllChapters} disabled={!!scanAll} className="btn-ghost" title="Read every chapter and add what's missing">
+            {scanAll ? <Loader2 size={16} className="animate-spin" /> : <ScanSearch size={16} />}
+            {scanAll ? `Scanning ${scanAll.done + 1} of ${scanAll.total}…` : "Scan all chapters"}
+          </button>
+          <button onClick={startNew} className="btn-primary">
+            <Plus size={16} /> New entry
+          </button>
+        </div>
       </div>
+      {scanMsg && <p className="mt-3 rounded-lg border border-line bg-panel px-3 py-2 text-sm text-muted" role="status">{scanMsg}</p>}
 
       <div className="mt-6 flex flex-wrap items-center gap-2">
         {(["All", ...ENTITY_CATEGORIES] as const).map((c) => {
@@ -158,6 +239,20 @@ export default function WorldBibleTab({
             </button>
           );
         })}
+        <button
+          onClick={() => setUnusedOnly((v) => !v)}
+          className={`flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm transition ${
+            unusedOnly ? "border-accent bg-accent-soft text-accent" : "border-line text-muted hover:text-text"
+          }`}
+          title="Entries no chapter mentions yet"
+        >
+          Not in any chapter
+        </button>
+        <select className="input w-auto py-1.5 text-sm" value={sort} onChange={(e) => setSort(e.target.value as SortMode)} aria-label="Sort entries">
+          <option value="name">A to Z</option>
+          <option value="mentions">Most mentioned</option>
+          <option value="newest">Newest first</option>
+        </select>
         <label className="relative ml-auto w-full sm:w-64">
           <Search size={15} className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-muted" />
           <input className="input pl-9" placeholder="Search names, aliases, notes" value={query} onChange={(e) => setQuery(e.target.value)} />
@@ -170,11 +265,16 @@ export default function WorldBibleTab({
             <EmptyState
               icon={BookMarked}
               title="Build your story world"
-              body="Add characters, places and lore yourself, or use Canon scan in the Write tab to pull them straight from your chapters."
+              body="MANTIS fills this in by itself as you write. You can also scan the chapters you already have, or add entries yourself."
               action={
-                <button onClick={startNew} className="btn-primary">
-                  <Plus size={16} /> Add the first entry
-                </button>
+                <div className="flex flex-wrap justify-center gap-2">
+                  <button onClick={scanAllChapters} disabled={!!scanAll} className="btn-primary">
+                    {scanAll ? <Loader2 size={16} className="animate-spin" /> : <ScanSearch size={16} />} Scan my chapters
+                  </button>
+                  <button onClick={startNew} className="btn-ghost">
+                    <Plus size={16} /> Add an entry
+                  </button>
+                </div>
               }
             />
           ) : shown.length === 0 ? (
@@ -202,6 +302,11 @@ export default function WorldBibleTab({
                       </div>
                     </div>
                     <p className="mt-3 line-clamp-3 text-sm whitespace-pre-line text-muted">{e.description || "No notes yet."}</p>
+                    <p className="mt-2 text-[11px] text-muted/80">
+                      {appearsIn.get(e.id)?.length
+                        ? `In ${appearsIn.get(e.id)!.length} ${appearsIn.get(e.id)!.length === 1 ? "chapter" : "chapters"}`
+                        : "Not in any chapter yet"}
+                    </p>
                   </button>
                 );
               })}
@@ -274,6 +379,12 @@ export default function WorldBibleTab({
                   onChange={(e) => setDraft({ ...draft, description: e.target.value })}
                 />
               </div>
+              {editing.id && (
+                <p className="text-xs text-muted">
+                  <span className="font-medium text-text/80">Appears in: </span>
+                  {appearsIn.get(editing.id)?.map((c) => c.title || "Untitled").join(", ") || "no chapters yet"}
+                </p>
+              )}
               {err && <p className="rounded-lg border border-danger/30 bg-danger-soft px-3 py-2 text-sm text-danger">{err}</p>}
               <div className="flex gap-2">
                 <button onClick={save} disabled={saving} className="btn-primary flex-1">

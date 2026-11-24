@@ -1,4 +1,6 @@
 import "server-only";
+import { stripThinking } from "./text-clean";
+import { worldBlock, type WorldEntry } from "./world-context";
 
 export const REWRITE_PRESETS: Record<string, string> = {
   "Fix Grammar": "Correct grammar and spelling only. Change nothing else.",
@@ -25,7 +27,7 @@ export interface AiContext {
   };
   chapterTitle?: string;
   previousSummaries?: string[];
-  entities?: { name: string; category: string; description: string }[];
+  entities?: WorldEntry[];
 }
 
 const clip = (s: string | undefined, n: number) => (s ?? "").slice(0, n);
@@ -50,7 +52,7 @@ function describeDials(d: Record<string, number> | null | undefined): string {
     .join("\n");
 }
 
-function projectBlock(ctx: AiContext): string {
+function projectBlock(ctx: AiContext, text = ""): string {
   const p = ctx.project ?? {};
   const parts: string[] = [];
   if (p.title) parts.push(`TITLE: ${clip(p.title, 200)}`);
@@ -63,13 +65,7 @@ function projectBlock(ctx: AiContext): string {
   if (p.outline) parts.push(`OUTLINE:\n${clip(p.outline, 3000)}`);
   if (ctx.previousSummaries?.length)
     parts.push(`STORY SO FAR:\n${ctx.previousSummaries.slice(-5).map((s) => `- ${clip(s, 400)}`).join("\n")}`);
-  if (ctx.entities?.length)
-    parts.push(
-      `WORLD BIBLE:\n${ctx.entities
-        .slice(0, 40)
-        .map((e) => `- ${e.name} (${e.category}): ${clip(e.description, 200)}`)
-        .join("\n")}`,
-    );
+  if (ctx.entities?.length) parts.push(worldBlock(ctx.entities, text));
   return parts.join("\n\n");
 }
 
@@ -82,8 +78,9 @@ export function buildMessages(
   ctx: AiContext,
   opts: { preset?: string; instruction?: string; words?: number },
 ): { role: "system" | "user"; content: string }[] {
-  const context = projectBlock(ctx);
   const t = clip(text, 24000);
+  // For long chapters, look for World Bible names near where the author is working (the end).
+  const context = projectBlock(ctx, `${t.slice(0, 2000)}\n${t.slice(-8000)}\n${opts.instruction ?? ""}`);
   let user: string;
   switch (action) {
     case "continue":
@@ -104,8 +101,21 @@ export function buildMessages(
       user = `${context}\n\nWrite a chapter-by-chapter outline for this novel. Use exactly this format, one line per chapter:\nChapter 1: <title> — <2-3 sentence beat>\nWrite exactly ${opts.words ?? 20} chapters (Chapter 1 to Chapter ${opts.words ?? 20}), no more and no fewer, with a clear three-act structure.${opts.instruction ? `\nAuthor direction: ${clip(opts.instruction, 600)}` : ""}`;
       break;
     case "extract":
-      user = `Extract story-world canon from the chapter below. Return ONLY a JSON array, no other text. Each item: {"name": string, "category": "Character"|"Location"|"Item"|"Faction"|"Lore", "description": string (1-2 sentences of facts stated in the text)}. Include only entities a reader would need to remember: named characters, important places, significant objects, groups and rules of the world. Skip generic scenery and furniture (the sea, a desk, a pipe) unless the plot turns on it. Maximum 15 items.\n\nCHAPTER:\n${t}`;
+    case "extract": {
+      // Canon scan (original MANTIS "scan on save"): World Bible entries, firm facts and a summary in one call.
+      const known = (ctx.entities ?? []).map((e) => e.name).slice(0, 150).join(", ");
+      const rules = clip(ctx.project?.canon_rules, 2000);
+      user = `Read the chapter below and keep the story bible up to date. Return ONLY a JSON object, no other text:
+{"summary": 2-3 sentences on what happens in this chapter,
+ "entities": [{"name": string, "category": "Character"|"Location"|"Item"|"Faction"|"Lore", "description": 1-2 sentences of facts stated in the text, "aliases": [other names or titles used for them in the text]}],
+ "facts": [short permanent facts later chapters must not contradict, e.g. "Nell is 34." or "The lighthouse has 112 steps."]}
+Entities: only things a reader needs to remember (named characters, important places, significant objects, groups, rules of the world). Skip generic scenery and furniture (the sea, a desk, a pipe) unless the plot turns on it. Use the exact existing name when an entity is already known. Maximum 15.
+Facts: only stated plainly in the text, stable (ages, dates, family ties, physical rules, how magic or technology works), not moods or passing events, and not already in the canon rules. Maximum 5; [] if none.
+${known ? `\nALREADY IN THE WORLD BIBLE: ${known}\n` : ""}${rules ? `\nCANON RULES ALREADY RECORDED:\n${rules}\n` : ""}
+CHAPTER:
+${t.slice(-16000)}`;
       break;
+    }
     case "draft":
       // Sudowrite-style "write the chapter from its beat".
       user = `${context}\n\nCHAPTER TO WRITE: ${clip(ctx.chapterTitle, 200)}\nBEAT (what must happen): ${clip(opts.instruction, 1500)}\n${t.trim() ? `\nEXISTING OPENING (continue from here, don't repeat it):\n${t.slice(-4000)}\n` : ""}\nWrite this chapter as finished prose, about ${opts.words ?? 1200} words. Follow the style guide and canon rules, pick up naturally from the story so far, and end on a moment that pulls the reader into the next chapter.`;
@@ -185,13 +195,16 @@ async function pickAvailableModel(provider: ProviderId, apiKey: string): Promise
   }
 }
 
-export async function callModel(opts: {
+interface ModelOpts {
   provider: ProviderId;
   apiKey: string;
   model?: string | null;
   messages: { role: string; content: string }[];
   maxTokens?: number;
-}): Promise<{ text: string; tokens: number }> {
+}
+
+/** Send the request, swapping in an available model if the provider retired the configured one. */
+async function openModel(opts: ModelOpts, stream: boolean): Promise<Response> {
   const p = PROVIDERS[opts.provider];
   const send = (model: string) => {
     // Reasoning models (gpt-oss, o-series, qwen3) think before answering and that thinking uses the
@@ -206,8 +219,9 @@ export async function callModel(opts: {
         temperature: 0.8,
         max_tokens: (opts.maxTokens ?? 1500) + (reasoning ? 2048 : 0),
         ...(reasoning && opts.provider === "groq" ? { reasoning_effort: /qwen3/.test(model) ? "none" : "low" } : {}),
+        ...(stream ? { stream: true, ...(opts.provider === "groq" ? {} : { stream_options: { include_usage: true } }) } : {}),
       }),
-      signal: AbortSignal.timeout(60_000),
+      signal: AbortSignal.timeout(stream ? 120_000 : 60_000),
     });
   };
   const cacheKey = `${opts.provider}:${opts.apiKey.slice(-6)}`;
@@ -238,25 +252,81 @@ export async function callModel(opts: {
     }
     throw new AiError("The AI couldn't respond just now. Please try again.", 502);
   }
-  const data = await res.json();
-  let text: string = data.choices?.[0]?.message?.content ?? "";
-  // Some reasoning models wrap their thinking in <think> tags; writers only want the answer.
-  text = text.replace(/<think>[\s\S]*?<\/think>/g, "");
-  if (!text.trim()) throw new AiError("The AI came back empty. Please try again.", 502);
-  const tokens: number = data.usage?.total_tokens ?? Math.ceil(JSON.stringify(opts.messages).length / 4 + text.length / 4);
-  return { text: text.trim(), tokens };
+  return res;
 }
 
-/** Models sometimes add markdown even when told not to. Writers never want stray asterisks in a manuscript. */
-export function stripMarkdown(text: string): string {
-  return text
-    .replace(/\*\*([^*\n]+?)\*\*/g, "$1")
-    .replace(/__([^_\n]+?)__/g, "$1")
-    .replace(/^#{1,6}\s+/gm, "")
-    .replace(/^\s*[-*]{3,}\s*$/gm, "")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
+const estimateTokens = (messages: { content: string }[], text: string) => Math.ceil(JSON.stringify(messages).length / 4 + text.length / 4);
+
+export async function callModel(opts: ModelOpts): Promise<{ text: string; tokens: number }> {
+  const res = await openModel(opts, false);
+  const data = await res.json();
+  const text = stripThinking(data.choices?.[0]?.message?.content ?? "").trim();
+  if (!text) throw new AiError("The AI came back empty. Please try again.", 502);
+  const tokens: number = data.usage?.total_tokens ?? estimateTokens(opts.messages, text);
+  return { text, tokens };
 }
+
+/**
+ * Stream the answer as plain text while the model writes it. Errors that happen before the first
+ * word are thrown (so the route can answer with a normal error); `onDone` reports the token count.
+ */
+export async function streamModel(opts: ModelOpts, onDone: (tokens: number, text: string) => Promise<void> | void): Promise<ReadableStream<Uint8Array>> {
+  const res = await openModel(opts, true);
+  if (!res.body) throw new AiError("The AI couldn't respond just now. Please try again.", 502);
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  const encoder = new TextEncoder();
+  let buffer = "";
+  let full = "";
+  let tokens = 0;
+
+  return new ReadableStream<Uint8Array>({
+    async pull(controller) {
+      try {
+        for (;;) {
+          const { value, done } = await reader.read();
+          if (done) {
+            await onDone(tokens || estimateTokens(opts.messages, full), full);
+            controller.close();
+            return;
+          }
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() ?? "";
+          let out = "";
+          for (const line of lines) {
+            const l = line.trim();
+            if (!l.startsWith("data:")) continue;
+            const payload = l.slice(5).trim();
+            if (!payload || payload === "[DONE]") continue;
+            try {
+              const chunk = JSON.parse(payload);
+              const delta: string = chunk.choices?.[0]?.delta?.content ?? "";
+              if (delta) out += delta;
+              const usage = chunk.usage ?? chunk.x_groq?.usage;
+              if (usage?.total_tokens) tokens = usage.total_tokens;
+            } catch {
+              // Ignore keep-alives and partial lines.
+            }
+          }
+          if (out) {
+            full += out;
+            controller.enqueue(encoder.encode(out));
+            return;
+          }
+        }
+      } catch (e) {
+        console.error("AI stream failed", e);
+        controller.error(e);
+      }
+    },
+    cancel() {
+      void reader.cancel();
+    },
+  });
+}
+
+export { stripMarkdown } from "./text-clean";
 
 export class AiError extends Error {
   constructor(

@@ -1,11 +1,14 @@
 import { NextResponse } from "next/server";
-import { AiError, buildMessages, callModel, stripMarkdown, type AiAction, type AiContext, type ProviderId } from "@/lib/ai";
+import { AiError, buildMessages, callModel, streamModel, stripMarkdown, type AiAction, type AiContext, type ProviderId } from "@/lib/ai";
 import { decrypt } from "@/lib/crypto";
 import { currentPeriod, planFor } from "@/lib/plans";
 import { createAdminClient, getProfile, requireUser } from "@/lib/supabase/server";
 import { includedAiCredentials } from "@/lib/env";
 
 const ACTIONS: AiAction[] = ["continue", "rewrite", "summarize", "brainstorm", "outline", "extract", "draft", "check", "ask", "autofill", "reverse_outline", "enrich", "custom"];
+const STREAMABLE: AiAction[] = ["continue", "rewrite", "brainstorm", "draft", "ask", "custom", "enrich", "summarize"];
+// Streaming answers can run longer than the default function limit on slow models.
+export const maxDuration = 60;
 
 export async function POST(req: Request) {
   const { user } = await requireUser();
@@ -80,6 +83,18 @@ export async function POST(req: Request) {
     });
     const wordsReq = Math.min(Math.max(Number(body.words) || (action === "draft" ? 1200 : 400), 50), 2000);
     const maxTokens = action === "continue" || action === "draft" ? Math.ceil(wordsReq * 2) : action === "outline" ? Math.min(800 + (Number(body.words) || 20) * 110, 9000) : action === "reverse_outline" ? 3000 : 2000;
+    const logUsage = async (tokens: number) => {
+      if (usingIncluded) await admin.rpc("add_ai_usage", { p_user: user.id, p_period: period, p_tokens: tokens });
+    };
+
+    // Prose answers stream word by word so writers see the AI writing instead of a spinner.
+    if (body.stream === true && STREAMABLE.includes(action)) {
+      const stream = await streamModel({ provider, apiKey, model, messages, maxTokens }, (tokens) => logUsage(tokens));
+      return new Response(stream, {
+        headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store", "X-Accel-Buffering": "no" },
+      });
+    }
+
     const result = await callModel({ provider, apiKey, model, messages, maxTokens });
     if (usingIncluded) {
       await admin.rpc("add_ai_usage", { p_user: user.id, p_period: period, p_tokens: result.tokens });

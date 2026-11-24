@@ -52,7 +52,7 @@ export default function Workspace({ initialProject, initialChapters, initialEnti
         style_guide: project.style_guide,
         style_dials: project.style_dials ?? null,
       },
-      entities: entities.map((e) => ({ name: e.name, category: e.category, description: e.description })),
+      entities: entities.map((e) => ({ name: e.name, category: e.category, description: e.description, aliases: e.aliases })),
     }),
     [project, entities],
   );
@@ -117,12 +117,13 @@ export default function Workspace({ initialProject, initialChapters, initialEnti
             setChapters={setChapters}
             entities={entities}
             setEntities={setEntities}
+            setProject={setProject}
             aiContext={aiContext}
             focus={focus}
             setFocus={setFocus}
           />
         )}
-        {tab === "world" && <WorldBibleTab project={project} entities={entities} setEntities={setEntities} />}
+        {tab === "world" && <WorldBibleTab project={project} setProject={setProject} chapters={chapters} entities={entities} setEntities={setEntities} />}
         {tab === "export" && <ExportTab project={project} chapters={chapters} docxExport={docxExport} />}
       </div>
     </div>

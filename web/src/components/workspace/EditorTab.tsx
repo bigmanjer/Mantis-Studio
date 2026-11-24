@@ -20,11 +20,13 @@ import {
   Wand2,
   X,
 } from "lucide-react";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { mentionedIn } from "@/lib/world-context";
+import { applyScan, parseScan, planIsEmpty, planScan, undoScan, type AppliedScan, type ScanPlan } from "./canonScan";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { createClient } from "@/lib/supabase/client";
 import { countWords, type Chapter, type Entity, type EntityCategory, type Project } from "@/lib/types";
-import { AiClientError, runAi } from "./aiClient";
+import { AiClientError, runAi, streamAi } from "./aiClient";
 import { SaveBadge, useAutosave } from "./autosave";
 import VersionHistory from "./VersionHistory";
 
@@ -37,12 +39,13 @@ interface Props {
   setChapters: React.Dispatch<React.SetStateAction<Chapter[]>>;
   entities: Entity[];
   setEntities: React.Dispatch<React.SetStateAction<Entity[]>>;
+  setProject: React.Dispatch<React.SetStateAction<Project>>;
   aiContext: { project: object; entities: object[] };
   focus: boolean;
   setFocus: (f: boolean) => void;
 }
 
-export default function EditorTab({ project, chapters, setChapters, entities, setEntities, aiContext, focus, setFocus }: Props) {
+export default function EditorTab({ project, chapters, setChapters, entities, setEntities, setProject, aiContext, focus, setFocus }: Props) {
   const supabase = createClient();
   const confirm = useConfirm();
   const [activeId, setActiveId] = useState(chapters[0]?.id ?? null);
@@ -158,6 +161,7 @@ export default function EditorTab({ project, chapters, setChapters, entities, se
           project={project}
           entities={entities}
           setEntities={setEntities}
+          setProject={setProject}
           aiContext={{ ...aiContext, chapterTitle: active.title, previousSummaries }}
         />
       ) : (
@@ -176,7 +180,11 @@ export default function EditorTab({ project, chapters, setChapters, entities, se
 
 type Issue = { problem: string; quote: string; canon: string; fix: string };
 type AiMode = "draft" | "rewrite" | "canon" | "ask";
-type Suggestion = { name: string; category: EntityCategory; description: string; existingId?: string; newFacts?: string[] };
+type Suggestion = { name: string; category: EntityCategory; description: string; aliases?: string[]; existingId?: string; newFacts?: string[]; newAliases?: string[] };
+/** Word count each chapter had at its last canon scan (kept across chapter switches). */
+const scannedWords = new Map<string, number>();
+/** Projects whose empty planning fields were already auto-filled this session. */
+const autoFilled = new Set<string>();
 
 function ChapterEditor({
   chapter,
@@ -184,6 +192,7 @@ function ChapterEditor({
   project,
   entities,
   setEntities,
+  setProject,
   aiContext,
   focus,
   setFocus,
@@ -193,6 +202,7 @@ function ChapterEditor({
   project: Project;
   entities: Entity[];
   setEntities: React.Dispatch<React.SetStateAction<Entity[]>>;
+  setProject: React.Dispatch<React.SetStateAction<Project>>;
   aiContext: object;
   focus: boolean;
   setFocus: (f: boolean) => void;
@@ -270,6 +280,9 @@ function ChapterEditor({
     text: string;
     range?: [number, number];
   } | null>(null);
+  // World Bible entries named in this chapter (deferred so typing stays smooth in long chapters).
+  const deferredText = useDeferredValue(chapter.content);
+  const inChapter = useMemo(() => mentionedIn(entities, deferredText), [entities, deferredText]);
   const resultRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (result) resultRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
@@ -281,6 +294,7 @@ function ChapterEditor({
   const [direction, setDirection] = useState("");
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [scanned, setScanned] = useState(false);
+  const [pendingFacts, setPendingFacts] = useState<string[]>([]);
   const [question, setQuestion] = useState("");
   const [qa, setQa] = useState<{ q: string; a: string }[]>([]);
 
@@ -297,6 +311,100 @@ function ChapterEditor({
     if (key === "content") patch.word_count = countWords(value as string);
     patchLocal(patch);
     schedule(patch);
+  }
+
+  // --- Automatic World Bible (original MANTIS "scan on save") ---
+  // When the writer pauses after adding ~150 words, MANTIS reads the chapter and updates the World Bible,
+  // the canon rules and the chapter summary by itself. Everything stays editable and one click undoes it.
+  const autoOn = project.auto_canon !== false;
+  const [autoLog, setAutoLog] = useState<AppliedScan | null>(null);
+  const [autoState, setAutoState] = useState<"idle" | "scanning" | "error">("idle");
+  const entitiesRef = useRef(entities);
+  entitiesRef.current = entities;
+  const projectRef = useRef(project);
+  projectRef.current = project;
+  if (!scannedWords.has(chapter.id)) scannedWords.set(chapter.id, chapter.summary.trim() ? chapter.word_count : 0);
+
+  async function saveScan(plan: ScanPlan) {
+    const p = projectRef.current;
+    const applied = await applyScan(supabase, plan, { id: p.id, user_id: p.user_id, canon_rules: p.canon_rules }, { includeFacts: true });
+    setEntities((prev) => {
+      const next = prev.map((e) => {
+        const m = plan.merges.find((x) => x.entity.id === e.id);
+        return m && applied.updated.some((u) => u.id === e.id)
+          ? { ...e, description: [e.description.trim(), ...m.newFacts.map((f) => `- ${f}`)].filter(Boolean).join("\n"), aliases: [...e.aliases, ...m.newAliases].slice(0, 30) }
+          : e;
+      });
+      return [...next, ...applied.created];
+    });
+    if (applied.factsAdded.length) setProject((prev) => ({ ...prev, canon_rules: [prev.canon_rules.trim(), ...applied.factsAdded].filter(Boolean).join("\n") }));
+    return applied;
+  }
+
+  async function autoScan() {
+    const words = latest.current.word_count;
+    scannedWords.set(chapter.id, words);
+    setAutoState("scanning");
+    try {
+      const raw = await runAi({ action: "extract", text: latest.current.content, context: aiContext });
+      const plan = planScan(parseScan(raw), entitiesRef.current, projectRef.current.canon_rules);
+      if (plan.summary && !latest.current.summary.trim()) set("summary", plan.summary);
+      if (!planIsEmpty(plan)) setAutoLog(await saveScan(plan));
+      await autoFillPlan();
+      setAutoState("idle");
+    } catch {
+      setAutoState("error");
+    }
+  }
+
+  /** Once there's real writing, fill the book's empty planning fields (never overwrites the writer's text). */
+  async function autoFillPlan() {
+    const p = projectRef.current;
+    const blank = (v: string | undefined) => !(v ?? "").trim();
+    const titleBlank = blank(p.title) || /^untitled( project)?$/i.test(p.title.trim());
+    if (autoFilled.has(p.id) || latest.current.word_count < 300) return;
+    if (!titleBlank && !blank(p.genre) && !blank(p.premise) && !blank(p.style_guide)) return;
+    autoFilled.add(p.id);
+    const raw = await runAi({ action: "autofill", text: latest.current.content.slice(0, 6000), context: aiContext });
+    const json = JSON.parse(raw.slice(raw.indexOf("{"), raw.lastIndexOf("}") + 1)) as Record<string, unknown>;
+    const str = (v: unknown) => (Array.isArray(v) ? v.join("\n") : typeof v === "string" ? v.trim() : "");
+    const patch: Partial<Project> = {};
+    if (titleBlank && str(json.title)) patch.title = str(json.title).slice(0, 200);
+    if (blank(p.genre) && str(json.genre)) patch.genre = str(json.genre).slice(0, 100);
+    if (blank(p.premise) && str(json.premise)) patch.premise = str(json.premise).slice(0, 4000);
+    if (blank(p.style_guide) && str(json.style_guide)) patch.style_guide = str(json.style_guide).slice(0, 4000);
+    if (blank(projectRef.current.canon_rules) && str(json.canon_rules)) patch.canon_rules = str(json.canon_rules).slice(0, 4000);
+    if (!Object.keys(patch).length) return;
+    const { error } = await supabase.from("projects").update(patch).eq("id", p.id);
+    if (!error) setProject((prev) => ({ ...prev, ...patch }));
+  }
+
+  useEffect(() => {
+    if (!autoOn || busy) return;
+    const since = chapter.word_count - (scannedWords.get(chapter.id) ?? 0);
+    if (chapter.word_count < 120 || since < 150) return;
+    const t = setTimeout(() => void autoScan(), 20_000);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chapter.content, autoOn, busy]);
+
+  async function undoAuto() {
+    if (!autoLog) return;
+    await undoScan(supabase, autoLog, project.id);
+    const created = new Set(autoLog.created.map((e) => e.id));
+    setEntities((prev) =>
+      prev.filter((e) => !created.has(e.id)).map((e) => {
+        const u = autoLog.updated.find((x) => x.id === e.id);
+        return u ? { ...e, description: u.description, aliases: u.aliases } : e;
+      }),
+    );
+    if (autoLog.canonBefore !== null) setProject((prev) => ({ ...prev, canon_rules: autoLog.canonBefore ?? "" }));
+    setAutoLog(null);
+  }
+
+  async function setAutoCanon(on: boolean) {
+    setProject((prev) => ({ ...prev, auto_canon: on }));
+    await supabase.from("projects").update({ auto_canon: on }).eq("id", project.id);
   }
 
   async function ai(label: string, fn: () => Promise<void>) {
@@ -321,14 +429,16 @@ function ChapterEditor({
 
   const doContinue = () =>
     ai("continue", async () => {
-      const text = await runAi({ action: "continue", text: chapter.content, words, instruction: direction, context: aiContext });
-      setResult({ kind: "continue", text });
+      await streamAi({ action: "continue", text: chapter.content, words, instruction: direction, context: aiContext }, (text) =>
+        setResult({ kind: "continue", text }),
+      );
     });
 
   const doBrainstorm = () =>
     ai("brainstorm", async () => {
-      const text = await runAi({ action: "brainstorm", text: chapter.content, instruction: direction, context: aiContext });
-      setResult({ kind: "brainstorm", text });
+      await streamAi({ action: "brainstorm", text: chapter.content, instruction: direction, context: aiContext }, (text) =>
+        setResult({ kind: "brainstorm", text }),
+      );
     });
 
   const doRewrite = () => {
@@ -339,21 +449,24 @@ function ChapterEditor({
     }
     return ai("rewrite", async () => {
       if (preset === "Custom" && !customRewrite.trim()) throw new AiClientError("Type how you want the passage rewritten first.");
-      const text = await runAi({
-        action: "rewrite",
-        text: chapter.content.slice(...range),
-        preset: preset === "Custom" ? undefined : preset,
-        instruction: preset === "Custom" ? customRewrite : undefined,
-        context: aiContext,
-      });
-      setResult({ kind: "rewrite", text, range });
+      await streamAi(
+        {
+          action: "rewrite",
+          text: chapter.content.slice(...range),
+          preset: preset === "Custom" ? undefined : preset,
+          instruction: preset === "Custom" ? customRewrite : undefined,
+          context: aiContext,
+        },
+        (text) => setResult({ kind: "rewrite", text, range }),
+      );
     });
   };
 
   const doDraftFromBeat = () =>
     ai("draft", async () => {
-      const text = await runAi({ action: "draft", text: chapter.content, instruction: chapter.summary, words: 1200, context: aiContext });
-      setResult({ kind: "draft", text });
+      await streamAi({ action: "draft", text: chapter.content, instruction: chapter.summary, words: 1200, context: aiContext }, (text) =>
+        setResult({ kind: "draft", text }),
+      );
     });
 
   const doCheck = () =>
@@ -391,9 +504,16 @@ function ChapterEditor({
     const q = (preset ?? question).trim();
     if (!q || busy) return;
     return ai("ask", async () => {
-      const a = await runAi({ action: "ask", text: chapter.content, instruction: q, context: aiContext });
-      setQa((prev) => [...prev, { q, a }]);
       setQuestion("");
+      setQa((prev) => [...prev, { q, a: "" }]);
+      const update = (a: string) => setQa((prev) => prev.map((m, i) => (i === prev.length - 1 ? { q, a } : m)));
+      try {
+        await streamAi({ action: "ask", text: chapter.content, instruction: q, context: aiContext }, update);
+      } catch (e) {
+        setQa((prev) => prev.slice(0, -1));
+        setQuestion(q);
+        throw e;
+      }
     });
   };
 
@@ -405,54 +525,56 @@ function ChapterEditor({
 
   const doExtract = () =>
     ai("extract", async () => {
-      const raw = await runAi({ action: "extract", text: chapter.content });
-      let items: Suggestion[] = [];
+      const raw = await runAi({ action: "extract", text: chapter.content, context: aiContext });
+      let plan: ScanPlan;
       try {
-        items = JSON.parse(raw.slice(raw.indexOf("["), raw.lastIndexOf("]") + 1));
+        plan = planScan(parseScan(raw), entities, project.canon_rules);
       } catch {
         throw new AiClientError("The AI returned something unreadable. Please try again.");
       }
-      const cats = ["Character", "Location", "Item", "Faction", "Lore"];
-      const byName = new Map<string, Entity>();
-      for (const e of entities) {
-        byName.set(e.name.toLowerCase(), e);
-        for (const a of e.aliases) byName.set(a.toLowerCase(), e);
-      }
-      const out: Suggestion[] = [];
-      for (const i of items) {
-        if (!i?.name || !cats.includes(i.category)) continue;
-        const existing = byName.get(i.name.toLowerCase());
-        if (!existing) {
-          out.push(i);
-          continue;
-        }
-        // Known entity: keep only sentences that add something new (like the original MANTIS merge).
-        const have = existing.description.toLowerCase();
-        const facts = (i.description || "")
-          .split(/(?<=[.!?])\s+/)
-          .map((f) => f.trim())
-          .filter((f) => f.length > 3 && !have.includes(f.toLowerCase().replace(/[.!?]$/, "")));
-        if (facts.length) out.push({ ...i, name: existing.name, existingId: existing.id, newFacts: facts });
-      }
-      setSuggestions(out);
+      scannedWords.set(chapter.id, chapter.word_count);
+      if (plan.summary && !chapter.summary.trim()) set("summary", plan.summary);
+      setPendingFacts(plan.facts);
+      setSuggestions([
+        ...plan.creates,
+        ...plan.merges.map((m) => ({
+          name: m.entity.name,
+          category: m.entity.category,
+          description: "",
+          existingId: m.entity.id,
+          newFacts: [...m.newFacts, ...m.newAliases.map((a) => `Also called "${a}"`)],
+          newAliases: m.newAliases,
+        })),
+      ]);
       setScanned(true);
     });
+
+  async function addFact(f: string) {
+    const next = [project.canon_rules.trim(), f].filter(Boolean).join("\n");
+    const { error } = await supabase.from("projects").update({ canon_rules: next }).eq("id", project.id);
+    if (!error) {
+      setProject((prev) => ({ ...prev, canon_rules: next }));
+      setPendingFacts((list) => list.filter((x) => x !== f));
+    }
+  }
 
   async function addSuggestion(s: Suggestion) {
     if (s.existingId && s.newFacts) {
       const existing = entities.find((e) => e.id === s.existingId);
       if (!existing) return;
-      const merged = [existing.description.trim(), ...s.newFacts.map((f) => `- ${f}`)].filter(Boolean).join("\n");
-      const { error } = await supabase.from("entities").update({ description: merged }).eq("id", existing.id);
+      const facts = s.newFacts.filter((f) => !f.startsWith("Also called "));
+      const merged = [existing.description.trim(), ...facts.map((f) => `- ${f}`)].filter(Boolean).join("\n");
+      const aliases = [...existing.aliases, ...(s.newAliases ?? [])].slice(0, 30);
+      const { error } = await supabase.from("entities").update({ description: merged, aliases }).eq("id", existing.id);
       if (!error) {
-        setEntities((prev) => prev.map((e) => (e.id === existing.id ? { ...e, description: merged } : e)));
+        setEntities((prev) => prev.map((e) => (e.id === existing.id ? { ...e, description: merged, aliases } : e)));
         setSuggestions((list) => list.filter((x) => x !== s));
       }
       return;
     }
     const { data, error } = await supabase
       .from("entities")
-      .insert({ project_id: project.id, user_id: project.user_id, name: s.name, category: s.category, description: s.description })
+      .insert({ project_id: project.id, user_id: project.user_id, name: s.name, category: s.category, description: s.description, aliases: s.aliases ?? [] })
       .select("*")
       .single();
     if (!error && data) {
@@ -561,6 +683,51 @@ function ChapterEditor({
             ))}
           </div>
 
+          {inChapter.length > 0 && (
+            <div className="mt-3">
+              <p className="mb-1 text-[11px] text-muted">In this chapter · the AI reads these first</p>
+              <div className="flex flex-wrap gap-1">
+                {inChapter.slice(0, 12).map((e) => (
+                  <span key={e.id} title={e.description || e.category} className="rounded-full border border-line bg-panel px-2 py-0.5 text-[11px] text-text/80">
+                    {e.name}
+                  </span>
+                ))}
+                {inChapter.length > 12 && <span className="px-1 text-[11px] text-muted">+{inChapter.length - 12} more</span>}
+              </div>
+            </div>
+          )}
+
+
+          {(autoLog || autoState !== "idle") && (
+            <div className="mt-3 rounded-lg border border-line bg-panel px-3 py-2 text-[11px] text-muted" aria-live="polite">
+              {autoState === "scanning" ? (
+                <span className="flex items-center gap-1.5">
+                  <Loader2 size={11} className="animate-spin" /> Updating the World Bible from this chapter…
+                </span>
+              ) : autoState === "error" ? (
+                <span>Couldn&apos;t update the World Bible automatically just now. It will try again as you write.</span>
+              ) : autoLog ? (
+                <>
+                  <span className="text-text/80">World Bible updated automatically: </span>
+                  {[
+                    autoLog.created.length ? `added ${autoLog.created.map((e) => e.name).slice(0, 4).join(", ")}${autoLog.created.length > 4 ? ` +${autoLog.created.length - 4}` : ""}` : "",
+                    autoLog.updated.length ? `new details for ${autoLog.updated.length} ${autoLog.updated.length === 1 ? "entry" : "entries"}` : "",
+                    autoLog.factsAdded.length ? `${autoLog.factsAdded.length} canon ${autoLog.factsAdded.length === 1 ? "rule" : "rules"}` : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                  .{" "}
+                  <button onClick={undoAuto} className="cursor-pointer font-medium text-accent hover:underline">
+                    Undo
+                  </button>
+                  <button onClick={() => setAutoLog(null)} className="ml-2 cursor-pointer hover:text-text" aria-label="Dismiss">
+                    ✕
+                  </button>
+                </>
+              ) : null}
+            </div>
+          )}
+
           <div className="mt-4 space-y-3">
             {mode === "draft" && (
               <>
@@ -636,6 +803,15 @@ function ChapterEditor({
 
             {mode === "canon" && (
               <>
+                <label className="flex cursor-pointer items-start gap-2 rounded-xl border border-line bg-panel p-3 text-xs">
+                  <input type="checkbox" className="mt-0.5 accent-[var(--color-accent)]" checked={autoOn} onChange={(e) => void setAutoCanon(e.target.checked)} />
+                  <span>
+                    <span className="font-medium text-text">Keep the World Bible up to date automatically</span>
+                    <span className="mt-0.5 block text-muted">
+                      When you pause, MANTIS adds new characters, places and details, records firm facts as canon rules and fills in the chapter summary. You can edit or undo anything.
+                    </span>
+                  </span>
+                </label>
                 <div className="rounded-xl border border-line bg-panel p-3">
                   <div className="flex items-center justify-between">
                     <p className="text-sm font-medium">Chapter summary</p>
@@ -685,7 +861,22 @@ function ChapterEditor({
                   {busy === "extract" ? <Loader2 size={15} className="animate-spin" /> : <ScanSearch size={15} />}
                   Scan chapter for new canon
                 </button>
-                {scanned && suggestions.length === 0 && <p className="text-center text-xs text-muted">No new characters, places or lore found.</p>}
+                {scanned && suggestions.length === 0 && pendingFacts.length === 0 && <p className="text-center text-xs text-muted">Nothing new found. Your World Bible is up to date.</p>}
+                {pendingFacts.length > 0 && (
+                  <div className="rounded-xl border border-line bg-panel p-3">
+                    <p className="mb-1.5 text-xs font-medium">New canon facts</p>
+                    <ul className="space-y-1.5">
+                      {pendingFacts.map((f) => (
+                        <li key={f} className="flex items-start justify-between gap-2 text-xs text-muted">
+                          <span>{f}</span>
+                          <button onClick={() => addFact(f)} className="btn-quiet h-6 shrink-0 gap-1 px-2 text-xs text-accent">
+                            <Plus size={12} /> Add
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
                 {suggestions.length > 1 && (
                   <button
                     onClick={async () => {
@@ -781,17 +972,17 @@ function ChapterEditor({
             <div className="flex flex-wrap gap-2 border-b border-line p-3">
               {result.kind === "rewrite" && (
                 <>
-                  <button onClick={() => applyResult("replace")} className="btn-primary flex-1 py-1.5">
+                  <button onClick={() => applyResult("replace")} disabled={!!busy} className="btn-primary flex-1 py-1.5">
                     Replace
                   </button>
-                  <button onClick={() => applyResult("insert")} className="btn-ghost py-1.5">
+                  <button onClick={() => applyResult("insert")} disabled={!!busy} className="btn-ghost py-1.5">
                     Insert after
                   </button>
                 </>
               )}
               {(result.kind === "continue" || result.kind === "draft") && (
-                <button onClick={() => applyResult("append")} className="btn-primary flex-1 py-1.5">
-                  Add to chapter
+                <button onClick={() => applyResult("append")} disabled={!!busy} className="btn-primary flex-1 py-1.5">
+                  {busy ? "Writing…" : "Add to chapter"}
                 </button>
               )}
               <button onClick={() => navigator.clipboard.writeText(result.text)} className="btn-ghost py-1.5" aria-label="Copy suggestion">

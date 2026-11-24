@@ -10,6 +10,8 @@ export interface Project {
   style_guide: string;
   target_words: number;
   style_dials?: Record<string, number> | null;
+  /** Keep the World Bible, canon rules and summaries updated by AI as the writer works (default on). */
+  auto_canon?: boolean;
   created_at: string;
   updated_at: string;
 }
