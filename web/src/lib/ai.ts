@@ -74,7 +74,7 @@ function projectBlock(ctx: AiContext): string {
 }
 
 const SYSTEM =
-  "You are MANTIS, an expert fiction editor and co-writer. Respect the author's voice, the established canon and the World Bible. Output only the requested text — no preambles, no commentary, no markdown headings unless asked.";
+  "You are MANTIS, an expert fiction editor and co-writer. Respect the author's voice, the established canon and the World Bible. Output only the requested text — no preambles, no commentary, plain text only: no markdown, no **bold**, no # headings.";
 
 export function buildMessages(
   action: AiAction,
@@ -101,10 +101,10 @@ export function buildMessages(
       user = `${context}\n\nBrainstorm for the author. Give 5 distinct, specific ideas as a numbered list.\nREQUEST: ${clip(opts.instruction, 1000) || "What could happen next?"}${t ? `\n\nCURRENT TEXT:\n${t.slice(-4000)}` : ""}`;
       break;
     case "outline":
-      user = `${context}\n\nWrite a chapter-by-chapter outline for this novel. Use exactly this format, one line per chapter:\nChapter 1: <title> — <2-3 sentence beat>\nAim for ${opts.words ?? 20} chapters with a clear three-act structure.${opts.instruction ? `\nAuthor direction: ${clip(opts.instruction, 600)}` : ""}`;
+      user = `${context}\n\nWrite a chapter-by-chapter outline for this novel. Use exactly this format, one line per chapter:\nChapter 1: <title> — <2-3 sentence beat>\nWrite exactly ${opts.words ?? 20} chapters (Chapter 1 to Chapter ${opts.words ?? 20}), no more and no fewer, with a clear three-act structure.${opts.instruction ? `\nAuthor direction: ${clip(opts.instruction, 600)}` : ""}`;
       break;
     case "extract":
-      user = `Extract story-world canon from the chapter below. Return ONLY a JSON array, no other text. Each item: {"name": string, "category": "Character"|"Location"|"Item"|"Faction"|"Lore", "description": string (1-2 sentences of facts stated in the text)}. Include only named, story-relevant entities. Maximum 20 items.\n\nCHAPTER:\n${t}`;
+      user = `Extract story-world canon from the chapter below. Return ONLY a JSON array, no other text. Each item: {"name": string, "category": "Character"|"Location"|"Item"|"Faction"|"Lore", "description": string (1-2 sentences of facts stated in the text)}. Include only entities a reader would need to remember: named characters, important places, significant objects, groups and rules of the world. Skip generic scenery and furniture (the sea, a desk, a pipe) unless the plot turns on it. Maximum 15 items.\n\nCHAPTER:\n${t}`;
       break;
     case "draft":
       // Sudowrite-style "write the chapter from its beat".
@@ -133,7 +133,7 @@ export function buildMessages(
  "genre": a short genre label like "Fantasy" or "Psychological thriller",
  "premise": 2-3 sentences: who the protagonist is, what they want, and what stands in the way,
  "canon_rules": 3-6 short facts the story must never contradict (ages, rules of the world, timeline), one per line,
- "style_guide": 1-2 sentences describing POV, tense, voice and tone as they appear in the writing}
+ "style_guide": 1-2 sentences describing POV, tense, voice and tone. If there is manuscript text, describe exactly the POV and tense it actually uses (check the verbs: "climbed" is past tense, "climbs" is present)}
 Where the material already states something, keep it consistent with that.`;
       break;
     default:
@@ -245,6 +245,17 @@ export async function callModel(opts: {
   if (!text.trim()) throw new AiError("The AI came back empty. Please try again.", 502);
   const tokens: number = data.usage?.total_tokens ?? Math.ceil(JSON.stringify(opts.messages).length / 4 + text.length / 4);
   return { text: text.trim(), tokens };
+}
+
+/** Models sometimes add markdown even when told not to. Writers never want stray asterisks in a manuscript. */
+export function stripMarkdown(text: string): string {
+  return text
+    .replace(/\*\*([^*\n]+?)\*\*/g, "$1")
+    .replace(/__([^_\n]+?)__/g, "$1")
+    .replace(/^#{1,6}\s+/gm, "")
+    .replace(/^\s*[-*]{3,}\s*$/gm, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
 export class AiError extends Error {

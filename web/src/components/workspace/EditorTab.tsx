@@ -270,6 +270,10 @@ function ChapterEditor({
     text: string;
     range?: [number, number];
   } | null>(null);
+  const resultRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (result) resultRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [result]);
   const [preset, setPreset] = useState(PRESETS[1]);
   const [customRewrite, setCustomRewrite] = useState("");
   const [issues, setIssues] = useState<Issue[] | null>(null);
@@ -382,10 +386,10 @@ function ChapterEditor({
     setIssues((prev) => (prev ? prev.filter((_, j) => j !== idx) : prev));
   }
 
-  const doAsk = (e: React.FormEvent) => {
-    e.preventDefault();
-    const q = question.trim();
-    if (!q) return;
+  const doAsk = (e?: React.FormEvent, preset?: string) => {
+    e?.preventDefault();
+    const q = (preset ?? question).trim();
+    if (!q || busy) return;
     return ai("ask", async () => {
       const a = await runAi({ action: "ask", text: chapter.content, instruction: q, context: aiContext });
       setQa((prev) => [...prev, { q, a }]);
@@ -582,7 +586,7 @@ function ChapterEditor({
                     {busy === "continue" ? <Loader2 size={15} className="animate-spin" /> : <PenLine size={15} />}
                     {busy === "continue" ? "Writing…" : "Continue the scene"}
                   </button>
-                  <select className="input w-[88px] py-2" value={words} onChange={(e) => setWords(Number(e.target.value))} aria-label="Length">
+                  <select className="input w-[104px] shrink-0 py-2" value={words} onChange={(e) => setWords(Number(e.target.value))} aria-label="Length">
                     {[200, 400, 800, 1200].map((n) => (
                       <option key={n} value={n}>
                         ~{n}w
@@ -682,6 +686,16 @@ function ChapterEditor({
                   Scan chapter for new canon
                 </button>
                 {scanned && suggestions.length === 0 && <p className="text-center text-xs text-muted">No new characters, places or lore found.</p>}
+                {suggestions.length > 1 && (
+                  <button
+                    onClick={async () => {
+                      for (const s of [...suggestions]) await addSuggestion(s);
+                    }}
+                    className="btn-ghost w-full py-1.5 text-xs"
+                  >
+                    <Plus size={13} /> Add all {suggestions.length} to the World Bible
+                  </button>
+                )}
                 {suggestions.length > 0 && (
                   <ul className="space-y-2">
                     {suggestions.map((s) => (
@@ -715,7 +729,7 @@ function ChapterEditor({
                 {qa.length === 0 && (
                   <div className="flex flex-wrap gap-1.5">
                     {["Who knows the secret so far?", "What do we know about the main character?", "Any loose threads to pay off?"].map((s) => (
-                      <button key={s} onClick={() => setQuestion(s)} className="cursor-pointer rounded-full border border-line px-2.5 py-1 text-xs text-muted hover:text-text">
+                      <button key={s} onClick={() => doAsk(undefined, s)} disabled={!!busy} className="cursor-pointer rounded-full border border-line px-2.5 py-1 text-xs text-muted hover:text-text">
                         {s}
                       </button>
                     ))}
@@ -754,7 +768,7 @@ function ChapterEditor({
         </div>
 
         {result && (
-          <div className="mx-4 mb-4 overflow-hidden rounded-xl border border-accent/40 bg-panel shadow-glow">
+          <div ref={resultRef} className="mx-4 mb-4 scroll-mb-4 overflow-hidden rounded-xl border border-accent/40 bg-panel shadow-glow">
             <div className="flex items-center justify-between border-b border-line px-3 py-2">
               <p className="flex items-center gap-1.5 text-xs font-semibold text-accent">
                 {result.kind === "check" ? <ShieldCheck size={13} /> : <Sparkles size={13} />}
@@ -764,8 +778,7 @@ function ChapterEditor({
                 <X size={13} />
               </button>
             </div>
-            <div className="max-h-80 overflow-y-auto px-3 py-3 font-serif text-[14px] leading-relaxed whitespace-pre-wrap">{result.text}</div>
-            <div className="flex flex-wrap gap-2 border-t border-line p-3">
+            <div className="flex flex-wrap gap-2 border-b border-line p-3">
               {result.kind === "rewrite" && (
                 <>
                   <button onClick={() => applyResult("replace")} className="btn-primary flex-1 py-1.5">
@@ -785,6 +798,7 @@ function ChapterEditor({
                 <Copy size={14} />
               </button>
             </div>
+            <div className="max-h-[45vh] overflow-y-auto px-3 py-3 font-serif text-[14px] leading-relaxed whitespace-pre-wrap">{result.text}</div>
           </div>
         )}
       </aside>

@@ -1,5 +1,6 @@
 import { BookOpen, Feather, FileText, Sparkles } from "lucide-react";
 import Link from "next/link";
+import Greeting from "@/components/app/Greeting";
 import EmptyState from "@/components/ui/EmptyState";
 import { ProgressBar } from "@/components/ui/Progress";
 import { compact, coverFor, timeAgo } from "@/lib/format";
@@ -38,8 +39,6 @@ export default function ProjectsView({
   const totalWords = projects.reduce((a, p) => a + p.words, 0);
   const totalChapters = projects.reduce((a, p) => a + p.chapterCount, 0);
   const name = email.split("@")[0];
-  const hour = new Date().getHours();
-  const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
   const latest = projects[0];
 
   return (
@@ -47,7 +46,7 @@ export default function ProjectsView({
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-sm text-muted">
-            {greeting}, {name}
+            <Greeting name={name} />
           </p>
           <h1 className="mt-1 font-serif text-3xl font-semibold sm:text-4xl">Your projects</h1>
         </div>

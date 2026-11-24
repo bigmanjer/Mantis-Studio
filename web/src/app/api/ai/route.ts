@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { AiError, buildMessages, callModel, type AiAction, type AiContext, type ProviderId } from "@/lib/ai";
+import { AiError, buildMessages, callModel, stripMarkdown, type AiAction, type AiContext, type ProviderId } from "@/lib/ai";
 import { decrypt } from "@/lib/crypto";
 import { currentPeriod, planFor } from "@/lib/plans";
 import { createAdminClient, getProfile, requireUser } from "@/lib/supabase/server";
@@ -70,15 +70,23 @@ export async function POST(req: Request) {
     const messages = buildMessages(action, String(body.text ?? ""), (body.context ?? {}) as AiContext, {
       preset: body.preset,
       instruction: body.instruction,
-      words: typeof body.words === "number" ? Math.min(Math.max(body.words, 50), 2000) : undefined,
+      // For outlines "words" is the chapter count, so it must not be clamped like a word count.
+      words:
+        typeof body.words !== "number"
+          ? undefined
+          : action === "outline"
+            ? Math.min(Math.max(Math.round(body.words), 1), 80)
+            : Math.min(Math.max(body.words, 50), 2000),
     });
     const wordsReq = Math.min(Math.max(Number(body.words) || (action === "draft" ? 1200 : 400), 50), 2000);
-    const maxTokens = action === "continue" || action === "draft" ? Math.ceil(wordsReq * 2) : action === "outline" || action === "reverse_outline" ? 3000 : 2000;
+    const maxTokens = action === "continue" || action === "draft" ? Math.ceil(wordsReq * 2) : action === "outline" ? Math.min(800 + (Number(body.words) || 20) * 110, 9000) : action === "reverse_outline" ? 3000 : 2000;
     const result = await callModel({ provider, apiKey, model, messages, maxTokens });
     if (usingIncluded) {
       await admin.rpc("add_ai_usage", { p_user: user.id, p_period: period, p_tokens: result.tokens });
     }
-    return NextResponse.json({ text: result.text, tokens: result.tokens, included: usingIncluded });
+    const JSON_ACTIONS: AiAction[] = ["extract", "check", "autofill"];
+    const text = JSON_ACTIONS.includes(action) ? result.text : stripMarkdown(result.text);
+    return NextResponse.json({ text, tokens: result.tokens, included: usingIncluded });
   } catch (e) {
     const err = e instanceof AiError ? e : new AiError("The AI request failed. Please try again.", 502);
     return NextResponse.json({ error: err.message }, { status: err.status });

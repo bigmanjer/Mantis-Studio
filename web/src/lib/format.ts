@@ -11,6 +11,7 @@ export function timeAgo(iso: string): string {
 }
 
 export function compact(n: number): string {
+  if (n >= 1_000_000) return `${+(n / 1_000_000).toFixed(n >= 10_000_000 ? 0 : 1)}M`;
   return n >= 10_000 ? `${(n / 1000).toFixed(n >= 100_000 ? 0 : 1)}k` : n.toLocaleString();
 }
 

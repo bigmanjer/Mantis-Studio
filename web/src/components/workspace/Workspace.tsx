@@ -1,7 +1,7 @@
 "use client";
 import { ArrowLeft, BookMarked, Download, ListTree, PenLine } from "lucide-react";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Logo from "@/components/ui/Logo";
 import { ProgressRing } from "@/components/ui/Progress";
 import ThemeToggle from "@/components/ui/ThemeToggle";
@@ -30,6 +30,9 @@ export interface WorkspaceProps {
 export default function Workspace({ initialProject, initialChapters, initialEntities, docxExport }: WorkspaceProps) {
   const [tab, setTab] = useState<TabId>(initialChapters.some((c) => c.word_count > 0) ? "write" : "plan");
   const [project, setProject] = useState(initialProject);
+  useEffect(() => {
+    document.title = `${project.title || "Untitled"} — MANTIS Studio`;
+  }, [project.title]);
   const [chapters, setChapters] = useState(initialChapters);
   const [entities, setEntities] = useState(initialEntities);
   const [focus, setFocus] = useState(false);
