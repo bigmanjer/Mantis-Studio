@@ -13,7 +13,7 @@ export async function createProject(formData: FormData): Promise<{ error?: strin
 
   const profile = await getProfile(user.id, user.email);
   const plan = planFor(profile);
-  const { count } = await supabase.from("projects").select("id", { count: "exact", head: true });
+  const { count } = await supabase.from("projects").select("id", { count: "exact", head: true }).is("deleted_at", null);
   if ((count ?? 0) >= plan.maxProjects) {
     return { error: `The ${plan.name} plan includes ${plan.maxProjects} projects. Upgrade for unlimited projects.` };
   }
@@ -54,7 +54,7 @@ export async function importProject(formData: FormData): Promise<{ error?: strin
 
   const profile = await getProfile(user.id, user.email);
   const plan = planFor(profile);
-  const { count } = await supabase.from("projects").select("id", { count: "exact", head: true });
+  const { count } = await supabase.from("projects").select("id", { count: "exact", head: true }).is("deleted_at", null);
   if ((count ?? 0) >= plan.maxProjects) {
     return { error: `The ${plan.name} plan includes ${plan.maxProjects} projects. Upgrade to import more.` };
   }
@@ -138,12 +138,37 @@ async function importBackup(text: string, userId: string, titleOverride: string)
   redirect(`/app/projects/${project.id}`);
 }
 
+/** Move a book to the Trash. It can be restored for 30 days (see /app/trash). */
 export async function deleteProject(projectId: string) {
   const { supabase, user } = await requireUser();
   if (!user) redirect("/login");
-  await supabase.from("projects").delete().eq("id", projectId);
+  await supabase.from("projects").update({ deleted_at: new Date().toISOString() }).eq("id", projectId);
   revalidatePath("/app");
-  redirect("/app");
+  redirect("/app?trashed=1");
+}
+
+export async function restoreProject(projectId: string): Promise<{ error?: string } | void> {
+  const { supabase, user } = await requireUser();
+  if (!user) redirect("/login");
+  const profile = await getProfile(user.id, user.email);
+  const plan = planFor(profile);
+  const { count } = await supabase.from("projects").select("id", { count: "exact", head: true }).is("deleted_at", null);
+  if ((count ?? 0) >= plan.maxProjects) {
+    return { error: `The ${plan.name} plan includes ${plan.maxProjects} projects. Move one to the Trash or upgrade, then restore this one.` };
+  }
+  const { error } = await supabase.from("projects").update({ deleted_at: null }).eq("id", projectId);
+  if (error) return { error: error.message };
+  revalidatePath("/app");
+  redirect(`/app/projects/${projectId}`);
+}
+
+/** Permanently delete a book that is already in the Trash. */
+export async function purgeProject(projectId: string): Promise<{ error?: string } | void> {
+  const { supabase, user } = await requireUser();
+  if (!user) redirect("/login");
+  const { error } = await supabase.from("projects").delete().eq("id", projectId).not("deleted_at", "is", null);
+  if (error) return { error: error.message };
+  revalidatePath("/app/trash");
 }
 
 /** Permanently deletes the account: cancels any subscription, then removes the user (all data cascades). */

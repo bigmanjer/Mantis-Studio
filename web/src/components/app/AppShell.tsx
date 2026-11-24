@@ -1,5 +1,5 @@
 "use client";
-import { CreditCard, FolderOpen, LogOut, Menu, Settings, ShieldCheck, Sparkles, X } from "lucide-react";
+import { CreditCard, FolderOpen, LogOut, Menu, Settings, ShieldCheck, Sparkles, Trash2, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -22,6 +22,7 @@ const ADMIN_NAV = { href: "/app/admin", label: "Admin", icon: ShieldCheck, match
 
 const NAV = [
   { href: "/app", label: "Projects", icon: FolderOpen, match: (p: string) => p === "/app" || p.startsWith("/app/projects") },
+  { href: "/app/trash", label: "Trash", icon: Trash2, match: (p: string) => p === "/app/trash" },
   { href: "/app/settings", label: "Settings", icon: Settings, match: (p: string) => p === "/app/settings" },
   { href: "/app/settings#billing", label: "Plan & billing", icon: CreditCard, match: () => false },
 ];

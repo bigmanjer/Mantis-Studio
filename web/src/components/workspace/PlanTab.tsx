@@ -202,9 +202,9 @@ export default function PlanTab({ project, setProject, chapters, setChapters, ai
 
   async function onDelete() {
     const ok = await confirm({
-      title: `Delete “${project.title || "Untitled"}”?`,
-      body: "This permanently deletes the project, every chapter and the World Bible. Export first if you want a copy. This can’t be undone.",
-      confirmLabel: "Delete project",
+      title: `Move “${project.title || "Untitled"}” to the Trash?`,
+      body: "You can restore it, with every chapter and the World Bible, from the Trash for 30 days. After that it's deleted for good.",
+      confirmLabel: "Move to Trash",
       danger: true,
     });
     if (ok) startDelete(() => deleteProject(project.id));
@@ -408,10 +408,10 @@ export default function PlanTab({ project, setProject, chapters, setChapters, ai
               })}
             </div>
           </Panel>
-          <Panel icon={ScrollText} title="Project" hint="Deleting removes every chapter and World Bible entry.">
+          <Panel icon={ScrollText} title="Project" hint="Books in the Trash can be restored for 30 days.">
             <button onClick={onDelete} disabled={deleting} className="btn-danger w-full">
               {deleting ? <Loader2 size={15} className="animate-spin" /> : <Trash2 size={15} />}
-              {deleting ? "Deleting…" : "Delete project"}
+              {deleting ? "Moving…" : "Move to Trash"}
             </button>
           </Panel>
         </aside>

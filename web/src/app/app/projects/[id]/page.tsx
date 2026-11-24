@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import Workspace from "@/components/workspace/Workspace";
 import { planFor } from "@/lib/plans";
 import { getProfile, requireUser } from "@/lib/supabase/server";
@@ -14,6 +14,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
     getProfile(user!.id, user!.email),
   ]);
   if (!project) notFound();
+  if (project.deleted_at) redirect("/app/trash");
   return (
     <Workspace
       initialProject={project as Project}
