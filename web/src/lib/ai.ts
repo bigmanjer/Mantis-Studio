@@ -109,7 +109,7 @@ export function buildMessages(
 {"summary": 2-3 sentences on what happens in this chapter,
  "entities": [{"name": string, "category": "Character"|"Location"|"Item"|"Faction"|"Lore", "description": 1-2 sentences of facts stated in the text, "aliases": [other names or titles used for them in the text]}],
  "facts": [short permanent facts later chapters must not contradict, e.g. "Nell is 34." or "The lighthouse has 112 steps."]}
-Entities: only things a reader needs to remember (named characters, important places, significant objects, groups, rules of the world). Skip generic scenery and furniture (the sea, a desk, a pipe) unless the plot turns on it. Use the exact existing name when an entity is already known. Maximum 15.
+Entities: only things a reader needs to remember: characters, important places, groups, rules of the world, and objects the plot depends on (a key that opens the vault, a cursed ring). Skip scenery, furniture and props (the sea, a desk, a pipe, a lantern) unless the story turns on them. "name" must be the name exactly as the text uses it (e.g. "the brass key", "Nell"), never an invented label. Use the exact existing name when an entity is already in the World Bible. Maximum 12.
 Facts: only stated plainly in the text, stable (ages, dates, family ties, physical rules, how magic or technology works), not moods or passing events, and not already in the canon rules. Maximum 5; [] if none.
 ${known ? `\nALREADY IN THE WORLD BIBLE: ${known}\n` : ""}${rules ? `\nCANON RULES ALREADY RECORDED:\n${rules}\n` : ""}
 CHAPTER:

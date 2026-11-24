@@ -139,3 +139,49 @@ export async function undoScan(supabase: SupabaseClient, applied: AppliedScan, p
   for (const u of applied.updated) await supabase.from("entities").update({ description: u.description, aliases: u.aliases }).eq("id", u.id);
   if (applied.canonBefore !== null) await supabase.from("projects").update({ canon_rules: applied.canonBefore }).eq("id", projectId);
 }
+
+/**
+ * Scan many chapters in a row, carrying what each one found into the next (original "Scan All
+ * Chapters"). Fills empty chapter summaries too. Stops at the first AI error, keeping what was saved.
+ */
+export async function scanChapters(
+  supabase: SupabaseClient,
+  project: { id: string; user_id: string; canon_rules: string },
+  chapters: { id: string; content: string; summary: string }[],
+  entities: Entity[],
+  runExtract: (text: string, context: unknown) => Promise<string>,
+  onProgress: (state: { done: number; total: number; entities: Entity[]; canon: string; summaries: Record<string, string> }) => void,
+) {
+  const todo = chapters.filter((c) => c.content.trim().split(/\s+/).length >= 50);
+  let known = entities;
+  let canon = project.canon_rules ?? "";
+  const summaries: Record<string, string> = {};
+  const totals = { added: 0, updated: 0, facts: 0, chapters: todo.length };
+  for (const [i, c] of todo.entries()) {
+    const raw = await runExtract(c.content, {
+      project: { canon_rules: canon },
+      entities: known.map((e) => ({ name: e.name, category: e.category, description: "" })),
+    });
+    const plan = planScan(parseScan(raw), known, canon);
+    if (plan.summary && !c.summary.trim()) {
+      const { error } = await supabase.from("chapters").update({ summary: plan.summary }).eq("id", c.id);
+      if (!error) summaries[c.id] = plan.summary;
+    }
+    if (!planIsEmpty(plan)) {
+      const applied = await applyScan(supabase, plan, { id: project.id, user_id: project.user_id, canon_rules: canon }, { includeFacts: true });
+      known = known.map((e) => {
+        const m = plan.merges.find((x) => x.entity.id === e.id);
+        return m && applied.updated.some((u) => u.id === e.id)
+          ? { ...e, description: [e.description.trim(), ...m.newFacts.map((f) => `- ${f}`)].filter(Boolean).join("\n"), aliases: [...e.aliases, ...m.newAliases].slice(0, 30) }
+          : e;
+      });
+      known = [...known, ...applied.created];
+      if (applied.factsAdded.length) canon = [canon.trim(), ...applied.factsAdded].filter(Boolean).join("\n");
+      totals.added += applied.created.length;
+      totals.updated += applied.updated.length;
+      totals.facts += applied.factsAdded.length;
+    }
+    onProgress({ done: i + 1, total: todo.length, entities: known, canon, summaries });
+  }
+  return totals;
+}

@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { AiClientError, runAi } from "./aiClient";
 import { ENTITY_CATEGORIES, type Chapter, type Entity, type EntityCategory, type Project } from "@/lib/types";
 import { mentionedIn } from "@/lib/world-context";
-import { applyScan, parseScan, planIsEmpty, planScan } from "./canonScan";
+import { scanChapters } from "./canonScan";
 
 export const CATEGORY_ICONS: Record<EntityCategory, LucideIcon> = {
   Character: UserRound,
@@ -23,12 +23,14 @@ export default function WorldBibleTab({
   project,
   setProject,
   chapters,
+  setChapters,
   entities,
   setEntities,
 }: {
   project: Project;
   setProject: React.Dispatch<React.SetStateAction<Project>>;
   chapters: Chapter[];
+  setChapters: React.Dispatch<React.SetStateAction<Chapter[]>>;
   entities: Entity[];
   setEntities: React.Dispatch<React.SetStateAction<Entity[]>>;
 }) {
@@ -56,40 +58,23 @@ export default function WorldBibleTab({
 
   /** Read every chapter and update the World Bible and canon rules (original "Scan All Chapters"). */
   async function scanAllChapters() {
-    const todo = ordered.filter((c) => c.content.trim().split(/\s+/).length >= 50);
-    if (!todo.length) return setScanMsg("Write a little in a chapter first, then scan.");
+    if (!ordered.some((c) => c.content.trim().split(/\s+/).length >= 50)) return setScanMsg("Write a little in a chapter first, then scan.");
     setScanMsg("");
-    setScanAll({ done: 0, total: todo.length });
-    let known = entities;
-    let canon = project.canon_rules;
-    const totals = { added: 0, updated: 0, facts: 0 };
+    setScanAll({ done: 0, total: ordered.length });
     try {
-      for (const [i, c] of todo.entries()) {
-        const raw = await runAi({
-          action: "extract",
-          text: c.content,
-          context: { project: { canon_rules: canon }, entities: known.map((e) => ({ name: e.name, category: e.category, description: "" })) },
-        });
-        const plan = planScan(parseScan(raw), known, canon);
-        if (plan.summary && !c.summary.trim()) await supabase.from("chapters").update({ summary: plan.summary }).eq("id", c.id);
-        if (!planIsEmpty(plan)) {
-          const applied = await applyScan(supabase, plan, { id: project.id, user_id: project.user_id, canon_rules: canon }, { includeFacts: true });
-          known = known.map((e) => {
-            const m = plan.merges.find((x) => x.entity.id === e.id);
-            return m && applied.updated.some((u) => u.id === e.id)
-              ? { ...e, description: [e.description.trim(), ...m.newFacts.map((f) => `- ${f}`)].filter(Boolean).join("\n"), aliases: [...e.aliases, ...m.newAliases].slice(0, 30) }
-              : e;
-          });
-          known = [...known, ...applied.created];
-          if (applied.factsAdded.length) canon = [canon.trim(), ...applied.factsAdded].filter(Boolean).join("\n");
-          totals.added += applied.created.length;
-          totals.updated += applied.updated.length;
-          totals.facts += applied.factsAdded.length;
+      const totals = await scanChapters(
+        supabase,
+        project,
+        ordered,
+        entities,
+        (text, context) => runAi({ action: "extract", text, context }),
+        ({ done, total, entities: known, canon, summaries }) => {
+          setScanAll({ done, total });
           setEntities(known);
           setProject((prev) => ({ ...prev, canon_rules: canon }));
-        }
-        setScanAll({ done: i + 1, total: todo.length });
-      }
+          setChapters((prev) => prev.map((c) => (summaries[c.id] ? { ...c, summary: summaries[c.id] } : c)));
+        },
+      );
       setScanMsg(
         totals.added + totals.updated + totals.facts
           ? `Done: ${totals.added} new ${totals.added === 1 ? "entry" : "entries"}, ${totals.updated} updated, ${totals.facts} canon ${totals.facts === 1 ? "rule" : "rules"} added.`

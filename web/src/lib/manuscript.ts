@@ -60,8 +60,35 @@ export function splitManuscript(raw: string): ParsedChapter[] {
       return { title: c.title || "Untitled", content, word_count: countWords(content) };
     })
     // Drop tiny front matter (e.g. a title page) but never drop real chapters.
-    .filter((c, i) => !(i === 0 && c.title === "Opening" && c.word_count < 60 && chapters.length > 1));
+    .filter((c, i) => !(i === 0 && c.title === "Opening" && c.word_count < 60 && chapters.length > 1))
+    // A heading with nothing under it (the book's own title, a "Part One" divider) isn't a chapter.
+    .filter((c, _i, all) => c.word_count > 0 || all.length === 1);
 
   if (result.length === 1 && result[0].title === "Opening") result[0].title = "Chapter 1";
+  // No headings in a long manuscript: split it into readable parts instead of one giant chapter.
+  if (result.length === 1 && result[0].word_count > 8000) return splitByLength(result[0].content).slice(0, 300);
   return result.slice(0, 300);
+}
+
+/** Split text into ~4,000-word parts, preferring scene breaks, never cutting a paragraph. */
+function splitByLength(text: string, target = 4000): ParsedChapter[] {
+  const paras = text.split(/\n\s*\n/);
+  const parts: string[][] = [[]];
+  let words = 0;
+  for (const p of paras) {
+    const isBreak = /^\s*(\*\s*){3,}\s*$|^\s*#\s*$/.test(p);
+    if ((isBreak && words > target * 0.6) || words > target * 1.4) {
+      parts.push([]);
+      words = 0;
+      if (isBreak) continue;
+    }
+    parts[parts.length - 1].push(p);
+    words += countWords(p);
+  }
+  return parts
+    .map((lines, i) => {
+      const content = lines.join("\n\n").trim();
+      return { title: `Part ${i + 1}`, content, word_count: countWords(content) };
+    })
+    .filter((c) => c.word_count > 0);
 }

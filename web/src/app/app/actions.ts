@@ -33,19 +33,23 @@ export async function createProject(formData: FormData): Promise<{ error?: strin
   redirect(`/app/projects/${data.id}`);
 }
 
-const MAX_IMPORT_BYTES = 6 * 1024 * 1024;
+const MAX_IMPORT_BYTES = 4 * 1024 * 1024; // Vercel accepts request bodies up to 4.5 MB.
 
-/** Create a project from an uploaded manuscript (.docx, .md or .txt), split into chapters by its headings. */
+/**
+ * Create a project from an uploaded manuscript in almost any format (Word, PDF, RTF, ODT, EPUB, HTML,
+ * Markdown, text), split into chapters by its headings. The workspace then organizes it with AI.
+ */
 export async function importProject(formData: FormData): Promise<{ error?: string } | void> {
   const { supabase, user } = await requireUser();
   if (!user) redirect("/login");
 
   const file = formData.get("file");
   if (!(file instanceof File) || file.size === 0) return { error: "Choose a file to import." };
-  if (file.size > MAX_IMPORT_BYTES) return { error: "That file is over 6 MB. Try saving it as plain text first." };
+  if (file.size > MAX_IMPORT_BYTES) return { error: "That file is over 4 MB. Save it as .docx or plain text (much smaller) and try again." };
   const ext = file.name.toLowerCase().split(".").pop() ?? "";
-  if (!["docx", "md", "markdown", "txt", "json"].includes(ext)) {
-    return { error: "Import a Word (.docx), Markdown (.md), text (.txt) or MANTIS backup (.json) file." };
+  const { IMPORT_EXTENSIONS } = await import("@/lib/extract-text");
+  if (ext !== "json" && !(IMPORT_EXTENSIONS as readonly string[]).includes(ext)) {
+    return { error: "MANTIS can import Word, PDF, RTF, OpenDocument, EPUB, HTML, Markdown and text files, or a MANTIS backup (.json)." };
   }
 
   const profile = await getProfile(user.id, user.email);
@@ -59,20 +63,21 @@ export async function importProject(formData: FormData): Promise<{ error?: strin
 
   let text: string;
   try {
-    if (ext === "docx") {
-      const mammoth = await import("mammoth");
-      text = (await mammoth.extractRawText({ buffer: Buffer.from(await file.arrayBuffer()) })).value;
-    } else {
-      text = await file.text();
-    }
-  } catch {
-    return { error: "We couldn't read that file. If it's a Word document, try re-saving it as .docx." };
+    const { extractText } = await import("@/lib/extract-text");
+    text = await extractText(file);
+  } catch (e) {
+    console.error("Import failed to read", ext, e);
+    return { error: "We couldn't read that file. Try saving it as .docx or plain text and import again." };
   }
 
   const { splitManuscript } = await import("@/lib/manuscript");
   const chapters = splitManuscript(text);
   const totalWords = chapters.reduce((a, c) => a + c.word_count, 0);
-  if (!totalWords) return { error: "That file doesn't seem to contain any text." };
+  if (!totalWords) {
+    return {
+      error: ext === "pdf" ? "That PDF has no selectable text (it may be scanned images). Export it as .docx or text and try again." : "That file doesn't seem to contain any text.",
+    };
+  }
 
   const title =
     String(formData.get("title") || "").trim().slice(0, 200) ||
@@ -95,7 +100,7 @@ export async function importProject(formData: FormData): Promise<{ error?: strin
       return { error: "Import failed while saving chapters. Nothing was created; please try again." };
     }
   }
-  redirect(`/app/projects/${project.id}`);
+  redirect(`/app/projects/${project.id}?organize=1`);
 }
 
 /** Restore a MANTIS backup (.mantis.json) or an original MANTIS Studio project file. */

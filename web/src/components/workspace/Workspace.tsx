@@ -7,7 +7,8 @@ import { ProgressRing } from "@/components/ui/Progress";
 import ThemeToggle from "@/components/ui/ThemeToggle";
 import { compact } from "@/lib/format";
 import type { Chapter, Entity, Project } from "@/lib/types";
-import EditorTab from "./EditorTab";
+import EditorTab, { markChaptersScanned } from "./EditorTab";
+import Organizer from "./Organizer";
 import ExportTab from "./ExportTab";
 import PlanTab from "./PlanTab";
 import WorldBibleTab from "./WorldBibleTab";
@@ -36,6 +37,16 @@ export default function Workspace({ initialProject, initialChapters, initialEnti
   const [chapters, setChapters] = useState(initialChapters);
   const [entities, setEntities] = useState(initialEntities);
   const [focus, setFocus] = useState(false);
+  // Fresh import: organize the whole book automatically (World Bible, canon, summaries, plan, outline).
+  const [organizing, setOrganizing] = useState(false);
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("organize") !== "1") return;
+    url.searchParams.delete("organize");
+    window.history.replaceState(null, "", url.pathname + url.search);
+    markChaptersScanned(initialChapters);
+    setOrganizing(true);
+  }, [initialChapters]);
 
   const totalWords = useMemo(() => chapters.reduce((a, c) => a + (c.word_count || 0), 0), [chapters]);
   const target = project.target_words || 80000;
@@ -99,6 +110,17 @@ export default function Workspace({ initialProject, initialChapters, initialEnti
           })}
         </nav>
       </header>
+      {organizing && (
+        <Organizer
+          project={project}
+          setProject={setProject}
+          chapters={chapters}
+          setChapters={setChapters}
+          entities={entities}
+          setEntities={setEntities}
+          onClose={() => setOrganizing(false)}
+        />
+      )}
       <div className="flex-1">
         {tab === "plan" && (
           <PlanTab
@@ -123,7 +145,7 @@ export default function Workspace({ initialProject, initialChapters, initialEnti
             setFocus={setFocus}
           />
         )}
-        {tab === "world" && <WorldBibleTab project={project} setProject={setProject} chapters={chapters} entities={entities} setEntities={setEntities} />}
+        {tab === "world" && <WorldBibleTab project={project} setProject={setProject} chapters={chapters} setChapters={setChapters} entities={entities} setEntities={setEntities} />}
         {tab === "export" && <ExportTab project={project} chapters={chapters} docxExport={docxExport} />}
       </div>
     </div>

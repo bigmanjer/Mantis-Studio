@@ -204,6 +204,10 @@ type AiMode = "draft" | "rewrite" | "canon" | "ask";
 type Suggestion = { name: string; category: EntityCategory; description: string; aliases?: string[]; existingId?: string; newFacts?: string[]; newAliases?: string[] };
 /** Word count each chapter had at its last canon scan (kept across chapter switches). */
 const scannedWords = new Map<string, number>();
+/** Treat these chapters as already scanned (e.g. while the import organizer reads them). */
+export function markChaptersScanned(chapters: Chapter[]) {
+  for (const c of chapters) scannedWords.set(c.id, c.word_count);
+}
 /** Projects whose empty planning fields were already auto-filled this session. */
 const autoFilled = new Set<string>();
 

@@ -78,10 +78,10 @@ export default function ImportDialog({ atLimit }: { atLimit: boolean }) {
             ) : (
               <>
                 <span className="font-medium">Drop a file here, or click to browse</span>
-                <span className="text-xs text-muted">Word, Markdown or text manuscript, or a MANTIS backup (.json), up to 6 MB</span>
+                <span className="text-xs text-muted">Word, PDF, RTF, ODT, EPUB, HTML, Markdown or text, or a MANTIS backup (.json). Up to 4 MB.</span>
               </>
             )}
-            <input type="file" accept=".docx,.md,.markdown,.txt,.json" className="sr-only" onChange={(e) => pick(e.target.files?.[0])} />
+            <input type="file" accept=".docx,.doc,.pdf,.rtf,.odt,.epub,.html,.htm,.md,.markdown,.txt,.fountain,.json" className="sr-only" onChange={(e) => pick(e.target.files?.[0])} />
           </label>
 
           <div className="mt-4">
