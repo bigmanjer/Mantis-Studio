@@ -1,5 +1,5 @@
 "use client";
-import { ArrowLeft, BookMarked, Download, Library, ListTree, PenLine } from "lucide-react";
+import { ArrowLeft, BookMarked, Download, Gauge, Library, ListTree, PenLine } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import Logo from "@/components/ui/Logo";
@@ -10,6 +10,7 @@ import type { Chapter, Entity, Project } from "@/lib/types";
 import EditorTab, { markChaptersScanned } from "./EditorTab";
 import Organizer from "./Organizer";
 import ExportTab from "./ExportTab";
+import InsightsTab from "./InsightsTab";
 import KnowledgeTab from "./KnowledgeTab";
 import PlanTab from "./PlanTab";
 import WorldBibleTab from "./WorldBibleTab";
@@ -18,6 +19,7 @@ const TABS = [
   { id: "plan", label: "Plan", icon: ListTree },
   { id: "write", label: "Write", icon: PenLine },
   { id: "world", label: "World Bible", icon: BookMarked },
+  { id: "insights", label: "Insights", icon: Gauge },
   { id: "library", label: "Library", icon: Library },
   { id: "export", label: "Export", icon: Download },
 ] as const;
@@ -151,6 +153,7 @@ export default function Workspace({ initialProject, initialChapters, initialEnti
           />
         )}
         {tab === "world" && <WorldBibleTab project={project} setProject={setProject} chapters={chapters} setChapters={setChapters} entities={entities} setEntities={setEntities} />}
+        {tab === "insights" && <InsightsTab project={project} chapters={chapters} entities={entities} aiContext={aiContext} goTo={(t) => setTab(t)} />}
         {tab === "library" && <KnowledgeTab project={project} setProject={setProject} />}
         {tab === "export" && <ExportTab project={project} chapters={chapters} docxExport={docxExport} />}
       </div>

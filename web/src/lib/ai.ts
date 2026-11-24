@@ -13,7 +13,7 @@ export const REWRITE_PRESETS: Record<string, string> = {
   Expand: "Add more detail and texture; roughly double the length.",
 };
 
-export type AiAction = "continue" | "rewrite" | "summarize" | "brainstorm" | "outline" | "extract" | "draft" | "check" | "ask" | "autofill" | "reverse_outline" | "enrich" | "custom";
+export type AiAction = "continue" | "rewrite" | "summarize" | "brainstorm" | "outline" | "extract" | "draft" | "check" | "ask" | "autofill" | "reverse_outline" | "enrich" | "review" | "custom";
 
 export interface AiContext {
   project?: {
@@ -129,6 +129,11 @@ ${t.slice(-16000)}`;
     case "check":
       // Continuity check: compare the chapter against canon rules, the World Bible and earlier summaries.
       user = `${context}\n\nYou are a meticulous continuity editor. Compare the CHAPTER below against the hard canon rules, the World Bible and the story so far. Find contradictions or likely continuity errors (names, ages, timeline, places, who-knows-what, physical details, magic/tech rules). Do not comment on style.\nReturn ONLY a JSON array, no other text. Each item: {"problem": short explanation, "quote": the exact sentence or phrase from the chapter, copied character-for-character, "canon": what canon says, "fix": replacement text for the quote that resolves the problem}. Return [] if there are no issues. Maximum 10 items.\n\nCHAPTER:\n${t}`;
+      break;
+    case "review":
+      // Whole-book developmental read from chapter summaries (Insights tab).
+      user = `${context}\n\nCHAPTERS IN ORDER (title and summary or opening):\n${t.slice(0, 20000)}\n\nYou are a sharp developmental editor. Read the book as it stands and find the problems a reader would notice: plot holes, setups that are never paid off, loose threads, characters who vanish, motivation that doesn't add up, timeline slips, and pacing sags. Be specific to this book; no generic advice.
+Return ONLY a JSON array, no other text, most important first, maximum 8 items. Each item: {"kind": "plot hole"|"loose thread"|"character"|"pacing"|"timeline", "chapter": the chapter title it concerns (or "Whole book"), "issue": one or two sentences, "suggestion": one concrete fix}. Return [] if the book is too short to judge.`;
       break;
     case "reverse_outline":
       // Outline from existing chapters (original MANTIS "reverse engineer outline").
