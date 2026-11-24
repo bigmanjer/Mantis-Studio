@@ -5,7 +5,8 @@ import { deleteProject } from "@/app/app/actions";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { createClient } from "@/lib/supabase/client";
 import type { Chapter, Project } from "@/lib/types";
-import { AiClientError, runAi } from "./aiClient";
+import { AiClientError, runAi, streamAi } from "./aiClient";
+import ChangesView from "./ChangesView";
 import { SaveBadge, useAutosave } from "./autosave";
 
 interface Props {
@@ -16,6 +17,17 @@ interface Props {
   aiContext: unknown;
   goToWrite: () => void;
 }
+
+/** Ways to revise an outline (Custom lets the writer type their own). */
+const OUTLINE_REVISIONS: Record<string, string> = {
+  "Raise the stakes": "Revise this outline so the stakes rise steadily: each chapter should cost the protagonist more, and the midpoint and climax should hit harder.",
+  "Fix the pacing": "Revise this outline to fix pacing: cut or merge chapters that repeat, move slow stretches along, and make sure every chapter changes something.",
+  "Add twists": "Revise this outline to add two or three fair, well set-up twists or reversals without breaking the canon.",
+  "Clarify motivations": "Revise this outline so every major character's choices clearly follow from what they want and fear.",
+  Tighten: "Tighten this outline: make each chapter line shorter and sharper without losing any plot points.",
+  "Expand the beats": "Expand each chapter line into a fuller 2-3 sentence beat with the key turn of the chapter.",
+  Custom: "",
+};
 
 // Mirrors STYLE_DIALS in lib/ai.ts (kept here so this client file doesn't import server code).
 const DIALS = [
@@ -80,6 +92,45 @@ export default function PlanTab({ project, setProject, chapters, setChapters, ai
   const [aiBusy, setAiBusy] = useState(false);
   const [aiErr, setAiErr] = useState("");
   const [chapterCount, setChapterCount] = useState(20);
+
+  // Outline revision (original MANTIS "Revision Tools"): reviewed before it's applied, with undo.
+  const [reviseStyle, setReviseStyle] = useState("Raise the stakes");
+  const [reviseCustom, setReviseCustom] = useState("");
+  const [pendingOutline, setPendingOutline] = useState<string | null>(null);
+  const [prevOutline, setPrevOutline] = useState<string | null>(null);
+  const [revising, setRevising] = useState(false);
+
+  async function reviseOutline() {
+    const instruction = reviseStyle === "Custom" ? reviseCustom.trim() : OUTLINE_REVISIONS[reviseStyle];
+    if (!instruction) return setAiErr("Type how you want the outline revised first.");
+    setAiErr("");
+    setRevising(true);
+    setAiBusy(true);
+    try {
+      await streamAi(
+        { action: "rewrite", text: latest.current.outline, instruction: `${instruction} Keep the exact format: one line per chapter, "Chapter N: Title — what happens".`, context: aiContext },
+        (text) => setPendingOutline(text),
+      );
+    } catch (e) {
+      setPendingOutline(null);
+      setAiErr(e instanceof AiClientError ? e.message : "AI request failed.");
+    }
+    setRevising(false);
+    setAiBusy(false);
+  }
+
+  function applyRevision() {
+    if (!pendingOutline) return;
+    setPrevOutline(latest.current.outline);
+    set("outline", pendingOutline);
+    setPendingOutline(null);
+  }
+
+  function undoRevision() {
+    if (prevOutline === null) return;
+    set("outline", prevOutline);
+    setPrevOutline(null);
+  }
   const [deleting, startDelete] = useTransition();
   const [creating, setCreating] = useState(false);
   const latest = useRef(project);
@@ -336,6 +387,43 @@ export default function PlanTab({ project, setProject, chapters, setChapters, ai
             }
           >
             {aiErr && <p className="mb-3 rounded-lg border border-danger/30 bg-danger-soft px-3 py-2 text-sm text-danger">{aiErr}</p>}
+            {project.outline.trim() && !pendingOutline && (
+              <div className="mb-3 flex flex-wrap items-center gap-2">
+                <span className="text-xs text-muted">Revise the outline:</span>
+                <select className="input w-auto py-1.5 text-sm" value={reviseStyle} onChange={(e) => setReviseStyle(e.target.value)} aria-label="How to revise the outline">
+                  {Object.keys(OUTLINE_REVISIONS).map((k) => (
+                    <option key={k}>{k}</option>
+                  ))}
+                </select>
+                {reviseStyle === "Custom" && (
+                  <input className="input min-w-[200px] flex-1 py-1.5 text-sm" placeholder="e.g. “Move the betrayal earlier”" value={reviseCustom} onChange={(e) => setReviseCustom(e.target.value)} />
+                )}
+                <button onClick={reviseOutline} disabled={aiBusy} className="btn-ghost py-1.5">
+                  {revising ? <Loader2 size={15} className="animate-spin" /> : <Sparkles size={15} />} {revising ? "Revising…" : "Revise"}
+                </button>
+                {prevOutline !== null && (
+                  <button onClick={undoRevision} className="cursor-pointer text-xs text-accent hover:underline">
+                    Undo last revision
+                  </button>
+                )}
+              </div>
+            )}
+            {pendingOutline && (
+              <div className="mb-3 overflow-hidden rounded-xl border border-accent/40 bg-panel">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-3 py-2">
+                  <p className="text-xs font-semibold text-accent">Revised outline: review the changes</p>
+                  <div className="flex gap-2">
+                    <button onClick={applyRevision} disabled={revising} className="btn-primary py-1.5">
+                      Apply
+                    </button>
+                    <button onClick={() => setPendingOutline(null)} disabled={revising} className="btn-ghost py-1.5">
+                      Discard
+                    </button>
+                  </div>
+                </div>
+                <ChangesView before={project.outline} after={pendingOutline} className="max-h-[50vh] overflow-y-auto px-3 py-3" />
+              </div>
+            )}
             <textarea
               rows={18}
               className="input font-mono text-[13px] leading-relaxed"

@@ -29,6 +29,7 @@ import { createClient } from "@/lib/supabase/client";
 import { countWords, type Chapter, type Entity, type EntityCategory, type Project } from "@/lib/types";
 import { AiClientError, runAi, streamAi } from "./aiClient";
 import { SaveBadge, useAutosave } from "./autosave";
+import ChangesView from "./ChangesView";
 import FindReplace from "./FindReplace";
 import VersionHistory from "./VersionHistory";
 
@@ -304,7 +305,11 @@ function ChapterEditor({
     kind: "continue" | "draft" | "rewrite" | "brainstorm" | "check";
     text: string;
     range?: [number, number];
+    /** The text that was rewritten, to show changes and to find it again if the chapter moved. */
+    original?: string;
+    whole?: boolean;
   } | null>(null);
+  const [showChanges, setShowChanges] = useState(false);
   // World Bible entries named in this chapter (deferred so typing stays smooth in long chapters).
   const deferredText = useDeferredValue(chapter.content);
   const inChapter = useMemo(() => mentionedIn(entities, deferredText), [entities, deferredText]);
@@ -539,7 +544,27 @@ function ChapterEditor({
           instruction: preset === "Custom" ? customRewrite : undefined,
           context: aiContext,
         },
-        (text) => setResult({ kind: "rewrite", text, range }),
+        (text) => setResult({ kind: "rewrite", text, range, original: chapter.content.slice(...range) }),
+      );
+    });
+  };
+
+  /** Improve the whole chapter (original MANTIS "Modify / Improve Text"), reviewed before it's applied. */
+  const doRewriteChapter = () => {
+    if (!chapter.content.trim()) return setErr("Write something in this chapter first.");
+    const original = chapter.content;
+    return ai("rewrite", async () => {
+      if (preset === "Custom" && !customRewrite.trim()) throw new AiClientError("Type how you want the chapter rewritten first.");
+      setShowChanges(true);
+      await streamAi(
+        {
+          action: "rewrite",
+          text: original,
+          preset: preset === "Custom" ? undefined : preset,
+          instruction: preset === "Custom" ? customRewrite : undefined,
+          context: aiContext,
+        },
+        (text) => setResult({ kind: "rewrite", text, range: [0, original.length], original, whole: true }),
       );
     });
   };
@@ -675,8 +700,22 @@ function ChapterEditor({
       loggedWords.current += countWords(result.text);
     }
     let next = chapter.content;
-    if (how === "replace" && result.range) next = next.slice(0, result.range[0]) + result.text + next.slice(result.range[1]);
-    else if (how === "insert" && result.range) next = next.slice(0, result.range[1]) + "\n\n" + result.text + next.slice(result.range[1]);
+    let range = result.range;
+    if (range && result.original !== undefined && next.slice(...range) !== result.original) {
+      // The chapter changed while the AI worked: find the passage again, or stop rather than overwrite the wrong text.
+      const at = next.indexOf(result.original);
+      if (at < 0 || result.whole) {
+        setErr(result.whole ? "The chapter changed while the AI was working. Run Improve again so nothing you typed is lost." : "That passage changed while the AI was working, so it wasn't replaced. Highlight it and try again.");
+        return;
+      }
+      range = [at, at + result.original.length];
+    }
+    if (result.kind === "rewrite" && result.original !== undefined && how === "replace") {
+      // Rewritten words aren't the writer's own new words.
+      loggedWords.current += countWords(result.text) - countWords(result.original);
+    }
+    if (how === "replace" && range) next = next.slice(0, range[0]) + result.text + next.slice(range[1]);
+    else if (how === "insert" && range) next = next.slice(0, range[1]) + "\n\n" + result.text + next.slice(range[1]);
     else next = next.replace(/\s*$/, "") + (next.trim() ? "\n\n" : "") + result.text;
     set("content", next);
     setResult(null);
@@ -906,6 +945,10 @@ function ChapterEditor({
                   {busy === "rewrite" ? <Loader2 size={15} className="animate-spin" /> : <Wand2 size={15} />}
                   Rewrite selection
                 </button>
+                <button onClick={doRewriteChapter} disabled={!!busy} className="btn-ghost w-full">
+                  <Sparkles size={15} /> Improve the whole chapter
+                </button>
+                <p className="text-[11px] text-muted">You&apos;ll see every change before anything is replaced, and History keeps the original.</p>
               </>
             )}
 
@@ -1080,7 +1123,7 @@ function ChapterEditor({
             <div className="flex items-center justify-between border-b border-line px-3 py-2">
               <p className="flex items-center gap-1.5 text-xs font-semibold text-accent">
                 {result.kind === "check" ? <ShieldCheck size={13} /> : <Sparkles size={13} />}
-                {result.kind === "check" ? "Continuity report" : result.kind === "brainstorm" ? "Ideas" : "Suggestion"}
+                {result.kind === "check" ? "Continuity report" : result.kind === "brainstorm" ? "Ideas" : result.whole ? "Improved chapter" : "Suggestion"}
               </p>
               <button onClick={() => setResult(null)} className="btn-quiet h-6 w-6 p-0" aria-label="Discard suggestion">
                 <X size={13} />
@@ -1090,11 +1133,18 @@ function ChapterEditor({
               {result.kind === "rewrite" && (
                 <>
                   <button onClick={() => applyResult("replace")} disabled={!!busy} className="btn-primary flex-1 py-1.5">
-                    Replace
+                    {result.whole ? "Replace chapter" : "Replace"}
                   </button>
-                  <button onClick={() => applyResult("insert")} disabled={!!busy} className="btn-ghost py-1.5">
-                    Insert after
-                  </button>
+                  {!result.whole && (
+                    <button onClick={() => applyResult("insert")} disabled={!!busy} className="btn-ghost py-1.5">
+                      Insert after
+                    </button>
+                  )}
+                  {result.original !== undefined && (
+                    <button onClick={() => setShowChanges((v) => !v)} className="btn-ghost py-1.5" aria-pressed={showChanges}>
+                      {showChanges ? "Show text" : "Show changes"}
+                    </button>
+                  )}
                 </>
               )}
               {(result.kind === "continue" || result.kind === "draft") && (
@@ -1106,7 +1156,11 @@ function ChapterEditor({
                 <Copy size={14} />
               </button>
             </div>
-            <div className="max-h-[45vh] overflow-y-auto px-3 py-3 font-serif text-[14px] leading-relaxed whitespace-pre-wrap">{result.text}</div>
+            {result.kind === "rewrite" && showChanges && result.original !== undefined ? (
+              <ChangesView before={result.original} after={result.text} className="max-h-[45vh] overflow-y-auto px-3 py-3" />
+            ) : (
+              <div className="max-h-[45vh] overflow-y-auto px-3 py-3 font-serif text-[14px] leading-relaxed whitespace-pre-wrap">{result.text}</div>
+            )}
           </div>
         )}
       </aside>

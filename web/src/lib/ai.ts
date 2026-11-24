@@ -94,7 +94,7 @@ export function buildMessages(
       break;
     case "rewrite": {
       const instr = opts.preset && REWRITE_PRESETS[opts.preset] ? REWRITE_PRESETS[opts.preset] : clip(opts.instruction, 1000);
-      user = `${context ? context + "\n\n" : ""}Rewrite the passage below.\nINSTRUCTION: ${instr || "Improve it."}\n\nPASSAGE:\n${t}`;
+      user = `${context ? context + "\n\n" : ""}Rewrite the passage below.\nINSTRUCTION: ${instr || "Improve it."}\nKeep the same paragraph breaks and the same events, names and facts unless the instruction says otherwise. Return the complete rewritten passage and nothing else.\n\nPASSAGE:\n${t}`;
       break;
     }
     case "summarize":
