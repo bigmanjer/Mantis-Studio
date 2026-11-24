@@ -6,7 +6,8 @@ const ROWS: [string, boolean | string, boolean | string, boolean | string][] = [
   ["Use your own AI key", true, true, false],
   ["AI included in the plan", "1M tokens / $19", false, true],
   ["Story bible the AI reads from", true, true, true],
-  ["Word manuscript export", true, true, true],
+  ["Builds your outline and story bible from an imported draft", true, false, "Some"],
+  ["Word and ebook (EPUB) export", "Pro", true, "Some"],
   ["One subscription covers app + AI", "Studio", false, true],
 ];
 

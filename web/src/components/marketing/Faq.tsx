@@ -22,7 +22,7 @@ export const FAQ: [string, string][] = [
     "What happens to my projects if I downgrade?",
     "Nothing is deleted. On Free you can still open, edit and export everything; you just can't create new projects beyond the limit.",
   ],
-  ["Can I take my book elsewhere?", "Any time, on any plan. Download plain text or Markdown, or a formatted Word manuscript on Pro and Studio. It’s your book."],
+  ["Can I take my book elsewhere?", "Any time, on any plan. Download plain text, Markdown or a full backup on any plan, or a formatted Word manuscript and an EPUB ebook on Pro and Studio. It’s your book."],
 ];
 
 export default function Faq({ items = FAQ }: { items?: [string, string][] }) {

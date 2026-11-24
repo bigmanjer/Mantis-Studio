@@ -2,7 +2,7 @@
 import { Replace, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { countWords, type Chapter } from "@/lib/types";
+import { countWords, type Chapter, type Entity } from "@/lib/types";
 
 const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
@@ -15,12 +15,16 @@ export default function FindReplace({
   activeId,
   userId,
   setChapters,
+  entities,
+  setEntities,
   onClose,
 }: {
   chapters: Chapter[];
   activeId: string | null;
   userId: string;
   setChapters: React.Dispatch<React.SetStateAction<Chapter[]>>;
+  entities: Entity[];
+  setEntities: React.Dispatch<React.SetStateAction<Entity[]>>;
   onClose: () => void;
 }) {
   const supabase = createClient();
@@ -31,6 +35,7 @@ export default function FindReplace({
   const [scope, setScope] = useState<"chapter" | "book">("book");
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState("");
+  const [inWorld, setInWorld] = useState(true);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -50,9 +55,12 @@ export default function FindReplace({
     ? inScope.map((c) => ({ c, count: (c.content.match(pattern) ?? []).length + (c.title.match(pattern) ?? []).length })).filter((h) => h.count > 0)
     : [];
   const total = hits.reduce((a, h) => a + h.count, 0);
+  // World Bible entries that mention the term too (renaming a character should rename their entry).
+  const test = (s: string) => !!pattern && new RegExp(pattern.source, pattern.flags.replace("g", "")).test(s);
+  const worldHits = pattern ? entities.filter((e) => test(e.name) || e.aliases.some(test) || test(e.description)) : [];
 
   async function apply() {
-    if (!pattern || !hits.length) return;
+    if (!pattern || (!hits.length && !(inWorld && worldHits.length))) return;
     setBusy(true);
     const updated: Chapter[] = [];
     for (const { c } of hits) {
@@ -74,8 +82,23 @@ export default function FindReplace({
       if (!error) updated.push({ ...c, content, title, word_count });
     }
     setChapters((prev) => prev.map((c) => updated.find((u) => u.id === c.id) ?? c));
+    const renamed: Entity[] = [];
+    if (inWorld) {
+      for (const e of worldHits) {
+        const next = {
+          name: e.name.replace(pattern, () => replace).trim() || e.name,
+          aliases: e.aliases.map((a) => a.replace(pattern, () => replace).trim()).filter(Boolean),
+          description: e.description.replace(pattern, () => replace),
+        };
+        const { error } = await supabase.from("entities").update(next).eq("id", e.id);
+        if (!error) renamed.push({ ...e, ...next });
+      }
+      setEntities((prev) => prev.map((e) => renamed.find((r) => r.id === e.id) ?? e));
+    }
     setBusy(false);
-    setDone(`Replaced ${total} ${total === 1 ? "match" : "matches"} in ${updated.length} ${updated.length === 1 ? "chapter" : "chapters"}. Each one has a copy in History.`);
+    setDone(
+      `Replaced ${total} ${total === 1 ? "match" : "matches"} in ${updated.length} ${updated.length === 1 ? "chapter" : "chapters"}${renamed.length ? ` and updated ${renamed.length} World Bible ${renamed.length === 1 ? "entry" : "entries"}` : ""}. Changed chapters have a copy in History.`,
+    );
   }
 
   return (
@@ -116,6 +139,15 @@ export default function FindReplace({
               <input type="radio" name="fr-scope" checked={scope === "chapter"} onChange={() => setScope("chapter")} /> This chapter
             </label>
           </div>
+          {worldHits.length > 0 && !done && (
+            <label className="flex cursor-pointer items-start gap-1.5 text-sm text-muted">
+              <input type="checkbox" className="mt-1" checked={inWorld} onChange={(e) => setInWorld(e.target.checked)} />
+              <span>
+                Also update {worldHits.length === 1 ? "the World Bible entry" : `${worldHits.length} World Bible entries`}: {worldHits.slice(0, 3).map((e) => e.name).join(", ")}
+                {worldHits.length > 3 ? "…" : ""}
+              </span>
+            </label>
+          )}
           {find && !done && (
             <p className="text-sm text-muted" aria-live="polite">
               {total ? `${total} ${total === 1 ? "match" : "matches"} in ${hits.map((h) => h.c.title || "Untitled").slice(0, 5).join(", ")}${hits.length > 5 ? ` and ${hits.length - 5} more` : ""}.` : "No matches."}
@@ -126,7 +158,7 @@ export default function FindReplace({
             <button onClick={onClose} className="btn-ghost">
               {done ? "Close" : "Cancel"}
             </button>
-            <button onClick={apply} disabled={!total || busy} className="btn-primary">
+            <button onClick={apply} disabled={(!total && !(inWorld && worldHits.length)) || busy} className="btn-primary">
               {busy ? "Replacing…" : `Replace ${total || ""}`.trim()}
             </button>
           </div>

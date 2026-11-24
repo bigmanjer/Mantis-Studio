@@ -47,7 +47,7 @@ const FEATURES = [
     body: "Most AI tools forget your story the moment you close the tab. MANTIS sends your outline, rules and characters with every request, so it won’t invent a sister you never wrote.",
     wide: true,
   },
-  { icon: Users, title: "World Bible", body: "Characters, places, objects, factions and lore. One searchable list instead of fifteen sticky notes." },
+  { icon: Users, title: "A World Bible that keeps itself", body: "As you write, MANTIS notes new characters, places and facts on its own. You can edit anything, or undo it with one click." },
   { icon: Sparkles, title: "Rewrite a passage", body: "Highlight a paragraph and ask for it tighter, darker, funnier or more vivid. Keep it or don’t." },
   {
     icon: ShieldCheck,
@@ -56,9 +56,9 @@ const FEATURES = [
   },
   { icon: FilePen, title: "Draft from your outline", body: "Turn “Chapter 7: they get caught” into a rough first draft to push against. A starting point, not a finished page." },
   { icon: MessageCircleQuestion, title: "Ask your book", body: "“What did I call the inn in chapter two?” Ask in plain English and get the answer from your own notes." },
-  { icon: Upload, title: "Bring your draft", body: "Already 40,000 words in? Upload the Word file and it’s split into chapters for you." },
+  { icon: Upload, title: "Bring your draft", body: "Already 40,000 words in? Upload Word, PDF, RTF, EPUB or plain text. MANTIS splits it into chapters, then builds the outline and World Bible from it." },
   { icon: FileText, title: "Focus mode", body: "Hide everything but the page. Press Esc when you want your tools back." },
-  { icon: Download, title: "Take it with you", body: "Export plain text or Markdown any time, or a properly formatted Word manuscript on paid plans." },
+  { icon: Download, title: "Take it with you", body: "Export plain text or Markdown any time. On paid plans, a formatted Word manuscript or an ebook ready for Kindle, Apple Books and Kobo." },
   {
     icon: Lock,
     title: "Your words stay yours",

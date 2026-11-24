@@ -170,7 +170,7 @@ export default function EditorTab({ project, chapters, setChapters, entities, se
         </ol>
       </aside>
 
-      {findOpen && <FindReplace chapters={chapters} activeId={activeId} userId={project.user_id} setChapters={setChapters} onClose={() => setFindOpen(false)} />}
+      {findOpen && <FindReplace chapters={chapters} activeId={activeId} userId={project.user_id} setChapters={setChapters} entities={entities} setEntities={setEntities} onClose={() => setFindOpen(false)} />}
 
       {active ? (
         <ChapterEditor
