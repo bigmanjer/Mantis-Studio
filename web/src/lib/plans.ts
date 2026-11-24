@@ -11,6 +11,7 @@ export interface Plan {
   byokAi: boolean; // may use their own Groq/OpenAI key
   includedAiTokens: number; // monthly tokens paid for by MANTIS (0 = none)
   docxExport: boolean;
+  maxKnowledgeDocs: number; // own reference documents in the Knowledge Base
   features: string[];
 }
 
@@ -28,11 +29,13 @@ export const PLANS: Record<PlanId, Plan> = {
     byokAi: true,
     includedAiTokens: 25_000,
     docxExport: false,
+    maxKnowledgeDocs: 3,
     features: [
       "2 projects",
       "Outline, chapter editor & World Bible",
       "Free AI to try (25k tokens a month)",
       "Unlimited AI with your own Groq or OpenAI key",
+      "Knowledge Base: built-in craft library, 250 author style lenses, 3 of your own documents",
       "Markdown & text export",
     ],
   },
@@ -46,10 +49,12 @@ export const PLANS: Record<PlanId, Plan> = {
     byokAi: true,
     includedAiTokens: 25_000,
     docxExport: true,
+    maxKnowledgeDocs: 100,
     features: [
       "Unlimited projects",
       "Everything in Free",
       "Unlimited AI with your own key",
+      "Knowledge Base with 100 of your own documents",
       "Word (.docx) and ebook (.epub) export",
     ],
   },
@@ -63,6 +68,7 @@ export const PLANS: Record<PlanId, Plan> = {
     byokAi: true,
     includedAiTokens: 1_000_000,
     docxExport: true,
+    maxKnowledgeDocs: 500,
     features: [
       "Everything in Pro",
       "1M AI tokens a month (roughly 150 chapter drafts)",

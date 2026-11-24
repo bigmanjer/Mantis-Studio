@@ -6,12 +6,13 @@ import { createAdminClient, getProfile, requireUser } from "@/lib/supabase/serve
 import { includedAiCredentials } from "@/lib/env";
 
 const ACTIONS: AiAction[] = ["continue", "rewrite", "summarize", "brainstorm", "outline", "extract", "draft", "check", "ask", "autofill", "reverse_outline", "enrich", "custom"];
+const KNOWLEDGE_ACTIONS: AiAction[] = ["continue", "rewrite", "brainstorm", "draft", "ask", "custom", "enrich", "outline"];
 const STREAMABLE: AiAction[] = ["continue", "rewrite", "brainstorm", "draft", "ask", "custom", "enrich", "summarize"];
 // Streaming answers can run longer than the default function limit on slow models.
 export const maxDuration = 60;
 
 export async function POST(req: Request) {
-  const { user } = await requireUser();
+  const { supabase, user } = await requireUser();
   if (!user) return NextResponse.json({ error: "Please log in." }, { status: 401 });
 
   const body = await req.json().catch(() => null);
@@ -70,7 +71,20 @@ export async function POST(req: Request) {
   }
 
   try {
-    const messages = buildMessages(action, String(body.text ?? ""), (body.context ?? {}) as AiContext, {
+    const ctx = (body.context ?? {}) as AiContext;
+    delete ctx.knowledge; // only ever set here on the server
+    // Knowledge Base: the few reference passages and style lenses that matter for this request.
+    if (KNOWLEDGE_ACTIONS.includes(action) && ctx.project) {
+      const { knowledgeBlock } = await import("@/lib/knowledge");
+      const text = String(body.text ?? "");
+      ctx.knowledge = await knowledgeBlock(supabase, {
+        projectId: typeof ctx.project.id === "string" ? ctx.project.id : null,
+        query: [body.instruction, ctx.chapterTitle, ctx.project.genre, text.slice(-1200)].filter(Boolean).join("\n"),
+        lenses: Array.isArray(ctx.project.style_lenses) ? ctx.project.style_lenses.slice(0, 3).map(String) : [],
+        useLibrary: ctx.project.use_knowledge !== false,
+      }).catch(() => "");
+    }
+    const messages = buildMessages(action, String(body.text ?? ""), ctx, {
       preset: body.preset,
       instruction: body.instruction,
       // For outlines "words" is the chapter count, so it must not be clamped like a word count.

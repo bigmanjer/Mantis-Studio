@@ -24,8 +24,13 @@ export interface AiContext {
     canon_rules?: string;
     style_guide?: string;
     style_dials?: Record<string, number> | null;
+    id?: string;
+    use_knowledge?: boolean;
+    style_lenses?: string[];
   };
   chapterTitle?: string;
+  /** Filled in on the server from the Knowledge Base; never trusted from the client. */
+  knowledge?: string;
   previousSummaries?: string[];
   entities?: WorldEntry[];
 }
@@ -66,6 +71,7 @@ function projectBlock(ctx: AiContext, text = ""): string {
   if (ctx.previousSummaries?.length)
     parts.push(`STORY SO FAR:\n${ctx.previousSummaries.slice(-5).map((s) => `- ${clip(s, 400)}`).join("\n")}`);
   if (ctx.entities?.length) parts.push(worldBlock(ctx.entities, text));
+  if (ctx.knowledge) parts.push(ctx.knowledge);
   return parts.join("\n\n");
 }
 
