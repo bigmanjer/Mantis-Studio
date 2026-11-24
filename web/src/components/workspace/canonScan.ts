@@ -1,6 +1,7 @@
 "use client";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { ENTITY_CATEGORIES, type Entity, type EntityCategory } from "@/lib/types";
+import { nameForms, overlap } from "@/lib/world-context";
 
 export interface ScannedEntity {
   name: string;
@@ -55,43 +56,59 @@ export function parseScan(raw: string): { summary: string; entities: ScannedEnti
 
 /** Work out what the scan adds, merging into existing entries instead of creating duplicates. */
 export function planScan(scan: ReturnType<typeof parseScan>, entities: Entity[], canonRules: string): ScanPlan {
+  // Look entries up by every form of their name ("the brass key" is also "brass key"; "Ivy Marsh" is also "Ivy").
   const byName = new Map<string, Entity>();
-  for (const e of entities) {
-    byName.set(norm(e.name), e);
-    for (const a of e.aliases) byName.set(norm(a), e);
-  }
+  const add = (form: string, e: Entity) => {
+    const k = norm(form);
+    if (k && !byName.has(k)) byName.set(k, e);
+  };
+  for (const e of entities) for (const f of nameForms(e)) add(f, e);
+
   const creates: ScannedEntity[] = [];
   const merges = new Map<string, { entity: Entity; newFacts: string[]; newAliases: string[] }>();
-  const seenNew = new Set<string>();
+  const pending = new Map<string, ScannedEntity>();
 
   for (const item of scan.entities) {
-    const existing = byName.get(norm(item.name)) ?? item.aliases.map((a) => byName.get(norm(a))).find(Boolean);
+    const forms = nameForms(item);
+    const existing = forms.map((f) => byName.get(norm(f))).find(Boolean);
     if (!existing) {
-      if (seenNew.has(norm(item.name))) continue;
-      seenNew.add(norm(item.name));
+      // Same new thing listed twice in one scan: fold it into the first.
+      const twin = forms.map((f) => pending.get(norm(f))).find(Boolean);
+      if (twin) {
+        twin.aliases = [...new Set([...twin.aliases, item.name, ...item.aliases].filter((a) => norm(a) !== norm(twin.name)))];
+        continue;
+      }
       creates.push(item);
+      for (const f of forms) if (!pending.has(norm(f))) pending.set(norm(f), item);
       continue;
     }
     // Keep only sentences that say something new, like the original MANTIS merge.
-    const have = norm(existing.description);
+    const have = existing.description.split(/\n|(?<=[.!?])\s+/).map((s) => s.replace(/^[-•*]\s*/, "").trim()).filter(Boolean);
+    const prev = merges.get(existing.id);
+    const already = [...have, ...(prev?.newFacts ?? [])];
     const newFacts = item.description
       .split(/(?<=[.!?])\s+/)
       .map((f) => f.trim())
-      .filter((f) => f.length > 3 && !have.includes(norm(f)));
-    const known = new Set([norm(existing.name), ...existing.aliases.map(norm)]);
-    const newAliases = [item.name, ...item.aliases].filter((a) => !known.has(norm(a)));
+      .filter((f) => f.length > 3 && !already.some((h) => overlap(f, h) >= 0.6));
+    const known = new Set(nameForms(existing).map(norm));
+    const newAliases = [item.name, ...item.aliases].filter((a) => !known.has(norm(a)) && !known.has(norm(a.replace(/^(the|a|an)\s+/i, ""))));
     if (!newFacts.length && !newAliases.length) continue;
-    const prev = merges.get(existing.id);
     if (prev) {
-      prev.newFacts.push(...newFacts.filter((f) => !prev.newFacts.includes(f)));
+      prev.newFacts.push(...newFacts);
       prev.newAliases.push(...newAliases.filter((a) => !prev.newAliases.some((x) => norm(x) === norm(a))));
     } else {
       merges.set(existing.id, { entity: existing, newFacts, newAliases: [...new Map(newAliases.map((a) => [norm(a), a])).values()] });
     }
   }
 
-  const rulesNorm = norm(canonRules);
-  const facts = scan.facts.filter((f) => !rulesNorm.includes(norm(f))).slice(0, 5);
+  // Canon rules: skip anything the rules already say, even in other words. At most 3 per scan.
+  const ruleLines = canonRules.split("\n").map((l) => l.trim()).filter(Boolean);
+  const facts: string[] = [];
+  for (const f of scan.facts) {
+    if (facts.length >= 3) break;
+    if ([...ruleLines, ...facts].some((r) => overlap(f, r) >= 0.6)) continue;
+    facts.push(f);
+  }
   return { summary: scan.summary, creates, merges: [...merges.values()], facts };
 }
 
