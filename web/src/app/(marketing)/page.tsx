@@ -4,6 +4,7 @@ import {
   Download,
   FilePen,
   FileText,
+  Library,
   ListTree,
   Lock,
   MessageCircleQuestion,
@@ -57,6 +58,11 @@ const FEATURES = [
   { icon: FilePen, title: "Draft from your outline", body: "Turn “Chapter 7: they get caught” into a rough first draft to push against. A starting point, not a finished page." },
   { icon: MessageCircleQuestion, title: "Ask your book", body: "“What did I call the inn in chapter two?” Ask in plain English and get the answer from your own notes." },
   { icon: Upload, title: "Bring your draft", body: "Already 40,000 words in? Upload Word, PDF, RTF, EPUB or plain text. MANTIS splits it into chapters, then builds the outline and World Bible from it." },
+  {
+    icon: Library,
+    title: "Your research, on hand",
+    body: "Drop in research notes, a series bible or a craft book you own. The AI looks things up there before it writes, and you can borrow the craft of 250 authors from Austen to Christie, never their sentences.",
+  },
   { icon: FileText, title: "Focus mode", body: "Hide everything but the page. Press Esc when you want your tools back." },
   { icon: Download, title: "Take it with you", body: "Export plain text or Markdown any time. On paid plans, a formatted Word manuscript or an ebook ready for Kindle, Apple Books and Kobo." },
   {

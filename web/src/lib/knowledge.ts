@@ -31,7 +31,7 @@ export function queryTerms(text: string, max = 24): string[] {
 }
 
 /** Keyword search over the built-in library (same scoring idea as the original app). */
-export function searchBuiltin(query: string, limit = 6, category?: string): KnowledgeHit[] {
+export function searchBuiltin(query: string, limit = 6, category?: string, minScore = 0): KnowledgeHit[] {
   const terms = queryTerms(query);
   if (!terms.length) return [];
   const scored: KnowledgeHit[] = [];
@@ -39,12 +39,18 @@ export function searchBuiltin(query: string, limit = 6, category?: string): Know
     if (category && e.c !== category) continue;
     const hay = `${e.s} ${e.c} ${e.t}`.toLowerCase();
     let score = 0;
+    let matched = 0;
     for (const term of terms) {
       const hits = hay.split(term).length - 1;
-      if (hits) score += Math.min(4, 1 + hits * 0.35);
+      if (hits) {
+        score += Math.min(4, 1 + hits * 0.35);
+        matched++;
+      }
       if (e.c === term || e.s.toLowerCase().includes(term)) score += 1.5;
     }
-    if (score > 0) scored.push({ source: "builtin", title: e.s, category: e.c, text: e.t, score });
+    // A note that shares one stray word with a longer query isn't relevant.
+    const needed = terms.length >= 3 ? 2 : 1;
+    if (matched >= needed && score > minScore) scored.push({ source: "builtin", title: e.s, category: e.c, text: e.t, score });
   }
   return scored.sort((a, b) => b.score - a.score).slice(0, limit);
 }
@@ -168,7 +174,7 @@ export async function knowledgeBlock(
 ): Promise<string> {
   const parts: string[] = [];
   if (opts.useLibrary && opts.query.trim()) {
-    const [mine, builtin] = await Promise.all([searchMine(supabase, opts.projectId, opts.query, 3), Promise.resolve(searchBuiltin(opts.query, 2))]);
+    const [mine, builtin] = await Promise.all([searchMine(supabase, opts.projectId, opts.query, 3), Promise.resolve(searchBuiltin(opts.query, 2, undefined, 6))]);
     const hits = [...mine, ...builtin].slice(0, 4);
     if (hits.length) {
       parts.push(
