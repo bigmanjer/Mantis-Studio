@@ -11,7 +11,18 @@ export function stripMarkdown(text: string): string {
 
 /** Some reasoning models wrap their thinking in <think> tags; writers only want the answer. */
 export function stripThinking(text: string): string {
-  return text.replace(/<think>[\s\S]*?(<\/think>|$)/g, "");
+  return normalizeChars(text.replace(/<think>[\s\S]*?(<\/think>|$)/g, ""));
+}
+
+/**
+ * Some models write look-alike characters (non-breaking hyphens, narrow spaces, zero-width
+ * marks). They look normal but break search, find-and-replace and word counts in a manuscript.
+ */
+export function normalizeChars(text: string): string {
+  return text
+    .replace(/[‐‑]/g, "-")
+    .replace(/[   ]/g, " ")
+    .replace(/[​‌‍⁠﻿]/g, "");
 }
 
 /** Light clean-up for text that is still arriving: hide bold markers and unfinished thinking. */
