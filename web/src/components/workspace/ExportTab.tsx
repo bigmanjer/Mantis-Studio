@@ -1,5 +1,5 @@
 "use client";
-import { DatabaseBackup, FileDown, FileText, FileType2, Lock } from "lucide-react";
+import { BookOpen, DatabaseBackup, FileDown, FileText, FileType2, Lock } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import type { Chapter, Project } from "@/lib/types";
@@ -11,6 +11,14 @@ export default function ExportTab({ project, chapters, docxExport }: { project: 
 
   const FORMATS = [
     { id: "docx", icon: FileType2, title: "Word manuscript", ext: ".docx", body: "Standard manuscript format: Times New Roman, double-spaced, each chapter on a new page.", locked: !docxExport },
+    {
+      id: "epub",
+      icon: BookOpen,
+      title: "Ebook",
+      ext: ".epub",
+      body: "Ready for Kindle (KDP), Apple Books, Kobo and Google Play, with a title page and table of contents.",
+      locked: !docxExport,
+    },
     { id: "md", icon: FileText, title: "Markdown", ext: ".md", body: "Clean text with headings. Great for Scrivener, Obsidian, Vellum or GitHub." },
     { id: "txt", icon: FileDown, title: "Plain text", ext: ".txt", body: "Just the words. Opens anywhere." },
     {

@@ -50,7 +50,7 @@ export const PLANS: Record<PlanId, Plan> = {
       "Unlimited projects",
       "Everything in Free",
       "Unlimited AI with your own key",
-      "Word (.docx) manuscript export",
+      "Word (.docx) and ebook (.epub) export",
     ],
   },
   studio: {

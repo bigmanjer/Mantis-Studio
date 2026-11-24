@@ -87,6 +87,28 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     });
   }
 
+  if (format === "epub") {
+    // Ebook for Kindle (KDP accepts EPUB), Apple Books, Kobo and Google Play. Paid plans, like Word export.
+    const profile = await getProfile(user.id, user.email);
+    if (!planFor(profile).docxExport) {
+      return NextResponse.json({ error: "Ebook export is available on Pro and Studio." }, { status: 402 });
+    }
+    const { buildEpub } = await import("@/lib/epub");
+    const bytes = await buildEpub({
+      id: p.id,
+      title: p.title || "Untitled",
+      author: p.author,
+      description: p.premise,
+      chapters: chs.map((c) => ({ title: c.title, content: c.content })),
+    });
+    return new NextResponse(bytes as BodyInit, {
+      headers: {
+        "Content-Type": "application/epub+zip",
+        "Content-Disposition": `attachment; filename="${name}.epub"`,
+      },
+    });
+  }
+
   const md = format === "md";
   const parts: string[] = [md ? `# ${p.title}` : p.title.toUpperCase()];
   if (p.author) parts.push(md ? `*by ${p.author}*` : `by ${p.author}`);

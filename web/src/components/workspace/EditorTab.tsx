@@ -12,6 +12,7 @@ import {
   Minimize2,
   PenLine,
   Plus,
+  Replace,
   ScanSearch,
   Send,
   ShieldCheck,
@@ -28,6 +29,7 @@ import { createClient } from "@/lib/supabase/client";
 import { countWords, type Chapter, type Entity, type EntityCategory, type Project } from "@/lib/types";
 import { AiClientError, runAi, streamAi } from "./aiClient";
 import { SaveBadge, useAutosave } from "./autosave";
+import FindReplace from "./FindReplace";
 import VersionHistory from "./VersionHistory";
 
 const PRESETS = ["Custom", "Improve Flow", "Fix Grammar", "Tighten", "Sensory Expansion", "Deepen POV", "Make Witty", "Make Darker", "Expand"];
@@ -50,6 +52,18 @@ export default function EditorTab({ project, chapters, setChapters, entities, se
   const confirm = useConfirm();
   const [activeId, setActiveId] = useState(chapters[0]?.id ?? null);
   const active = chapters.find((c) => c.id === activeId) ?? null;
+  const [findOpen, setFindOpen] = useState(false);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === "h" || (e.shiftKey && e.key.toLowerCase() === "f"))) {
+        e.preventDefault();
+        setFindOpen(true);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   useEffect(() => {
     if (!focus) return;
@@ -116,9 +130,14 @@ export default function EditorTab({ project, chapters, setChapters, entities, se
       <aside className={`border-b border-line bg-panel/40 lg:sticky lg:top-[105px] lg:h-[calc(100vh-105px)] lg:overflow-y-auto lg:border-r lg:border-b-0 ${focus ? "hidden" : ""}`}>
         <div className="flex items-center justify-between px-4 pt-4 pb-2">
           <p className="text-[11px] font-semibold tracking-widest text-muted uppercase">Chapters · {sorted.length}</p>
-          <button onClick={addChapter} className="btn-quiet h-7 gap-1 px-2 text-xs" aria-label="Add chapter">
-            <Plus size={14} /> Add
-          </button>
+          <div className="flex gap-0.5">
+            <button onClick={() => setFindOpen(true)} className="btn-quiet h-7 w-7 p-0" aria-label="Find and replace" title="Find and replace (Ctrl+H)">
+              <Replace size={14} />
+            </button>
+            <button onClick={addChapter} className="btn-quiet h-7 gap-1 px-2 text-xs" aria-label="Add chapter">
+              <Plus size={14} /> Add
+            </button>
+          </div>
         </div>
         <ol className="flex gap-1 overflow-x-auto px-2 pb-3 lg:block lg:space-y-0.5">
           {sorted.map((c, i) => {
@@ -150,6 +169,8 @@ export default function EditorTab({ project, chapters, setChapters, entities, se
           })}
         </ol>
       </aside>
+
+      {findOpen && <FindReplace chapters={chapters} activeId={activeId} userId={project.user_id} setChapters={setChapters} onClose={() => setFindOpen(false)} />}
 
       {active ? (
         <ChapterEditor
