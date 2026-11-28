@@ -1,6 +1,6 @@
 "use client";
 import { Flame, Pencil, Target } from "lucide-react";
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { setDailyGoal } from "@/app/app/actions";
 import { ProgressRing } from "@/components/ui/Progress";
 
@@ -14,9 +14,14 @@ export default function WritingStreak({ days, goal: initialGoal }: { days: { day
   const [err, setErr] = useState("");
   const [pending, start] = useTransition();
 
+  // "Today" must be the writer's day, not the server's (UTC): only work it out in the browser.
+  // Until then it renders empty, so server and browser output match (no hydration error).
+  const [now, setNow] = useState<Date | null>(null);
+  useEffect(() => setNow(new Date()), []);
+
   const { today, streak, week } = useMemo(() => {
     const byDay = new Map(days.map((d) => [d.day, d.words]));
-    const now = new Date();
+    if (!now) return { today: 0, streak: 0, week: Array.from({ length: 7 }, (_, i) => ({ label: "", words: 0, isToday: i === 6 })) };
     const todayWords = byDay.get(dayKey(now)) ?? 0;
     // A streak counts consecutive days with any writing; today doesn't break it until it's over.
     let s = 0;
@@ -32,7 +37,7 @@ export default function WritingStreak({ days, goal: initialGoal }: { days: { day
       return { label: d.toLocaleDateString(undefined, { weekday: "narrow" }), words: byDay.get(dayKey(d)) ?? 0, isToday: i === 6 };
     });
     return { today: todayWords, streak: s, week: w };
-  }, [days]);
+  }, [days, now]);
 
   const max = Math.max(goal, ...week.map((d) => d.words), 1);
   const pct = (today / goal) * 100;
