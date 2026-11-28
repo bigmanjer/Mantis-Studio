@@ -31,9 +31,11 @@ export interface WorkspaceProps {
   initialEntities: Entity[];
   initialLinks: EntityLink[];
   docxExport: boolean;
+  /** Paid plan, admin, or own AI key: automatic World Bible and fixes may run. */
+  autoAllowed: boolean;
 }
 
-export default function Workspace({ initialProject, initialChapters, initialEntities, initialLinks, docxExport }: WorkspaceProps) {
+export default function Workspace({ initialProject, initialChapters, initialEntities, initialLinks, docxExport, autoAllowed }: WorkspaceProps) {
   const [tab, setTab] = useState<TabId>(initialChapters.some((c) => c.word_count > 0) ? "write" : "plan");
   const [project, setProject] = useState(initialProject);
   useEffect(() => {
@@ -45,13 +47,16 @@ export default function Workspace({ initialProject, initialChapters, initialEnti
   const [focus, setFocus] = useState(false);
   // Fresh import: organize the whole book automatically (World Bible, canon, summaries, plan, outline).
   const [organizing, setOrganizing] = useState(false);
+  const [organizeLimit, setOrganizeLimit] = useState(false);
   useEffect(() => {
     const url = new URL(window.location.href);
-    if (url.searchParams.get("organize") !== "1") return;
+    const organize = url.searchParams.get("organize");
+    if (organize !== "1" && organize !== "limit") return;
     url.searchParams.delete("organize");
     window.history.replaceState(null, "", url.pathname + url.search);
     markChaptersScanned(initialChapters);
-    setOrganizing(true);
+    if (organize === "limit") setOrganizeLimit(true);
+    else setOrganizing(true);
   }, [initialChapters]);
 
   const totalWords = useMemo(() => chapters.reduce((a, c) => a + (c.word_count || 0), 0), [chapters]);
@@ -127,6 +132,27 @@ export default function Workspace({ initialProject, initialChapters, initialEnti
           })}
         </nav>
       </header>
+      {organizeLimit && (
+        <div className="border-b border-line bg-panel px-4 py-3 text-sm sm:px-6" role="status">
+          <div className="mx-auto flex max-w-6xl items-start justify-between gap-3">
+            <p className="text-muted">
+              <span className="font-medium text-text">Imported and split into {chapters.length} {chapters.length === 1 ? "chapter" : "chapters"}.</span> Automatic organizing
+              (World Bible, outline, summaries) is included once on Free.{" "}
+              <a href="/app/settings#ai" className="text-accent hover:underline">
+                Add a free Groq key
+              </a>{" "}
+              or{" "}
+              <a href="/app/settings#billing" className="text-accent hover:underline">
+                upgrade
+              </a>{" "}
+              to organize every book, or use “Scan all chapters” in the World Bible.
+            </p>
+            <button onClick={() => setOrganizeLimit(false)} className="btn-quiet h-7 w-7 shrink-0 p-0" aria-label="Dismiss">
+              ×
+            </button>
+          </div>
+        </div>
+      )}
       {organizing && (
         <Organizer
           project={project}
@@ -158,6 +184,7 @@ export default function Workspace({ initialProject, initialChapters, initialEnti
             setEntities={setEntities}
             setProject={setProject}
             aiContext={aiContext}
+            autoAllowed={autoAllowed}
             focus={focus}
             setFocus={setFocus}
           />

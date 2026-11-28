@@ -44,11 +44,12 @@ interface Props {
   setEntities: React.Dispatch<React.SetStateAction<Entity[]>>;
   setProject: React.Dispatch<React.SetStateAction<Project>>;
   aiContext: { project: object; entities: object[] };
+  autoAllowed: boolean;
   focus: boolean;
   setFocus: (f: boolean) => void;
 }
 
-export default function EditorTab({ project, chapters, setChapters, entities, setEntities, setProject, aiContext, focus, setFocus }: Props) {
+export default function EditorTab({ project, chapters, setChapters, entities, setEntities, setProject, aiContext, autoAllowed, focus, setFocus }: Props) {
   const supabase = createClient();
   const confirm = useConfirm();
   const [activeId, setActiveId] = useState(chapters[0]?.id ?? null);
@@ -184,6 +185,7 @@ export default function EditorTab({ project, chapters, setChapters, entities, se
           entities={entities}
           setEntities={setEntities}
           setProject={setProject}
+          autoAllowed={autoAllowed}
           aiContext={{ ...aiContext, chapterTitle: active.title, previousSummaries }}
         />
       ) : (
@@ -221,6 +223,7 @@ function ChapterEditor({
   entities,
   setEntities,
   setProject,
+  autoAllowed,
   aiContext,
   focus,
   setFocus,
@@ -231,6 +234,7 @@ function ChapterEditor({
   entities: Entity[];
   setEntities: React.Dispatch<React.SetStateAction<Entity[]>>;
   setProject: React.Dispatch<React.SetStateAction<Project>>;
+  autoAllowed: boolean;
   aiContext: object;
   focus: boolean;
   setFocus: (f: boolean) => void;
@@ -348,7 +352,7 @@ function ChapterEditor({
   // --- Automatic World Bible (original MANTIS "scan on save") ---
   // When the writer pauses after adding ~150 words, MANTIS reads the chapter and updates the World Bible,
   // the canon rules and the chapter summary by itself. Everything stays editable and one click undoes it.
-  const autoOn = project.auto_canon !== false;
+  const autoOn = autoAllowed && project.auto_canon !== false;
   const [autoLog, setAutoLog] = useState<AppliedScan | null>(null);
   const [autoState, setAutoState] = useState<"idle" | "scanning" | "error" | "quota">("idle");
   const entitiesRef = useRef(entities);
@@ -379,7 +383,7 @@ function ChapterEditor({
     setAutoState("scanning");
     try {
       if (autoOn) {
-        const raw = await runAi({ action: "extract", text: latest.current.content, context: aiContext });
+        const raw = await runAi({ action: "extract", text: latest.current.content, context: aiContext, auto: true });
         const plan = planScan(parseScan(raw), entitiesRef.current, projectRef.current.canon_rules);
         if (plan.summary && !latest.current.summary.trim()) set("summary", plan.summary);
         if (!planIsEmpty(plan)) setAutoLog(await saveScan(plan));
@@ -399,12 +403,12 @@ function ChapterEditor({
   // --- Automatic continuity fixes ---
   // After a pause, MANTIS checks the chapter against canon and fixes clear slips (a wrong age, a
   // renamed place) in place. A History copy is saved first, every change is listed, and Undo reverts them.
-  const autoFixOn = project.auto_fix !== false;
+  const autoFixOn = autoAllowed && project.auto_fix !== false;
   const [fixLog, setFixLog] = useState<{ quote: string; fix: string; problem: string }[] | null>(null);
 
   async function autoFix() {
     const before = latest.current;
-    const raw = await runAi({ action: "check", text: before.content, context: aiContext });
+    const raw = await runAi({ action: "check", text: before.content, context: aiContext, auto: true });
     let issues: Issue[] = [];
     try {
       const parsed = JSON.parse(raw.slice(raw.indexOf("["), raw.lastIndexOf("]") + 1));
@@ -458,7 +462,7 @@ function ChapterEditor({
     if (autoFilled.has(p.id) || latest.current.word_count < 300) return;
     if (!titleBlank && !blank(p.genre) && !blank(p.premise) && !blank(p.style_guide)) return;
     autoFilled.add(p.id);
-    const raw = await runAi({ action: "autofill", text: latest.current.content.slice(0, 6000), context: aiContext });
+    const raw = await runAi({ action: "autofill", text: latest.current.content.slice(0, 6000), context: aiContext, auto: true });
     const json = JSON.parse(raw.slice(raw.indexOf("{"), raw.lastIndexOf("}") + 1)) as Record<string, unknown>;
     const str = (v: unknown) => (Array.isArray(v) ? v.join("\n") : typeof v === "string" ? v.trim() : "");
     const patch: Partial<Project> = {};
@@ -969,7 +973,7 @@ function ChapterEditor({
             {mode === "canon" && (
               <>
                 <label className="flex cursor-pointer items-start gap-2 rounded-xl border border-line bg-panel p-3 text-xs">
-                  <input type="checkbox" className="mt-0.5 accent-[var(--color-accent)]" checked={autoOn} onChange={(e) => void setAutoCanon(e.target.checked)} />
+                  <input type="checkbox" className="mt-0.5 accent-[var(--color-accent)]" checked={autoOn} disabled={!autoAllowed} onChange={(e) => void setAutoCanon(e.target.checked)} />
                   <span>
                     <span className="font-medium text-text">Keep the World Bible up to date automatically</span>
                     <span className="mt-0.5 block text-muted">
@@ -978,9 +982,22 @@ function ChapterEditor({
                   </span>
                 </label>
                 <label className="flex cursor-pointer items-start gap-2 rounded-xl border border-line bg-panel p-3 text-xs">
-                  <input type="checkbox" className="mt-0.5 accent-[var(--color-accent)]" checked={autoFixOn} onChange={(e) => void setAutoFix(e.target.checked)} />
+                  <input type="checkbox" className="mt-0.5 accent-[var(--color-accent)]" checked={autoFixOn} disabled={!autoAllowed} onChange={(e) => void setAutoFix(e.target.checked)} />
                   <span>
                     <span className="font-medium text-text">Fix continuity slips as I write</span>
+                    {!autoAllowed && (
+                      <span className="mt-1 block text-accent">
+                        These two run automatically on Pro and Studio, or on Free with your own AI key.{" "}
+                        <a href="/app/settings#ai" className="underline">
+                          Add a free Groq key
+                        </a>{" "}
+                        or{" "}
+                        <a href="/app/settings#billing" className="underline">
+                          upgrade
+                        </a>
+                        . The buttons below work on every plan.
+                      </span>
+                    )}
                     <span className="mt-0.5 block text-muted">
                       When you pause, MANTIS checks the chapter against your canon and fixes clear mistakes, like a wrong age or a misnamed place. It keeps a copy in History and shows every change with Undo.
                     </span>

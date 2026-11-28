@@ -35,6 +35,7 @@ export const PLANS: Record<PlanId, Plan> = {
       "Outline, chapter editor & World Bible",
       "Free AI to try (25k tokens a month)",
       "Unlimited AI with your own Groq or OpenAI key",
+      "Import a draft and MANTIS organizes it: chapters, World Bible, outline (first book)",
       "Knowledge Base: built-in craft library, 250 author style lenses, 3 of your own documents",
       "Markdown & text export",
     ],
@@ -54,6 +55,7 @@ export const PLANS: Record<PlanId, Plan> = {
       "Unlimited projects",
       "Everything in Free",
       "Unlimited AI with your own key",
+      "World Bible that updates itself and fixes continuity slips as you write",
       "Knowledge Base with 100 of your own documents",
       "Word (.docx) and ebook (.epub) export",
     ],
@@ -77,6 +79,11 @@ export const PLANS: Record<PlanId, Plan> = {
     ],
   },
 };
+
+/** Automatic World Bible and continuity fixes run on paid plans, or on Free with the writer's own AI key. */
+export function autoFeaturesAllowed(profile: { plan?: string | null; is_admin?: boolean | null; ai_key_encrypted?: string | null }): boolean {
+  return !!profile.is_admin || (profile.plan ?? "free") !== "free" || !!profile.ai_key_encrypted;
+}
 
 export function getPlan(id: string | null | undefined): Plan {
   return PLANS[(id as PlanId) in PLANS ? (id as PlanId) : "free"];

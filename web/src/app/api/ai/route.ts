@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { AiError, buildMessages, callModel, streamModel, stripMarkdown, type AiAction, type AiContext, type ProviderId } from "@/lib/ai";
 import { decrypt } from "@/lib/crypto";
-import { currentPeriod, planFor } from "@/lib/plans";
+import { autoFeaturesAllowed, currentPeriod, planFor } from "@/lib/plans";
 import { createAdminClient, getProfile, requireUser } from "@/lib/supabase/server";
 import { includedAiCredentials } from "@/lib/env";
 
@@ -21,6 +21,9 @@ export async function POST(req: Request) {
 
   const profile = await getProfile(user.id, user.email);
   const plan = planFor(profile);
+  if (body.auto === true && !autoFeaturesAllowed(profile)) {
+    return NextResponse.json({ error: "Automatic updates are on Pro and Studio, or on Free with your own AI key.", needsKey: true }, { status: 402 });
+  }
   const admin = createAdminClient();
   const period = currentPeriod();
 

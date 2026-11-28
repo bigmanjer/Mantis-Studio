@@ -100,7 +100,13 @@ export async function importProject(formData: FormData): Promise<{ error?: strin
       return { error: "Import failed while saving chapters. Nothing was created; please try again." };
     }
   }
-  redirect(`/app/projects/${project.id}?organize=1`);
+  const { autoFeaturesAllowed } = await import("@/lib/plans");
+  if (autoFeaturesAllowed(profile)) redirect(`/app/projects/${project.id}?organize=1`);
+  if (!(profile as { organize_used?: boolean }).organize_used) {
+    await createAdminClient().from("profiles").update({ organize_used: true }).eq("id", user.id);
+    redirect(`/app/projects/${project.id}?organize=1`);
+  }
+  redirect(`/app/projects/${project.id}?organize=limit`);
 }
 
 /** Restore a MANTIS backup (.mantis.json) or an original MANTIS Studio project file. */

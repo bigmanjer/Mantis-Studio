@@ -8,6 +8,8 @@ export interface AiRequest {
   instruction?: string;
   words?: number;
   context?: unknown;
+  /** Sent by automatic features (not a button press), so the server can apply plan rules. */
+  auto?: boolean;
 }
 
 export class AiClientError extends Error {
