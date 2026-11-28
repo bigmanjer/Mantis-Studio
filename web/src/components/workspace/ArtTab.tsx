@@ -52,6 +52,8 @@ export default function ArtTab({
   const [style, setStyle] = useState<string>(/child|kid|picture/i.test(project.genre) ? "Picture book" : "Painted");
   const [direction, setDirection] = useState("");
   const [candidates, setCandidates] = useState<{ prompt: string; seed: number }[]>([]);
+  const [painted, setPainted] = useState(0);
+  const [paintedIll, setPaintedIll] = useState(0);
   const [busy, setBusy] = useState<"" | "cover" | "scenes" | "download">("");
   const [err, setErr] = useState("");
   const saved = (project.cover_style ?? {}) as Partial<CoverStyle>;
@@ -80,6 +82,7 @@ export default function ArtTab({
       const prompt = (JSON.parse(raw.slice(raw.indexOf("{"), raw.lastIndexOf("}") + 1)) as { prompt?: string }).prompt?.trim();
       if (!prompt) throw new Error();
       const p = fullPrompt(prompt, style);
+      setPainted(0);
       setCandidates(Array.from({ length: 4 }, () => ({ prompt: p, seed: seed() })));
     } catch (e) {
       setErr(e instanceof AiClientError ? e.message : "Couldn't design a cover just now. Please try again.");
@@ -123,6 +126,8 @@ export default function ArtTab({
       canvas.width = OUT.width;
       canvas.height = OUT.height;
       const ctx = canvas.getContext("2d")!;
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
       const scale = Math.max(OUT.width / img.naturalWidth, OUT.height / img.naturalHeight);
       const w = img.naturalWidth * scale;
       const h = img.naturalHeight * scale;
@@ -305,10 +310,16 @@ export default function ArtTab({
           <p className="mt-1 text-xs text-muted">The AI reads your premise and opening, art-directs a cover for your genre, and paints four versions. Pictures take 5 to 20 seconds each.</p>
           {candidates.length > 0 && (
             <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-              {candidates.map((c) => (
+              {candidates.map((c, i) => (
                 <figure key={c.seed} className="overflow-hidden rounded-lg border border-line bg-panel-2">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={previewSrc(c.prompt, c.seed, COVER.width, COVER.height)} alt="Cover option" loading="lazy" className="aspect-[5/8] w-full object-cover" />
+                  {/* The free image service paints one picture at a time, so options load in turn. */}
+                  <QueuedImage
+                    src={previewSrc(c.prompt, c.seed, COVER.width, COVER.height)}
+                    ready={i <= painted}
+                    onDone={() => setPainted((n) => Math.max(n, i + 1))}
+                    className="aspect-[5/8] w-full object-cover"
+                    alt="Cover option"
+                  />
                   <button onClick={() => void chooseCover(c)} className="flex w-full cursor-pointer items-center justify-center gap-1 py-2 text-sm text-accent hover:bg-accent-soft">
                     <Check size={14} /> Use this
                   </button>
@@ -357,8 +368,16 @@ export default function ArtTab({
                     .filter((i) => i.chapter_id === c.id)
                     .map((img) => (
                       <figure key={img.id} className="overflow-hidden rounded-lg border border-line bg-panel">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={`/api/image?id=${img.id}&s=${img.seed}`} alt={img.caption || "Illustration"} loading="lazy" className="w-full bg-panel-2" style={{ aspectRatio: `${img.width} / ${img.height}` }} />
+                        <div style={{ aspectRatio: `${img.width} / ${img.height}` }} className="bg-panel-2">
+                          <QueuedImage
+                            key={img.seed}
+                            src={`/api/image?id=${img.id}&s=${img.seed}`}
+                            ready={illustrations.indexOf(img) <= paintedIll}
+                            onDone={() => setPaintedIll((n) => Math.max(n, illustrations.indexOf(img) + 1))}
+                            className="h-full w-full"
+                            alt={img.caption || "Illustration"}
+                          />
+                        </div>
                         <figcaption className="space-y-2 p-2">
                           <input className="input py-1 text-xs" value={img.caption} onChange={(e) => void saveCaption(img, e.target.value.slice(0, 300))} placeholder="Caption" />
                           <div className="flex gap-2">
@@ -404,4 +423,55 @@ function wrap(ctx: CanvasRenderingContext2D, text: string, family: string, weigh
 /** Letter-spacing for canvas text (not supported everywhere natively). */
 function spaced(text: string, em: number) {
   return em > 0.05 ? text.split("").join(" ") : text;
+}
+
+/** An image that waits its turn, shows progress while painting, and offers a retry if it fails. */
+function QueuedImage({ src, ready, onDone, className, alt }: { src: string; ready: boolean; onDone: () => void; className: string; alt: string }) {
+  const [state, setState] = useState<"waiting" | "loading" | "done" | "failed">("waiting");
+  const [attempt, setAttempt] = useState(0);
+  const status = ready && state === "waiting" ? "loading" : state;
+  return (
+    <div className={`relative ${className}`}>
+      {status !== "waiting" && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          key={attempt}
+          src={attempt ? `${src}&r=${attempt}` : src}
+          alt={alt}
+          className={`h-full w-full object-cover ${status === "done" ? "" : "opacity-0"}`}
+          onLoad={() => {
+            setState("done");
+            onDone();
+          }}
+          onError={() => {
+            setState("failed");
+            onDone();
+          }}
+        />
+      )}
+      {status !== "done" && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 p-3 text-center text-xs text-muted">
+          {status === "failed" ? (
+            <>
+              <span>The painter was busy.</span>
+              <button
+                onClick={() => {
+                  setAttempt((a) => a + 1);
+                  setState("loading");
+                }}
+                className="btn-ghost py-1 text-xs"
+              >
+                <RefreshCw size={12} /> Try again
+              </button>
+            </>
+          ) : (
+            <>
+              <Loader2 size={16} className={status === "loading" ? "animate-spin" : ""} />
+              {status === "loading" ? "Painting…" : "Waiting its turn…"}
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
