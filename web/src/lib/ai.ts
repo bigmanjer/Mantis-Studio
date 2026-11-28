@@ -13,7 +13,7 @@ export const REWRITE_PRESETS: Record<string, string> = {
   Expand: "Add more detail and texture; roughly double the length.",
 };
 
-export type AiAction = "continue" | "rewrite" | "summarize" | "brainstorm" | "outline" | "extract" | "draft" | "check" | "ask" | "autofill" | "reverse_outline" | "enrich" | "review" | "custom";
+export type AiAction = "continue" | "rewrite" | "summarize" | "brainstorm" | "outline" | "extract" | "draft" | "check" | "ask" | "autofill" | "reverse_outline" | "enrich" | "review" | "cover_prompt" | "scene_prompts" | "custom";
 
 export interface AiContext {
   project?: {
@@ -131,6 +131,16 @@ ${t.slice(-16000)}`;
     case "check":
       // Continuity check: compare the chapter against canon rules, the World Bible and earlier summaries.
       user = `${context}\n\nYou are a meticulous continuity editor. Compare the CHAPTER below against the hard canon rules, the World Bible and the story so far. Find contradictions or likely continuity errors (names, ages, timeline, places, who-knows-what, physical details, magic/tech rules). Do not comment on style.\nReturn ONLY a JSON array, no other text. Each item: {"problem": short explanation, "quote": the exact sentence or phrase from the chapter, copied character-for-character, "canon": what canon says, "fix": replacement text for the quote that resolves the problem}. Return [] if there are no issues. Maximum 10 items.\n\nCHAPTER:\n${t}`;
+      break;
+    case "cover_prompt":
+      // Art direction for a professional cover. Typography is added by MANTIS, never painted.
+      user = `${context}\n\n${t ? `OPENING OF THE BOOK:\n${t.slice(0, 3000)}\n\n` : ""}You are an award-winning book cover art director. Design the cover ARTWORK (no lettering) for this book, the way a top publisher in this genre would: one strong focal image, clear silhouette, mood that signals the genre at thumbnail size, and calm space at the top and bottom where the title and author name will be set.${opts.instruction ? `\nAuthor's direction: ${clip(opts.instruction, 400)}` : ""}
+Return ONLY a JSON object: {"prompt": one detailed image-generation prompt (60-110 words) describing subject, composition, setting, lighting and palette. Describe any people by appearance only, never by name. Do not mention text, titles or lettering.}`;
+      break;
+    case "scene_prompts":
+      // Picture-book / illustrated-edition scenes from a chapter, with consistent characters.
+      user = `${context}\n\nCHAPTER:\n${t.slice(0, 9000)}\n\nPick the ${opts.words ?? 3} most visual, story-important moments in this chapter for illustrations. For each, write an image-generation prompt that describes every character who appears by fixed physical appearance taken from the World Bible (age, hair, clothing, build), so they look the same in every picture. Describe people by appearance, never by name.${opts.instruction ? `\nAuthor's direction: ${clip(opts.instruction, 400)}` : ""}
+Return ONLY a JSON array: [{"caption": one short sentence for under the picture, "prompt": 50-90 word image prompt covering subject, action, setting, composition and lighting}]. No text or lettering in the images.`;
       break;
     case "review":
       // Whole-book developmental read from chapter summaries (Insights tab).

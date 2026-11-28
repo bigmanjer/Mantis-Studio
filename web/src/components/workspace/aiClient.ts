@@ -2,7 +2,7 @@
 import { cleanPartial, stripMarkdown } from "@/lib/text-clean";
 
 export interface AiRequest {
-  action: "continue" | "rewrite" | "summarize" | "brainstorm" | "outline" | "extract" | "draft" | "check" | "ask" | "autofill" | "reverse_outline" | "enrich" | "review" | "custom";
+  action: "continue" | "rewrite" | "summarize" | "brainstorm" | "outline" | "extract" | "draft" | "check" | "ask" | "autofill" | "reverse_outline" | "enrich" | "review" | "cover_prompt" | "scene_prompts" | "custom";
   text?: string;
   preset?: string;
   instruction?: string;

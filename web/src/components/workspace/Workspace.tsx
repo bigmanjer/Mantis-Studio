@@ -1,5 +1,5 @@
 "use client";
-import { ArrowLeft, BookMarked, Download, Gauge, Library, ListTree, PenLine } from "lucide-react";
+import { ArrowLeft, BookMarked, Download, Gauge, Image as ImageIcon, Library, ListTree, PenLine } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import Logo from "@/components/ui/Logo";
@@ -9,6 +9,7 @@ import { compact } from "@/lib/format";
 import type { Chapter, Entity, EntityLink, Project } from "@/lib/types";
 import EditorTab, { markChaptersScanned } from "./EditorTab";
 import Organizer from "./Organizer";
+import ArtTab from "./ArtTab";
 import ExportTab from "./ExportTab";
 import InsightsTab from "./InsightsTab";
 import KnowledgeTab from "./KnowledgeTab";
@@ -21,6 +22,7 @@ const TABS = [
   { id: "world", label: "World Bible", icon: BookMarked },
   { id: "insights", label: "Insights", icon: Gauge },
   { id: "library", label: "Library", icon: Library },
+  { id: "art", label: "Art", icon: ImageIcon },
   { id: "export", label: "Export", icon: Download },
 ] as const;
 type TabId = (typeof TABS)[number]["id"];
@@ -191,6 +193,7 @@ export default function Workspace({ initialProject, initialChapters, initialEnti
         )}
         {tab === "world" && <WorldBibleTab project={project} setProject={setProject} chapters={chapters} setChapters={setChapters} entities={entities} setEntities={setEntities} links={links} setLinks={setLinks} />}
         {tab === "insights" && <InsightsTab project={project} chapters={chapters} entities={entities} aiContext={aiContext} goTo={(t) => setTab(t)} />}
+        {tab === "art" && <ArtTab project={project} setProject={setProject} chapters={chapters} aiContext={aiContext} />}
         {tab === "library" && <KnowledgeTab project={project} setProject={setProject} />}
         {tab === "export" && <ExportTab project={project} chapters={chapters} docxExport={docxExport} />}
       </div>

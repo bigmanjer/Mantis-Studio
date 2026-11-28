@@ -1,13 +1,23 @@
 import "server-only";
 import JSZip from "jszip";
 
+export interface EpubImage {
+  bytes: ArrayBuffer;
+  type: string;
+  caption?: string;
+}
+
+const ext = (type: string) => (type.includes("png") ? "png" : type.includes("webp") ? "webp" : "jpg");
+
 export interface EpubBook {
   id: string;
   title: string;
   author: string;
   language?: string;
   description?: string;
-  chapters: { title: string; content: string }[];
+  chapters: { title: string; content: string; images?: EpubImage[] }[];
+  /** Cover artwork (shown as the book's cover in readers). */
+  cover?: EpubImage;
 }
 
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -39,7 +49,12 @@ h1 + p, p.break + p { text-indent: 0; }
 p.break { text-align: center; text-indent: 0; margin: 1em 0; }
 .title-page { text-align: center; margin-top: 30%; }
 .title-page h1 { page-break-before: avoid; font-size: 2em; margin: 0 0 0.5em; }
-.title-page p { text-indent: 0; text-align: center; font-style: italic; }`;
+.title-page p { text-indent: 0; text-align: center; font-style: italic; }
+figure.illus { margin: 1.5em 0; text-align: center; page-break-inside: avoid; }
+figure.illus img { max-width: 100%; height: auto; }
+figcaption { font-size: 0.85em; font-style: italic; margin-top: 0.4em; }
+.cover { margin: 0; padding: 0; text-align: center; }
+.cover img { max-width: 100%; max-height: 100%; }`;
 
 /** Build a valid EPUB 3 (with an EPUB 2 table of contents for older readers). */
 export async function buildEpub(book: EpubBook): Promise<Uint8Array> {
@@ -57,6 +72,7 @@ export async function buildEpub(book: EpubBook): Promise<Uint8Array> {
   const lang = book.language || "en";
   const uid = `urn:uuid:${book.id}`;
   const modified = new Date().toISOString().replace(/\.\d+Z$/, "Z");
+  const art: { id: string; href: string; type: string }[] = [];
   const chapters = book.chapters.filter((c) => c.content.trim() || c.title.trim());
 
   zip.file("OEBPS/style.css", CSS);
@@ -65,7 +81,13 @@ export async function buildEpub(book: EpubBook): Promise<Uint8Array> {
     page(book.title, `<section class="title-page" epub:type="titlepage"><h1>${esc(book.title)}</h1>${book.author ? `<p>${esc(book.author)}</p>` : ""}</section>`),
   );
   chapters.forEach((c, i) => {
-    zip.file(`OEBPS/ch${i + 1}.xhtml`, page(c.title || `Chapter ${i + 1}`, `<section epub:type="chapter"><h1>${esc(c.title || `Chapter ${i + 1}`)}</h1>\n${toParagraphs(c.content)}</section>`));
+    const pics = (c.images ?? []).map((img, j) => {
+      const name = `img/ch${i + 1}-${j + 1}.${ext(img.type)}`;
+      zip.file(`OEBPS/${name}`, img.bytes);
+      art.push({ id: `ch${i + 1}img${j + 1}`, href: name, type: img.type });
+      return `<figure class="illus"><img src="${name}" alt="${esc(img.caption || "Illustration")}"/>${img.caption ? `<figcaption>${esc(img.caption)}</figcaption>` : ""}</figure>`;
+    });
+    zip.file(`OEBPS/ch${i + 1}.xhtml`, page(c.title || `Chapter ${i + 1}`, `<section epub:type="chapter"><h1>${esc(c.title || `Chapter ${i + 1}`)}</h1>\n${toParagraphs(c.content)}\n${pics.join("\n")}</section>`));
   });
 
   const navItems = chapters.map((c, i) => `<li><a href="ch${i + 1}.xhtml">${esc(c.title || `Chapter ${i + 1}`)}</a></li>`).join("\n");
@@ -85,14 +107,22 @@ ${chapters.map((c, i) => `<navPoint id="np${i + 1}" playOrder="${i + 1}"><navLab
 </ncx>`,
   );
 
+  if (book.cover) {
+    zip.file(`OEBPS/img/cover.${ext(book.cover.type)}`, book.cover.bytes);
+    zip.file("OEBPS/cover.xhtml", page("Cover", `<section epub:type="cover" class="cover"><img src="img/cover.${ext(book.cover.type)}" alt="${esc(book.title)}"/></section>`));
+  }
   const manifest = [
+    ...(book.cover
+      ? [`<item id="cover-image" href="img/cover.${ext(book.cover.type)}" media-type="${book.cover.type}" properties="cover-image"/>`, `<item id="cover" href="cover.xhtml" media-type="application/xhtml+xml"/>`]
+      : []),
+    ...art.map((a) => `<item id="${a.id}" href="${a.href}" media-type="${a.type}"/>`),
     `<item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>`,
     `<item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/>`,
     `<item id="css" href="style.css" media-type="text/css"/>`,
     `<item id="title" href="title.xhtml" media-type="application/xhtml+xml"/>`,
     ...chapters.map((_, i) => `<item id="ch${i + 1}" href="ch${i + 1}.xhtml" media-type="application/xhtml+xml"/>`),
   ].join("\n    ");
-  const spine = [`<itemref idref="title"/>`, ...chapters.map((_, i) => `<itemref idref="ch${i + 1}"/>`)].join("\n    ");
+  const spine = [...(book.cover ? [`<itemref idref="cover"/>`] : []), `<itemref idref="title"/>`, ...chapters.map((_, i) => `<itemref idref="ch${i + 1}"/>`)].join("\n    ");
 
   zip.file(
     "OEBPS/content.opf",
@@ -104,7 +134,7 @@ ${chapters.map((c, i) => `<navPoint id="np${i + 1}" playOrder="${i + 1}"><navLab
     ${book.author ? `<dc:creator>${esc(book.author)}</dc:creator>` : ""}
     <dc:language>${lang}</dc:language>
     ${book.description ? `<dc:description>${esc(book.description.slice(0, 2000))}</dc:description>` : ""}
-    <meta property="dcterms:modified">${modified}</meta>
+    <meta property="dcterms:modified">${modified}</meta>${book.cover ? '\n    <meta name="cover" content="cover-image"/>' : ""}
   </metadata>
   <manifest>
     ${manifest}

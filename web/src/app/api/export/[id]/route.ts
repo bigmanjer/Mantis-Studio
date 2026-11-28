@@ -8,6 +8,9 @@ function safeName(s: string) {
   return (s || "manuscript").replace(/[^\w\- ]+/g, "").trim().replace(/\s+/g, "_").slice(0, 80) || "manuscript";
 }
 
+// Ebook export may fetch the cover and illustrations.
+export const maxDuration = 60;
+
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const { supabase, user } = await requireUser();
@@ -94,12 +97,39 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       return NextResponse.json({ error: "Ebook export is available on Pro and Studio." }, { status: 402 });
     }
     const { buildEpub } = await import("@/lib/epub");
+    // Book art: the chosen cover and each chapter's illustrations (fetched a few at a time).
+    const { data: art } = await supabase
+      .from("book_images")
+      .select("id, kind, chapter_id, prompt, seed, width, height, caption")
+      .eq("project_id", id)
+      .order("created_at")
+      .limit(40);
+    const { renderImage, clampSpec } = await import("@/lib/images");
+    const fetched = new Map<string, { bytes: ArrayBuffer; type: string; caption: string }>();
+    const wanted = (art ?? []).filter((a) => a.kind === "illustration" || a.id === (p as Project & { cover_id?: string }).cover_id);
+    for (let i = 0; i < wanted.length; i += 4) {
+      await Promise.all(
+        wanted.slice(i, i + 4).map(async (a) => {
+          try {
+            fetched.set(a.id, { ...(await renderImage(clampSpec(a))), caption: a.caption });
+          } catch {
+            // A picture that fails to load is left out rather than failing the whole export.
+          }
+        }),
+      );
+    }
+    const coverId = (p as Project & { cover_id?: string }).cover_id;
     const bytes = await buildEpub({
       id: p.id,
       title: p.title || "Untitled",
       author: p.author,
       description: p.premise,
-      chapters: chs.map((c) => ({ title: c.title, content: c.content })),
+      cover: coverId ? fetched.get(coverId) : undefined,
+      chapters: chs.map((c) => ({
+        title: c.title,
+        content: c.content,
+        images: (art ?? []).filter((a) => a.kind === "illustration" && a.chapter_id === c.id).flatMap((a) => (fetched.has(a.id) ? [fetched.get(a.id)!] : [])),
+      })),
     });
     return new NextResponse(bytes as BodyInit, {
       headers: {

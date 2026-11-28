@@ -460,7 +460,10 @@ function ChapterEditor({
       if (autoOn) {
         const raw = await runAi({ action: "extract", text: latest.current.content, context: aiContext, auto: true });
         const plan = planScan(parseScan(raw), entitiesRef.current, projectRef.current.canon_rules);
-        if (plan.summary && !latest.current.summary.trim()) set("summary", plan.summary);
+        if (plan.summary && (!latest.current.summary.trim() || latest.current.summary_auto)) {
+          set("summary", plan.summary);
+          set("summary_auto", true);
+        }
         if (!planIsEmpty(plan)) setAutoLog(await saveScan(plan));
         await autoFillPlan();
       }
@@ -713,6 +716,7 @@ function ChapterEditor({
     ai("summarize", async () => {
       const text = await runAi({ action: "summarize", text: chapter.content });
       set("summary", text);
+      set("summary_auto", true);
     });
 
   const doExtract = () =>
@@ -1122,7 +1126,10 @@ function ChapterEditor({
                     </button>
                   </div>
                   <p className="mt-0.5 text-[11px] text-muted">The AI reads this as “story so far” in later chapters.</p>
-                  <textarea rows={4} className="input mt-2" value={chapter.summary} onChange={(e) => set("summary", e.target.value)} />
+                  <textarea rows={4} className="input mt-2" value={chapter.summary} onChange={(e) => {
+                      set("summary", e.target.value);
+                      set("summary_auto", false);
+                    }} />
                 </div>
                 <button onClick={doCheck} disabled={!!busy || !chapter.content.trim()} className="btn-primary w-full">
                   {busy === "check" ? <Loader2 size={15} className="animate-spin" /> : <ShieldCheck size={15} />}

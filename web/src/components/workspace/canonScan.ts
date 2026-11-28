@@ -164,7 +164,7 @@ export async function undoScan(supabase: SupabaseClient, applied: AppliedScan, p
 export async function scanChapters(
   supabase: SupabaseClient,
   project: { id: string; user_id: string; canon_rules: string },
-  chapters: { id: string; content: string; summary: string }[],
+  chapters: { id: string; content: string; summary: string; summary_auto?: boolean }[],
   entities: Entity[],
   runExtract: (text: string, context: unknown) => Promise<string>,
   onProgress: (state: { done: number; total: number; entities: Entity[]; canon: string; summaries: Record<string, string> }) => void,
@@ -180,8 +180,8 @@ export async function scanChapters(
       entities: known.map((e) => ({ name: e.name, category: e.category, description: "" })),
     });
     const plan = planScan(parseScan(raw), known, canon);
-    if (plan.summary && !c.summary.trim()) {
-      const { error } = await supabase.from("chapters").update({ summary: plan.summary }).eq("id", c.id);
+    if (plan.summary && (!c.summary.trim() || c.summary_auto)) {
+      const { error } = await supabase.from("chapters").update({ summary: plan.summary, summary_auto: true }).eq("id", c.id);
       if (!error) summaries[c.id] = plan.summary;
     }
     if (!planIsEmpty(plan)) {

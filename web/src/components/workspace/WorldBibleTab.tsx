@@ -78,7 +78,7 @@ export default function WorldBibleTab({
           setScanAll({ done, total });
           setEntities(known);
           setProject((prev) => ({ ...prev, canon_rules: canon }));
-          setChapters((prev) => prev.map((c) => (summaries[c.id] ? { ...c, summary: summaries[c.id] } : c)));
+          setChapters((prev) => prev.map((c) => (summaries[c.id] ? { ...c, summary: summaries[c.id], summary_auto: true } : c)));
         },
       );
       setScanMsg(

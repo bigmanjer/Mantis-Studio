@@ -67,7 +67,7 @@ export default function Organizer({
           canon = s.canon;
           setProject((prev) => ({ ...prev, canon_rules: s.canon }));
           Object.assign(chapterSummaries, s.summaries);
-          setChapters((prev) => prev.map((c) => (s.summaries[c.id] ? { ...c, summary: s.summaries[c.id] } : c)));
+          setChapters((prev) => prev.map((c) => (s.summaries[c.id] ? { ...c, summary: s.summaries[c.id], summary_auto: true } : c)));
         },
       );
 

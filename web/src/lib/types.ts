@@ -14,6 +14,9 @@ export interface Project {
   auto_canon?: boolean;
   /** Fix clear continuity slips automatically while writing (default on). */
   auto_fix?: boolean;
+  /** The chosen cover (book_images) and its title layout. */
+  cover_id?: string | null;
+  cover_style?: Record<string, unknown> | null;
   /** Let the AI read the Knowledge Base for this book (default on). */
   use_knowledge?: boolean;
   /** Up to 3 author style lenses (names from the built-in library). */
@@ -29,6 +32,8 @@ export interface Chapter {
   title: string;
   content: string;
   summary: string;
+  /** True when the AI wrote the summary; it then refreshes as the chapter changes. */
+  summary_auto?: boolean;
   word_count: number;
   updated_at: string;
 }

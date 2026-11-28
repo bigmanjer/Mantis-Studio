@@ -5,7 +5,7 @@ import { autoFeaturesAllowed, currentPeriod, planFor } from "@/lib/plans";
 import { createAdminClient, getProfile, requireUser } from "@/lib/supabase/server";
 import { includedAiCredentials } from "@/lib/env";
 
-const ACTIONS: AiAction[] = ["continue", "rewrite", "summarize", "brainstorm", "outline", "extract", "draft", "check", "ask", "autofill", "reverse_outline", "enrich", "review", "custom"];
+const ACTIONS: AiAction[] = ["continue", "rewrite", "summarize", "brainstorm", "outline", "extract", "draft", "check", "ask", "autofill", "reverse_outline", "enrich", "review", "cover_prompt", "scene_prompts", "custom"];
 const KNOWLEDGE_ACTIONS: AiAction[] = ["continue", "rewrite", "brainstorm", "draft", "ask", "custom", "enrich", "outline"];
 const STREAMABLE: AiAction[] = ["continue", "rewrite", "brainstorm", "draft", "ask", "custom", "enrich", "summarize"];
 // Streaming answers can run longer than the default function limit on slow models.
@@ -94,7 +94,7 @@ export async function POST(req: Request) {
       words:
         typeof body.words !== "number"
           ? undefined
-          : action === "outline"
+          : action === "outline" || action === "scene_prompts"
             ? Math.min(Math.max(Math.round(body.words), 1), 80)
             : Math.min(Math.max(body.words, 50), 2000),
     });
@@ -119,7 +119,7 @@ export async function POST(req: Request) {
     if (usingIncluded) {
       await admin.rpc("add_ai_usage", { p_user: user.id, p_period: period, p_tokens: result.tokens });
     }
-    const JSON_ACTIONS: AiAction[] = ["extract", "check", "autofill", "review"];
+    const JSON_ACTIONS: AiAction[] = ["extract", "check", "autofill", "review", "cover_prompt", "scene_prompts"];
     const text = JSON_ACTIONS.includes(action) ? result.text : stripMarkdown(result.text);
     return NextResponse.json({ text, tokens: result.tokens, included: usingIncluded });
   } catch (e) {
