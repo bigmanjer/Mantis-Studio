@@ -50,7 +50,8 @@ export default async function DevPreview({ params }: { params: Promise<{ screen:
     case "workspace":
       return (
         <ConfirmProvider>
-          <Workspace initialProject={SAMPLE_PROJECT} initialChapters={SAMPLE_CHAPTERS} initialEntities={SAMPLE_ENTITIES} docxExport={false} />
+          <Workspace initialProject={SAMPLE_PROJECT} initialChapters={SAMPLE_CHAPTERS} initialEntities={SAMPLE_ENTITIES}
+            initialLinks={[]} docxExport={false} />
         </ConfirmProvider>
       );
     default:

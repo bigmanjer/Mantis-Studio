@@ -46,6 +46,19 @@ export interface Entity {
   created_at: string;
 }
 
+export const LINK_KINDS = ["ally", "rival", "family", "love", "mentor", "enemy", "mystery", "other"] as const;
+export type LinkKind = (typeof LINK_KINDS)[number];
+
+/** A relationship the writer drew between two World Bible entries. */
+export interface EntityLink {
+  id: string;
+  project_id: string;
+  source_id: string;
+  target_id: string;
+  kind: LinkKind;
+  note: string;
+}
+
 export function countWords(text: string): number {
   const m = text.trim().match(/\S+/g);
   return m ? m.length : 0;

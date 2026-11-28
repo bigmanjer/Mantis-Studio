@@ -5,7 +5,8 @@ import { useConfirm } from "@/components/ui/ConfirmDialog";
 import EmptyState from "@/components/ui/EmptyState";
 import { createClient } from "@/lib/supabase/client";
 import { AiClientError, runAi } from "./aiClient";
-import { ENTITY_CATEGORIES, type Chapter, type Entity, type EntityCategory, type Project } from "@/lib/types";
+import { ENTITY_CATEGORIES, type Chapter, type Entity, type EntityCategory, type EntityLink, type Project } from "@/lib/types";
+import RelationshipMap from "./RelationshipMap";
 import { mentionedIn } from "@/lib/world-context";
 import { scanChapters } from "./canonScan";
 
@@ -26,6 +27,8 @@ export default function WorldBibleTab({
   setChapters,
   entities,
   setEntities,
+  links,
+  setLinks,
 }: {
   project: Project;
   setProject: React.Dispatch<React.SetStateAction<Project>>;
@@ -33,6 +36,8 @@ export default function WorldBibleTab({
   setChapters: React.Dispatch<React.SetStateAction<Chapter[]>>;
   entities: Entity[];
   setEntities: React.Dispatch<React.SetStateAction<Entity[]>>;
+  links: EntityLink[];
+  setLinks: React.Dispatch<React.SetStateAction<EntityLink[]>>;
 }) {
   const supabase = createClient();
   const confirm = useConfirm();
@@ -44,6 +49,7 @@ export default function WorldBibleTab({
   const [saving, setSaving] = useState(false);
   const [expanding, setExpanding] = useState(false);
   const [sort, setSort] = useState<SortMode>("name");
+  const [view, setView] = useState<"entries" | "map">("entries");
   const [unusedOnly, setUnusedOnly] = useState(false);
   const [scanAll, setScanAll] = useState<{ done: number; total: number } | null>(null);
   const [scanMsg, setScanMsg] = useState("");
@@ -205,9 +211,21 @@ export default function WorldBibleTab({
           </button>
         </div>
       </div>
+      <div className="mt-4 inline-flex rounded-lg border border-line bg-panel-2 p-0.5 text-sm" role="tablist">
+        {(["entries", "map"] as const).map((v) => (
+          <button key={v} role="tab" aria-selected={view === v} onClick={() => setView(v)} className={`cursor-pointer rounded-md px-3 py-1 ${view === v ? "bg-panel text-text" : "text-muted"}`}>
+            {v === "entries" ? "Entries" : "Relationship map"}
+          </button>
+        ))}
+      </div>
+      {view === "map" && (
+        <div className="mt-4">
+          <RelationshipMap project={project} chapters={chapters} entities={entities} links={links} setLinks={setLinks} />
+        </div>
+      )}
       {scanMsg && <p className="mt-3 rounded-lg border border-line bg-panel px-3 py-2 text-sm text-muted" role="status">{scanMsg}</p>}
 
-      <div className="mt-6 flex flex-wrap items-center gap-2">
+      <div className={`mt-6 flex flex-wrap items-center gap-2 ${view === "map" ? "hidden" : ""}`}>
         {(["All", ...ENTITY_CATEGORIES] as const).map((c) => {
           const Icon = c === "All" ? BookMarked : CATEGORY_ICONS[c];
           const active = filter === c;
@@ -244,7 +262,7 @@ export default function WorldBibleTab({
         </label>
       </div>
 
-      <div className={`mt-6 grid gap-6 ${editing ? "lg:grid-cols-[minmax(0,1fr)_380px]" : ""}`}>
+      <div className={`mt-6 grid gap-6 ${view === "map" ? "hidden" : ""} ${editing ? "lg:grid-cols-[minmax(0,1fr)_380px]" : ""}`}>
         <div>
           {entities.length === 0 ? (
             <EmptyState

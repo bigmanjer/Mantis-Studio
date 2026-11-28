@@ -32,6 +32,7 @@ export interface AiContext {
   /** Filled in on the server from the Knowledge Base; never trusted from the client. */
   knowledge?: string;
   previousSummaries?: string[];
+  relationships?: string[];
   entities?: WorldEntry[];
 }
 
@@ -71,6 +72,7 @@ function projectBlock(ctx: AiContext, text = ""): string {
   if (ctx.previousSummaries?.length)
     parts.push(`STORY SO FAR:\n${ctx.previousSummaries.slice(-5).map((s) => `- ${clip(s, 400)}`).join("\n")}`);
   if (ctx.entities?.length) parts.push(worldBlock(ctx.entities, text));
+  if (ctx.relationships?.length) parts.push(`RELATIONSHIPS (who is what to whom):\n${ctx.relationships.slice(0, 60).map((r) => `- ${clip(r, 200)}`).join("\n")}`);
   if (ctx.knowledge) parts.push(ctx.knowledge);
   return parts.join("\n\n");
 }

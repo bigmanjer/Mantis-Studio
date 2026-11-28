@@ -6,7 +6,7 @@ import Logo from "@/components/ui/Logo";
 import { ProgressRing } from "@/components/ui/Progress";
 import ThemeToggle from "@/components/ui/ThemeToggle";
 import { compact } from "@/lib/format";
-import type { Chapter, Entity, Project } from "@/lib/types";
+import type { Chapter, Entity, EntityLink, Project } from "@/lib/types";
 import EditorTab, { markChaptersScanned } from "./EditorTab";
 import Organizer from "./Organizer";
 import ExportTab from "./ExportTab";
@@ -29,10 +29,11 @@ export interface WorkspaceProps {
   initialProject: Project;
   initialChapters: Chapter[];
   initialEntities: Entity[];
+  initialLinks: EntityLink[];
   docxExport: boolean;
 }
 
-export default function Workspace({ initialProject, initialChapters, initialEntities, docxExport }: WorkspaceProps) {
+export default function Workspace({ initialProject, initialChapters, initialEntities, initialLinks, docxExport }: WorkspaceProps) {
   const [tab, setTab] = useState<TabId>(initialChapters.some((c) => c.word_count > 0) ? "write" : "plan");
   const [project, setProject] = useState(initialProject);
   useEffect(() => {
@@ -40,6 +41,7 @@ export default function Workspace({ initialProject, initialChapters, initialEnti
   }, [project.title]);
   const [chapters, setChapters] = useState(initialChapters);
   const [entities, setEntities] = useState(initialEntities);
+  const [links, setLinks] = useState(initialLinks);
   const [focus, setFocus] = useState(false);
   // Fresh import: organize the whole book automatically (World Bible, canon, summaries, plan, outline).
   const [organizing, setOrganizing] = useState(false);
@@ -71,8 +73,16 @@ export default function Workspace({ initialProject, initialChapters, initialEnti
         style_lenses: project.style_lenses ?? [],
       },
       entities: entities.map((e) => ({ name: e.name, category: e.category, description: e.description, aliases: e.aliases })),
+      // Relationships the writer drew, so the AI knows who is whose brother, rival or mentor.
+      relationships: links
+        .map((l) => {
+          const a = entities.find((e) => e.id === l.source_id);
+          const b = entities.find((e) => e.id === l.target_id);
+          return a && b ? `${a.name} → ${l.kind} → ${b.name}${l.note ? ` (${l.note})` : ""}` : "";
+        })
+        .filter(Boolean),
     }),
-    [project, entities],
+    [project, entities, links],
   );
 
   return (
@@ -152,7 +162,7 @@ export default function Workspace({ initialProject, initialChapters, initialEnti
             setFocus={setFocus}
           />
         )}
-        {tab === "world" && <WorldBibleTab project={project} setProject={setProject} chapters={chapters} setChapters={setChapters} entities={entities} setEntities={setEntities} />}
+        {tab === "world" && <WorldBibleTab project={project} setProject={setProject} chapters={chapters} setChapters={setChapters} entities={entities} setEntities={setEntities} links={links} setLinks={setLinks} />}
         {tab === "insights" && <InsightsTab project={project} chapters={chapters} entities={entities} aiContext={aiContext} goTo={(t) => setTab(t)} />}
         {tab === "library" && <KnowledgeTab project={project} setProject={setProject} />}
         {tab === "export" && <ExportTab project={project} chapters={chapters} docxExport={docxExport} />}
