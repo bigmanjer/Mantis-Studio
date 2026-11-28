@@ -1,6 +1,6 @@
 "use client";
 import { useState, useTransition } from "react";
-import { saveAiSettings } from "@/app/app/actions";
+import { saveAiSettings, testAiKey } from "@/app/app/actions";
 
 export default function AiKeyForm({ provider, model, maskedKey }: { provider: string; model: string; maskedKey: string | null }) {
   const [pending, start] = useTransition();
@@ -44,6 +44,21 @@ export default function AiKeyForm({ provider, model, maskedKey }: { provider: st
         {maskedKey && (
           <button type="submit" name="clear" value="1" disabled={pending} className="btn-ghost">
             Remove saved key
+          </button>
+        )}
+        {maskedKey && (
+          <button
+            type="button"
+            disabled={pending}
+            className="btn-ghost"
+            onClick={() =>
+              start(async () => {
+                setMsg({ ok: true, text: "Checking…" });
+                setMsg(await testAiKey());
+              })
+            }
+          >
+            Test my key
           </button>
         )}
         {msg && <span className={`text-sm ${msg.ok ? "text-accent" : "text-danger"}`}>{msg.text}</span>}

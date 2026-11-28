@@ -246,3 +246,32 @@ export async function createSampleProject(): Promise<{ error?: string } | void> 
   await supabase.from("entities").insert(SAMPLE.entities.map((e) => ({ ...e, project_id: project.id, user_id: user.id })));
   redirect(`/app/projects/${project.id}`);
 }
+
+/** Check the saved AI key works (original MANTIS "Check Connection"). Listing models costs nothing. */
+export async function testAiKey(): Promise<{ ok: boolean; text: string }> {
+  const { user } = await requireUser();
+  if (!user) return { ok: false, text: "Please log in." };
+  const profile = await getProfile(user.id, user.email);
+  if (!profile.ai_key_encrypted) return { ok: false, text: "No key saved yet." };
+  const { decrypt } = await import("@/lib/crypto");
+  let key: string;
+  try {
+    key = decrypt(profile.ai_key_encrypted);
+  } catch {
+    return { ok: false, text: "The saved key couldn't be read. Please enter it again." };
+  }
+  const provider = (profile.ai_provider ?? "groq") as ProviderId;
+  const p = PROVIDERS[provider] ?? PROVIDERS.groq;
+  try {
+    const res = await fetch(p.url.replace(/chat\/completions$/, "models"), { headers: { Authorization: `Bearer ${key}` }, signal: AbortSignal.timeout(10_000) });
+    if (res.status === 401 || res.status === 403) return { ok: false, text: "The provider rejected this key. Check it, or create a new one." };
+    if (!res.ok) return { ok: false, text: `The provider answered with an error (${res.status}). Try again in a minute.` };
+    const ids: string[] = ((await res.json()).data ?? []).map((m: { id: string }) => m.id);
+    const model = profile.ai_model || p.defaultModel;
+    return ids.includes(model)
+      ? { ok: true, text: `Key works. ${ids.length} models available, including ${model}.` }
+      : { ok: true, text: `Key works (${ids.length} models). “${model}” isn't one of them, so MANTIS will pick the best available.` };
+  } catch {
+    return { ok: false, text: "Couldn't reach the provider. Check your connection and try again." };
+  }
+}
