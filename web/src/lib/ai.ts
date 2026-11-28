@@ -240,6 +240,16 @@ async function openModel(opts: ModelOpts, stream: boolean): Promise<Response> {
   const cacheKey = `${opts.provider}:${opts.apiKey.slice(-6)}`;
   let model = fallbackModels.get(cacheKey) || opts.model || p.defaultModel;
   let res = await send(model);
+  // Rate limited (many writers share one key on the free tier): wait as the provider asks and retry,
+  // up to twice and never more than ~20s in total, instead of failing the writer straight away.
+  for (let attempt = 0, waited = 0; res.status === 429 && attempt < 2 && waited < 20_000; attempt++) {
+    const after = Number(res.headers.get("retry-after"));
+    const ms = Math.min(12_000, Number.isFinite(after) && after > 0 ? after * 1000 : 3000 * (attempt + 1));
+    await res.body?.cancel().catch(() => {});
+    await new Promise((r) => setTimeout(r, ms));
+    waited += ms;
+    res = await send(model);
+  }
   let body = "";
   if (!res.ok) {
     body = await res.text().catch(() => "");

@@ -211,6 +211,8 @@ export function markChaptersScanned(chapters: Chapter[]) {
 }
 /** Projects whose empty planning fields were already auto-filled this session. */
 const autoFilled = new Set<string>();
+/** Set when the monthly AI allowance runs out, so automatic updates stop retrying this session. */
+const autoPaused = { value: false };
 
 function ChapterEditor({
   chapter,
@@ -348,7 +350,7 @@ function ChapterEditor({
   // the canon rules and the chapter summary by itself. Everything stays editable and one click undoes it.
   const autoOn = project.auto_canon !== false;
   const [autoLog, setAutoLog] = useState<AppliedScan | null>(null);
-  const [autoState, setAutoState] = useState<"idle" | "scanning" | "error">("idle");
+  const [autoState, setAutoState] = useState<"idle" | "scanning" | "error" | "quota">("idle");
   const entitiesRef = useRef(entities);
   entitiesRef.current = entities;
   const projectRef = useRef(project);
@@ -385,8 +387,12 @@ function ChapterEditor({
       }
       if (autoFixOn) await autoFix();
       setAutoState("idle");
-    } catch {
-      setAutoState("error");
+    } catch (e) {
+      // Out of AI for the month: pause automatic updates for this session instead of failing on every pause.
+      if (e instanceof AiClientError && e.needsKey) {
+        autoPaused.value = true;
+        setAutoState("quota");
+      } else setAutoState("error");
     }
   }
 
@@ -467,7 +473,7 @@ function ChapterEditor({
   }
 
   useEffect(() => {
-    if ((!autoOn && !autoFixOn) || busy) return;
+    if ((!autoOn && !autoFixOn) || busy || autoPaused.value) return;
     const since = chapter.word_count - (scannedWords.get(chapter.id) ?? 0);
     if (chapter.word_count < 120 || since < 150) return;
     const t = setTimeout(() => void autoScan(), 20_000);
@@ -850,6 +856,14 @@ function ChapterEditor({
               {autoState === "scanning" ? (
                 <span className="flex items-center gap-1.5">
                   <Loader2 size={11} className="animate-spin" /> {autoOn && autoFixOn ? "Updating the World Bible and checking continuity…" : autoOn ? "Updating the World Bible from this chapter…" : "Checking this chapter for continuity slips…"}
+                </span>
+              ) : autoState === "quota" ? (
+                <span>
+                  Automatic World Bible and fixes are paused: this month&apos;s included AI is used up.{" "}
+                  <a href="/app/settings#ai" className="font-medium text-accent hover:underline">
+                    Add your own key
+                  </a>{" "}
+                  to keep them running.
                 </span>
               ) : autoState === "error" ? (
                 <span>Couldn&apos;t update the World Bible automatically just now. It will try again as you write.</span>
