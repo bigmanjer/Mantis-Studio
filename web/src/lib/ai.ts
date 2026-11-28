@@ -92,7 +92,7 @@ export function buildMessages(
   let user: string;
   switch (action) {
     case "continue":
-      user = `${context}\n\nCURRENT CHAPTER: ${clip(ctx.chapterTitle, 200)}\n\nTEXT SO FAR (ends mid-chapter):\n${t.slice(-8000)}\n\nContinue the chapter seamlessly from where it stops, for about ${opts.words ?? 400} words. Match tense, POV and voice. ${opts.instruction ? `Author direction: ${clip(opts.instruction, 600)}` : ""}`;
+      user = `${context}\n\nCURRENT CHAPTER: ${clip(ctx.chapterTitle, 200)}\n\nTEXT SO FAR (ends mid-chapter):\n${t.slice(-8000)}\n\nContinue the chapter seamlessly from where it stops, for about ${opts.words ?? 400} words (stay within 15% of that). Match tense, POV and voice. ${opts.instruction ? `Author direction: ${clip(opts.instruction, 600)}` : ""}`;
       break;
     case "rewrite": {
       const instr = opts.preset && REWRITE_PRESETS[opts.preset] ? REWRITE_PRESETS[opts.preset] : clip(opts.instruction, 1000);
@@ -126,7 +126,7 @@ ${t.slice(-16000)}`;
     }
     case "draft":
       // Sudowrite-style "write the chapter from its beat".
-      user = `${context}\n\nCHAPTER TO WRITE: ${clip(ctx.chapterTitle, 200)}\nBEAT (what must happen): ${clip(opts.instruction, 1500)}\n${t.trim() ? `\nEXISTING OPENING (continue from here, don't repeat it):\n${t.slice(-4000)}\n` : ""}\nWrite this chapter as finished prose, about ${opts.words ?? 1200} words. Follow the style guide and canon rules, pick up naturally from the story so far, and end on a moment that pulls the reader into the next chapter.`;
+      user = `${context}\n\nCHAPTER TO WRITE: ${clip(ctx.chapterTitle, 200)}\nBEAT (what must happen): ${clip(opts.instruction, 1500)}\n${t.trim() ? `\nEXISTING OPENING (continue from here, don't repeat it):\n${t.slice(-4000)}\n` : ""}\nWrite this chapter as finished prose, about ${opts.words ?? 1200} words (stay within 15% of that; stop at a natural break rather than running long). Follow the style guide and canon rules, pick up naturally from the story so far, and end on a moment that pulls the reader into the next chapter.`;
       break;
     case "check":
       // Continuity check: compare the chapter against canon rules, the World Bible and earlier summaries.

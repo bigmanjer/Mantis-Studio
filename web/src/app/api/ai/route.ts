@@ -99,7 +99,7 @@ export async function POST(req: Request) {
             : Math.min(Math.max(body.words, 50), 2000),
     });
     const wordsReq = Math.min(Math.max(Number(body.words) || (action === "draft" ? 1200 : 400), 50), 2000);
-    const maxTokens = action === "continue" || action === "draft" ? Math.ceil(wordsReq * 2) : action === "outline" ? Math.min(800 + (Number(body.words) || 20) * 110, 9000) : action === "reverse_outline" ? 3000
+    const maxTokens = action === "continue" || action === "draft" ? Math.ceil(wordsReq * 1.6) : action === "outline" ? Math.min(800 + (Number(body.words) || 20) * 110, 9000) : action === "reverse_outline" ? 3000
       // A rewrite must have room to return the whole passage (a full chapter can be thousands of words).
       : action === "rewrite" ? Math.min(9000, Math.max(2000, Math.ceil(String(body.text ?? "").split(/\s+/).length * 1.8) + 300))
       : 2000;
