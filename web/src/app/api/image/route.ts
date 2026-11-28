@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { clampSpec, renderImage } from "@/lib/images";
+import { clampSpec, ImageError, renderImage } from "@/lib/images";
 import { requireUser } from "@/lib/supabase/server";
 
 export const maxDuration = 60;
@@ -18,9 +18,16 @@ export async function GET(req: Request) {
   let spec;
   const id = q.get("id");
   if (id) {
-    const { data } = await supabase.from("book_images").select("prompt, seed, width, height").eq("id", id).maybeSingle();
+    // Saved art: owner check through RLS, then served from storage (painted only once).
+    const { data } = await supabase.from("book_images").select("id, user_id, prompt, seed, width, height").eq("id", id).maybeSingle();
     if (!data) return NextResponse.json({ error: "Not found" }, { status: 404 });
-    spec = clampSpec(data);
+    try {
+      const { savedImage } = await import("@/lib/art-store");
+      const { bytes, type } = await savedImage(data);
+      return new NextResponse(bytes, { headers: { "Content-Type": type, "Cache-Control": "private, max-age=31536000, immutable" } });
+    } catch (e) {
+      return NextResponse.json({ error: e instanceof Error ? e.message : "Image failed." }, { status: e instanceof ImageError ? e.status : 502 });
+    }
   } else {
     spec = clampSpec({ prompt: q.get("prompt") ?? "", seed: Number(q.get("seed")), width: Number(q.get("width")), height: Number(q.get("height")) });
     if (!spec.prompt.trim()) return NextResponse.json({ error: "Missing prompt" }, { status: 400 });
@@ -32,6 +39,6 @@ export async function GET(req: Request) {
       headers: { "Content-Type": type, "Cache-Control": "private, max-age=31536000, immutable" },
     });
   } catch (e) {
-    return NextResponse.json({ error: e instanceof Error ? e.message : "Image failed." }, { status: 502 });
+    return NextResponse.json({ error: e instanceof Error ? e.message : "Image failed." }, { status: e instanceof ImageError ? e.status : 502 });
   }
 }

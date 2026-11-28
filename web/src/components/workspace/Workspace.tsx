@@ -35,9 +35,11 @@ export interface WorkspaceProps {
   docxExport: boolean;
   /** Paid plan, admin, or own AI key: automatic World Bible and fixes may run. */
   autoAllowed: boolean;
+  /** Book art: on, off, or "setup" (admin sees how to switch it on). */
+  art: "on" | "off" | "setup";
 }
 
-export default function Workspace({ initialProject, initialChapters, initialEntities, initialLinks, docxExport, autoAllowed }: WorkspaceProps) {
+export default function Workspace({ initialProject, initialChapters, initialEntities, initialLinks, docxExport, autoAllowed, art }: WorkspaceProps) {
   const [tab, setTab] = useState<TabId>(initialChapters.some((c) => c.word_count > 0) ? "write" : "plan");
   const [project, setProject] = useState(initialProject);
   useEffect(() => {
@@ -193,7 +195,7 @@ export default function Workspace({ initialProject, initialChapters, initialEnti
         )}
         {tab === "world" && <WorldBibleTab project={project} setProject={setProject} chapters={chapters} setChapters={setChapters} entities={entities} setEntities={setEntities} links={links} setLinks={setLinks} />}
         {tab === "insights" && <InsightsTab project={project} chapters={chapters} entities={entities} aiContext={aiContext} goTo={(t) => setTab(t)} />}
-        {tab === "art" && <ArtTab project={project} setProject={setProject} chapters={chapters} aiContext={aiContext} />}
+        {tab === "art" && <ArtTab project={project} setProject={setProject} chapters={chapters} aiContext={aiContext} art={art} />}
         {tab === "library" && <KnowledgeTab project={project} setProject={setProject} />}
         {tab === "export" && <ExportTab project={project} chapters={chapters} docxExport={docxExport} />}
       </div>

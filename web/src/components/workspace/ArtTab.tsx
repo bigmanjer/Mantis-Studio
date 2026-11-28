@@ -24,9 +24,9 @@ interface CoverStyle {
   tagline: string;
 }
 
-// Amazon KDP's recommended ebook cover is 1600×2560 (1:1.6). Art is generated at 800×1280 and
+// Amazon KDP's recommended ebook cover is 1600×2560 (1:1.6). Art is generated at 1200×1920 and
 // the downloadable cover is drawn at full size.
-const COVER = { width: 800, height: 1280 };
+const COVER = { width: 1200, height: 1920 };
 const OUT = { width: 1600, height: 2560 };
 const seed = () => Math.floor(Math.random() * 2_000_000_000);
 const previewSrc = (prompt: string, s: number, w: number, h: number) =>
@@ -41,11 +41,13 @@ export default function ArtTab({
   setProject,
   chapters,
   aiContext,
+  art,
 }: {
   project: Project;
   setProject: React.Dispatch<React.SetStateAction<Project>>;
   chapters: Chapter[];
   aiContext: unknown;
+  art: "on" | "off" | "setup";
 }) {
   const supabase = createClient();
   const [images, setImages] = useState<BookImage[]>([]);
@@ -189,8 +191,8 @@ export default function ArtTab({
         kind: "illustration",
         prompt: fullPrompt(String(s.prompt), style),
         seed: seed(),
-        width: square ? 1024 : 1152,
-        height: square ? 1024 : 768,
+        width: square ? 1280 : 1536,
+        height: square ? 1280 : 1024,
         caption: String(s.caption ?? "").slice(0, 300),
       }));
       const { data, error } = await supabase.from("book_images").insert(rows).select("id, kind, chapter_id, prompt, seed, width, height, caption");
@@ -220,6 +222,24 @@ export default function ArtTab({
 
   const illustrations = images.filter((i) => i.kind === "illustration");
   const font = COVER_FONTS[cs.font];
+
+  if (art !== "on") {
+    return (
+      <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
+        <h1 className="font-serif text-2xl font-semibold">Book art</h1>
+        <div className="card mt-4 p-6 text-sm text-muted">
+          {art === "off" ? (
+            <p>Covers and illustrations are coming very soon.</p>
+          ) : (
+            <p>
+              Switch on book art (free, no card, no watermark): create a free Cloudflare account, make an API token with the &quot;Workers AI&quot; template, then add
+              CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_AI_TOKEN in Vercel → Settings → Environment Variables and redeploy. Only you see this; writers see &quot;coming soon&quot;.
+            </p>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">

@@ -1,5 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import Workspace from "@/components/workspace/Workspace";
+import { imagesConfigured } from "@/lib/images";
 import { autoFeaturesAllowed, planFor } from "@/lib/plans";
 import { getProfile, requireUser } from "@/lib/supabase/server";
 import type { Chapter, Entity, EntityLink, Project } from "@/lib/types";
@@ -24,6 +25,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
       initialLinks={(links ?? []) as EntityLink[]}
       docxExport={planFor(profile).docxExport}
       autoAllowed={autoFeaturesAllowed(profile)}
+      art={imagesConfigured() ? "on" : profile.is_admin ? "setup" : "off"}
     />
   );
 }

@@ -100,18 +100,18 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     // Book art: the chosen cover and each chapter's illustrations (fetched a few at a time).
     const { data: art } = await supabase
       .from("book_images")
-      .select("id, kind, chapter_id, prompt, seed, width, height, caption")
+      .select("id, user_id, kind, chapter_id, prompt, seed, width, height, caption")
       .eq("project_id", id)
       .order("created_at")
       .limit(40);
-    const { renderImage, clampSpec } = await import("@/lib/images");
+    const { savedImage } = await import("@/lib/art-store");
     const fetched = new Map<string, { bytes: ArrayBuffer; type: string; caption: string }>();
     const wanted = (art ?? []).filter((a) => a.kind === "illustration" || a.id === (p as Project & { cover_id?: string }).cover_id);
     for (let i = 0; i < wanted.length; i += 4) {
       await Promise.all(
         wanted.slice(i, i + 4).map(async (a) => {
           try {
-            fetched.set(a.id, { ...(await renderImage(clampSpec(a))), caption: a.caption });
+            fetched.set(a.id, { ...(await savedImage(a)), caption: a.caption });
           } catch {
             // A picture that fails to load is left out rather than failing the whole export.
           }
