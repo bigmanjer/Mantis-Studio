@@ -52,7 +52,7 @@ export default async function DevPreview({ params }: { params: Promise<{ screen:
         <ConfirmProvider>
           <Workspace initialProject={SAMPLE_PROJECT} initialChapters={SAMPLE_CHAPTERS} initialEntities={SAMPLE_ENTITIES}
             initialLinks={[]}
-            autoAllowed docxExport={false} />
+            autoAllowed art="on" docxExport={false} />
         </ConfirmProvider>
       );
     default:
