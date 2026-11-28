@@ -78,8 +78,9 @@ export default function FindReplace({
       const content = c.content.replace(pattern, () => replace);
       const title = c.title.replace(pattern, () => replace);
       const word_count = countWords(content);
-      const { error } = await supabase.from("chapters").update({ content, title, word_count, updated_at: new Date().toISOString() }).eq("id", c.id);
-      if (!error) updated.push({ ...c, content, title, word_count });
+      const updated_at = new Date().toISOString();
+      const { error } = await supabase.from("chapters").update({ content, title, word_count, updated_at }).eq("id", c.id);
+      if (!error) updated.push({ ...c, content, title, word_count, updated_at });
     }
     setChapters((prev) => prev.map((c) => updated.find((u) => u.id === c.id) ?? c));
     const renamed: Entity[] = [];

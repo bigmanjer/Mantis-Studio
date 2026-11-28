@@ -267,7 +267,7 @@ function ChapterEditor({
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   };
 
-  const { state, schedule, flush } = useAutosave<Chapter>(async (patch) => {
+  const { state, schedule, flush, resolve } = useAutosave<Chapter>(async (patch) => {
     const now = new Date().toISOString();
     if ("content" in patch) {
       const s = sessionStart.current;
@@ -281,8 +281,22 @@ function ChapterEditor({
         lastSnapshotAt.current = Date.now();
       }
     }
-    const { error } = await supabase.from("chapters").update({ ...patch, updated_at: now }).eq("id", chapter.id);
+    // Only save over the version this tab last saw; if another tab or device saved since, ask first.
+    const { data: rows, error } = await supabase
+      .from("chapters")
+      .update({ ...patch, updated_at: now })
+      .eq("id", chapter.id)
+      .eq("updated_at", lastKnown.current)
+      .select("id");
+    if (!error && !rows?.length) {
+      setConflict(true);
+      return { error: "conflict", conflict: true };
+    }
     if (!error) {
+      lastKnown.current = now;
+      try {
+        localStorage.removeItem(`mantis-unsaved-${chapter.id}`);
+      } catch {}
       await supabase.from("projects").update({ updated_at: now }).eq("id", project.id);
       if (typeof patch.word_count === "number") {
         const delta = patch.word_count - loggedWords.current;
@@ -292,6 +306,67 @@ function ChapterEditor({
     }
     return { error };
   });
+
+  // --- Two tabs or devices ---
+  const lastKnown = useRef(chapter.updated_at);
+  const [conflict, setConflict] = useState(false);
+  useEffect(() => {
+    // Saves made elsewhere in this tab (find & replace) move the known version forward.
+    if (chapter.updated_at > lastKnown.current) lastKnown.current = chapter.updated_at;
+  }, [chapter.updated_at]);
+
+  async function keepMine() {
+    const { data } = await supabase.from("chapters").select("title, content, word_count, updated_at").eq("id", chapter.id).single();
+    if (data) {
+      await snapshot(data.title, data.content, data.word_count, "Other device's version");
+      lastKnown.current = data.updated_at;
+    }
+    setConflict(false);
+    resolve("save");
+  }
+
+  async function loadTheirs() {
+    const c = latest.current;
+    await snapshot(c.title, c.content, c.word_count, "This tab's version (replaced)");
+    const { data } = await supabase.from("chapters").select("title, content, word_count, summary, updated_at").eq("id", chapter.id).single();
+    resolve("discard");
+    if (data) {
+      lastKnown.current = data.updated_at;
+      loggedWords.current = data.word_count;
+      patchLocal({ title: data.title, content: data.content, word_count: data.word_count, summary: data.summary, updated_at: data.updated_at });
+    }
+    setConflict(false);
+  }
+
+  // --- Crash copy: unsaved text is also kept in this browser until the server has it ---
+  const [recovered, setRecovered] = useState<{ title: string; content: string; at: number } | null>(null);
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(`mantis-unsaved-${chapter.id}`);
+      if (!raw) return;
+      const copy = JSON.parse(raw) as { title: string; content: string; at: number };
+      if (copy.content !== chapter.content && copy.at > Date.parse(chapter.updated_at)) setRecovered(copy);
+      else localStorage.removeItem(`mantis-unsaved-${chapter.id}`);
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chapter.id]);
+  useEffect(() => {
+    if (state === "saved") return;
+    const t = setTimeout(() => {
+      try {
+        localStorage.setItem(`mantis-unsaved-${chapter.id}`, JSON.stringify({ title: latest.current.title, content: latest.current.content, at: Date.now() }));
+      } catch {}
+    }, 1000);
+    return () => clearTimeout(t);
+  }, [chapter.content, chapter.title, state, chapter.id]);
+
+  async function restoreRecovered() {
+    if (!recovered) return;
+    await snapshot(chapter.title, chapter.content, chapter.word_count, "Before restoring unsaved text");
+    set("title", recovered.title);
+    set("content", recovered.content);
+    setRecovered(null);
+  }
 
   async function restoreVersion(v: { title: string; content: string; word_count: number }) {
     await flush();
@@ -738,6 +813,42 @@ function ChapterEditor({
       {/* Manuscript */}
       <section className={`min-w-0 bg-paper ${focus ? "min-h-screen" : ""}`}>
         <div className={`mx-auto w-full max-w-[44rem] px-5 sm:px-10 ${focus ? "py-20" : "py-10"}`}>
+          {conflict && (
+            <div className="mb-5 rounded-xl border border-danger/40 bg-danger-soft p-4 font-sans text-sm" role="alert">
+              <p className="font-medium text-text">This chapter was changed in another tab or on another device.</p>
+              <p className="mt-1 text-muted">Your recent edits here aren&apos;t saved yet. Pick which version to keep; the other one goes to History, so nothing is lost.</p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button onClick={() => void keepMine()} className="btn-primary py-1.5">
+                  Keep this version
+                </button>
+                <button onClick={() => void loadTheirs()} className="btn-ghost py-1.5">
+                  Load the other version
+                </button>
+              </div>
+            </div>
+          )}
+          {recovered && !conflict && (
+            <div className="mb-5 rounded-xl border border-accent/40 bg-accent-soft/40 p-4 font-sans text-sm" role="alert">
+              <p className="font-medium text-text">We found writing from {new Date(recovered.at).toLocaleString()} that never reached the server.</p>
+              <p className="mt-1 text-muted">Probably a closed tab or a lost connection. Restore it? What&apos;s here now goes to History first.</p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button onClick={() => void restoreRecovered()} className="btn-primary py-1.5">
+                  Restore unsaved writing
+                </button>
+                <button
+                  onClick={() => {
+                    try {
+                      localStorage.removeItem(`mantis-unsaved-${chapter.id}`);
+                    } catch {}
+                    setRecovered(null);
+                  }}
+                  className="btn-ghost py-1.5"
+                >
+                  Discard it
+                </button>
+              </div>
+            </div>
+          )}
           <input
             className="w-full bg-transparent font-serif text-3xl font-semibold tracking-tight outline-none placeholder:text-muted/50"
             value={chapter.title}
